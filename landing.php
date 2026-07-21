@@ -1,13 +1,10 @@
 <?php
-require_once('.\db\conexion.php');
 
-/**
- * Datos de ejemplo para maquetar el ranking. Cuando tengas listos tus
- * métodos en Tcg (consultas.php), sustituye estos arrays por las llamadas
- * correspondientes, por ejemplo:
- *   $topJugadores    = $db->listarTopJugadores();
- *   $cartasInusuales = $db->listarCartasInusuales();
- */
+session_start();
+
+require_once(__DIR__ . '/db/conexion.php');
+require_once __DIR__ . '/rareza-clases.php';
+
 $topJugadores = [
     ['nombre' => 'KazeStorm_7',  'rating' => 248],
     ['nombre' => 'FrostSharp',   'rating' => 231],
@@ -15,8 +12,9 @@ $topJugadores = [
     ['nombre' => 'ForestRoots',  'rating' => 204],
 ];
 
-$payoAgua=$db->listarDestacados();
-var_dump($payoAgua);
+$cromos=$db->listarDestacados();
+$expansiones=$db->listarExpansionesActivas();
+//var_dump($expansiones);
 
 $cartasInusuales = [
     ['carta' => 'Mark Slate',   'rareza' => 'Legendaria', 'probabilidad' => 0.8,  'poseedores' => 12],
@@ -30,25 +28,46 @@ $cartasInusuales = [
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>INAZUMA TCG — El Torneo Definitivo</title>
+<title>SUPERLIGA FRONTIER TCG</title>
+<link rel="icon" type="image/png" href="assets/img/iconos/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
 <nav id="nav">
-  <div class="logo">INAZUMA<span>·</span>TCG</div>
-  <div class="nav-links">
-    <a href="#cartas">Cartas</a>
-    <a href="#expansiones">Expansiones</a>
-    <a href="#leyendas">Leyendas</a>
-    <a href="#noticias">Noticias</a>
-    <a href="#ranking">Ranking</a>
+  <div class="logo">SUPERLIGA FRONTIER<span>·</span>TCG</div>
+
+  <input type="checkbox" id="navToggle" class="nav-toggle-input">
+
+  <div class="nav-collapse">
+    <div class="nav-links">
+      <a href="#cartas">Cartas</a>
+      <a href="#expansiones">Expansiones</a>
+      <a href="#ranking">Ranking</a>
+    </div>
+    <div class="nav-actions">
+      <?php if (!empty($_SESSION['id_usuario'])): ?>
+        <a href="perfil.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Hola, <?= htmlspecialchars($_SESSION['nombre']) ?></button></a>
+        <a href="logout.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Salir</button></a>
+      <?php else: ?>
+        <a href="login.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Entrar</button></a>
+      <?php endif; ?>
+      <?php if (isset($_SESSION['dictador'])){
+                if($_SESSION['dictador']==1){
+      ?>
+        <a href="./panel/cromos.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Panel de admin</button></a>
+      <?php }}?>
+    </div>
   </div>
-  <div style="display:flex; gap:14px;">
-    <a href="registro.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Entrar</button></a>
+
+  <div class="nav-right">
+    <label for="navToggle" class="nav-burger" aria-label="Abrir menú">
+      <span></span><span></span><span></span>
+    </label>
   </div>
 </nav>
 
@@ -64,7 +83,7 @@ $cartasInusuales = [
     <p class="sub">Forma tu equipo, domina el campo y colecciona a las leyendas del fútbol más eléctrico jamás jugado.</p>
     <div class="hero-cta">
       <button class="btn btn-primary">Empieza tu colección</button>
-      <button class="btn btn-ghost">Ver cartas</button>
+      <button class="btn btn-ghost" onclick="window.location.href='album.php'">Ver cartas</button>
     </div>
   </div>
 
@@ -77,15 +96,15 @@ $cartasInusuales = [
       <span class="section-tag">Colección activa</span>
       <h2>Cartas destacadas</h2>
     </div>
-    <button class="btn btn-ghost" style="font-size:12px; padding:12px 24px;">Ver todas</button>
+    <a href="album.php"><button class="btn btn-ghost" style="font-size:12px; padding:12px 24px;">Ver todas</button></a>
   </div>
 
   <div class="card-grid">
-    <?php foreach ($payoAgua as $carta): ?>
+    <?php foreach ($cromos as $carta): ?>
     <div class="tcard reveal">
       <div class="tcard-inner">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span class="rarity r-legend"><?= $carta["rareza"] ?></span>
+          <span class="rarity <?= $claseRarezaPorId[$carta['id_rareza']] ?? 'r-comun' ?>"><?= $carta["rareza"] ?></span>
           <div class="hex"><img src="<?= $carta["afinidad_imagen"] ?>"/></div>
         </div>
         <div class="portrait"><img src="<?= $carta["imagen"] ?>"/></div>
@@ -106,92 +125,19 @@ $cartasInusuales = [
   </div>
 
   <div class="hscroll reveal">
+    <?php foreach ($expansiones as $expansion): 
+      $ncartas = $db->cartasExpansion($expansion["id_expansion"]);
+    ?>
     <div class="exp-card">
       <div class="glow-orb" style="background:var(--volt);"></div>
       <div class="exp-inner">
-        <span class="exp-date">Marzo 2026</span>
-        <h3>Tormenta de Raimon</h3>
-        <span class="exp-count">120 cartas nuevas</span>
+        <span class="exp-date"><?= $expansion["fecha_salida"] ?></span>
+        <h3><?= $expansion["nombre"] ?></h3>
+        <span class="exp-count"><?=$ncartas?> cartas nuevas</span>
         <span class="exp-link">Explorar →</span>
       </div>
     </div>
-    
-  </div>
-</section>
-
-<section id="leyendas">
-  <div class="section-head reveal">
-    <div>
-      <span class="section-tag">Salón de la fama</span>
-      <h2>Jugadores legendarios</h2>
-    </div>
-  </div>
-  <div class="legend-strip">
-    <div class="legend-card reveal">
-      <div class="legend-aura" style="background:radial-gradient(circle at 30% 20%, var(--ignition), transparent 60%);"></div>
-      <span class="legend-num">01</span>
-      <h3>Mark Evans</h3>
-      <span class="pos">Portero · Raimon</span>
-    </div>
-    <div class="legend-card reveal">
-      <div class="legend-aura" style="background:radial-gradient(circle at 30% 20%, #ff8a3e, transparent 60%);"></div>
-      <span class="legend-num">02</span>
-      <h3>Axel Blaze</h3>
-      <span class="pos">Delantero · Zeus</span>
-    </div>
-    <div class="legend-card reveal">
-      <div class="legend-aura" style="background:radial-gradient(circle at 30% 20%, var(--volt-2), transparent 60%);"></div>
-      <span class="legend-num">03</span>
-      <h3>Jude Sharp</h3>
-      <span class="pos">Centrocampista · Zeus</span>
-    </div>
-    <div class="legend-card reveal">
-      <div class="legend-aura" style="background:radial-gradient(circle at 30% 20%, #3bffd6, transparent 60%);"></div>
-      <span class="legend-num">04</span>
-      <h3>Shawn Frost</h3>
-      <span class="pos">Portero · Diamond Dust</span>
-    </div>
-    <div class="legend-card reveal">
-      <div class="legend-aura" style="background:radial-gradient(circle at 30% 20%, var(--energy), transparent 60%);"></div>
-      <span class="legend-num">05</span>
-      <h3>Xavier Foster</h3>
-      <span class="pos">Defensa · Big Waves</span>
-    </div>
-  </div>
-</section>
-
-<section id="noticias" style="background:linear-gradient(180deg, transparent, rgba(59,107,255,.04), transparent);">
-  <div class="section-head reveal">
-    <div>
-      <span class="section-tag">Actualidad</span>
-      <h2>Noticias</h2>
-    </div>
-  </div>
-  <div class="news-grid">
-    <div class="news-card reveal">
-      <div class="news-thumb"><span class="news-cat">Torneo</span></div>
-      <div class="news-body">
-        <span class="news-date mono">10 Jul 2026</span>
-        <h3>La Copa Frontier revela su nuevo formato de clasificación</h3>
-        <span class="news-link">Leer más →</span>
-      </div>
-    </div>
-    <div class="news-card reveal">
-      <div class="news-thumb"><span class="news-cat">Meta</span></div>
-      <div class="news-body">
-        <span class="news-date mono">4 Jul 2026</span>
-        <h3>Los mazos de elemento Fuego dominan el ranking de julio</h3>
-        <span class="news-link">Leer más →</span>
-      </div>
-    </div>
-    <div class="news-card reveal">
-      <div class="news-thumb"><span class="news-cat">Expansión</span></div>
-      <div class="news-body">
-        <span class="news-date mono">28 Jun 2026</span>
-        <h3>Tormenta de Raimon ya disponible en todos los sobres</h3>
-        <span class="news-link">Leer más →</span>
-      </div>
-    </div>
+    <?php endforeach; ?>
   </div>
 </section>
 
@@ -238,7 +184,15 @@ $cartasInusuales = [
       <div class="logo" style="margin-bottom:14px;">INAZUMA<span>·</span>TCG</div>
       <p style="color:var(--frost-dim); font-size:14px; max-width:280px;">El juego de cartas coleccionables definitivo para revivir la energía del fútbol más eléctrico.</p>
       <div class="socials" style="margin-top:22px;">
-        <a href="#">X</a><a href="#">IG</a><a href="#">YT</a><a href="#">DC</a>
+        <a href="https://x.com/supligafrontier">
+          <i class="fa-brands fa-x-twitter"></i>
+        </a>
+        <a href="https://www.instagram.com/superligafrontier/">
+          <i class="fa-brands fa-instagram"></i>
+        </a>
+        <a href="https://discord.gg/KgEBHA87fF">
+          <i class="fa-brands fa-discord"></i>
+        </a>
       </div>
     </div>
     <div>
@@ -249,14 +203,10 @@ $cartasInusuales = [
       <h4>Soporte</h4>
       <ul><li><a href="#">FAQ</a></li><li><a href="#">Contacto</a></li><li><a href="#">Comunidad</a></li><li><a href="#">Reportar bug</a></li></ul>
     </div>
-    <div>
-      <h4>Legal</h4>
-      <ul><li><a href="#">Términos</a></li><li><a href="#">Privacidad</a></li><li><a href="#">Cookies</a></li></ul>
-    </div>
   </div>
   <div class="foot-bottom">
     <p>© 2026 Inazuma TCG. Proyecto de fan no oficial — Inazuma Eleven es propiedad de Level-5.</p>
-    <p class="mono" style="font-size:10px;">Hecho con energía eléctrica ⚡</p>
+    <p class="mono" style="font-size:10px;">Al Gonzalo ese le gano fácil</p>
   </div>
 </footer>
 

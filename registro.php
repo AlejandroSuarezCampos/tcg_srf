@@ -1,16 +1,50 @@
 <?php
-require_once __DIR__ . '.\db\conexion.php';
 
-/**
- * Aquí procesarás el envío del formulario cuando lo tengas listo, algo como:
- *
- * if ($_SERVER['REQUEST_METHOD'] === 'POST') {
- *     $nombre   = $_POST['nombre']          ?? '';
- *     $password = $_POST['password']        ?? '';
- *     $confirm  = $_POST['password_confirm'] ?? '';
- *     // ... tu lógica con $db (comprobar si el nombre existe, hashear password, insertar, etc.)
- * }
- */
+session_start();
+
+require_once __DIR__ . '/db/conexion.php';
+
+// Si ya hay sesión iniciada, no tiene sentido ver el registro de nuevo
+if (!empty($_SESSION['id_usuario'])) {
+	header('Location: landing.php');
+	exit;
+}
+
+$error = '';
+$nombreEnviado = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$nombreEnviado    = trim($_POST['nombre'] ?? '');
+	$password         = $_POST['password'] ?? '';
+	$passwordConfirm  = $_POST['password_confirm'] ?? '';
+
+	if ($nombreEnviado === '' || $password === '' || $passwordConfirm === '') {
+		$error = 'Rellena todos los campos.';
+	} elseif (mb_strlen($nombreEnviado) > 50) {
+		$error = 'El nombre de invocador es demasiado largo (máx. 50 caracteres).';
+	} elseif (mb_strlen($password) < 6) {
+		$error = 'La contraseña debe tener al menos 6 caracteres.';
+	} elseif ($password !== $passwordConfirm) {
+		$error = 'Las contraseñas no coinciden.';
+	} elseif ($db->comprobarEmailExiste($nombreEnviado)) {
+		$error = 'Ese nombre de invocador ya está en uso.';
+	} else {
+		$idUsuario = $db->registrarUsuario($nombreEnviado, $password);
+		$usuario   = $db->obtenerUsuarioPorNombre($nombreEnviado);
+
+		// Iniciamos sesión automáticamente tras el registro
+		session_regenerate_id(true);
+
+		$_SESSION['id_usuario'] = $usuario['id_usuario'];
+		$_SESSION['nombre']     = $usuario['nombre'];
+		$_SESSION['foto']       = $usuario['foto'];
+		$_SESSION['monedas']    = $usuario['monedas'];
+		$_SESSION['dictador']   = (bool) $usuario['dictador'];
+
+		header('Location: landing.php');
+		exit;
+	}
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -22,6 +56,7 @@ require_once __DIR__ . '.\db\conexion.php';
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" type="image/png" href="assets/img/iconos/favicon.ico">
 </head>
 <body>
 
@@ -35,17 +70,16 @@ require_once __DIR__ . '.\db\conexion.php';
   <div class="auth-card">
     <div class="auth-card-inner">
       <div class="auth-logo">
-        <span class="auth-eyebrow">Temporada 01</span>
         <h1>Crea tu colección</h1>
         <p class="auth-sub">Regístrate y empieza a formar tu equipo definitivo.</p>
       </div>
 
-      <div class="auth-error" id="authError">Ese nombre de invocador ya está en uso.</div>
+      <div class="auth-error<?= $error !== '' ? ' show' : '' ?>" id="authError"><?= htmlspecialchars($error) ?></div>
 
       <form method="POST" action="registro.php">
         <div class="field">
           <label for="nombre">Nombre de invocador</label>
-          <input type="text" id="nombre" name="nombre" placeholder="KazeStorm_7" required autocomplete="username">
+          <input type="text" id="nombre" name="nombre" placeholder="Payo Water" value="<?= htmlspecialchars($nombreEnviado) ?>" required autocomplete="username">
           <p class="field-hint">Así te verán en el ranking. Podrás cambiarlo más adelante.</p>
         </div>
         <div class="field">

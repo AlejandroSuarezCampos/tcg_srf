@@ -1,15 +1,44 @@
 <?php
-require_once __DIR__ . '.\db\conexion.php';
 
-/**
- * Aquí procesarás el envío del formulario cuando lo tengas listo, algo como:
- *
- * if ($_SERVER['REQUEST_METHOD'] === 'POST') {
- *     $nombre   = $_POST['nombre']   ?? '';
- *     $password = $_POST['password'] ?? '';
- *     // ... tu lógica con $db (verificar credenciales, iniciar sesión, etc.)
- * }
- */
+session_start();
+
+require_once __DIR__ . '/db/conexion.php';
+
+// Si ya hay sesión iniciada, no tiene sentido ver el login de nuevo
+if (!empty($_SESSION['id_usuario'])) {
+	header('Location: landing.php');
+	exit;
+}
+
+$error = '';
+$nombreEnviado = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$nombreEnviado = trim($_POST['nombre'] ?? '');
+	$password      = $_POST['password'] ?? '';
+
+	if ($nombreEnviado === '' || $password === '') {
+		$error = 'Rellena tu nombre de invocador y tu contraseña.';
+	} else {
+		$usuario = $db->verificarLogin($nombreEnviado, $password);
+
+		if ($usuario) {
+			// Regeneramos el id de sesión para evitar session fixation
+			session_regenerate_id(true);
+
+			$_SESSION['id_usuario'] = $usuario['id_usuario'];
+			$_SESSION['nombre']     = $usuario['nombre'];
+			$_SESSION['foto']       = $usuario['foto'];
+			$_SESSION['monedas']    = $usuario['monedas'];
+			$_SESSION['dictador']   = (bool) $usuario['dictador'];
+
+			header('Location: landing.php');
+			exit;
+		}
+
+		$error = 'Nombre de invocador o contraseña incorrectos.';
+	}
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -21,6 +50,7 @@ require_once __DIR__ . '.\db\conexion.php';
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" type="image/png" href="assets/img/iconos/favicon.ico">
 </head>
 <body>
 
@@ -39,12 +69,12 @@ require_once __DIR__ . '.\db\conexion.php';
         <p class="auth-sub">Accede a tu colección, tus mazos y tu progreso.</p>
       </div>
 
-      <div class="auth-error" id="authError">Nombre de invocador o contraseña incorrectos.</div>
+      <div class="auth-error<?= $error !== '' ? ' show' : '' ?>" id="authError"><?= htmlspecialchars($error) ?></div>
 
       <form method="POST" action="login.php">
         <div class="field">
           <label for="nombre">Nombre de invocador</label>
-          <input type="text" id="nombre" name="nombre" placeholder="KazeStorm_7" required autocomplete="username">
+          <input type="text" id="nombre" name="nombre" placeholder="Payo Water" value="<?= htmlspecialchars($nombreEnviado) ?>" required autocomplete="username">
         </div>
         <div class="field">
           <label for="password">Contraseña</label>
