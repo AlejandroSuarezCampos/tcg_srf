@@ -40,7 +40,7 @@ $tieneFoto  = $fotoWeb !== '' && is_file($fotoDisco);
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css">
-<link rel="icon" type="image/png" href="assets/img/iconos/favicon.ico">
+<link rel="icon" type="image/png" href="./assets/img/iconos/favicon.ico">
 </head>
 <body>
 
@@ -100,7 +100,13 @@ include __DIR__ . '/navbar.php';
       <div class="tcard">
         <div class="tcard-inner">
           <span class="rarity <?= $claseRarezaPorId[$c['id_rareza']] ?? 'r-comun' ?>"><?= htmlspecialchars($c['rareza']) ?></span>
-          <div class="portrait"><?= strtoupper(substr($c['nombre'],0,2)) ?></div>
+          <div class="portrait">
+            <?php if (!empty($c['imagen'])): ?>
+            <img src="<?= htmlspecialchars($c['imagen']) ?>" alt="<?= htmlspecialchars($c['nombre']) ?>" loading="lazy">
+            <?php else: ?>
+            <?= strtoupper(substr($c['nombre'],0,2)) ?>
+            <?php endif; ?>
+          </div>
           <h3><?= htmlspecialchars($c['nombre']) ?></h3>
           <div class="meta-row"><span><?= htmlspecialchars($c['equipo']) ?></span></div>
         </div>
@@ -123,7 +129,13 @@ include __DIR__ . '/navbar.php';
         <div class="tcard-inner" style="position:relative;">
           <span class="lock-badge">🔒</span>
           <span class="rarity <?= $claseRarezaPorId[$c['id_rareza']] ?? 'r-comun' ?>"><?= htmlspecialchars($c['rareza']) ?></span>
-          <div class="portrait"><?= strtoupper(substr($c['nombre'],0,2)) ?></div>
+          <div class="portrait">
+            <?php if (!empty($c['imagen'])): ?>
+            <img src="<?= htmlspecialchars($c['imagen']) ?>" alt="<?= htmlspecialchars($c['nombre']) ?>" loading="lazy">
+            <?php else: ?>
+            <?= strtoupper(substr($c['nombre'],0,2)) ?>
+            <?php endif; ?>
+          </div>
           <h3><?= htmlspecialchars($c['nombre']) ?></h3>
           <div class="meta-row"><span><?= htmlspecialchars($c['equipo']) ?></span></div>
         </div>

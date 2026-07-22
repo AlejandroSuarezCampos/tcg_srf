@@ -35,6 +35,7 @@ $cartasInusuales = [
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" type="image/png" href="./assets/img/iconos/favicon.ico">
 </head>
 <body>
 
@@ -59,7 +60,7 @@ $cartasInusuales = [
       <?php if (isset($_SESSION['dictador'])){
                 if($_SESSION['dictador']==1){
       ?>
-        <a href="./panel/cromos.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Panel de admin</button></a>
+        <a href="./panel/index.php"><button class="btn btn-ghost" style="padding:10px 22px; font-size:12px;">Panel de admin</button></a>
       <?php }}?>
     </div>
   </div>
@@ -80,9 +81,11 @@ $cartasInusuales = [
   <div class="hero-content">
     <a href="https://superligafrontier.es"><span class="eyebrow">Temporada 02 · Ya disponible</span></a>
     <h1>EL TCG DEFINITIVO<br>DE LA <em>SUPERRUINA FRONTIER</em></h1>
-    <p class="sub">Forma tu equipo, domina el campo y colecciona a las leyendas del fútbol más eléctrico jamás jugado.</p>
+    <p class="sub">Forma tu equipo, domina el campo y colecciona a las leyendas del fútbol más ruinero jamás jugado.</p>
     <div class="hero-cta">
-      <button class="btn btn-primary">Empieza tu colección</button>
+      <?php if(!isset($_SESSION['id_usuario'])) : ?>
+      <button class="btn btn-primary" onclick="window.location.href='login.php'">Empieza tu colección</button>
+      <?php endif ?>
       <button class="btn btn-ghost" onclick="window.location.href='album.php'">Ver cartas</button>
     </div>
   </div>

@@ -160,7 +160,7 @@ $monedasActuales = $_SESSION['monedas'] ?? 0;
         $esTuyo = (int) $a['id_vendedor'] === (int) $id_usuario;
         $imagenPanel = $a['imagen'] ? $a['imagen'] : null;
     ?>
-    <div class="tcard reveal" data-anuncio="<?= $a['id_anuncio'] ?>">
+    <div class="tcard" data-anuncio="<?= $a['id_anuncio'] ?>">
       <div class="tcard-inner" style="position:relative;">
         <span class="listing-price"><?= number_format($a['precio']) ?> ⛁</span>
         <span class="rarity <?= $claseRarezaPorId[$a['id_rareza']] ?? 'r-comun' ?>"><?= htmlspecialchars($a['rareza']) ?></span>

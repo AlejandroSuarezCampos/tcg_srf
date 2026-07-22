@@ -53,6 +53,7 @@ if (!empty($_SESSION['id_usuario'])) {
   <div class="nav-collapse">
     <div class="nav-links">
       <a href="landing.php" class="<?= $activePage === 'landing' ? 'active' : '' ?>">Inicio</a>
+      <a href="sobres.php" class="<?= $activePage === 'sobres' ? 'active' : '' ?>">Sobres</a>
       <a href="coleccion.php" class="<?= $activePage === 'coleccion' ? 'active' : '' ?>">Colección</a>
       <a href="mercado.php" class="<?= $activePage === 'mercado' ? 'active' : '' ?>">Mercado</a>
       <a href="album.php" class="<?= $activePage === 'album' ? 'active' : '' ?>">Álbum</a>

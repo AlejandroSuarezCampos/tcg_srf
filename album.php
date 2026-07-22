@@ -169,7 +169,7 @@ include __DIR__ . "/navbar.php";
                 $total = count($expansion["cromos"]);
                 ?>
 
-                <div class="expansion-group reveal">
+                <div class="expansion-group">
 
                     <div class="expansion-head">
 
@@ -192,7 +192,7 @@ include __DIR__ . "/navbar.php";
                         <?php foreach ($expansion["cromos"] as $cromo): ?>
 
                             <div
-                              class="tcard reveal"
+                              class="tcard"
                               data-nombre="<?= htmlspecialchars($cromo["nombre"]) ?>"
                               data-equipo="<?= htmlspecialchars($cromo["equipo"]) ?>"
                               data-afinidad="<?= htmlspecialchars($cromo["afinidad"]) ?>"

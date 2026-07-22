@@ -138,7 +138,7 @@ $totalObtenidas = $db->contarColeccionUsuario($id_usuario);
         <?php foreach ($cromos as $c):
             $imagenPanel = $c['imagen'] ? $c['imagen'] : null;
         ?>
-        <div class="tcard reveal">
+        <div class="tcard">
           <div class="tcard-inner" style="position:relative;">
             <form method="POST" action="coleccion.php<?= $_SERVER['QUERY_STRING'] !== '' ? '?' . htmlspecialchars($_SERVER['QUERY_STRING']) : '' ?>" style="position:absolute; top:10px; left:10px; z-index:4;">
               <input type="hidden" name="accion" value="toggle_bloqueo">

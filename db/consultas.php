@@ -434,9 +434,10 @@ class Tcg
 		return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
 	}
 
-	// Nº de cromos que posee un usuario (copias incluidas)
+	// Nº de cromos DISTINTOS que posee un usuario (las copias repetidas de un
+	// mismo cromo solo cuentan una vez; es lo que se usa para el X/Y de progreso)
 	public function contarColeccionUsuario($id_usuario) {
-		$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM coleccion WHERE id_usuario = :id");
+		$stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT id_cromo) AS total FROM coleccion WHERE id_usuario = :id");
 		$stmt->execute([":id" => $id_usuario]);
 		return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
 	}
@@ -499,7 +500,7 @@ class Tcg
 		$sql = "
 			SELECT
 				col.id_coleccion, col.obtenida,
-				c.nombre, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
+				c.nombre, c.imagen, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -518,7 +519,7 @@ class Tcg
 		$sql = "
 			SELECT
 				col.id_coleccion,
-				c.nombre, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
+				c.nombre, c.imagen, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -733,6 +734,216 @@ class Tcg
 			$this->pdo->rollBack();
 			return ["ok" => false, "error" => "Ha ocurrido un error al procesar la compra."];
 		}
+	}
+
+	// ==========================================================
+	// SOBRES (packs)
+	// ==========================================================
+
+	// Sobres a la venta ahora mismo (solo de expansiones activas)
+	public function listarSobresActivos() {
+		$sql = "
+			SELECT
+				s.id_sobre, s.nombre, s.cantidad, s.precio, s.imagen, s.id_expansion,
+				e.nombre AS expansion, e.fecha_salida,
+				(SELECT COUNT(*) FROM cromos c WHERE c.id_expansion = s.id_expansion) AS total_cartas
+			FROM sobre s
+			INNER JOIN expansiones e ON s.id_expansion = e.id_expansion
+			WHERE s.activo = 1 AND e.activo = 1
+			ORDER BY e.fecha_salida DESC, s.precio ASC
+		";
+
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute();
+
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// Compra y abre un sobre: cobra al usuario y le da $cantidad cartas al azar
+	// de la expansión del sobre, respetando la probabilidad real de cada rareza
+	// (columna `probabilidad` de la tabla `rarezas`).
+	public function abrirSobre($id_sobre, $id_usuario) {
+		try {
+			$this->pdo->beginTransaction();
+
+			$stmtSobre = $this->pdo->prepare("
+				SELECT s.id_sobre, s.id_expansion, s.cantidad, s.precio,
+				       s.activo AS sobre_activo, e.activo AS expansion_activa
+				FROM sobre s
+				INNER JOIN expansiones e ON s.id_expansion = e.id_expansion
+				WHERE s.id_sobre = :id_sobre
+				FOR UPDATE
+			");
+			$stmtSobre->execute([":id_sobre" => $id_sobre]);
+			$sobre = $stmtSobre->fetch(PDO::FETCH_ASSOC);
+
+			if (!$sobre || (int) $sobre["sobre_activo"] !== 1 || (int) $sobre["expansion_activa"] !== 1) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Este sobre ya no está disponible."];
+			}
+
+			$stmtUsuario = $this->pdo->prepare("SELECT monedas FROM usuarios WHERE id_usuario = :id FOR UPDATE");
+			$stmtUsuario->execute([":id" => $id_usuario]);
+			$usuario = $stmtUsuario->fetch(PDO::FETCH_ASSOC);
+
+			if (!$usuario) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Usuario no encontrado."];
+			}
+			if ((int) $usuario["monedas"] < (int) $sobre["precio"]) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "No tienes monedas suficientes para comprar este sobre."];
+			}
+
+			// Cartas disponibles en esa expansión, con su rareza y probabilidad real
+			$stmtCartas = $this->pdo->prepare("
+				SELECT
+					c.id_cromo, c.nombre, c.imagen,
+					eq.nombre AS equipo,
+					c.id_rareza, r.nombre AS rareza, r.probabilidad
+				FROM cromos c
+				INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
+				INNER JOIN rarezas r ON c.id_rareza = r.id_rareza
+				WHERE c.id_expansion = :id_expansion
+			");
+			$stmtCartas->execute([":id_expansion" => $sobre["id_expansion"]]);
+			$cartasDisponibles = $stmtCartas->fetchAll(PDO::FETCH_ASSOC);
+
+			if (empty($cartasDisponibles)) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Esta expansión todavía no tiene cartas cargadas."];
+			}
+
+			$cartasObtenidas = $this->elegirCartasSobre($cartasDisponibles, (int) $sobre["cantidad"]);
+
+			$stmtInsertar = $this->pdo->prepare("
+				INSERT INTO coleccion (id_usuario, id_cromo, obtenida, bloqueada)
+				VALUES (:id_usuario, :id_cromo, NOW(), 0)
+			");
+			foreach ($cartasObtenidas as $carta) {
+				$stmtInsertar->execute([
+					":id_usuario" => $id_usuario,
+					":id_cromo"   => $carta["id_cromo"],
+				]);
+			}
+
+			$this->pdo->prepare("UPDATE usuarios SET monedas = monedas - :precio WHERE id_usuario = :id")
+				->execute([":precio" => $sobre["precio"], ":id" => $id_usuario]);
+
+			$this->pdo->commit();
+
+			return [
+				"ok"      => true,
+				"error"   => null,
+				"cartas"  => $cartasObtenidas,
+				"monedas" => (int) $usuario["monedas"] - (int) $sobre["precio"],
+			];
+
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return ["ok" => false, "error" => "Ha ocurrido un error al abrir el sobre."];
+		}
+	}
+
+	// Elige $cantidad cartas al azar respetando la probabilidad real de cada
+	// rareza (solo entre las rarezas que de verdad tienen cartas en esa expansión,
+	// para no "desperdiciar" probabilidad en un tier vacío)
+	private function elegirCartasSobre($cartasDisponibles, $cantidad) {
+		$porRareza = [];
+		foreach ($cartasDisponibles as $carta) {
+			$idRareza = $carta["id_rareza"];
+			if (!isset($porRareza[$idRareza])) {
+				$porRareza[$idRareza] = [
+					"probabilidad" => (float) $carta["probabilidad"],
+					"cartas"       => [],
+				];
+			}
+			$porRareza[$idRareza]["cartas"][] = $carta;
+		}
+
+		$totalProbabilidad = array_sum(array_column($porRareza, "probabilidad"));
+		if ($totalProbabilidad <= 0) {
+			$totalProbabilidad = count($porRareza); // fallback por si alguna probabilidad está a 0
+		}
+
+		$elegidas = [];
+
+		for ($i = 0; $i < $cantidad; $i++) {
+			$tirada    = mt_rand() / mt_getrandmax() * $totalProbabilidad;
+			$acumulado = 0;
+			$rarezaElegida = array_key_first($porRareza);
+
+			foreach ($porRareza as $idRareza => $grupo) {
+				$acumulado += $grupo["probabilidad"];
+				if ($tirada <= $acumulado) {
+					$rarezaElegida = $idRareza;
+					break;
+				}
+			}
+
+			$cartasDeEsaRareza = $porRareza[$rarezaElegida]["cartas"];
+			$elegidas[] = $cartasDeEsaRareza[array_rand($cartasDeEsaRareza)];
+		}
+
+		return $elegidas;
+	}
+	// ==========================================================
+	// PANEL DE CONTROL — SOBRES (crear / editar / eliminar)
+	// ==========================================================
+
+	// Todos los sobres (activos e inactivos) para la tabla del panel
+	public function listarSobresAdmin() {
+		$sql = "
+			SELECT s.id_sobre, s.nombre, s.cantidad, s.precio, s.imagen, s.id_expansion, s.activo,
+			       e.nombre AS expansion
+			FROM sobre s
+			INNER JOIN expansiones e ON s.id_expansion = e.id_expansion
+			ORDER BY s.id_sobre DESC
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute();
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function crearSobre($nombre, $cantidad, $precio, $imagen, $id_expansion, $activo) {
+		$sql = "
+			INSERT INTO sobre (nombre, cantidad, precio, imagen, id_expansion, activo)
+			VALUES (:nombre, :cantidad, :precio, :imagen, :id_expansion, :activo)
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([
+			":nombre" => $nombre,
+			":cantidad" => $cantidad,
+			":precio" => $precio,
+			":imagen" => $imagen,
+			":id_expansion" => $id_expansion,
+			":activo" => $activo,
+		]);
+		return $this->pdo->lastInsertId();
+	}
+
+	public function actualizarSobre($id_sobre, $nombre, $cantidad, $precio, $imagen, $id_expansion, $activo) {
+		$sql = "
+			UPDATE sobre SET
+				nombre = :nombre, cantidad = :cantidad, precio = :precio,
+				imagen = :imagen, id_expansion = :id_expansion, activo = :activo
+			WHERE id_sobre = :id_sobre
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([
+			":nombre" => $nombre,
+			":cantidad" => $cantidad,
+			":precio" => $precio,
+			":imagen" => $imagen,
+			":id_expansion" => $id_expansion,
+			":activo" => $activo,
+			":id_sobre" => $id_sobre,
+		]);
+	}
+
+	public function eliminarSobre($id_sobre) {
+		$stmt = $this->pdo->prepare("DELETE FROM sobre WHERE id_sobre = :id");
+		$stmt->execute([":id" => $id_sobre]);
 	}
 }
 

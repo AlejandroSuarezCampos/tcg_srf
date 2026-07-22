@@ -13,6 +13,15 @@ const io = new IntersectionObserver((entries) => {
 }, { threshold: 0.15 });
 revealEls.forEach(el => io.observe(el));
 
+// Red de seguridad: si por lo que sea el observer no marca algún elemento
+// (contenedores muy grandes, timing raro de layout, etc.), lo forzamos a
+// visible igualmente al terminar de cargar la página.
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.querySelectorAll('.reveal:not(.in)').forEach(el => el.classList.add('in'));
+  }, 400);
+});
+
 // card tilt on mouse (solo para cartas ya descubiertas)
 document.querySelectorAll('.tcard:not(.locked)').forEach(card => {
   card.addEventListener('mousemove', (e) => {

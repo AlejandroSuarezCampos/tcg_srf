@@ -24,11 +24,17 @@ $activeAdmin = $activeAdmin ?? '';
   <span class="admin-tag">Panel de control</span>
 
   <nav class="admin-nav">
+    <a href="index.php" class="<?= $activeAdmin === 'inicio' ? 'active' : '' ?>">
+      <span class="nav-ico">🏠</span> Inicio
+    </a>
     <a href="cromos.php" class="<?= $activeAdmin === 'cromos' ? 'active' : '' ?>">
       <span class="nav-ico">🃏</span> Cromos
     </a>
+    <a href="sobres.php" class="<?= $activeAdmin === 'sobres' ? 'active' : '' ?>">
+      <span class="nav-ico">📦</span> Sobres
+    </a>
     <a href="expansiones.php" class="<?= $activeAdmin === 'expansiones' ? 'active' : '' ?>">
-      <span class="nav-ico">📦</span> Expansiones
+      <span class="nav-ico">🗂️</span> Expansiones
     </a>
     <a href="usuarios.php" class="<?= $activeAdmin === 'usuarios' ? 'active' : '' ?>">
       <span class="nav-ico">👤</span> Usuarios
