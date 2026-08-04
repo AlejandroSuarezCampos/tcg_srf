@@ -1,0 +1,533 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — CHROME DE PÁGINA
+   Logotipo, cabecera de página y pie. La navegación se incorpora en la Fase 1.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   LOGOTIPO
+   El lockup principal siempre es "Superliga Frontier · TCG". El apodo
+   "Superruina Frontier" no aparece aquí nunca (briefing, sección 9).
+   -------------------------------------------------------------------------- */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+  font-size: 1.125rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--frost);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.logo-punto { color: var(--amber); }
+
+/* --------------------------------------------------------------------------
+   NAVEGACIÓN
+   Es sticky, no fija en superposición: al ocupar sitio en el flujo se elimina
+   de raíz que tape contenido con el foco puesto (WCAG 2.2 SC 2.4.11). El
+   scroll-padding de base.css cubre el resto de casos.
+   -------------------------------------------------------------------------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 12, 16, .88);
+  backdrop-filter: blur(12px);
+}
+.nav-interior {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--wrap);
+  min-height: var(--nav-h);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.nav-lista {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+}
+.nav-enlace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.nav-enlace:hover { color: var(--frost); background: rgba(255, 255, 255, .05); }
+.nav-enlace.is-activo { color: var(--frost); font-weight: var(--fw-semibold); }
+
+/* separador entre clústeres: en escritorio los grupos se leen por el espacio
+   y esta línea, sin necesidad de desplegables para un solo destino */
+.nav-sep {
+  width: 1px;
+  height: 18px;
+  margin-inline: var(--space-2);
+  background: var(--line);
+}
+/* los títulos de grupo y los iconos solo existen en el panel móvil */
+.nav-grupo-titulo, .nav-ico { display: none; }
+
+.nav-derecha { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+.nav-salir {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  margin-right: -6px;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--frost-dim);
+  font-size: 16px;
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.nav-salir:hover { color: var(--amber-light); }
+
+.nav-burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  /* flex-shrink:0 es necesario: dentro de la barra flex el botón se comprimía
+     a 20px de ancho y se quedaba por debajo del objetivo táctil mínimo */
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.nav-burger span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--frost);
+  transition: transform var(--t-media) var(--ease), opacity var(--t-micro) var(--ease);
+}
+.nav-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+@media (max-width: 900px) {
+  /* El orden visual en móvil es logo · chip de usuario · hamburguesa.
+     El `margin-left:auto` tiene que vivir en el chip, no en la hamburguesa:
+     si lo lleva la hamburguesa, empuja el chip fuera del viewport y la página
+     se puede deslizar de lado. */
+  .nav-burger { display: flex; order: 3; margin-left: var(--space-2); }
+  .nav-derecha { order: 2; margin-left: auto; min-width: 0; }
+  .nav-interior { gap: var(--space-2); }
+  .chip-usuario { padding-right: var(--space-3); }
+
+  .nav-menu {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    max-height: 0;
+    overflow: hidden;
+    border-bottom: 1px solid transparent;
+    background: rgba(11, 12, 16, .98);
+    backdrop-filter: blur(12px);
+    transition: max-height var(--t-media) var(--ease);
+  }
+  .nav-menu.is-abierto {
+    max-height: min(70vh, 560px);
+    overflow-y: auto;
+    border-bottom-color: var(--line);
+  }
+
+  .nav-lista {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: var(--space-3) var(--gutter) var(--space-5);
+  }
+  .nav-enlace { min-height: 48px; font-size: var(--fs-body); padding-inline: var(--space-2); }
+
+  /* en móvil los clústeres sí se etiquetan */
+  .nav-grupo-titulo {
+    display: block;
+    margin-top: var(--space-4);
+    padding: 0 var(--space-2) var(--space-2);
+    font-size: var(--fs-caption-sm);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-caption);
+    text-transform: uppercase;
+    color: var(--frost-dim);
+  }
+  .nav-ico { display: inline-block; width: 20px; font-size: 18px; }
+  .nav-sep { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   CABECERA DE PÁGINA INTERNA
+   -------------------------------------------------------------------------- */
+.cabecera {
+  position: relative;
+  padding-block: var(--space-7) var(--space-6);
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 60% 60% at 12% 0%, var(--amber-soft), transparent 62%),
+    var(--void);
+  overflow: hidden;
+}
+.cabecera-contenido { position: relative; z-index: 2; }
+.cabecera p {
+  max-width: 60ch;
+  margin-top: var(--space-3);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.cabecera-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-5);
+}
+
+/* línea de campo: firma visual discreta del sitio, no un grid de puntos */
+.linea-campo { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.linea-campo::before {
+  content: '';
+  position: absolute;
+  top: 42%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(70vw, 640px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, .055);
+  border-radius: 50%;
+}
+.linea-campo::after {
+  content: '';
+  position: absolute;
+  top: 42%; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, .055);
+}
+
+/* --------------------------------------------------------------------------
+   HERO (portada)
+   -------------------------------------------------------------------------- */
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: min(78vh, 720px);
+  padding-block: var(--space-8);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 6%, var(--amber-soft), transparent 62%),
+    var(--void);
+}
+.hero-contenido { position: relative; z-index: 2; text-align: center; }
+.hero h1 { margin-inline: auto; max-width: 18ch; }
+.hero-sub {
+  max-width: 46ch;
+  margin: var(--space-5) auto 0;
+  font-size: clamp(1rem, .95rem + .4vw, 1.25rem);
+  color: var(--frost-dim);
+}
+.hero-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+}
+@media (max-width: 520px) {
+  .hero-acciones { flex-direction: column; }
+  .hero-acciones .btn { width: 100%; }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  margin-bottom: var(--space-5);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-pill);
+  background: var(--amber-soft);
+  color: var(--amber-light);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.eyebrow:hover { border-color: var(--amber); }
+
+/* --------------------------------------------------------------------------
+   AUTENTICACIÓN (login / registro)
+   Estas páginas no llevan navegación: el único camino de vuelta es explícito.
+   -------------------------------------------------------------------------- */
+.auth {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-6) var(--gutter);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 0%, var(--amber-soft), transparent 62%),
+    var(--void);
+}
+.auth-caja { position: relative; z-index: 2; width: 100%; max-width: 420px; }
+.auth-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  margin-bottom: var(--space-3);
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.auth-volver:hover { color: var(--frost); }
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+.auth-cabecera { display: flex; flex-direction: column; gap: var(--space-2); text-align: center; }
+.auth-cabecera .logo { justify-content: center; margin-bottom: var(--space-3); font-size: 1rem; }
+.auth-cabecera h1 { font-size: var(--fs-h2); }
+.auth-cambio { text-align: center; }
+.auth-cambio a { color: var(--amber-light); font-weight: var(--fw-semibold); }
+
+/* en las páginas de auth el pie se pega abajo, sin margen superior grande */
+.auth + .pie { margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   EXPANSIONES (portada y álbum)
+   -------------------------------------------------------------------------- */
+.expansion-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.expansion-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  text-decoration: none;
+  transition: border-color var(--t-micro) var(--ease), transform var(--t-media) var(--ease);
+}
+@media (hover: hover) {
+  .expansion-tarjeta:hover { transform: translateY(-4px); border-color: var(--amber-line); }
+}
+.expansion-tarjeta h3 { font-size: var(--fs-h3); }
+.expansion-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--amber-light);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+}
+
+/* cabecera de grupo de expansión, en álbum y sobres */
+.expansion-grupo { margin-bottom: var(--space-8); }
+.expansion-grupo:last-child { margin-bottom: 0; }
+.expansion-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT CON PANEL DE FILTROS (colección, álbum)
+   En móvil los filtros van arriba y se pliegan; en escritorio, en columna fija.
+   -------------------------------------------------------------------------- */
+.con-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .con-filtros { grid-template-columns: 260px 1fr; gap: var(--space-7); }
+}
+
+.filtros {
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.filtros fieldset { border: 0; }
+.filtros .campo-label { display: block; margin-bottom: var(--space-2); }
+
+/* en móvil los filtros se pliegan: si no, empujan la rejilla de cartas
+   media pantalla hacia abajo */
+.filtros-resumen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  list-style: none;
+}
+.filtros-resumen::-webkit-details-marker { display: none; }
+.filtros-resumen span { display: flex; align-items: center; gap: var(--space-2); }
+.filtros-caret { transition: transform var(--t-micro) var(--ease); }
+.filtros[open] .filtros-caret { transform: rotate(180deg); }
+.filtros[open] .filtros-cuerpo { padding-top: var(--space-5); }
+
+@media (min-width: 1024px) {
+  /* La columna acompaña al scroll. El panel es más alto que el viewport, así
+     que además de sticky necesita altura máxima y scroll propio: sin eso hay
+     que bajar hasta el final de la página para ver el último filtro. */
+  .filtros {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--space-4));
+    max-height: calc(100vh - var(--nav-h) - var(--space-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .filtros-resumen { display: none; }
+  .filtros .filtros-cuerpo { padding-top: 0; }
+
+  /* barra de scroll discreta dentro del panel */
+  .filtros::-webkit-scrollbar { width: 6px; }
+  .filtros::-webkit-scrollbar-thumb {
+    border-radius: var(--radius-pill);
+    background: var(--line-strong);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   PERFIL
+   -------------------------------------------------------------------------- */
+.perfil-cabecera {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+.perfil-cabecera h1 { font-size: var(--fs-h2); }
+
+/* --------------------------------------------------------------------------
+   AJUSTES (configuración)
+   -------------------------------------------------------------------------- */
+.ajustes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.ajustes-foto { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+
+/* --------------------------------------------------------------------------
+   BARRA DE FILTROS HORIZONTAL (mercado)
+   -------------------------------------------------------------------------- */
+.barra-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+@media (min-width: 768px) {
+  .barra-filtros { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+}
+.barra-filtros-acciones { display: flex; gap: var(--space-2); }
+
+/* --------------------------------------------------------------------------
+   PIE
+   -------------------------------------------------------------------------- */
+.pie {
+  margin-top: var(--space-8);
+  padding-block: var(--space-7) var(--space-5);
+  border-top: 1px solid var(--line);
+  background: var(--void-2);
+}
+.pie-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+@media (min-width: 768px) {
+  .pie-grid { grid-template-columns: 2fr 1fr 1fr; gap: var(--space-7); }
+}
+
+.pie-col h2 { margin-bottom: var(--space-3); color: var(--frost); }
+.pie-col ul { list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.pie-col a {
+  /* el relleno vertical lleva el objetivo táctil por encima del mínimo de
+     24×24 (WCAG 2.2 SC 2.5.8); sin él estos enlaces medían 20px de alto */
+  display: inline-block;
+  padding-block: var(--space-2);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.pie-col a:hover { color: var(--frost); text-decoration: underline; }
+
+.pie-redes { display: flex; gap: var(--space-3); }
+.pie-redes a {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--frost-dim);
+  font-size: 18px;
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.pie-redes a:hover { color: var(--frost); border-color: var(--amber-line); }
+
+/* el aviso legal aparece en TODAS las páginas, no solo en la portada */
+.pie-legal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.pie-legal p { line-height: 1.5; }

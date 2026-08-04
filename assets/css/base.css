@@ -1,0 +1,214 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — BASE
+   Reset, tipografía, foco, layout de página y utilidades.
+   Depende de tokens.css. No define ningún componente.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+* { margin: 0; padding: 0; }
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  /* el ancla de scroll deja hueco para la nav fija: sin esto, saltar a un
+     destino por teclado deja el elemento enfocado bajo la barra */
+  scroll-padding-top: calc(var(--nav-h) + var(--space-4));
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--void);
+  color: var(--frost);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* `clip` y no `hidden`: hidden convierte el body en contenedor de scroll y
+     eso rompe el position:sticky de la navegación. Además hidden no impedía
+     el desplazamiento lateral, porque el que scrollea es el elemento html. */
+  overflow-x: clip;
+}
+
+img, svg, video { display: block; max-width: 100%; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+a { color: inherit; }
+
+::selection { background: var(--amber); color: var(--amber-ink); }
+
+/* --------------------------------------------------------------------------
+   TIPOGRAFÍA
+   -------------------------------------------------------------------------- */
+h1, h2, h3, h4 { font-weight: var(--fw-bold); line-height: var(--lh-heading); }
+
+.t-display {
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-display);
+}
+
+h1, .t-h1 {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-tight);
+  letter-spacing: -.015em;
+}
+
+h2, .t-h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+
+h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
+
+.t-body { font-size: var(--fs-body); line-height: var(--lh-body); }
+.t-body-sm { font-size: var(--fs-body-sm); line-height: var(--lh-body); }
+
+/* caption / meta: la etiqueta pequeña en mayúsculas del sistema */
+.t-caption {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+}
+.t-caption-sm { font-size: var(--fs-caption-sm); }
+
+.t-dim { color: var(--frost-dim); }
+
+/* mono: SOLO datos — monedas, estadísticas, contadores, timestamps.
+   Nunca texto editorial. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* --------------------------------------------------------------------------
+   FOCO VISIBLE — no negociable, consistente en todo elemento interactivo
+   (WCAG 2.2 SC 2.4.11 / 2.4.13)
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--amber-light);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* quitamos el outline por defecto solo cuando NO es navegación por teclado */
+:focus:not(:focus-visible) { outline: none; }
+
+/* enlace de salto: primer tabulable de cada página */
+.skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: calc(var(--z-toast) + 1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--amber);
+  color: var(--amber-ink);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  transform: translateY(-150%);
+  transition: transform var(--t-micro) var(--ease);
+}
+.skip-link:focus-visible { transform: translateY(0); }
+
+/* solo para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   MOVIMIENTO REDUCIDO
+   Cubre también las ceremonias de sobre y duelo: las clases de ceremonia
+   consultan este mismo criterio, no tienen excepción propia.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT DE PÁGINA
+   -------------------------------------------------------------------------- */
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* sección estándar: aire vertical entre bloques */
+.seccion { padding-block: var(--space-7); }
+@media (min-width: 1024px) { .seccion { padding-block: var(--space-8); } }
+
+/* grid de página: 1 / 8 / 12 columnas según breakpoint */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+.stack { display: flex; flex-direction: column; }
+.stack-2 { gap: var(--space-2); }
+.stack-3 { gap: var(--space-3); }
+.stack-4 { gap: var(--space-4); }
+.stack-5 { gap: var(--space-5); }
+.stack-6 { gap: var(--space-6); }
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.fila-entre { justify-content: space-between; }
+
+/* cabecera de sección: título a la izquierda, acción a la derecha */
+.seccion-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.seccion-tag {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--amber-light);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+}
+
+/* separador */
+.hr { height: 1px; background: var(--line); border: 0; }
+
+/* --------------------------------------------------------------------------
+   REVELADO AL SCROLL — decorativo y discreto (principio 4)
+   -------------------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--t-media) var(--ease), transform var(--t-media) var(--ease);
+}
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; }
+}
