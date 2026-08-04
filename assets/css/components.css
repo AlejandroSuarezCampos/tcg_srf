@@ -232,7 +232,13 @@
   display: grid;
   place-items: center;
 }
+/* La imagen se posiciona en absoluto contra la placa. Con `height: 100%` a
+   secas el porcentaje no resuelve —la altura de la placa viene de
+   aspect-ratio, no de un valor explícito— y un arte muy alto desbordaba la
+   caja: se recortaba justo lo que este sistema promete no recortar nunca. */
 .carta-arte {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;      /* NUNCA cover: el arte no se recorta jamás */
@@ -249,6 +255,7 @@
   position: absolute;
   left: var(--space-2);
   bottom: var(--space-2);
+  z-index: 3;               /* por encima del tinte y el barrido holográficos */
   padding: 3px var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -646,9 +653,12 @@
   font-size: 36px;
   color: rgba(255, 255, 255, .14);
 }
+/* mismo posicionamiento absoluto que el arte de carta, y por el mismo motivo */
 .sobre-arte img {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: var(--space-2);
+  width: calc(100% - var(--space-4));
+  height: calc(100% - var(--space-4));
   object-fit: contain;
   object-position: center;
 }

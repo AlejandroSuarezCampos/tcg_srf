@@ -7,10 +7,9 @@
 (function () {
   'use strict';
 
-  var modal   = document.getElementById('modalConfirmar');
-  var texto   = document.getElementById('confirmarTexto');
-  var btnSi   = document.getElementById('confirmarSi');
-  if (!modal) return;
+  var modal = document.getElementById('modalConfirmar');
+  var texto = document.getElementById('confirmarTexto');
+  var btnSi = document.getElementById('confirmarSi');
 
   var formPendiente = null;
 
@@ -20,12 +19,14 @@
     SRF.abrirModal(modal);
   }
 
-  btnSi.addEventListener('click', function () {
-    var form = formPendiente;
-    formPendiente = null;
-    SRF.cerrarModal(modal);
-    if (form) enviar(form);
-  });
+  if (btnSi) {
+    btnSi.addEventListener('click', function () {
+      var form = formPendiente;
+      formPendiente = null;
+      SRF.cerrarModal(modal);
+      if (form) enviar(form);
+    });
+  }
 
   async function enviar(form) {
     var boton = form.querySelector('button[type="submit"]');
@@ -71,6 +72,9 @@
   Array.prototype.forEach.call(document.querySelectorAll('.js-mercado'), function (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      /* sin modal de confirmación no se ejecuta nada a ciegas: el formulario
+         se envía por la vía normal, que confirma en servidor */
+      if (!modal) { form.submit(); return; }
       pedirConfirmacion(form);
     });
   });

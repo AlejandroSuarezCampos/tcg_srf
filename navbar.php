@@ -112,6 +112,13 @@ $navGrupos = [
             </a>
           </li>
           <?php endif; ?>
+          <?php /* En móvil el chip se queda sin sitio para el icono de salir,
+                   así que la salida vive aquí dentro. */ ?>
+          <li class="solo-movil">
+            <a href="<?= $base ?>logout.php" class="nav-enlace">
+              <i class="ph ph-sign-out nav-ico" aria-hidden="true"></i>Cerrar sesión
+            </a>
+          </li>
         <?php endif; ?>
       </ul>
     </nav>
