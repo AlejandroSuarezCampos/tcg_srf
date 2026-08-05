@@ -688,21 +688,102 @@
 
 .hueco-quitar {
   position: absolute;
-  top: -4px; right: -4px;
+  top: -6px; right: -6px;
   z-index: 4;
   display: grid;
   place-items: center;
-  width: 22px; height: 22px;
+  /* 26px, no 22: por debajo de 24×24 incumple el objetivo táctil mínimo
+     (WCAG 2.2 SC 2.5.8) y en el selector de mazos era además el elemento
+     que quedaba más cerca del borde de la pantalla en móvil. */
+  width: 26px; height: 26px;
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   background: var(--panel-2);
   color: var(--frost-dim);
+  font-size: 13px;
   cursor: pointer;
 }
 .hueco-quitar:hover { color: var(--frost); border-color: var(--frost-dim); }
 
 @media (max-width: 480px) {
   .hueco-nombre { font-size: 9px; }
+}
+
+/* --------------------------------------------------------------------------
+   CAPA 2 — COMPOS
+   Panel de rasgos activos, en el constructor de mazos y en el resultado de
+   duelo. El nivel se lee por puntos llenos/vacíos además de por el número:
+   misma regla que las rarezas, nunca solo por color.
+   -------------------------------------------------------------------------- */
+.compos {
+  margin-block: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.compos-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.compos-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+}
+.compo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--void-2);
+}
+/* afinidad y configuración se distinguen por el filo izquierdo, pero el tipo
+   también se lee en el texto del detalle: el color no es la única señal */
+.compo--afinidad { border-left-color: var(--amber); }
+.compo--configuracion { border-left-color: var(--info); }
+.compo--derivado { border-left-color: var(--success); }
+
+.compo-nombre { font-weight: var(--fw-semibold); }
+.compo-detalle { grid-column: 1 / -1; font-size: var(--fs-caption-sm); }
+
+.compo-nivel { display: inline-flex; align-items: center; gap: 3px; }
+.compo-punto {
+  width: 7px; height: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+.compo-punto.esta-lleno { background: var(--amber); border-color: var(--amber); }
+
+.compos-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.compos-resumen .dato.es-malo b { color: var(--danger-text); }
+.compos .alerta { margin-top: var(--space-4); }
+
+/* en el resultado de duelo van dos paneles enfrentados */
+.compos--duelo { margin-block: 0; }
+.compos-enfrentadas {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+@media (min-width: 900px) {
+  .compos-enfrentadas { grid-template-columns: 1fr 1fr; }
 }
 
 /* --------------------------------------------------------------------------
@@ -808,11 +889,21 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  max-width: 220px;
   padding: var(--space-3) var(--space-5);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
 .aumento-destape-lado b { font-size: var(--fs-h3); }
+/* mismo motivo que .partido-nombre: un nombre de invocador largo y sin
+   espacios (hasta 50 caracteres, válido en el registro) no tiene dónde
+   romper de forma natural y se salía de esta tarjeta */
+.aumento-destape-lado > span.t-caption {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .aumento-destape-lado.es-oro    { border-color: var(--warning-line); }
 .aumento-destape-lado.es-prisma { border-color: var(--amber-line); }
 
@@ -825,9 +916,19 @@
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
-.partido-lado { display: flex; align-items: center; gap: var(--space-3); }
-.partido-nombre { font-weight: var(--fw-semibold); }
-.partido-goles { font-size: var(--fs-h1); line-height: 1; }
+/* min-width:0 es necesario para que .partido-lado pueda encogerse dentro de
+   .partido-marcador (flex): sin él, un nombre de invocador largo y sin
+   espacios (permitido, hasta 50 caracteres) no tiene dónde romper y se sale
+   del marcador en vez de truncarse. Mismo patrón que .rz-texto en las cartas. */
+.partido-lado { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.partido-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 15ch;
+  font-weight: var(--fw-semibold);
+}
+.partido-goles { font-size: var(--fs-h1); line-height: 1; flex-shrink: 0; }
 .partido-guion { color: var(--frost-dim); font-size: var(--fs-h2); }
 
 .partido-veredicto {
@@ -898,6 +999,78 @@
 .carta-aporte b { color: var(--frost); }
 
 .carta-grid--compacta { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
+/* --------------------------------------------------------------------------
+   SIMULACIÓN DEL PARTIDO
+   Ceremonia exclusiva de duelo: reloj + goles que aparecen, nunca ruleta ni
+   tragaperras. El marcador y la barra reutilizan .partido-marcador y
+   .progreso ya existentes; aquí solo lo que es nuevo de verdad.
+   -------------------------------------------------------------------------- */
+.simulacion-cuerpo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-2);
+  overflow: hidden;
+}
+.simulacion-cuerpo .linea-campo { opacity: .5; }
+.simulacion-cuerpo .partido-marcador { position: relative; z-index: 1; margin-bottom: 0; }
+
+.simulacion-reloj {
+  position: relative;
+  z-index: 1;
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  color: var(--frost-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.simulacion-barra { position: relative; z-index: 1; width: 100%; max-width: 360px; }
+
+/* espacio reservado para el evento de gol: fijo, para que aparecer y
+   desaparecer no haga saltar el resto del modal */
+.simulacion-eventos {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* dentro de .simulacion-cuerpo (columna centrada), un hijo flex no hereda
+     el ancho del padre por defecto: sin esto crecía tanto como su contenido
+     y se salía, aunque la propia insignia ya llevara su límite */
+  width: 100%;
+  min-height: 40px;
+}
+.simulacion-evento {
+  max-width: min(90%, 320px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px var(--space-4);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-pill);
+  background: var(--amber-soft);
+  color: var(--amber-light);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  animation: simulacionEvento 1.5s var(--ease) forwards;
+}
+@keyframes simulacionEvento {
+  0%   { opacity: 0; transform: translateY(6px) scale(.94); }
+  15%  { opacity: 1; transform: none; }
+  80%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-6px) scale(.98); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* red de seguridad: este modal no debería llegar a abrirse con movimiento
+     reducido (el JS lo evita), pero si algo falla, el evento se queda fijo
+     en vez de animarse */
+  .simulacion-evento { animation: none; }
+}
 
 /* entrada del marcador al llegar recién resuelto */
 .partido.es-revelando .partido-marcador,

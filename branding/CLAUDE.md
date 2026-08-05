@@ -1,54 +1,53 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión ampliada (2026-08-05). Léelo entero antes de
-> tocar código. Si trabajas desde otro equipo con **la misma copia del
-> proyecto** (mismos ficheros, misma base de datos `tcg`), este fichero es
-> todo el contexto necesario: no hace falta la conversación anterior.
+> Documento de traspaso, versión 3 (2026-08-05, sesión de Capa 2).
+> Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
+> misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
+> fichero es todo el contexto necesario: no hace falta la conversación anterior.
 >
-> **Sustituye a la versión anterior de este mismo documento.** La Fase 2 ha
-> avanzado mucho desde la última vez que se escribió: Mazos y Duelos están
-> construidos y probados, no son ya "lo que viene". Si tienes por ahí una
-> copia vieja de este fichero, tírala y usa esta.
+> **Sustituye a las versiones anteriores.** Desde la última: la **Capa 2 de
+> combate (Compos) está construida, verificada y funcionando** — ya no es "lo
+> que falta". Si tienes por ahí una copia vieja de este fichero, tírala.
+>
+> Lo siguiente en la cola es **Misiones** (§11).
 
 ---
 
 ## Cómo arrancar en un chat nuevo
 
-Estás recogiendo un proyecto con las **Fases 0 y 1 terminadas y aprobadas**,
-y la **Fase 2 en curso y avanzada**: el Deck Builder y los Duelos (con su
-capa de aumento pre-partido) están construidos, probados en navegador contra
-la base de datos real, y comprometidos en git. No los rehagas ni los revises
-salvo que Alejandro lo pida explícitamente.
+Estás recogiendo un proyecto con **Fases 0 y 1 cerradas**, y la **Fase 2 casi
+completa**: migración de BD, Deck Builder, Duelos (Capa 1 + Capa 3) y **Capa 2
+(Compos)** están construidos, probados en navegador contra la base de datos real
+y funcionando. No los rehagas ni los revises salvo que Alejandro lo pida.
 
 **Lo primero que tienes que hacer, en este orden:**
 
 1. Leer este documento entero.
-2. Comprobar que el entorno responde: Apache y MariaDB levantados
-   (`Get-Process httpd`, `Get-Process mysqld`) y
-   `http://localhost/tcg_srf/styleguide.php` carga. Ahí está el sistema de
-   diseño completo y funcionando.
+2. Comprobar el entorno: `Get-Process httpd`, `Get-Process mysqld`. Si algo está
+   parado, lánzalo desde `C:\xampp\`. Luego abre
+   `http://localhost/tcg_srf/styleguide.php` para ver el sistema de diseño.
 3. Verificar que el repo está intacto:
-   `for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php; do C:/xampp/php/php.exe -l "$f"; done`
-4. Comprobar el estado de git (`git status`, `git log --oneline -5`): el
-   proyecto **sí está bajo control de versiones** desde antes de que existiera
-   este documento — corrige cualquier nota antigua que diga lo contrario.
-5. Mirar qué falta exactamente de la Fase 2 en la tabla de §1 antes de asumir
-   nada: no está todo hecho, pero lo que está hecho es real y probado, no un
-   plan.
+   ```
+   for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done
+   ```
+4. `git status` y `git log --oneline -5`. El proyecto **está en git** (rama
+   `master`, remoto `origin`).
+5. Comprobar que la BD tiene la Capa 2 aplicada:
+   ```
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"   -- debe dar 9
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cromo_rasgos;" -- debe dar 38
+   ```
+   Si dan 0 o la tabla no existe, aplica §5.2.
 
-**Antes de escribir código nuevo, presentar un plan corto y esperar el visto
-bueno.** Es la forma de trabajar acordada con Alejandro: plan → aprobación →
-implementación → resumen de cierre. Dentro de eso, si algo tiene dos lecturas
-razonables y llevarían a trabajo distinto, pregúntalo con opciones concretas
-en vez de decidir por iniciativa propia — así se ha trabajado toda la Fase 2
-(ver §10 para ejemplos reales de esto).
+**Antes de escribir código nuevo, presenta un plan corto y espera el visto
+bueno.** Es la forma de trabajar acordada: plan → aprobación → implementación →
+resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
+distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Excepción autorizada por Alejandro, fuera del orden de fases:** el rediseño
-3D de la ceremonia de sobres descrito en **§14**. Sigue sin empezar. Si
-Alejandro no dice por dónde seguir y §14 sigue sin tocar, pregunta primero si
-quiere continuar con §14, con lo que queda de Fase 2 (ver tabla de §1), o con
-las decisiones de contenido de la Capa 2 de combate (§10.4) — son trabajos
-independientes entre sí.
+**Si Alejandro no dice por dónde seguir**, pregunta entre: **Misiones** (§11, lo
+siguiente natural y sin dependencias), el **panel para curar rasgos a mano**
+(§10.5), o la **ceremonia 3D de sobres** (§14, autorizada aparte del orden de
+fases y sin empezar).
 
 ---
 
@@ -59,28 +58,27 @@ Eleven: Victory Road. Las cartas representan jugadores, presidentes,
 entrenadores y escudos reales de una comunidad activa, no personajes de ficción.
 
 - **Stack:** PHP 8 + MariaDB sobre XAMPP. Sin framework, sin build, sin npm
-  (con la excepción puntual de §9 para GSAP/Three.js, vendored sin bundler,
-  reservada a §14 y todavía sin usar).
-- **Raíz del proyecto:** `C:\xampp\htdocs\tcg_srf` (servido en `http://localhost/tcg_srf/`).
-- **Control de versiones:** el proyecto **está en git** (rama `master`,
-  remoto `origin`). Los commits de Fase 2 ya están hechos por Alejandro.
-  Sigue las reglas normales de git del entorno (nunca `--force`, nunca
-  reescribir historial sin que lo pida explícitamente).
+  (con la excepción de §9 para GSAP/Three.js, reservada a §14 y aún sin usar).
+- **Raíz:** `C:\xampp\htdocs\tcg_srf` (servido en `http://localhost/tcg_srf/`).
+- **Control de versiones:** git, rama `master`, remoto `origin`
+  (`github.com/AlejandroSuarezCampos/tcg_srf`). Nunca `--force`, nunca
+  reescribir historial sin que lo pida explícitamente.
 - **Ejecutado por una sola persona** (Alejandro), sin fecha de lanzamiento fija.
 - **Gratuito**, sin monetización, exclusivo para participantes de la liga.
 - **Legal:** proyecto fan-made sin ánimo de lucro. Inazuma Eleven es propiedad
-  de Level-5. Sin afiliación. Este aviso debe estar visible en **todas** las
-  páginas (lo pone `partials/footer.php`, incluido en todas).
+  de Level-5. Sin afiliación. Aviso visible en **todas** las páginas
+  (lo pone `partials/footer.php`).
 
-El documento maestro de marca es
-`branding/Brand-Identity-Briefing-Superliga-Frontier-TCG.docx` (38 secciones).
-Si algo de diseño no está claro aquí, la respuesta está ahí.
+**Documentos maestros** (en `branding/`):
+- `Brand-Identity-Briefing-Superliga-Frontier-TCG.docx` — marca y diseño, 38 secciones.
+- `Superliga_Frontier_TCG_Sistema_Compos_Balance.md` — la especificación de la
+  Capa 2, el balance y el PvE, con más de 100M de duelos simulados detrás.
+  **Está en Descargas, no en el repo; pídeselo a Alejandro si lo necesitas.**
 
 **Cuenta de pruebas dedicada:** usuario `Claude` (id 9), contraseña `123456`,
-`dictador=1` (admin), 1.000.000 de monedas, con un mazo titular ya armado
-("Once titular", 11 huecos cubiertos). La creó Alejandro específicamente para
-que la IA pruebe cosas en navegador real. **Úsala siempre** en vez de
-improvisar sesiones con las cuentas de otros usuarios o pedir credenciales.
+`dictador=1`, ~1M de monedas, 38 cartas jugadoras (una de cada) y un mazo
+titular "Once titular" completo. La creó Alejandro para que la IA pruebe en
+navegador real. **Úsala siempre** en vez de pedir credenciales o improvisar.
 
 ---
 
@@ -88,75 +86,43 @@ improvisar sesiones con las cuentas de otros usuarios o pedir credenciales.
 
 | Fase / bloque | Contenido | Estado |
 |---|---|---|
-| **Fase 0 — Fundamentos** | Tokens de diseño, componente de tarjeta, guía de estilo | ✅ Terminada y aprobada |
-| **Fase 1 — Núcleo** | Las 9 pantallas del núcleo migradas, aviso legal en todas | ✅ Terminada y aprobada |
-| **§14 — Ceremonia de sobres 3D** | Vitrina 3D, sobres al cursor, reveal secuencial, secuencia FUT | ⬜ Sin empezar |
-| **Fase 2 — Migración de BD** | 002_duelos_misiones_mazos.sql, 9 tablas nuevas, stats de combate | ✅ Aplicada y probada |
-| **Fase 2 — Deck Builder** | `mazos.php`, alineación en formación real sobre un campo | ✅ Construido y probado |
-| **Fase 2 — Duelos, Capa 1** | Fuerza de mazo + curva de resolución (Elo) + sala en vivo | ✅ Construido y probado |
-| **Fase 2 — Duelos, Capa 3** | Aumento pre-partido (3 opciones, tiers, plazo, fallback) | ✅ Construido y probado |
-| **Fase 2 — Duelos, Capa 2** | Rasgos/sinergias entre cartas | ⏸️ **Aplazada — falta decidir contenido, ver §10.4** |
-| **Fase 2 — Misiones** | 8 misiones sembradas en BD | ⬜ **Sin pantalla ni lógica de progreso** |
-| **Fase 2 — Minijuegos** | Solo la tabla `minijuegos_partidas` | ⬜ Aplazados por decisión de Alejandro, sin contenido definido |
+| **Fase 0 — Fundamentos** | Tokens, componente de tarjeta, guía de estilo | ✅ Cerrada |
+| **Fase 1 — Núcleo** | 9 pantallas migradas, aviso legal en todas | ✅ Cerrada |
+| **Fase 2 — Migración BD** | `002`, 10 tablas nuevas, stats de combate | ✅ Aplicada |
+| **Fase 2 — Deck Builder** | `mazos.php`, alineación sobre campo real | ✅ Construido |
+| **Fase 2 — Duelos Capa 1** | Fuerza de mazo + curva Elo + sala en vivo | ✅ Construido |
+| **Fase 2 — Duelos Capa 3** | Aumento pre-partido (tiers, plazo, fallback) | ✅ Construido |
+| **Fase 2 — Duelos Capa 2** | **Compos: rasgos, ciclo, malus, Tensión** | ✅ **Construido (§10)** |
+| **Fase 2 — Simulación de partido** | Modal de 7 s con reloj y goles antes del resultado | ✅ Construido |
+| **Fase 2 — Misiones** | 8 misiones sembradas en BD, **nada más** | ⬜ **Siguiente (§11)** |
+| **Fase 2 — Minijuegos** | Solo la tabla `minijuegos_partidas` | ⬜ Aplazados por Alejandro |
+| **§14 — Ceremonia 3D de sobres** | Vitrina 3D, reveal secuencial, secuencia FUT | ⬜ Sin empezar |
 | **Fase 3 — Pulido y escala** | Panel admin, motion unificado, doc de expansiones | ⬜ Pendiente |
 
-**Regla de trabajo:** una fase (o §14, o cada capa de combate) se cierra por
-completo y deja el sitio desplegable antes de abrir la siguiente. Al terminar
-cada bloque, resumir qué cambió y por qué antes de continuar.
+**Regla de trabajo:** cada bloque se cierra por completo y deja el sitio
+desplegable antes de abrir el siguiente. Al terminar, resumir qué cambió y por qué.
 
-### Qué cubrió cada fase ya cerrada
+### Qué cubrió cada fase cerrada
 
 **Fase 0** — No se tocó ninguna pantalla hasta tener el sistema debajo:
-`tokens.css` con todas las variables, Geist autoalojada, `components.css` con
-los 16 componentes del briefing, el componente de tarjeta con todos sus
-estados, y `styleguide.php` como página de validación.
+`tokens.css`, Geist autoalojada, `components.css` con los 16 componentes, el
+componente de tarjeta con todos sus estados, y `styleguide.php`.
 
 **Fase 1** — Migración pantalla a pantalla: `navbar` → `landing` →
-`login`/`registro` → `sobres` (con la ceremonia plana) → `coleccion` →
-`album` → `mercado` → `perfil`/`configuracion`. Aviso legal vía
-`partials/footer.php`. CSS/JS antiguos retirados a `_legacy/`.
+`login`/`registro` → `sobres` → `coleccion` → `album` → `mercado` →
+`perfil`/`configuracion`. CSS/JS antiguos retirados a `_legacy/`.
 
-> **Nota de honestidad sobre la ceremonia de sobres:** la ceremonia cerrada en
-> la Fase 1 es **plana** (modal, reveal de las cartas del sobre, escalado
-> visual por rareza en el propio marco). **No incluye** vitrina 3D, cursor con
-> tilt, flip de reverso a frente ni secuencia FUT. Todo eso sigue en §14, sin
+> **Nota de honestidad sobre la ceremonia de sobres:** la de la Fase 1 es
+> **plana** (modal + reveal escalado por rareza). **No incluye** vitrina 3D,
+> tilt al cursor, flip de reverso ni secuencia FUT: eso sigue en §14, sin
 > empezar. El §4 describe el aspecto SRF como objetivo de marca, no como
 > inventario de lo construido.
 
-**Fase 2, lo construido hasta ahora** — ver §10 para el detalle técnico
-completo. En resumen: base de datos migrada de forma aditiva y repetible,
-constructor de mazos con formación real sobre un campo, y duelos jugables de
-principio a fin (crear sala → esperar rival con latido → aumento pre-partido
-→ resolución con curva de probabilidad → resultado con desglose por líneas).
-
-**Bugs de Fase 1 corregidos durante el trabajo de Fase 2** (efecto
-secundario, no planeado, pero real y verificado):
-
-- Colección: copias repetidas del mismo cromo se agrupaban visualmente con
-  insignia "×N" en vez de renderizar una tarjeta por copia (189 tarjetas →
-  22 en la cuenta de prueba). Filtros de colección aplicándose solos al
-  cambiar cualquier campo, sin botón "Aplicar".
-- Un bug real de CSS en los filtros plegables (`.stack` con `display:flex`
-  ganaba al `display:none` nativo de un `<details>` cerrado, por ser de
-  origen "autor" y no "user-agent") hacía que el panel de filtros se
-  renderizara superpuesto al resto de la página en móvil. Corregido con
-  `.filtros:not([open]) .filtros-cuerpo { display: none; }`.
-- Ceremonia de sobres con muchas cartas: `.modal-caja` fuerza `overflow:
-  hidden` (para que sobres pequeños "se miren, no se naveguen"), pero con un
-  sobre de cientos de cartas eso dejaba la mayoría inalcanzables y los
-  botones enterrados entre cartas. Corregido dándole scroll propio a
-  `.ceremonia-mesa`, dejando cabecera y botones siempre fijos alrededor.
-- Peso del arte de cartas: 16 PNG sumaban 45,7 MB (hasta 1130×2005 px para un
-  hueco de 204×315). Convertidos a WebP a 800 px de alto: **1,79 MB en
-  total**. Originales conservados en `assets/img/_originales_sin_optimizar/`
-  (no se borran, el proyecto ya está en git pero por si acaso). Requirió
-  descomentar `extension=gd` en `php.ini` (ver §8).
-- Auditoría de la probabilidad de rareza en sobres (Alejandro reportó que en
-  otra máquina la SRF salía "demasiado" a menudo): simulación de 200.000
-  tiradas con el algoritmo real dio SRF al 0,481 % contra el 0,5 % esperado.
-  **La lógica y los datos de esta base de datos son correctos.** Si se
-  reproduce en otra máquina, lo primero a mirar es `SELECT * FROM rarezas;`
-  ahí, no el código.
+**Fase 2** — Ver §10 para el detalle de la Capa 2. El resto: base de datos
+migrada de forma aditiva y repetible, constructor de mazos con formación real
+sobre un campo, y duelos jugables de principio a fin (crear sala → esperar
+rival con latido → aumento pre-partido → **compos** → resolución con curva de
+probabilidad → simulación de partido → resultado con desglose completo).
 
 ---
 
@@ -167,54 +133,42 @@ tcg_srf/
 ├── partials/
 │   ├── head.php          ← abre el documento: fuentes, CSS, <body>, skip-link
 │   ├── footer.php        ← pie + AVISO LEGAL + carga de ui.js
-│   ├── ceremonia.php     ← marcado del modal de apertura de sobres
-│   └── confirmar.php     ← NUEVO: modal de confirmación compartido
-│                            (mercado.js lo usaba solo; ahora SRF.confirmar()
-│                            en ui.js lo expone a cualquier pantalla)
+│   ├── ceremonia.php     ← modal de apertura de sobres
+│   └── confirmar.php     ← modal de confirmación compartido (SRF.confirmar)
 ├── components/
 │   └── carta.php         ← EL componente de tarjeta (render_carta, carta_html)
-│                            + opción 'cantidad' NUEVA para insignia "×N"
-├── navbar.php            ← navegación; clúster "Jugar" con Sobres/Mazos/Duelos
-├── mazos.php             ← NUEVO: constructor de mazos (ver §10.2)
-├── duelos.php            ← NUEVO: lobby de duelos (ver §10.3)
-├── duelo.php             ← NUEVO: sala en vivo + partido (ver §10.3)
+├── navbar.php            ← clúster "Jugar": Sobres / Mazos / Duelos
+├── mazos.php             ← constructor de mazos + panel de COMPOS (§10.4)
+├── duelos.php            ← lobby de duelos
+├── duelo.php             ← sala en vivo + partido + resultado con compos
 ├── assets/
 │   ├── css/
 │   │   ├── tokens.css      variables + @font-face. Fuente de verdad.
 │   │   ├── base.css        reset, tipografía, foco, layout de página
-│   │   ├── components.css  los 16 componentes + ceremonia
-│   │   ├── layout.css      nav, hero, cabecera, filtros, pie, MAZOS, DUELOS
+│   │   ├── components.css  los 16 componentes + ceremonia de sobres
+│   │   ├── layout.css      nav, hero, filtros, pie, MAZOS, DUELOS, COMPOS
 │   │   └── styleguide.css  solo para styleguide.php
 │   ├── js/
-│   │   ├── ui.js         modales, toasts, tabs, nav, plegables, reveal,
-│   │   │                  SRF.confirmar() NUEVO
+│   │   ├── ui.js         modales, toasts, tabs, nav, plegables, SRF.confirmar
 │   │   ├── ceremonia.js  SRF.ceremonia(cartas)
-│   │   ├── sobres.js     compra → llama a la ceremonia
-│   │   ├── mercado.js    confirmación + selector visual de venta
-│   │   ├── album.js      filtrado en cliente
-│   │   ├── coleccion.js  NUEVO: auto-submit de filtros
-│   │   ├── perfil.js     canje de códigos
-│   │   ├── configuracion.js
-│   │   ├── mazos.js      NUEVO: asignación hueco→jugador (ver §10.2)
-│   │   ├── duelos.js     NUEVO: lobby, tipo de apuesta, confirmación
-│   │   ├── duelo.js      NUEVO: latido, sondeo, cuenta atrás de aumento
+│   │   ├── sobres.js · mercado.js · album.js · coleccion.js
+│   │   ├── perfil.js · configuracion.js
+│   │   ├── mazos.js      asignación hueco→jugador
+│   │   ├── duelos.js     lobby, tipo de apuesta, confirmación
+│   │   ├── duelo.js      latido, sondeo, cuenta atrás, SIMULACIÓN DE PARTIDO
 │   │   └── vendor/       ← reservado para §14 (GSAP/Three.js), vacío aún
 │   ├── fonts/            ← Geist autoalojada (4 .woff2)
-│   ├── ajax/
-│   │   ├── canjear_codigo.php
-│   │   ├── monedas.php
-│   │   └── duelo_estado.php  ← NUEVO: latido + sondeo de la sala de duelo
-│   ├── async/js/scriptsAsync.js ← actualizarMonedasNav() (sin tocar)
+│   ├── ajax/             ← canjear_codigo.php, monedas.php, duelo_estado.php
 │   └── img/
-│       ├── Cromos/...           ← arte optimizado a WebP (ver §8)
+│       ├── Cromos/...    ← arte optimizado a WebP
 │       └── _originales_sin_optimizar/  ← PNG originales, no borrados
 ├── db/
 │   ├── conexion.php      ← instancia $db (sin tocar)
-│   ├── consultas.php     ← clase Tcg, ~2200 l. TODA la Fase 2 vive aquí como
-│   │                        métodos nuevos de la misma clase (ver §10.1)
+│   ├── consultas.php     ← clase Tcg, ~2630 líneas. TODA la lógica vive aquí.
 │   ├── migraciones/
-│   │   └── 002_duelos_misiones_mazos.sql  ← toda la migración de Fase 2,
-│   │                                          aditiva y re-ejecutable
+│   │   ├── 002_duelos_misiones_mazos.sql   Fase 2
+│   │   ├── 003_capa2_compos.sql            Capa 2
+│   │   └── 004_reparar_codificacion.php    utilidad (§5.3)
 │   └── tcg.sql
 ├── panel/                ← admin, TODAVÍA CON EL SISTEMA VIEJO (Fase 3)
 ├── _legacy/              ← CSS y JS retirados. Nadie los referencia.
@@ -229,13 +183,14 @@ session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
 
-// ... lógica ...
+// ... lógica; los POST se procesan aquí arriba y SIEMPRE acaban en
+//     header('Location: ...'); exit;  — nunca se renderiza tras un POST.
 
-$paginaTitulo = 'Mercado';
+$paginaTitulo = 'Misiones';
 $paginaDesc   = 'Descripción para el <meta>.';
 include __DIR__ . '/partials/head.php';
 
-$activePage = 'mercado';
+$activePage = 'misiones';
 include __DIR__ . '/navbar.php';
 ?>
 
@@ -247,23 +202,16 @@ include __DIR__ . '/navbar.php';
 </html>
 ```
 
-Los patrones nuevos de Fase 2 (todos siguen esqueletos parecidos, no
-inventan nada nuevo):
-
-- **Acción POST → redirección**: todas las páginas de Fase 2 procesan
-  `$_POST['accion']` al principio del fichero y hacen `header('Location:
-  ...'); exit;`, nunca renderizan tras un POST.
-- **AJAX aparte en `assets/ajax/`**: cuando una pantalla necesita sondeo
-  periódico (la sala de duelo), el endpoint vive en su propio fichero, nunca
-  mezclado con la lógica de render de la página.
+`head.php` acepta `$base` (`''` en la raíz, `'../'` en `panel/`) y `$cssExtra`.
+Si una pantalla necesita sondeo periódico, el endpoint va en su propio fichero
+dentro de `assets/ajax/`, nunca mezclado con el render.
 
 ---
 
 ## 3. El componente de tarjeta
 
 Vive en `components/carta.php`. **Nunca se copia su marcado con variaciones.**
-Si una pantalla necesita algo distinto, se añade una opción al componente —
-así se hizo con `cantidad` esta fase, no creando una tarjeta aparte.
+Si una pantalla necesita algo distinto, se añade una opción al componente.
 
 ```php
 render_carta($cromo, $opts);   // imprime
@@ -271,58 +219,37 @@ carta_html($cromo, $opts);     // devuelve string (lo usa la ceremonia por AJAX)
 render_rareza($idRareza, $nombreRareza);  // etiqueta suelta
 ```
 
-`$cromo` usa las claves que ya devuelven las consultas existentes: `nombre`,
-`imagen`, `posicion`, `equipo`, `id_rareza`, `rareza`, `afinidad`,
-`afinidad_imagen`.
+Opciones: `tamano` (`sm`/`md`/`lg`), `href`, `poseida`, `protegida`, `precio`,
+`seleccionada`, `cantidad` (insignia "×N"), `stats`, `acciones` (HTML flotante),
+`pie` (HTML al final), `datos` (atributos `data-*`), `clase`, `lazy`.
 
-Opciones (`$opts`):
-
-| Clave | Efecto |
-|---|---|
-| `tamano` | `'sm'` / `'md'` (defecto) / `'lg'` |
-| `href` | la carta pasa a ser un enlace interactivo |
-| `poseida` | `false` ⇒ silueta apagada con candado (álbum) |
-| `protegida` | `true` ⇒ insignia de bloqueada para venta |
-| `precio` | int ⇒ insignia de precio (mercado) |
-| `seleccionada` | `true` ⇒ anillo ámbar (deck builder) |
-| `cantidad` | **NUEVO** int ⇒ insignia "×N" junto al hexágono de afinidad, para copias repetidas (colección, selector de mazos) |
-| `stats` | `['ATA'=>88,'DEF'=>72,'TÉC'=>91]`, hasta 3 |
-| `acciones` | HTML flotante sobre la carta |
-| `pie` | HTML al final del marco |
-| `datos` | `['equipo'=>'x']` ⇒ atributos `data-*` para filtros de cliente |
-| `clase`, `lazy` | clases extra / carga diferida de la imagen |
-
-### Tres reglas que el componente garantiza
+### Tres reglas que garantiza
 
 1. **El arte se muestra siempre completo.** `object-fit: contain`, nunca
-   `cover`. La imagen va **posicionada en absoluto** contra la placa: con
-   `height:100%` a secas el porcentaje no resuelve, y un arte muy alto
-   desbordaba y se recortaba. Validado con arte real: cero desbordes, ratios
-   de 0,45 a 1,53.
-2. **La rareza lleva marca no cromática** además del color: 0/1/2/3 chevrones
-   dibujados en CSS, corona para legendaria, destello para SRF.
+   `cover`, y la imagen va **posicionada en absoluto** contra la placa: con
+   `height:100%` a secas el porcentaje no resuelve (la altura viene de
+   `aspect-ratio`) y un arte muy alto desbordaba y se recortaba. Ya se rompió
+   una vez; no lo cambies sin volver a medirlo.
+2. **La rareza lleva marca no cromática:** 0/1/2/3 chevrones en CSS, corona
+   para legendaria, destello para SRF.
 3. **Todo arte lleva texto alternativo.**
 
-### El borde real de una carta (importante si tocas cualquier vista nueva)
+### El borde real de una carta
 
-El borde de rareza **no es un `border` CSS**. Es la técnica
-`padding + background`: `.carta` tiene `padding: 1px; background:
-var(--rz-borde);` y el marco interior (`.carta-marco`) pinta encima, dejando
-ver solo 1px del fondo — ESO es el borde. `--rz-borde` es:
+**No es un `border` CSS.** Es `padding + background`: `.carta` tiene
+`padding: 1px; background: var(--rz-borde)` y `.carta-marco` pinta encima
+dejando ver 1px. `--rz-borde` es: rareza 1 `var(--line-strong)`; 2-4
+`color-mix(in srgb, var(--rzN) 34-42%, transparent)`; 5 un degradado metálico;
+6 `var(--rz6-grad)` animado con `holoDeriva`.
 
-```
-rareza 1 (Común)      var(--line-strong)                          (gris neutro)
-rareza 2 (Poco común)  color-mix(in srgb, var(--rz2) 34%, transparent)
-rareza 3 (Raro)        color-mix(in srgb, var(--rz3) 38%, transparent)
-rareza 4 (Épico)       color-mix(in srgb, var(--rz4) 42%, transparent)
-rareza 5 (Legendario)  linear-gradient(140deg, #FFE0AE, #E8752A 30%, #7A3A12 52%, #F2B134 72%, #FFE0AE)
-rareza 6 (SRF)         var(--rz6-grad), animado con @keyframes holoDeriva
-```
+**Nunca uses el tono puro de `--rzN` como borde sólido** — ya se cometió una vez
+en el chip del mazo y se corrigió reutilizando esta técnica.
 
-**Nunca uses el tono puro de `--rzN` como borde sólido en una vista nueva** —
-es un error que ya se cometió una vez en el chip del mazo (ver §10.2) y se
-corrigió reutilizando exactamente esta técnica, incluida la mezcla de
-transparencia y el tratamiento especial de legendaria/SRF.
+`.carta-marco` lleva `overflow: hidden` como red de seguridad: sin él, una
+etiqueta de rareza larga ("Poco común") empujaba la insignia de cantidad fuera
+de la tarjeta. Y `.rz` lleva `min-width: 0` con `.rz-texto` truncando por
+elipsis, para que lo que se recorte sea el texto y **nunca** las marcas no
+cromáticas, que son la señal de accesibilidad.
 
 ---
 
@@ -337,7 +264,7 @@ transparencia y el tratamiento especial de legendaria/SRF.
 ```
 
 Los semánticos son literalmente los colores de las tarjetas arbitrales del
-fútbol. Es una decisión deliberada, no un sistema genérico.
+fútbol. Decisión deliberada, no un sistema genérico.
 
 ### Rarezas
 
@@ -350,45 +277,94 @@ fútbol. Es una decisión deliberada, no un sistema genérico.
 | 5 | Legendario | 1 % | corona + borde metálico |
 | 6 | SRF | 0,5 % | borde arcoíris animado + aura + barrido |
 
-**Estas probabilidades están auditadas y confirmadas correctas** (ver §1,
-bugs corregidos): coinciden entre el código, la base de datos y el seed SQL.
-La lógica de sorteo de sobres (`elegirCartasSobre()` en `db/consultas.php`)
-verificada con 200.000 muestras simuladas.
+**Probabilidades auditadas y correctas**: 200.000 tiradas simuladas con el
+algoritmo real dieron SRF al 0,481 % contra el 0,5 % esperado. Si en otra
+máquina la SRF "sale mucho", lo primero a mirar es `SELECT * FROM rarezas;` ahí,
+no el código.
 
 La **SRF tiene que ganar visualmente a la legendaria sin discusión**. Sigue
-siendo aspiración de §14, no algo ya construido (ver nota de honestidad en §1).
+siendo aspiración de §14 en cuanto a ceremonia, aunque su tratamiento en la
+tarjeta (borde arcoíris + aura + barrido) ya está construido.
 
-### Tipografía
+### Tipografía, espaciado, motion
 
-Geist Sans para UI. **Geist Mono solo para datos**: monedas, estadísticas,
-contadores, marcas de tiempo, y ahora también los totales de fuerza de un
-mazo y el marcador de un duelo.
-
-### Espaciado, radio, motion
-
-- Espaciado: `--space-1..8` = 4·8·12·16·24·32·48·64px.
-- Radio: 8 (controles) / 12 / 16 / 22px (carta y modales).
-- Motion: una sola curva `--ease`. `--t-micro` 160ms, `--t-media` 380ms,
-  `--t-ceremonia` 700ms **para sobre y duelo** (la entrada del marcador de
-  partido ya usa `--t-ceremonia`, ver §10.3).
-
-### Iconografía
-
-Phosphor Icons por CDN, pinneado a `@2.1.1`. No dependas de un glifo para
-información crítica (los chevrones de rareza y el check del selector van
-dibujados en CSS por eso).
+- Geist Sans para UI. **Geist Mono solo para datos**: monedas, estadísticas,
+  contadores, marcas de tiempo, fuerza de mazo, marcador de duelo.
+- Espaciado `--space-1..8` = 4·8·12·16·24·32·48·64px.
+- Radio 8 (controles) / 12 / 16 / 22px (carta y modales).
+- Una sola curva `--ease`. `--t-micro` 160ms, `--t-media` 380ms,
+  `--t-ceremonia` 700ms **solo para sobre y duelo**.
+- Phosphor Icons por CDN pinneado a `@2.1.1`. **No dependas de un glifo para
+  información crítica**: los chevrones de rareza y el check del selector van
+  dibujados en CSS por eso.
 
 ---
 
-## 5. Principios que gobiernan cada decisión
+## 5. Base de datos
 
-1. **El arte manda.** La interfaz sirve a la ilustración, nunca compite.
-2. **Un acento, cero ruido.** El ámbar solo en lo que importa de verdad.
-3. **La rareza se lee sin color.** Redundancia no cromática siempre.
-4. **Ceremonia con propósito.** Motion largo solo en sobre y duelo.
-5. **Denso pero nunca abarrotado.**
-6. **Un solo chiste, dos veces** (ver tono).
-7. **Se adapta, no se recorta.**
+### 5.1 Tablas
+
+Originales: `usuarios`, `cromos`, `coleccion`, `mercado`, `sobre`,
+`expansiones`, `equipos`, `rarezas`, `afinidad`, `codigos`, `codigos_canjeados`.
+
+De la Fase 2 (`002`): `mazos`, `mazo_cartas`, `duelos`, `duelo_apuestas`,
+`duelo_alineaciones`, `duelo_aumentos`, `configuracion`, `misiones`,
+`misiones_progreso`, `minijuegos_partidas`.
+
+De la Capa 2 (`003`): `rasgos`, `cromo_rasgos`, `duelo_compos`.
+
+### 5.2 Cómo aplicar las migraciones
+
+```
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/002_duelos_misiones_mazos.sql
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/003_capa2_compos.sql
+C:\xampp\php\php.exe db/migraciones/004_reparar_codificacion.php --aplicar
+```
+
+Las dos SQL son aditivas y re-ejecutables. Después de `003`, ejecuta una vez:
+
+```php
+$db->derivarRasgosConfiguracion();   // rellena cromo_rasgos, debe devolver 38
+```
+
+### 5.3 ⚠️ TRAMPA DE CODIFICACIÓN — léela antes de aplicar nada
+
+**El flag `--default-character-set=utf8mb4` NO es opcional.** Sin él, en Windows
+`mysql.exe < fichero.sql` lee el .sql con la codepage de consola (CP850) en vez
+de UTF-8, y las tildes y eñes entran corrompidas: "Montaña" se guarda como
+"Monta├▒a". **Pasó de verdad, dos veces**, con `002` y con `003`.
+
+Cómo detectarlo (compara contra un dato preexistente correcto):
+```sql
+SELECT HEX(nombre) FROM rasgos WHERE clave='montana';   -- correcto: ...c3b1...
+SELECT HEX(nombre) FROM afinidad WHERE id=1;            -- referencia sana
+```
+Si ves `e2949c` (carácter de dibujo de caja) en vez de `c3b1`, está corrupto.
+
+Cómo arreglarlo: `db/migraciones/004_reparar_codificacion.php` revierte la
+transformación exacta (UTF-8 → CP850 devuelve los bytes originales). Es
+idempotente y hace dry-run si lo lanzas sin `--aplicar`. Ojo: `002` siembra con
+`INSERT IGNORE`, así que **reaplicarla NO arregla el texto ya corrupto** — hay
+que usar el reparador.
+
+### 5.4 Parámetros de balance (`configuracion`)
+
+Todo número de balance vive aquí, nunca como constante en el código. Se lee con
+`$db->config($clave, $porDefecto)`.
+
+| Clave | Valor | Qué es |
+|---|---|---|
+| `duelo_k` | 400 | K de la curva Elo |
+| `duelo_p_min` / `duelo_p_max` | 0.05 / 0.95 | probabilidad acotada, nunca 0 ni 1 |
+| `duelo_plazo_aumento` | 30 | segundos para elegir aumento |
+| `duelo_latido_max` | 45 | segundos antes de dar una sala por abandonada |
+| `line_cap` | 20 | tope % del bonus de compos sobre UNA línea |
+| `compo_pesos_dr` | 1.0,0.7,0.45,0.25 | rendimientos decrecientes por línea |
+| `ciclo_contra_afinidad_bonus` | 5.5 | % al total por ventaja de afinidad |
+| `coherencia_umbral_libre` | 2.5 | rareza media sin exigencia de compos |
+| `coherencia_malus_rate` | 3.0 | cuánta coherencia se exige por punto de rareza |
+| `coherencia_malus_tope` | 18 | tope % del malus |
+| `tension_tiers_0..3` | 60,30,10 … 43,36,21 | probabilidades Plata/Oro/Prisma |
 
 ---
 
@@ -397,147 +373,107 @@ dibujados en CSS por eso).
 Editorial y serio, como una ficha oficial de competición. Sin argot gamer, sin
 superlativos vacíos, sin bromear con nombres de jugadores reales.
 
-El humor se limita a **exactamente dos guiños, ninguno más**: "Superruina
-Frontier" (solo contextos secundarios) y "a ese Gonzalo le gano fácil" (cita
-de folclore de liga, en `partials/footer.php`). No inventes chistes nuevos.
+El humor se limita a **exactamente dos guiños**: "Superruina Frontier" (solo
+contextos secundarios, nunca en el lockup del logo) y "a ese Gonzalo le gano
+fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos.
 
-> Nota: el `<h1>` de la portada lo editó Alejandro a mano. Respétalo.
+> El `<h1>` de la portada lo edita Alejandro a mano. Respétalo.
 
 ---
 
 ## 7. Accesibilidad — no negociable (WCAG 2.2)
 
-- Contraste ≥4.5:1 en texto normal, ≥3:1 en texto grande.
+- Contraste ≥4.5:1 en texto normal, ≥3:1 en grande.
 - Foco visible en todo elemento interactivo, nunca tapado.
-- Objetivo táctil mínimo 24×24px, estándar interno 44×44px. **En el mazo, el
-  retrato visual de un jugador puede ser menor (41px en móvil) siempre que el
-  área de clic del botón completo (retrato + nombre) siga midiendo ≥44px** —
-  verificado así en `mazos.php`/`layout.css`.
-- Todo operable por teclado: filtros, modales, ceremonia de sobre, **huecos
-  del mazo y opciones de aumento** (son `<button>`, no hace falta arrastrar).
-- Si algo usa arrastrar y soltar, alternativa por tap/clic desde el primer
-  lanzamiento (SC 2.5.7). El deck builder cumple esto por diseño: nunca ha
-  tenido arrastre, solo "elegir hueco → elegir jugador".
-- `prefers-reduced-motion` cubre las ceremonias. La entrada del marcador de
-  partido (`duelo.js`) comprueba esta preferencia y no anima si está activa.
-- Regiones `aria-live` para resultados de sobre y duelo. El reloj de la fase
-  de aumento usa `role="timer" aria-live="off"` a propósito (no se lee cada
-  segundo).
-- Un solo `<h1>` por página — **se rompió una vez en `duelo.php`** (la vista
-  de resultado no tenía ninguno) y se corrigió haciendo que el veredicto
-  ("Victoria"/"Derrota") sea el propio `<h1>`, con contexto para lector de
-  pantalla en un `<span class="sr-only">`.
+- Objetivo táctil mínimo 24×24px, estándar interno 44×44px. En el mazo, el
+  retrato puede ser menor si el **botón completo** llega a 44px.
+- Todo operable por teclado. El deck builder nunca ha usado arrastre, solo
+  "elegir hueco → elegir jugador", así que cumple SC 2.5.7 por diseño.
+- `prefers-reduced-motion` cubre las ceremonias. La simulación de partido ni
+  siquiera abre su modal si está activo: va directo al resultado.
+- `aria-live` para resultados de sobre y duelo. El reloj del aumento usa
+  `role="timer" aria-live="off"` a propósito.
+- Un solo `<h1>` por página. En `duelo.php` el veredicto ES el `<h1>`, con
+  `tabindex="-1"` para que la simulación le pase el foco al terminar.
 
-Errores de accesibilidad ya encontrados y corregidos (no los reintroduzcas):
-
+**Errores ya corregidos — no los reintroduzcas:**
 - Texto blanco sobre el holográfico SRF caía a 1,9:1 → placa oscura debajo.
 - Enlaces del pie a 20px de alto → `padding-block`.
-- Botón de hamburguesa comprimido a 20px por el flex → `flex-shrink: 0`.
-- `duelo.php`, vista de resultado, sin `<h1>` → corregido (ver arriba).
+- Hamburguesa comprimida a 20px por el flex → `flex-shrink: 0`.
+- `duelo.php` resultado sin `<h1>` → el veredicto pasó a serlo.
+- `.partido-nombre` y `.aumento-destape-lado` desbordaban con nombres largos
+  sin espacios (permitidos hasta 50 caracteres) → truncan con elipsis.
 
 ---
 
-## 8. Trampas conocidas del entorno y del código
+## 8. Trampas conocidas
 
 ### Entorno
 
 - **No hay Python real**: `python`/`python3`/`py` son el stub de Microsoft
-  Store. No hay `pandoc`.
-- **El navegador cachea CSS y JS con fuerza.** Tras editar, o bien recarga
-  con Ctrl+F5, o si estás automatizando pruebas, sustituye el `<link>`/
-  `<script>` con un `?bust=timestamp` y espera a `onload` antes de medir —
-  es el patrón usado durante toda la Fase 2 para verificar cambios de CSS/JS
-  sin depender de que el navegador respete la caché.
-- Apache y MariaDB a veces están parados. Comprobar con `Get-Process httpd`
-  y `Get-Process mysqld`. Si XAMPP los deja a medio arrancar/parar (pasó una
-  vez durante la Fase 2), mata los procesos `httpd`/`mysqld` colgados y
-  vuelve a lanzar `apache_start.bat`/`mysql_start.bat` desde `C:\xampp\`.
-- PHP CLI está en `C:\xampp\php\php.exe`.
-- **`extension=gd` estaba comentada en `php.ini`** (necesaria para convertir
-  imágenes). Ya se descomentó y Apache se reinició para aplicar el cambio.
-  Si `gd_info()` falla en otra máquina, es esto.
+  Store. No hay `pandoc`. No hay `node` (no puedes usar `node -c` para validar JS).
+- **El navegador cachea CSS y JS con fuerza.** Tras editar, recarga con Ctrl+F5,
+  o si automatizas pruebas, sustituye el `<link>`/`<script>` con
+  `?cb=timestamp` y espera a `onload` antes de medir. Es el patrón usado en
+  todas las verificaciones de este proyecto.
+- **El panel del navegador de pruebas no compone fotogramas si está en segundo
+  plano**: `requestAnimationFrame` se pausa y `document.hidden` es `true`. Las
+  animaciones no se pueden cronometrar ahí; hay que validar la lógica por
+  partes (estado final, algoritmos aislados) y decir honestamente que el ritmo
+  visual no se ha visto.
+- PHP CLI en `C:\xampp\php\php.exe`. `extension=gd` ya está descomentada.
+- Apache y MariaDB a veces están parados. Si XAMPP los deja a medias, mata los
+  procesos `httpd`/`mysqld` y relanza desde `C:\xampp\`.
 
-### Verificar pantallas con sesión sin iniciar sesión
+### Verificar pantallas con sesión
 
+Lo más cómodo es **iniciar sesión de verdad** con la cuenta `Claude` desde el
+navegador de pruebas:
+```js
+await fetch('/tcg_srf/login.php', {method:'POST',
+  body: new URLSearchParams({nombre:'Claude', password:'123456'})});
+```
+Para render en CLI sin navegador, inyecta la sesión:
 ```php
-session_start();
-$_SESSION['id_usuario'] = 2;   // usuario con cartas reales
-$sid = session_id();
-session_write_close();
+session_start(); $_SESSION['id_usuario'] = 9;
+$sid = session_id(); session_write_close();
 $_COOKIE[session_name()] = $sid;
 $_SERVER['REQUEST_METHOD'] = 'GET';
 ob_start(); include 'coleccion.php'; $html = ob_get_clean();
 ```
+Ojo: si incluyes dos páginas en el mismo proceso saldrá un aviso de
+`session_start()` duplicado — es artefacto del arnés, no un fallo de la página.
 
-O, para pruebas en navegador de verdad (recomendado para Fase 2, que tiene
-mucha interacción con JS): fija una sesión con `session_id()` explícito desde
-PHP CLI y pon esa cookie en el navegador con
-`document.cookie = "PHPSESSID=...; path=/"`.
+Usuarios: **id 9 `Claude`/`123456`** (la de pruebas, úsala), id 2 `LuluLulez`
+(~200 cartas, mazo titular "a"), id 1 `FranDictador` (1 solo cromo jugador, no
+puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
 
-Usuarios de prueba en la BD: id 2 (`LuluLulez`, ~200 cartas, admin), id 1
-(`FranDictador`, **solo 1 cromo jugador distinto — no puede formar
-alineación**), id 7 (`Prueba3`, sin cartas), id 8 (`Payo Water`, colección
-variada), **id 9 (`Claude` / `123456`, la cuenta dedicada a pruebas de IA —
-úsala siempre que puedas)**.
-
-### Código — general
+### Código
 
 - **`bloqueada` en BD = "protegida de la venta"**, no "no la tienes". En el
   componente son dos opciones distintas: `protegida` y `poseida`.
-- El mercado devuelve el nombre de la carta como `carta`, no `nombre`;
-  `mercado.php` lo adapta.
+- El mercado devuelve el nombre como `carta`, no `nombre`; `mercado.php` lo adapta.
 - `listarColeccionUsuario()` devuelve todas las copias; `contarColeccionUsuario()`
   cuenta distintas. No es un bug.
-- La ceremonia recibe la carta ya renderizada en servidor (`carta_html`). No
-  la reimplementes en JS — sigue aplicando en §14.
+- La ceremonia recibe la carta ya renderizada en servidor (`carta_html`). No la
+  reimplementes en JS — sigue aplicando en §14.
 - `rareza-clases.php` solo lo usa `panel/cromos.php`. Se retira en Fase 3.
-- `panel/` es autónomo, con Bootstrap Icons, no Phosphor. Se unifica en Fase 3.
-- `body` usa `overflow-x: clip`, no `hidden` (rompería el `sticky` de la nav).
-
-### Código — arte de cartas
-
-- `assets/img/` existe, con 35 ilustraciones de cromo (28 de 44 cromos con
-  arte), ya **optimizadas a WebP** (1,79 MB en total, antes 46,1 MB en PNG).
-  Originales sin optimizar en `assets/img/_originales_sin_optimizar/`, no
-  borrados.
-- Rutas con espacios y una `ñ` (`montaña.png`); Apache las sirve bien
-  percent-encodeadas.
-- `usuarios.foto` del id 2 apunta a un fichero que ya no existe; degrada a
-  iniciales sin romper nada (`is_file()` comprobado en `navbar.php`,
-  `perfil.php`, `configuracion.php`).
-
-### Código — Fase 2 (nuevo)
-
-- **`Tcg::HUECOS`** (en `db/consultas.php`) es el array `["POR","DF","DF",
-  "DF","DF","MC","MC","MC","MC","DC","DC"]` — el índice ES el número de
-  hueco (0–10). El orden del DOM en `mazos.php` sigue este array
-  exactamente, y el CSS de la disposición sobre el campo (`.hueco:nth-child`)
-  depende de que ese orden nunca cambie sin actualizar también el CSS.
-- **`mt_rand()`/`rowCount()` con MySQL**: `rowCount()` cuenta filas
-  *modificadas*, no *coincidentes*. `latirDuelo()` lo pisó una vez: dos
-  latidos en el mismo segundo escriben el mismo `NOW()`, así que
-  `rowCount()` daba 0 con la sala perfectamente viva. Se corrigió
-  confirmando con una lectura aparte en vez de fiarse del recuento del
-  `UPDATE`.
-- **Los navegadores estrangulan `setInterval` en pestañas de fondo.** El
-  margen de abandono de una sala de duelo (`duelo_latido_max`) se subió de
-  15 a 45 segundos tras comprobar que cambiar de pestaña un instante ya
-  cancelaba la sala por error. `duelo.js` además late inmediatamente al
-  volver a hacerse visible la pestaña (`visibilitychange`), no solo por el
-  temporizador.
-- **`fuerzaAlineacion()` es el contrato de la Capa 1** de combate. No se
-  modifica ni se envuelve dentro de sí misma: toda lógica nueva (aumento,
-  futuros rasgos) se calcula alrededor de su resultado, en
-  `calcularTotalFinal()`.
-- **La alineación de un duelo se congela** (`duelo_alineaciones`) en el
-  momento de comprometerse, copiando las cifras, no una referencia. Editar
-  el mazo después de crear/aceptar una sala no cambia ya nada de ese duelo —
-  verificado explícitamente con una prueba de "trampa" (mejorar el mazo tras
-  abrir la sala no sube la fuerza usada al resolver).
-- **No hay cron en este proyecto.** Todo lo que necesita "pasar el tiempo"
-  (vencer el plazo de aumento, dar una sala por abandonada) se evalúa de
-  forma perezosa: cada vez que alguien carga una pantalla o el sondeo AJAX
-  llama al servidor, se comprueba si algo venció y se actúa ahí mismo.
+- `panel/` es autónomo, con Bootstrap Icons y su propio `admin.css`. Fase 3.
+- `body` usa `overflow-x: clip`, **no `hidden`** (rompería el `sticky` de la nav).
+- **`Tcg::HUECOS`** es `["POR","DF","DF","DF","DF","MC","MC","MC","MC","DC","DC"]`
+  y el índice ES el número de hueco. El CSS `.hueco:nth-child` depende de ese
+  orden: si lo cambias, actualiza también el CSS.
+- **`rowCount()` en MySQL cuenta filas modificadas, no coincidentes.** Ya mordió
+  en `latirDuelo()`: dos latidos en el mismo segundo escriben el mismo `NOW()`
+  y daba 0 con la sala viva. Se confirma con una lectura aparte.
+- **Los navegadores estrangulan `setInterval` en pestañas de fondo.**
+  `duelo.js` late también en `visibilitychange`, no solo por temporizador.
+- **La alineación y las compos de un duelo se CONGELAN** al comprometerse.
+  Editar el mazo o reasignar un rasgo después no cambia un duelo en curso —
+  verificado con una prueba de "trampa".
+- **No hay cron.** Todo lo que necesita "pasar el tiempo" (vencer el plazo de
+  aumento, abandonar una sala) se evalúa de forma perezosa en cada carga o
+  sondeo. **Misiones debe seguir el mismo patrón.**
 
 ---
 
@@ -545,478 +481,393 @@ variada), **id 9 (`Claude` / `123456`, la cuenta dedicada a pruebas de IA —
 
 - **El briefing manda en diseño y marca. El código existente manda en
   convenciones técnicas.**
-- Nombres de clases CSS y de funciones **en español**.
-- Comentarios en español, explicando **por qué**, no qué.
-- **Sin dependencias nuevas de npm ni build step.** GSAP/Three.js siguen
-  siendo la única excepción autorizada, reservada a §14, y **todavía no se
-  han vendorizado** (`assets/js/vendor/` sigue vacío).
-- JS sin framework, en IIFE, con `'use strict'`. La API pública compartida
-  cuelga de `window.SRF`: `abrirModal`, `cerrarModal`, `toast`,
-  `ceremonia`, y **`confirmar(texto, alAceptar)` NUEVO** — envuelve
-  `partials/confirmar.php` para que cualquier pantalla pida confirmación sin
-  montar su propio modal. `mercado.js` sigue gestionando ese mismo modal por
-  su cuenta (además envía por AJAX); `SRF.confirmar` se aparta si detecta que
-  ya hay una petición de `mercado.js` en curso.
-- Escapar siempre con `htmlspecialchars()`. Consultas con PDO preparado.
-- **Toda la capa de acceso a datos vive en la clase `Tcg`** (`db/consultas.php`).
-  La Fase 2 no creó clases nuevas: añadió ~1150 líneas de métodos nuevos a
-  esta misma clase, agrupados por comentarios de sección (`MAZOS`, `DUELOS`,
-  `AUMENTO PRE-PARTIDO`, `CONFIGURACIÓN`).
-- **Parámetros de balance en BD, no en código.** La tabla `configuracion`
-  (clave/valor) guarda `duelo_k`, `duelo_p_min`, `duelo_p_max`,
-  `duelo_plazo_aumento`, `duelo_latido_max`. Se leen con `$db->config($clave,
-  $porDefecto)`. Cualquier parámetro de balance nuevo va aquí, nunca como
-  constante embebida.
-- **Patrón "sala en vivo" sin websockets**: latido periódico (cliente →
-  servidor cada pocos segundos) + sondeo (la misma respuesta dice si ya se
-  puede avanzar) + `navigator.sendBeacon` en `pagehide` para avisar al
-  servidor si se cierra la pestaña. Es el patrón de `duelo.js` +
-  `assets/ajax/duelo_estado.php`; reutilízalo si algo más necesita "estar en
-  una sala esperando a otro jugador".
+- Nombres de clases CSS y de funciones **en español**. Comentarios en español,
+  explicando **por qué**, no qué.
+- **Sin dependencias de npm ni build step.** GSAP/Three.js son la única
+  excepción autorizada, reservada a §14, y **aún no vendorizados**.
+- JS sin framework, en IIFE, con `'use strict'`. API pública en `window.SRF`:
+  `abrirModal`, `cerrarModal`, `toast`, `confirmar`, `ceremonia`.
+- Escapar siempre con `htmlspecialchars()`. PDO preparado siempre.
+- **Toda la capa de datos vive en la clase `Tcg`** (`db/consultas.php`, ~2630
+  líneas), agrupada por comentarios de sección (`MAZOS`, `DUELOS`, `AUMENTO
+  PRE-PARTIDO`, `CAPA 2 — COMPOS`, `CONFIGURACIÓN`). No se crean clases nuevas.
+- **Patrón "sala en vivo" sin websockets**: latido periódico + sondeo +
+  `navigator.sendBeacon` en `pagehide`. Ver `duelo.js` + `assets/ajax/duelo_estado.php`.
 
 ### Decisiones ya tomadas — no volver a abrirlas
 
-- **La nav es `sticky`, no fija superpuesta.**
-- **Nada de desplegables falsos en la navegación.**
-- **La ceremonia recibe la carta renderizada en servidor.**
-- **Geist va autoalojada**, no por CDN.
-- **GSAP y Three.js están autorizados y vendorizados sin npm**, exclusivamente
-  para §14.
-- **Los ficheros retirados se mueven a `_legacy/`, no se borran.**
-- **El texto del `<h1>` de la portada lo controla Alejandro.**
-- **Confirmación explícita en modal propio** para toda acción con
-  consecuencia económica. Nunca `confirm()` del navegador.
-- **La SRF tiene que ganar visualmente a la legendaria.**
+- La nav es `sticky`, no fija superpuesta.
+- Nada de desplegables falsos en la navegación.
+- La ceremonia recibe la carta renderizada en servidor.
+- Geist va autoalojada, no por CDN.
+- GSAP y Three.js autorizados **solo** para §14, vendorizados sin npm.
+- Los ficheros retirados se mueven a `_legacy/`, no se borran.
+- El `<h1>` de la portada lo controla Alejandro.
+- Confirmación explícita en modal propio para toda acción con consecuencia
+  económica. Nunca `confirm()` del navegador.
 - **Se duela siempre con el mazo titular**, nunca eligiendo mazo por partida.
-  Si no hay titular con los 11 huecos cubiertos, no se puede ni crear ni
-  aceptar un duelo.
-- **Un mismo cromo no puede repetirse en una alineación**, aunque haya varias
-  copias suyas en la colección. Es legal tenerlas, no alinearlas dos veces.
-- **Cualquier carta puede ir en cualquier hueco del mazo.** No hay reglas de
-  posición al armar; lo que cambia es con qué estadística puntúa ahí. Es
-  decisión explícita de Alejandro ("poder quien quieras donde quieras"), no
-  se vuelve a discutir aunque permita alineaciones "raras" a propósito.
-  Cualquier bloqueo de posición sería revertir esta decisión.
-- **En la apuesta de carta de un duelo, la carta concreta la elige quien
-  puja**, no el sistema automáticamente "la más valiosa".
-- **El fallback del aumento pre-partido es aleatorio entre las 3 opciones**,
-  no la de porcentaje más bajo (que era la especificación técnica original).
-  Alejandro lo cambió explícitamente para no penalizar tan duro a quien no
-  llega a tiempo. Es una **desviación documentada**, no un olvido — si se
-  quiere volver a la versión determinista, es una decisión de Alejandro.
-- **Los aumentos de ambos jugadores se destapan a la vez, solo cuando el
-  duelo ya está resuelto.** Nunca antes, ni parcialmente: es la regla
-  anti-abuso de la especificación de combate (evita que quien elige segundo
-  tenga ventaja).
+- **Un mismo cromo no puede repetirse en una alineación**, aunque tengas copias.
+- **Cualquier carta puede ir en cualquier hueco.** No hay reglas de posición;
+  lo que cambia es con qué estadística puntúa. Decisión explícita de Alejandro
+  ("poder quien quieras donde quieras"). Cualquier bloqueo de posición sería
+  revertirla.
+- **En la apuesta de carta, la carta concreta la elige quien puja**, no el sistema.
+- **El fallback del aumento es aleatorio entre las 3 opciones**, no la más baja
+  (que era la especificación original). Desviación documentada, decidida por
+  Alejandro para no castigar tan duro a quien no llega a tiempo.
+- **Los aumentos de ambos se destapan a la vez, solo con el duelo ya resuelto.**
+  Regla anti-abuso: verlos antes daría ventaja a quien elige segundo.
+- **Tensión no da fuerza**, mejora las probabilidades de tier del Aumento (§10.2).
 
 ---
 
-## 10. Fase 2 — detalle técnico de lo construido
+## 10. Capa 2 — Compos (CONSTRUIDA)
 
-### 10.1 Migración de base de datos
+Implementa `branding/Superliga_Frontier_TCG_Sistema_Compos_Balance.md`, §3 a §6.
 
-`db/migraciones/002_duelos_misiones_mazos.sql`. Aditiva, y **verificada
-re-ejecutable sin duplicar nada** (se ha corrido varias veces durante el
-desarrollo). Aplicar con:
+### 10.1 Modelo
 
-```bash
-C:\xampp\mysql\bin\mysql.exe -u root tcg < db/migraciones/002_duelos_misiones_mazos.sql
-```
+Un **rasgo** es una etiqueta que, con suficientes copias en el once, activa un
+bonus sobre una o dos líneas. **Umbrales 2 / 5 / 11 copias** para todos.
 
-Tablas nuevas: `mazos`, `mazo_cartas`, `duelos`, `duelo_apuestas`,
-`duelo_alineaciones`, `duelo_aumentos`, `configuracion`, `misiones`,
-`misiones_progreso`, `minijuegos_partidas`.
+| Rasgo | Tipo | Línea(s) | N1 | N2 | N3 |
+|---|---|---|---|---|---|
+| Fuego | afinidad | Ataque | 2,99 % | 6,97 % | 13,94 % |
+| Bosque | afinidad | Medio | 1,60 % | 3,74 % | 7,49 % |
+| Viento | afinidad | Defensa | 1,79 % | 4,17 % | 8,33 % |
+| Montaña | afinidad | Portería | 6,75 % | 15,75 % | 31,50 % |
+| Contraataque | configuración | Ataque | 2,99 % | 6,97 % | 13,94 % |
+| Vínculo | configuración | Medio | 1,60 % | 3,74 % | 7,49 % |
+| Justicia | configuración | Ataque + Defensa | 0,75 % | 1,68 % | 3,35 % |
+| Brecha | configuración | Ataque + Portería | 1,38 % | 3,11 % | 6,21 % |
+| Tensión | derivado | — (mejora el Aumento) | 3 rasgos | 5 rasgos | 7 rasgos |
 
-Columnas nuevas en tablas existentes:
+Los porcentajes **no son uniformes a propósito**: Portería pesa ~9 % del total
+y Medio ~37 %, así que Montaña necesita un % mucho mayor para tener el mismo
+impacto real. Están calibrados para equivaler, no para parecer iguales.
 
-- **`cromos`**: `ataque`, `defensa`, `tecnica` (TINYINT UNSIGNED). Sembradas
-  para las 38 cartas de posición jugadora (POR/DF/MC/DC); las 6 cartas no
-  jugadoras (escudos, entrenadores, gerentes) se quedan a 0 a propósito.
-  Fórmula: base por rareza (60→94) + ajuste por posición + variación
-  determinista por `id_cromo`.
-- **`duelos`**: `estado` amplíado de 3 a 6 valores (`creado`, `aceptado`,
-  `aumento_pendiente`, `listo_para_resolver`, `resuelto`, `cancelado`);
-  columnas de trazabilidad completa de la resolución (`total_bruto_*`,
-  `total_final_*`, `probabilidad_victoria_creador`, `valor_sorteo`,
-  `k_utilizado`, `aumento_vence`, `ultimo_latido`).
+**La afinidad NO se duplica en `cromo_rasgos`**: vive solo en
+`cromos.id_afinidad`, para que no haya dos fuentes de la misma verdad. Solo los
+rasgos de configuración se guardan en `cromo_rasgos`.
 
-Valores de arranque en `configuracion` (todos **provisionales**, sin
-calibrar con datos de duelos reales):
+### 10.2 Cómo se deriva el rasgo de configuración
 
-| Clave | Valor | Qué es |
+Alejandro eligió **derivación automática** en vez de curación a mano.
+
+**Se descartó derivar de las estadísticas** (`ataque`/`defensa`/`tecnica`), que
+es lo primero que uno intentaría: esas columnas se sembraron con una fórmula de
+base-por-rareza + ajuste-por-posición, así que **no contienen información
+independiente** (hay cartas con estadísticas idénticas: Vozinha y Strem Goozer,
+40/74/67). Derivar de ahí daría un rasgo que es un calco de la posición y —lo
+grave— **correlacionado con la rareza**, lo cual anularía el malus de coherencia,
+cuyo propósito exacto es que la rareza alta no venga con compos gratis.
+
+**Regla usada:** `rasgo = (línea_del_puesto − línea_de_la_afinidad) mod 4`, con
+POR/DF/MC/DC = 0..3 y Montaña/Viento/Bosque/Fuego = 0..3, mapeando
+`0→Contraataque, 1→Justicia, 2→Vínculo, 3→Brecha`. Como ambas se mueven en la
+misma escala de 4 líneas, sale un cuadrado latino: cada rasgo cae en las 4
+posiciones **y** en las 4 afinidades.
+
+Verificado sobre las 38 cartas: reparto **Vínculo 12, Contraataque 10, Justicia
+8, Brecha 8**; rareza media por rasgo 2,38–3,33 frente al 2,84 del catálogo, es
+decir **sin correlación con la rareza**.
+
+`Tcg::derivarRasgosConfiguracion()` la aplica. **Nunca pisa una fila con
+`manual = 1`**, así que curar a mano desde el panel (Fase 3) será compatible sin
+rediseñar nada. Se dispara sola al crear o editar un cromo desde
+`panel/cromos.php`.
+
+### 10.3 Motor
+
+Todo en `db/consultas.php`, sección `CAPA 2 — COMPOS`:
+
+- `calcularCompos(array $cartas)` — el núcleo. Devuelve `activos`,
+  `bonos_linea` (ya con rendimientos decrecientes y tope), `tension_nivel`,
+  `afinidad_dom`, `compo_index`, `rareza_index`, `malus`.
+- `bonoCicloAfinidad($mio, $suyo)` — ciclo canon **Fuego>Bosque>Viento>Montaña>Fuego**
+  (Fūrinkazan, no se toca nunca). Neutro ni gana ni pierde.
+- `congelarCompos()` / `listarComposDuelo()` — congelado por duelo.
+- `probabilidadesTier($tensionNivel)` — tabla de Tensión → Aumento.
+- `derivarRasgosConfiguracion()` — §10.2.
+
+**Orden de aplicación en la fórmula maestra** (importante, no lo cambies):
+1. Bonos de **categoría** por línea = compos (con rendimientos decrecientes
+   `[1.0, 0.7, 0.45, 0.25]` y tope de línea 20 %) **+** Aumento.
+   El tope acota **solo las compos**; el Aumento se suma por encima.
+2. Se suman las líneas ya ajustadas.
+3. Bonos de **total** sobre esa suma: ciclo de contra-afinidad (+) y malus de
+   coherencia (−). Nunca encadenados sobre un valor ya multiplicado.
+
+**Dónde se engancha:** `aceptarDuelo()` congela compos y genera los Aumentos con
+el nivel de Tensión de cada jugador; `resolverDuelo()` recalcula desde la
+alineación congelada y aplica todo.
+
+### 10.4 Interfaz
+
+- `mazos.php` — panel "Compos activas" con rasgos, nivel en puntos
+  llenos/vacíos, afinidad dominante, Tensión, rareza media y malus. Se
+  recalcula al guardar, **no en vivo con JS**: el cálculo vive en servidor y
+  duplicarlo en JavaScript sería tener dos fuentes de la misma verdad.
+- `duelo.php` — dos paneles enfrentados en el resultado, leyendo las compos
+  **congeladas**, más el ciclo y el malus de cada uno.
+
+### 10.5 Verificación hecha
+
+| Comprobación | Documento | Implementación |
 |---|---|---|
-| `duelo_k` | 400 | K de la curva Elo de resolución |
-| `duelo_p_min` | 0.05 | probabilidad mínima de ganar, nunca 0 |
-| `duelo_p_max` | 0.95 | probabilidad máxima de ganar, nunca 1 |
-| `duelo_plazo_aumento` | 30 (segundos) | tiempo para elegir aumento |
-| `duelo_latido_max` | 45 (segundos) | margen antes de dar una sala por abandonada |
+| Fuego vence a Bosque (ciclo 5,5 %) | 57,78 % | **57,75 %** |
+| 4 rasgos apilados en Ataque, bruto | «supera el 30 %» | 37,44 % |
+| …con rendimientos decrecientes | — | 27,33 % |
+| …con tope de línea | 20 % | **20,00 %** |
+| Probabilidades de tier por Tensión | 60/30/10 → 43/36/21 | idénticas |
 
-### 10.2 Constructor de mazos (`mazos.php`, `assets/js/mazos.js`)
+### 10.6 Tres hallazgos abiertos (decisiones para Alejandro)
 
-- 11 huecos fijos: 1 POR + 4 DF + 4 MC + 2 DC (`Tcg::HUECOS`). Cualquier
-  carta en cualquier hueco; puntúa con `defensa` (POR/DF), `tecnica` (MC) o
-  `ataque` (DC) según el hueco, no según su posición natural
-  (`Tcg::ESTADISTICA_LINEA`).
-- **La alineación se dibuja como un campo de fútbol real**, no como una
-  rejilla plana: `.alineacion` es un contenedor con fondo de líneas de campo
-  (SVG inline en el CSS: banda, círculo central, ambas áreas) y los 11
-  huecos se posicionan de forma absoluta con `:nth-child` siguiendo
-  exactamente el orden de `Tcg::HUECOS` (portero abajo, después DF, después
-  MC, delanteros arriba).
-- Cada hueco muestra un **retrato circular compacto** (no la tarjeta
-  completa: 11 tarjetas completas en un campo no serían legibles), con el
-  mismo lenguaje de borde de rareza que el resto del sitio — ver la técnica
-  exacta en §3. La tarjeta completa, con estadísticas y rareza en texto, se
-  ve en el selector de jugadores de abajo, que es donde hace falta el
-  detalle para elegir.
-- **El selector de jugadores agrupa copias repetidas** del mismo cromo con
-  la insignia "×N" (mismo criterio y misma opción del componente que ya usa
-  `coleccion.php`) — todas las copias de un jugador son intercambiables
-  (mismas estadísticas) y solo una puede alinearse a la vez, así que no
-  tiene sentido listar 200 veces la misma carta común.
-- Interacción: **elegir hueco → elegir jugador**, con `<button>` normales
-  (tap, clic, teclado — nunca arrastre). Avanza sola al siguiente hueco
-  libre tras cada asignación.
-- **Un mismo cromo no puede repetirse en el once**, validado en servidor
-  (`guardarCartasMazo()`), no solo en la pantalla.
-- Guardarraíles verificados con pruebas reales: una carta en un mazo no se
-  puede vender; no se puede guardar un mazo ajeno, de tamaño incorrecto, con
-  un hueco repetido o con el mismo jugador dos veces.
+1. **El malus de coherencia muerde menos de lo que dice el §6.3.** Su escenario
+   de "rareza alta con 0 compos" **no existe con solo 4 afinidades**: por
+   principio del palomar, un once de 11 siempre repite un elemento 3 veces y
+   activa Nivel 1. En una prueba el equipo "desordenado" acabó con más
+   `compo_index` (4) que el monotype (3). No es un fallo de implementación —la
+   fórmula está literal— sino que su simulación asumía un espacio de rasgos
+   mayor. Se corregirá solo según crezca el catálogo.
+2. **§3.3 y §3.5 se contradicen para Montaña.** Su Nivel 3 son +31,5 %, pero el
+   tope de línea es 20 %: cuando el catálogo permita un monotype Montaña puro,
+   el tope lo recortará a 20 %, deshaciendo la calibración que hacía a Montaña
+   equivalente. Hoy da igual (solo hay 9 cartas Montaña, hacen falta 11). Es el
+   único rasgo que toca el tope.
+3. **Nivel 3 casi inalcanzable.** Requiere 11 copias distintas del mismo rasgo.
+   Disponibles hoy: Viento 10, Bosque 10, Montaña 9, Fuego 9, Vínculo 12,
+   Contraataque 10, Justicia 8, Brecha 8. **Solo Vínculo llega.** Los umbrales
+   son absolutos por diseño (§16 del documento) para que el catálogo crezca sin
+   retocar parámetros; es techo aspiracional, no un error.
 
-### 10.3 Duelos (`duelos.php`, `duelo.php`, `assets/js/duelos.js`, `duelo.js`, `assets/ajax/duelo_estado.php`)
+### 10.7 Qué NO entró (fuera del alcance acordado)
 
-**Máquina de estados:**
+Del documento de balance quedan sin construir: **PvE Cadenas de Partido** (§7),
+**formaciones alternativas** (§8), **anti-tilt de sesión** (§9), **matchmaking
+anti-repetición** (§10), **validador de balance del panel** (§12) y el **pity
+del Aumento** (§5.3). Ninguno bloquea nada de lo construido.
 
+---
+
+## 11. MISIONES — lo siguiente (§ para quien lo recoja)
+
+### 11.1 Estado real
+
+- ✅ Esquema en BD (`002`): tablas `misiones` y `misiones_progreso`.
+- ✅ 8 misiones sembradas (texto ya reparado, ver §5.3).
+- ❌ **Cero métodos en `db/consultas.php`.** Comprobado: `grep -n "mision"`
+  no devuelve nada en la capa de datos.
+- ❌ Cero pantalla, cero enlace en la navegación.
+
+### 11.2 Esquema existente
+
+```sql
+misiones(id_mision, nombre, descripcion, tipo, objetivo,
+         recompensa_monedas, activo)
+
+tipo ENUM('cartas_distintas','copias_totales','duelos_jugados',
+          'duelos_ganados','expansiones_completas','mazos_creados')
+
+misiones_progreso(id_progreso, id_usuario, id_mision, fecha_reclamada)
 ```
-creado → aumento_pendiente → listo_para_resolver → resuelto
-   ↓ (nadie entra, o el creador abandona)
-cancelado
-```
 
-**Ciclo completo:**
+**Fíjate en el diseño:** `misiones_progreso` **solo registra el reclamo**, no un
+contador. Es deliberado y encaja con la regla de §8: el progreso se **deriva**
+de consultas ya existentes, nunca se duplica en un contador que puede
+desincronizarse.
 
-1. El creador abre una sala con su mazo titular y una apuesta (monedas,
-   retenidas al momento; o una carta concreta de una rareza, bloqueada al
-   momento). Se queda "dentro" de la sala latiendo cada 3s
-   (`assets/ajax/duelo_estado.php`); si deja de latir más de
-   `duelo_latido_max` segundos, la sala se cancela sola y se devuelve lo
-   apostado.
-2. Un rival entra desde el lobby, con su propio mazo titular y su apuesta.
-   En ese mismo POST se congela la alineación de AMBOS
-   (`duelo_alineaciones`) y el duelo pasa a `aumento_pendiente`.
-3. Ambos jugadores llegan a la pantalla de partido y ven **sus propias** 3
-   opciones de aumento (generadas una sola vez, nunca las del rival — ni
-   siquiera se consultan del lado servidor durante esta fase). Tienen
-   `duelo_plazo_aumento` segundos para elegir; si no eligen, se les asigna
-   una al azar entre las 3.
-4. En cuanto ambos tienen aumento elegido, el duelo se resuelve: fuerza bruta
-   de cada uno (`fuerzaAlineacion()`) + bono del aumento
-   (`calcularTotalFinal()`) → probabilidad vía curva Elo, acotada entre
-   `duelo_p_min` y `duelo_p_max` → sorteo real → ganador → apuestas movidas
-   → resultado guardado con trazabilidad completa (probabilidad, sorteo, K
-   usado).
-5. Los dos aumentos se destapan a la vez en la pantalla de resultado, junto
-   con el desglose de fuerza por las 4 líneas y las 11 cartas de cada
-   alineación.
+### 11.3 Las 8 misiones sembradas
 
-**Verificado con pruebas reales, no solo escrito:** ciclo completo con
-apuesta de monedas (retención + bote al ganador), ciclo completo con apuesta
-de carta (transferencia de propiedad), congelación de alineación resistiendo
-un intento de "trampa" (mejorar el mazo tras abrir la sala), curva de
-probabilidad acotada incluso con diferencias de fuerza extremas, tiers de
-aumento sobre 3.000 muestras (60,47/29,83/9,70 % contra 60/30/10 esperado),
-orden de aplicación de la fórmula maestra (categoría antes que total, nunca
-encadenado), latido y cancelación automática de sala abandonada con
-devolución exacta de lo apostado, sondeo detectando en vivo que el rival
-completó su elección sin recargar a mano.
+| id | Nombre | Tipo | Objetivo | Recompensa |
+|---|---|---|---|---|
+| 1 | Primeras fichas | cartas_distintas | 10 | 250 |
+| 2 | Plantilla amplia | cartas_distintas | 25 | 600 |
+| 3 | Archivo completo | cartas_distintas | 40 | 1500 |
+| 4 | Fondo de armario | copias_totales | 100 | 400 |
+| 5 | Alineación inscrita | mazos_creados | 1 | 300 |
+| 6 | Debut en competición | duelos_jugados | 1 | 250 |
+| 7 | Racha de temporada | duelos_ganados | 5 | 900 |
+| 8 | Expansión al día | expansiones_completas | 1 | 1200 |
 
-**Lo que es explícitamente provisional:**
+### 11.4 De dónde sale cada progreso (ya existe, no lo reinventes)
 
-- El marcador de goles (`marcadorDuelo()`) es un placeholder funcional: nunca
-  contradice al ganador ya sorteado, pero el algoritmo exacto no se considera
-  el diseño final.
-- `duelo_k`, `duelo_p_min`, `duelo_p_max` no están calibrados con datos de
-  duelos reales.
-
-### 10.4 Capa 2 de combate — rasgos/sinergias (APLAZADA, falta contenido)
-
-Diseño de motor ya cerrado (no discutirlo salvo problema real encontrado); lo
-que falta es **contenido de equipo**, y es el motivo por el que esta capa no
-se ha construido:
-
-- Un rasgo es una etiqueta asignada a mano a cartas concretas. Con
-  suficientes cartas del mismo rasgo en la alineación titular (11 cartas, no
-  toda la colección), se activa un nivel de bono. Solo cuenta el nivel más
-  alto por rasgo; entre rasgos distintos, los bonos se suman agrupados por a
-  qué afectan (una línea concreta, o el total general).
-- El motor de cálculo (`calcularTotalFinal()`) **ya tiene el hueco
-  preparado**: aplica bonos de categoría junto con el aumento, y un bono de
-  total al final, sobre la suma ya ajustada. Hoy esos bonos de rasgo valen
-  siempre 0. Construir esta capa no obliga a tocar el deck builder, la curva
-  de resolución ni ninguna pantalla ya hecha — solo añadir un paso más al
-  cálculo que ya existe.
-- **No existe ninguna tabla de rasgos todavía** (a diferencia de Misiones,
-  que sí tiene esquema aunque no pantalla). Cero implementación.
-
-**Decisiones de contenido pendientes**, con datos reales del catálogo para
-decidir con criterio:
-
-Cartas jugadoras por equipo (solo 2 de 6 equipos tienen catálogo suficiente
-para un rasgo con varios niveles):
-
-| Equipo | Cartas jugadoras |
+| Tipo | Consulta existente |
 |---|---|
-| Instituto Zeus | 17 |
-| Academia Plenilunio | 16 |
-| Alpino | 2 |
-| Triple C | 1 |
-| Zanark Domain | 1 |
-| Inazuma Kids CF | 1 |
+| `cartas_distintas` | `contarColeccionUsuario($id)` — cuenta distintas |
+| `copias_totales` | `COUNT(*) FROM coleccion WHERE id_usuario = ?` |
+| `expansiones_completas` | `contarExpansionesCompletas($id)` |
+| `mazos_creados` | `listarMazosUsuario($id)` (o un `COUNT`) |
+| `duelos_jugados` | `duelos` donde participa y `estado='resuelto'` |
+| `duelos_ganados` | `duelos` con `id_ganador = ?` |
 
-Afinidades disponibles: Montaña, Fuego, Viento, Bosque, sin afinidad.
-Distribución de rareza entre las 38 jugadoras: Común 11, Poco común 8, Raro
-6, Épico 7, Legendario 1, SRF 5.
+Solo faltan consultas de conteo para los dos últimos; el resto ya está.
 
-Preguntas abiertas que hay que responder antes de construir: ¿el criterio de
-rasgo es por equipo, por afinidad, por otra cosa, o varios combinados?; qué
-cartas concretas lleva cada rasgo; cuántos niveles y cuántas copias exige
-cada uno; qué bono da cada nivel y a qué afecta.
+### 11.5 Lo que hay que construir
+
+- [ ] Sección `MISIONES` en `db/consultas.php`: `listarMisionesConProgreso($id)`
+      (devuelve cada misión con su progreso actual, su objetivo y si ya está
+      reclamada) y `reclamarMision($id_mision, $id_usuario)`.
+- [ ] `misiones.php` reutilizando `.panel`, `.progreso`, `.btn`, `.vacio` — sin
+      componentes nuevos.
+- [ ] Enlace en el clúster **"Jugar"** de `navbar.php` (añadir una línea al
+      array `$navGrupos`; ya está montado para recibirlo).
+- [ ] Reclamo con **confirmación y transacción**: comprobar objetivo cumplido y
+      no reclamada antes de pagar, con `FOR UPDATE`, siguiendo el patrón de
+      `comprarAnuncio()` / `resolverDuelo()`.
+
+### 11.6 Decisiones que conviene preguntarle a Alejandro antes
+
+1. **¿El reclamo es manual o automático?** El esquema (`fecha_reclamada`) sugiere
+   manual — el jugador pulsa "Reclamar". Confirmar.
+2. **¿Las misiones se repiten o son de una sola vez?** El esquema actual solo
+   permite una vez por usuario (no hay fecha de ciclo ni contador de repetición).
+3. **¿Misiones diarias/semanales?** No hay columna para ello; añadirlas sería
+   una migración `005` aditiva.
 
 ---
 
-## 11. Fase 3 — pulido y escala
+## 12. Pendientes, en orden aproximado
 
-Sin cambios respecto a antes: se abre solo cuando la Fase 2 esté cerrada y
-estable de verdad (con Misiones construidas y la Capa 2 resuelta, no solo con
-Mazos y Duelos). Tres bloques: rediseñar `panel/` al sistema nuevo, unificar
-el motion de las ceremonias de sobre y duelo, y documentar cómo añadir una
-expansión de temporada.
-
----
-
-## 12. Pendientes, en orden aproximado de lo que probablemente toca primero
-
-1. **Pantalla de Misiones.** El esquema y las 8 misiones de arranque ya están
-   en BD (`misiones`, `misiones_progreso`); falta la pantalla y la lógica que
-   calcule el progreso (derivado de consultas ya existentes — cartas
-   distintas, duelos ganados, mazos creados — nunca un contador duplicado).
-   No depende de la Capa 2 ni de nada pendiente; se puede hacer en cualquier
-   momento.
-2. **Decidir contenido de la Capa 2** (§10.4) y construirla.
-3. **Minijuegos** — ni contenido ni pantalla; aplazados explícitamente por
-   Alejandro, sin fecha.
-4. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con datos de duelos
-   jugados de verdad, una vez haya volumen real de partidas.
-5. **Diseñar el algoritmo definitivo del marcador de goles**, hoy
-   placeholder.
-6. **`_legacy/` se puede borrar** cuando Alejandro confirme que no echa nada
-   en falta (ya no es tan urgente conservarlo como antes de tener git, pero
-   sigue sin haber orden de borrarlo).
-7. **§14, ceremonia 3D de sobres** — sigue sin empezar, es la extensión
-   autorizada aparte de todo este orden.
+1. **Misiones** (§11). Sin dependencias, el siguiente natural.
+2. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
+   y la derivación nunca lo pisa; falta solo la UI, que es de Fase 3.
+3. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
+4. **Resolver los tres hallazgos de §10.6.**
+5. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
+6. **Algoritmo definitivo del marcador de goles**, hoy placeholder funcional
+   (`marcadorDuelo()`): nunca contradice al ganador ya sorteado, pero el
+   algoritmo no se considera el diseño final.
+7. **`_legacy/` se puede borrar** cuando Alejandro confirme.
+8. **§14, ceremonia 3D de sobres** — extensión autorizada aparte del orden.
+9. **Fase 3** — panel admin al sistema nuevo, motion unificado, doc de expansiones.
 
 ---
 
 ## 13. Comprobaciones antes de dar algo por terminado
 
 ```bash
-for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php; do
+for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do
   C:/xampp/php/php.exe -l "$f"
 done
 ```
 
 En navegador, a 375×812 y en escritorio:
 
-- Sin scroll horizontal de página.
-- Recorre con el tabulador: foco siempre visible y nunca tapado.
-- Modales: se abren, atrapan el foco, cierran con Esc y devuelven el foco.
-- Con "reducir movimiento" activo: sin volteos ni destellos.
-- Objetivos táctiles ≥24×24 (44×44 en acciones primarias; en el mazo, el
-  botón completo cuenta, no solo el retrato visual).
+- Sin scroll horizontal de página (`document.documentElement.scrollWidth`).
+- Tabulador: foco siempre visible y nunca tapado.
+- Modales: se abren, atrapan el foco, cierran con Esc, devuelven el foco.
+- Con "reducir movimiento": sin volteos ni destellos, y la SRF sigue reconocible.
+- Objetivos táctiles ≥24×24 (44×44 en acciones primarias).
 - Un solo `<h1>`, `main#contenido`, `.skip-link` y aviso legal en cada página.
+- **Prueba con nombres largos**: un nombre de invocador de 50 caracteres sin
+  espacios ya rompió el marcador y el destape de aumentos. Es un caso real.
 
-Si tocas Duelos, añade además:
-
-- Crear una sala, dejarla sola más de `duelo_latido_max` segundos, y
-  comprobar que se cancela y devuelve lo apostado.
-- Comprobar en `duelo_aumentos` que las opciones de un jugador nunca
+Si tocas Duelos, además:
+- Crear sala, dejarla más de `duelo_latido_max` segundos, comprobar que se
+  cancela y devuelve lo apostado.
+- Comprobar en `duelo_aumentos` que las opciones de un jugador **nunca**
   aparecen en la respuesta que recibe el otro.
-- Comprobar que editar el mazo después de comprometerse a un duelo no
-  cambia el resultado (fuerza usada = la congelada, no la del mazo vivo).
+- Comprobar que editar el mazo tras comprometerse no cambia el resultado.
 
-Si trabajas en §14, sigue las comprobaciones específicas que ya tenía este
-documento (vendorizado sin npm, sin modelos 3D en el repo, `prefers-reduced-motion`
-cubierto, botones de skip sin dejar timelines colgadas) — sin cambios.
+Si tocas la Capa 2, además:
+- `SELECT HEX(nombre) FROM rasgos WHERE clave='montana';` → debe contener `c3b1`.
+- Reejecutar `derivarRasgosConfiguracion()` no debe cambiar el reparto
+  (12/10/8/8) ni pisar filas con `manual = 1`.
+- El ciclo Fuego→Bosque debe seguir dando ~57,8 % con onces equivalentes.
 
 ---
 
-## 14. Ceremonia de sobres 3D y reveal secuencial de cartas
+## 14. Ceremonia de sobres 3D y reveal secuencial
 
-**Estado: sin empezar.** Sin cambios de fondo respecto a como se dejó
-especificado. Es una extensión explícita y autorizada de la ceremonia de
-sobres ya cerrada en la Fase 1: no se reabre esa fase entera, se construye
-esto **encima**, en los mismos ficheros (`sobres.php`,
-`partials/ceremonia.php`, `assets/js/sobres.js`, `assets/js/ceremonia.js`,
-`assets/css/components.css`) más los nuevos módulos que se describen abajo.
+**Estado: sin empezar.** Extensión explícita y autorizada de la ceremonia ya
+cerrada en la Fase 1: no se reabre esa fase, se construye **encima**, en los
+mismos ficheros (`sobres.php`, `partials/ceremonia.php`, `assets/js/sobres.js`,
+`assets/js/ceremonia.js`, `assets/css/components.css`).
 
 ### 14.0 Tecnología permitida
 
-- **GSAP está permitido y se debe usar** como orquestador de todas las
-  timelines de esta sección (`gsap.timeline()`, `gsap.to()`,
-  `gsap.quickTo()`, y `ScrollTrigger` si la vitrina usa scroll). Vendorizar en
-  `assets/js/vendor/gsap/` (build UMD standalone, sin npm, sin bundler).
-- **Three.js también está permitido**, para lo que CSS 3D transforms no cubra
-  bien por rendimiento (partículas del walkout de §14.5, o un
-  `CSS3DRenderer` sobre el propio DOM de la vitrina si el CSS puro no aguanta
-  bien). Vendorizar en `assets/js/vendor/three/` (build ESM de un solo
-  fichero, sin npm).
-  - Lo único que sigue prohibido es **importar modelos 3D como asset**
-    (`.glb`/`.gltf`/`.obj`/`.fbx`/`.blend`). Si se usa Three.js, las
-    geometrías se generan por código (planos, sprites, partículas), nunca se
-    cargan desde un fichero de modelo externo.
-- Motivo de la corrección respecto a versiones antiguas de este documento: el
-  desarrollador que dejó esto sin hacer no evitó GSAP/Three.js por una
-  decisión de producto, sino porque no sabía usarlos. Alejandro ha confirmado
-  que sí quiere que se usen aquí.
+- **GSAP está permitido y se debe usar** como orquestador de las timelines
+  (`gsap.timeline()`, `gsap.to()`, `gsap.quickTo()`, `ScrollTrigger`).
+  Vendorizar en `assets/js/vendor/gsap/` (build UMD, sin npm, sin bundler).
+- **Three.js también**, para lo que CSS 3D no cubra por rendimiento.
+  Vendorizar en `assets/js/vendor/three/` (build ESM de un fichero).
+  - Sigue **prohibido importar modelos 3D** (`.glb`/`.gltf`/`.obj`/`.fbx`/
+    `.blend`). Las geometrías se generan por código.
+- Motivo: el desarrollador anterior no evitó GSAP/Three.js por decisión de
+  producto sino porque no sabía usarlos. Alejandro confirmó que sí los quiere.
 
 ### 14.1 Vitrina de expansiones (cajas tipo blaster)
 
-Sustituye o extiende la pantalla `sobres.php` actual (comprobar primero qué
-hay: puede que hoy solo liste sobres en una rejilla plana, sin cajas por
-expansión).
+Cada expansión como caja: imagen, logo del set, nombre, precio, disponibilidad,
+con los datos que ya devuelve `consultas.php`. Dispuestas en fila con
+perspectiva 3D (`perspective` en el contenedor, `transform-style: preserve-3d`):
+la central de frente y ampliada, las laterales con `rotateY` y `translateZ`
+negativo, `scale` y opacidad reducidos. Scroll horizontal (rueda, drag, flechas,
+swipe) animando esos valores según la distancia al centro. Contener el wrapper
+con `overflow: hidden` **solo en ese contenedor**, sin tocar el `overflow-x: clip`
+global del body.
 
-- Cada expansión se representa como una caja tipo blaster: imagen de caja +
-  logo del set + nombre + precio en monedas + stock/disponibilidad, usando los
-  datos que ya devuelve `db/consultas.php` para expansiones y sobres (revisar
-  qué consulta existe antes de inventar una nueva).
-- Las cajas se disponen en fila con perspectiva 3D (`perspective` en el
-  contenedor, `transform-style: preserve-3d` en cada caja): la caja central se
-  ve de frente y ampliada; las laterales rotan en Y (`rotateY`) y se alejan en
-  Z (`translateZ` negativo), con `scale` y opacidad reducidos.
-- El scroll horizontal (rueda, drag, flechas, y swipe en móvil) anima
-  `rotateY`/`translateZ`/`scale` de cada caja según su distancia al centro,
-  con `gsap.timeline()` + `ScrollTrigger` o un listener de `wheel`/`touch`
-  atado a `gsap.to()`.
-- Contener bien el wrapper (`overflow: hidden` solo en ese contenedor, sin
-  tocar la regla global de `overflow-x: clip` del body) para no introducir
-  scroll horizontal de página.
+### 14.2 Interior de la caja: sobres al cursor
 
-### 14.2 Interior de la caja: sobres interactivos al cursor
+Sobres en abanico con profundidad escalonada (`translateZ` por índice). Con
+`mousemove`, los cercanos al cursor se levantan, se acercan y rotan hacia el
+puntero (tilt), con `gsap.quickTo()` por eje. Los lejanos vuelven a reposo con
+`ease: power2.out`. En touch, sustituir por el sobre centrado en un swipe.
 
-Al seleccionar una caja, se muestran los sobres de esa expansión en abanico o
-cuadrícula con profundidad escalonada (`translateZ` por índice).
+### 14.3 Selección y confirmación
 
-- Con `mousemove` sobre el contenedor, los sobres cercanos al cursor se
-  levantan (`translateY` negativo), se acercan (`translateZ` positivo) y
-  rotan hacia el puntero (efecto tilt), usando `gsap.quickTo()` por eje para
-  no penalizar rendimiento. Los sobres lejanos vuelven a su reposo con
-  `ease: power2.out`.
-- En touch, sustituir el `mousemove` por el sobre actualmente centrado en un
-  scroll/swipe horizontal; no hay cursor que simular.
+El sobre elegido se centra y amplía; el resto se desenfoca (`filter: blur()`).
+Modal **usando el patrón existente** (`partials/confirmar.php` / `SRF.confirmar`),
+no uno nuevo: título "¿Quieres abrir este sobre?", coste y saldo actual, botón
+deshabilitado si no llega el saldo, "Abrir sobre" / "Cancelar" (cancelar
+revierte la animación).
 
-### 14.3 Selección y modal de confirmación
+### 14.4 Apertura y aura anticipatoria de rareza
 
-Al hacer clic en un sobre:
+Cierre rápido del modal, "rasgado" en 3D (dos mitades con `rotateX`
+divergentes), flash y partículas. **Esto es lo que hoy no existe:** justo antes
+de que cada carta se voltee, el fondo debe emitir un aura pulsante
+(`radial-gradient` animado + `box-shadow`/`drop-shadow` apilados) cuya
+intensidad y color dependan de **la rareza real de esa carta**, de forma que el
+aura **anticipe** la rareza antes de verla. Para legendaria y SRF, añadir un
+holográfico que reaccione al `pointermove`.
 
-- El sobre seleccionado se centra y amplía (`translateZ` máximo); el resto se
-  desenfoca (`filter: blur()`) y se oscurece con overlay.
-- Se abre el modal de confirmación **usando el patrón ya existente**
-  (`partials/confirmar.php` / `SRF.confirmar()`, ver §9), no un modal nuevo:
-  - Título: "¿Quieres abrir este sobre?"
-  - Texto dinámico: coste (`{precio}` monedas) y saldo actual
-    (`Tienes {saldoActual} monedas`), leído del mismo sitio que ya usa
-    `actualizarMonedasNav()`.
-  - Botón de confirmar deshabilitado si el saldo es insuficiente, con aviso
-    visual.
-  - "Abrir sobre" / "Cancelar" (cancelar revierte la animación de selección).
+### 14.5 Reveal secuencial con skip
 
-### 14.4 Apertura del sobre y aura anticipatoria de rareza
+Las cartas se muestran **de una en una**: aparece de espaldas (`ease: back.out`)
+→ aura anticipatoria → flip 3D (`rotateY` 180°→0°, `backface-visibility: hidden`)
+→ se mantiene unos segundos → se desliza a un mini-stack lateral. Cada carta es
+un paso de una `gsap.timeline()` única. **Botón "Saltar animación"** (salta la
+carta actual) y **"Saltar todo"** (resuelve la timeline entera), implementados
+fijando el estado final con `gsap.set()` y luego `timeline.kill()`, no dejando
+`progress(1)` a medias con listeners vivos. Con `prefers-reduced-motion` no hay
+timeline: se pinta el estado final.
 
-- Cierre rápido del modal (fade), animación de "rasgado" del sobre en 3D (dos
-  mitades con `rotateX` divergentes) y flash/partículas CSS antes de pasar al
-  reveal.
-- **Esto es lo que hoy no existe y que §4 da por hecho:** justo antes de que
-  cada carta se voltee, el fondo detrás de ella debe emitir un aura pulsante
-  (radial-gradient animado + `box-shadow`/`filter: drop-shadow` apilados en
-  `@keyframes`) cuya intensidad/color depende de la rareza real de esa carta
-  concreta (plata tenue → oro intenso → SRF multicolor/holográfico), de forma
-  que el aura **anticipe** la rareza antes de ver la carta.
-- Para legendaria/SRF, añadir además un efecto holográfico sobre la carta ya
-  revelada que reaccione al `pointermove` (gradiente que cambia con el ángulo
-  del cursor, al estilo de los efectos CSS-only que recrean el holográfico de
-  cartas físicas de coleccionable).
+### 14.6 Secuencia especial estilo FUT
 
-### 14.5 Reveal secuencial de cartas, con skip
+Solo para legendaria y SRF, como timeline **separada y reutilizable**: fondo se
+oscurece, rayos de luz (gradientes cónicos rotando), partículas 2D, nombre y
+rareza con la escala `display` y `text-shadow` pulsante. Preámbulo de 2-3 s,
+saltable con los mismos botones. Después, el flip amplificado: aura mayor,
+*screen shake* leve (`gsap.to` con traslaciones pequeñas y `yoyo: true`), y un
+hook `onExclusiveReveal()` preparado para audio futuro. Dispararla leyendo el
+campo de rareza ya devuelto por `consultas.php`; si el campo que necesitas no
+existe, **dilo antes de improvisar un nombre de columna**.
 
-- Las cartas del sobre se muestran **de una en una**, no todas a la vez:
-  1. Aparece de espaldas en el centro (`ease: back.out`).
-  2. Tras el aura anticipatoria de §14.4, flip 3D de reverso a frente
-     (`rotateY` 180°→0°, contenedor con `transform-style: preserve-3d`, caras
-     `.front`/`.back` con `backface-visibility: hidden`).
-  3. Se mantiene visible unos segundos y se desliza a un mini-stack lateral de
-     "ya reveladas" antes de dar paso a la siguiente.
-- Cada carta es un paso de una `gsap.timeline()` única para todo el sobre.
-- **Botón "Saltar animación"** (salta solo la carta actual a su estado final)
-  y **botón "Saltar todo"** (resuelve toda la timeline al instante, todas las
-  cartas visibles ya en cuadrícula, cara arriba). Implementar limpiando la
-  timeline (`timeline.kill()` tras fijar el estado final con
-  `gsap.set()`), no dejando el `timeline.progress(1)` a medio camino con
-  listeners aún vivos.
-- Respeta `prefers-reduced-motion`: si está activo, no hay timeline que saltar
-  porque no se anima nada; se pinta el estado final directamente.
+### 14.7 Entregables y comprobaciones
 
-### 14.6 Secuencia especial estilo FIFA Ultimate Team para rarezas exclusivas
+Vitrina 3D · vista interior · modal reutilizando el patrón · apertura + aura por
+rareza · reveal secuencial con skips · secuencia FUT independiente · GSAP (y
+Three.js si hace falta) en `assets/js/vendor/` colgando de
+`window.SRF.ceremonia3D` · variables CSS centralizadas para perspectiva, aura y
+duración, coherentes con los tokens de motion.
 
-Solo para legendaria y SRF (las dos rarezas top de la tabla de §4), y como
-función/timeline **separada y reutilizable**, no mezclada con el flip
-estándar de §14.5:
-
-- Antes del flip de esa carta: fondo se oscurece del todo, rayos de luz
-  animados (gradientes cónicos o lineales rotando en CSS), partículas 2D
-  (divs o canvas 2D — o Three.js con geometría generada por código, ver
-  §14.0 — nunca WebGL con modelos) cayendo o flotando, y el nombre/rareza
-  apareciendo con tipografía grande (usar la escala `display` de §4) y
-  `text-shadow` pulsante.
-- Preámbulo de 2–3 segundos, saltable con los mismos botones de §14.5.
-- Tras el preámbulo, el flip normal pero amplificado: aura más grande que la
-  de §14.4, ligero *screen shake* (`gsap.to` con pequeñas traslaciones
-  aleatorias y `yoyo: true`), y un hook `onExclusiveReveal()` preparado para
-  disparar audio en el futuro (la implementación de audio en sí es opcional
-  por ahora).
-- Disparar esta secuencia leyendo el campo de rareza/`esExclusiva` de la carta
-  ya devuelta por `consultas.php`; si ese campo no existe todavía, decirlo
-  explícitamente antes de improvisarlo, no inventar un nombre de columna.
-
-### 14.7 Entregables de §14
-
-1. Vitrina 3D de cajas por expansión con scroll (§14.1).
-2. Vista interior de caja con sobres interactivos al cursor/touch (§14.2).
-3. Modal de confirmación reutilizando el patrón existente (§14.3).
-4. Animación de apertura del sobre + sistema de aura anticipatoria por rareza
-   (§14.4).
-5. Reveal secuencial con flip, mini-stack de reveladas, y botones de skip
-   individual/global (§14.5).
-6. Secuencia especial estilo FUT para legendaria/SRF, como timeline
-   independiente (§14.6).
-7. GSAP (y Three.js si hace falta) vendorizados en `assets/js/vendor/`, sin
-   npm ni build step, colgando de `window.SRF.ceremonia3D`.
-8. Variables CSS centralizadas para intensidad de perspectiva, aura y
-   duración, coherentes con los tokens de motion de §4.
-9. Resumen de cierre explicando qué de lo descrito en §4 sobre la SRF ha
-   quedado realmente implementado tras §14, para que ese apartado deje de ser
-   aspiracional.
-
-Además de las comprobaciones generales de §13, si trabajas en §14 verifica:
-
-- `assets/js/vendor/gsap/` y (si se usa) `assets/js/vendor/three/` existen en
-  disco y se cargan con `<script>`/`<script type="module">` normal, sin
-  ningún `package.json`, `node_modules/` ni paso de build nuevo en el repo.
-- No hay ningún fichero `.glb`/`.gltf`/`.obj`/`.fbx`/`.blend` añadido al repo.
-- Con `prefers-reduced-motion` activo, la vitrina no rota sola, el tilt al
-  cursor no se aplica, el reveal salta directo al estado final de cada carta,
-  y la secuencia estilo FUT se sustituye por el aura final estática sin rayos
-  ni partículas.
-- Los botones "saltar animación" (por carta) y "saltar todo" dejan el DOM en
-  el mismo estado final que si se hubiera visto la animación completa, sin
-  timelines de GSAP colgadas ni listeners duplicados tras usarlos varias
-  veces seguidas.
+Además de §13, verifica:
+- `assets/js/vendor/…` existe y se carga con `<script>` normal, **sin**
+  `package.json`, `node_modules/` ni paso de build.
+- Ningún `.glb`/`.gltf`/`.obj`/`.fbx`/`.blend` añadido al repo.
+- Con `prefers-reduced-motion`: la vitrina no rota sola, no hay tilt, el reveal
+  salta al estado final y la secuencia FUT se sustituye por el aura estática.
+- Los botones de skip dejan el DOM en el mismo estado final que la animación
+  completa, sin timelines colgadas ni listeners duplicados tras varios usos.

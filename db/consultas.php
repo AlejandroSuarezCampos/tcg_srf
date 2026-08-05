@@ -1681,10 +1681,33 @@ class Tcg
 				":id_duelo" => $id_duelo,
 			]);
 
+			// --- Capa 2: las compos se congelan junto a la alineación ---
+			// Tiene que ser aquí y no al resolver: la Tensión decide con qué
+			// probabilidades se sortean los tiers del Aumento, y el Aumento se
+			// genera en este mismo bloque, unas líneas más abajo.
+			$composCreador = $this->calcularCompos($this->listarAlineacionDuelo($id_duelo, (int) $duelo["id_creador"]));
+			$composRival   = $this->calcularCompos($this->listarAlineacionDuelo($id_duelo, $id_usuario));
+
+			$this->congelarCompos($id_duelo, (int) $duelo["id_creador"], $composCreador);
+			$this->congelarCompos($id_duelo, $id_usuario, $composRival);
+
+			$this->pdo->prepare("
+				UPDATE duelos SET
+					afinidad_dom_creador = :afc, afinidad_dom_rival = :afr,
+					malus_coh_creador = :mcc, malus_coh_rival = :mcr,
+					tension_creador = :tc, tension_rival = :tr
+				WHERE id_duelo = :id_duelo
+			")->execute([
+				":afc" => $composCreador["afinidad_dom"], ":afr" => $composRival["afinidad_dom"],
+				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
+				":tc"  => $composCreador["tension_nivel"], ":tr" => $composRival["tension_nivel"],
+				":id_duelo" => $id_duelo,
+			]);
+
 			// Las opciones se generan y persisten AQUÍ, antes de que nadie las
 			// vea, para que no dependan de quién cargue antes la pantalla.
-			$this->generarAumentos($id_duelo, (int) $duelo["id_creador"]);
-			$this->generarAumentos($id_duelo, $id_usuario);
+			$this->generarAumentos($id_duelo, (int) $duelo["id_creador"], $composCreador["tension_nivel"]);
+			$this->generarAumentos($id_duelo, $id_usuario, $composRival["tension_nivel"]);
 
 			$this->pdo->commit();
 			return ["ok" => true, "error" => null, "id_duelo" => (int) $id_duelo];
@@ -1729,7 +1752,7 @@ class Tcg
 	 * un Prisma. La clave única (id_duelo, id_usuario, opcion) lo blinda además
 	 * a nivel de base de datos.
 	 */
-	public function generarAumentos($id_duelo, $id_usuario) {
+	public function generarAumentos($id_duelo, $id_usuario, $tensionNivel = 0) {
 		$stmt = $this->pdo->prepare("
 			SELECT COUNT(*) FROM duelo_aumentos WHERE id_duelo = :d AND id_usuario = :u
 		");
@@ -1740,9 +1763,14 @@ class Tcg
 
 		$stats = array_keys(self::AUMENTO_CATEGORIAS);
 
+		// Capa 2 (§3.6): la Tensión no da fuerza, mejora estas probabilidades.
+		// Nivel 0 devuelve exactamente la tabla base (60/30/10), así que un
+		// jugador sin Tensión no nota ninguna diferencia respecto a antes.
+		$probs = $this->probabilidadesTier($tensionNivel);
+
 		$insertar = $this->pdo->prepare("
-			INSERT IGNORE INTO duelo_aumentos (id_duelo, id_usuario, opcion, stat, tier, porcentaje)
-			VALUES (:d, :u, :opcion, :stat, :tier, :pct)
+			INSERT IGNORE INTO duelo_aumentos (id_duelo, id_usuario, opcion, stat, tier, porcentaje, tension_nivel)
+			VALUES (:d, :u, :opcion, :stat, :tier, :pct, :tension)
 		");
 
 		for ($opcion = 1; $opcion <= 3; $opcion++) {
@@ -1750,8 +1778,8 @@ class Tcg
 			$tirada = mt_rand(1, 100);
 			$acumulado = 0;
 			$tierElegido = "plata";
-			foreach (self::AUMENTO_TIERS as $nombre => $t) {
-				$acumulado += $t["prob"];
+			foreach ($probs as $nombre => $prob) {
+				$acumulado += $prob;
 				if ($tirada <= $acumulado) { $tierElegido = $nombre; break; }
 			}
 
@@ -1768,9 +1796,26 @@ class Tcg
 				":d" => $id_duelo, ":u" => $id_usuario,
 				":opcion" => $opcion, ":stat" => $stat,
 				":tier" => $tierElegido, ":pct" => $pct,
+				":tension" => (int) $tensionNivel,
 			]);
 		}
 		return true;
+	}
+
+	/**
+	 * Probabilidades de tier del Aumento para un nivel de Tensión (§3.6).
+	 * Devuelve ["plata" => %, "oro" => %, "prisma" => %] en el mismo orden que
+	 * AUMENTO_TIERS, porque el muestreo acumulado depende del orden.
+	 */
+	public function probabilidadesTier($tensionNivel = 0) {
+		$nivel = max(0, min(3, (int) $tensionNivel));
+		$porDefecto = ["plata" => 60, "oro" => 30, "prisma" => 10];
+
+		$crudo = (string) $this->config("tension_tiers_" . $nivel, "");
+		$partes = array_map("floatval", array_filter(explode(",", $crudo), "strlen"));
+		if (count($partes) !== 3) { return $porDefecto; }
+
+		return ["plata" => $partes[0], "oro" => $partes[1], "prisma" => $partes[2]];
 	}
 
 	// Las 3 opciones de un jugador. Nunca se piden las del rival: verlas antes
@@ -1920,6 +1965,340 @@ class Tcg
 		];
 	}
 
+	// ==========================================================
+	// CAPA 2 — COMPOS (rasgos y sinergias)
+	// ==========================================================
+
+	/**
+	 * Ciclo de contra-afinidad. Es canon de Inazuma Eleven (Fūrinkazan) y NO
+	 * se toca: lo único ajustable es la magnitud del bonus, que vive en
+	 * `configuracion`. clave => a quién vence.
+	 */
+	const CICLO_AFINIDAD = [
+		"fuego"   => "bosque",
+		"bosque"  => "viento",
+		"viento"  => "montana",
+		"montana" => "fuego",
+	];
+
+	/** Nombre de afinidad en BD => clave de rasgo. */
+	const AFINIDAD_A_RASGO = [
+		"Fuego"   => "fuego",
+		"Bosque"  => "bosque",
+		"Viento"  => "viento",
+		"Montaña" => "montana",
+	];
+
+	/**
+	 * Derivación automática del rasgo de CONFIGURACIÓN de cada carta jugadora.
+	 *
+	 * Por qué no se deriva de las estadísticas (ataque/defensa/tecnica), que
+	 * sería lo primero que uno intentaría: esas tres columnas se sembraron con
+	 * una fórmula de base-por-rareza + ajuste-por-posición, así que no contienen
+	 * información independiente. Derivar de ellas daría un rasgo que es un calco
+	 * de la posición (todos los DC saldrían iguales) y que además CORRELACIONA
+	 * CON LA RAREZA — lo cual anularía el malus de coherencia, cuyo objetivo es
+	 * justamente que la rareza alta no venga con compos gratis.
+	 *
+	 * Se deriva del cruce (línea del puesto − línea de la afinidad) mod 4. Como
+	 * ambas se mueven en la misma escala de 4 líneas, el resultado es un
+	 * cuadrado latino: cada rasgo cae en las 4 posiciones Y en las 4 afinidades,
+	 * de modo que es ortogonal a las dos, y no correlaciona con la rareza.
+	 *
+	 * Nunca pisa una asignación con `manual = 1`: el panel puede curar a mano
+	 * las cartas que interese sin que una rederivación las revierta.
+	 *
+	 * Devuelve cuántas filas ha creado o actualizado.
+	 */
+	public function derivarRasgosConfiguracion() {
+		$LINEA_POS = ["POR" => 0, "DF" => 1, "MC" => 2, "DC" => 3];
+		$LINEA_AFI = ["Montaña" => 0, "Viento" => 1, "Bosque" => 2, "Fuego" => 3];
+		$POR_RESTO = [0 => "contraataque", 1 => "justicia", 2 => "vinculo", 3 => "brecha"];
+
+		$idsRasgo = [];
+		foreach ($this->pdo->query("SELECT id_rasgo, clave FROM rasgos WHERE tipo = 'configuracion'") as $fila) {
+			$idsRasgo[$fila["clave"]] = (int) $fila["id_rasgo"];
+		}
+		if (!$idsRasgo) { return 0; }
+
+		$marcadores = implode(",", array_fill(0, count(self::POSICIONES_JUGABLES), "?"));
+		$stmt = $this->pdo->prepare("
+			SELECT c.id_cromo, c.posicion, af.nombre AS afinidad
+			FROM cromos c
+			INNER JOIN afinidad af ON af.id = c.id_afinidad
+			WHERE c.posicion IN ($marcadores)
+		");
+		$stmt->execute(self::POSICIONES_JUGABLES);
+		$cartas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		$idsConfig = array_values($idsRasgo);
+		$enConfig  = implode(",", array_fill(0, count($idsConfig), "?"));
+
+		// Borra solo lo derivado automáticamente de esa carta, nunca lo manual.
+		$borrar = $this->pdo->prepare("
+			DELETE FROM cromo_rasgos
+			WHERE id_cromo = ? AND manual = 0 AND id_rasgo IN ($enConfig)
+		");
+		$tieneManual = $this->pdo->prepare("
+			SELECT COUNT(*) FROM cromo_rasgos
+			WHERE id_cromo = ? AND manual = 1 AND id_rasgo IN ($enConfig)
+		");
+		$insertar = $this->pdo->prepare("
+			INSERT IGNORE INTO cromo_rasgos (id_cromo, id_rasgo, manual) VALUES (?, ?, 0)
+		");
+
+		$tocadas = 0;
+		$this->pdo->beginTransaction();
+		try {
+			foreach ($cartas as $carta) {
+				$p = $LINEA_POS[$carta["posicion"]] ?? null;
+				$a = $LINEA_AFI[$carta["afinidad"]] ?? null;
+				// Sin afinidad real (p. ej. "no-afi") no hay cruce que derivar.
+				if ($p === null || $a === null) { continue; }
+
+				$tieneManual->execute(array_merge([$carta["id_cromo"]], $idsConfig));
+				if ((int) $tieneManual->fetchColumn() > 0) { continue; }
+
+				$borrar->execute(array_merge([$carta["id_cromo"]], $idsConfig));
+
+				$clave = $POR_RESTO[(($p - $a) % 4 + 4) % 4];
+				$insertar->execute([$carta["id_cromo"], $idsRasgo[$clave]]);
+				$tocadas++;
+			}
+			$this->pdo->commit();
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return 0;
+		}
+		return $tocadas;
+	}
+
+	/** Catálogo de rasgos indexado por clave. Se consulta varias veces por duelo. */
+	public function rasgosCatalogo() {
+		static $cache = null;
+		if ($cache !== null) { return $cache; }
+
+		$cache = [];
+		foreach ($this->pdo->query("SELECT * FROM rasgos") as $r) {
+			$cache[$r["clave"]] = $r;
+		}
+		return $cache;
+	}
+
+	/** Rasgos de configuración de un conjunto de cromos: [id_cromo => [clave, ...]]. */
+	private function rasgosConfigDeCromos(array $idsCromo) {
+		if (!$idsCromo) { return []; }
+		$marcadores = implode(",", array_fill(0, count($idsCromo), "?"));
+		$stmt = $this->pdo->prepare("
+			SELECT cr.id_cromo, r.clave
+			FROM cromo_rasgos cr
+			INNER JOIN rasgos r ON r.id_rasgo = cr.id_rasgo
+			WHERE cr.id_cromo IN ($marcadores)
+		");
+		$stmt->execute(array_values($idsCromo));
+
+		$porCromo = [];
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+			$porCromo[(int) $fila["id_cromo"]][] = $fila["clave"];
+		}
+		return $porCromo;
+	}
+
+	/** Nivel alcanzado (0-3) con N copias, según los umbrales del rasgo. */
+	private static function nivelPorCopias(array $rasgo, $copias) {
+		if ($copias >= (int) $rasgo["umbral_3"]) { return 3; }
+		if ($copias >= (int) $rasgo["umbral_2"]) { return 2; }
+		if ($copias >= (int) $rasgo["umbral_1"]) { return 1; }
+		return 0;
+	}
+
+	/**
+	 * Núcleo de la Capa 2. Recibe la alineación (11 cartas tal y como las
+	 * devuelve listarAlineacionDuelo o listarCartasMazo) y devuelve todo lo que
+	 * el motor de resolución necesita:
+	 *
+	 *   [
+	 *     "activos"       => [clave => ["copias"=>n, "nivel"=>0-3, "pct"=>float]],
+	 *     "bonos_linea"   => ["POR"=>%, "DF"=>%, "MC"=>%, "DC"=>%],  ya con
+	 *                        rendimientos decrecientes y tope aplicados
+	 *     "tension_nivel" => 0-3,
+	 *     "afinidad_dom"  => 'fuego'|'bosque'|'viento'|'montana'|'neutro',
+	 *     "compo_index"   => suma de niveles,
+	 *     "rareza_index"  => rareza media del once,
+	 *     "malus"         => % de malus de coherencia (positivo = penaliza),
+	 *   ]
+	 */
+	public function calcularCompos(array $cartas) {
+		$catalogo = $this->rasgosCatalogo();
+
+		$vacio = [
+			"activos" => [], "bonos_linea" => ["POR" => 0.0, "DF" => 0.0, "MC" => 0.0, "DC" => 0.0],
+			"tension_nivel" => 0, "afinidad_dom" => "neutro",
+			"compo_index" => 0, "rareza_index" => 0.0, "malus" => 0.0,
+		];
+		if (!$cartas) { return $vacio; }
+
+		// ---- 1. contar copias de cada rasgo en el once ----
+		$copias = [];
+		$copiasAfinidad = [];
+		$sumaRareza = 0;
+
+		$idsCromo = array_map(fn($c) => (int) $c["id_cromo"], $cartas);
+		$configPorCromo = $this->rasgosConfigDeCromos($idsCromo);
+
+		foreach ($cartas as $carta) {
+			$sumaRareza += (int) ($carta["id_rareza"] ?? 1);
+
+			$claveAfi = self::AFINIDAD_A_RASGO[$carta["afinidad"] ?? ""] ?? null;
+			if ($claveAfi !== null) {
+				$copias[$claveAfi] = ($copias[$claveAfi] ?? 0) + 1;
+				$copiasAfinidad[$claveAfi] = ($copiasAfinidad[$claveAfi] ?? 0) + 1;
+			}
+
+			foreach ($configPorCromo[(int) $carta["id_cromo"]] ?? [] as $claveConfig) {
+				$copias[$claveConfig] = ($copias[$claveConfig] ?? 0) + 1;
+			}
+		}
+
+		// ---- 2. nivel de cada rasgo ----
+		$activos = [];
+		foreach ($copias as $clave => $n) {
+			if (!isset($catalogo[$clave])) { continue; }
+			$rasgo = $catalogo[$clave];
+			$nivel = self::nivelPorCopias($rasgo, $n);
+			if ($nivel === 0) { continue; }
+
+			$activos[$clave] = [
+				"copias" => $n,
+				"nivel"  => $nivel,
+				"pct"    => (float) $rasgo["pct_" . $nivel],
+			];
+		}
+
+		// ---- 3. Tensión: cuenta rasgos DISTINTOS activos, no copias ----
+		// No se cuenta a sí misma (sería circular) ni aporta al compo_index:
+		// la diversidad ya está contada por tener muchos rasgos activos, y
+		// sumarla otra vez sería contar dos veces lo mismo.
+		$tensionNivel = 0;
+		if (isset($catalogo["tension"])) {
+			$tensionNivel = self::nivelPorCopias($catalogo["tension"], count($activos));
+		}
+
+		// ---- 4. bonos por línea con rendimientos decrecientes y tope ----
+		$pesos = array_map("floatval", explode(",", (string) $this->config("compo_pesos_dr", "1.0,0.7,0.45,0.25")));
+		if (!$pesos) { $pesos = [1.0, 0.7, 0.45, 0.25]; }
+		$tope = (float) $this->config("line_cap", 20);
+
+		$porLinea = ["POR" => [], "DF" => [], "MC" => [], "DC" => []];
+		foreach ($activos as $clave => $info) {
+			$rasgo = $catalogo[$clave];
+			foreach ([$rasgo["linea_1"], $rasgo["linea_2"]] as $linea) {
+				if ($linea !== null && isset($porLinea[$linea]) && $info["pct"] > 0) {
+					$porLinea[$linea][] = $info["pct"];
+				}
+			}
+		}
+
+		$bonosLinea = [];
+		foreach ($porLinea as $linea => $lista) {
+			rsort($lista);   // el bonus mayor cuenta al 100%, los siguientes menos
+			$suma = 0.0;
+			foreach ($lista as $i => $pct) {
+				$peso = $pesos[min($i, count($pesos) - 1)];
+				$suma += $pct * $peso;
+			}
+			$bonosLinea[$linea] = min($suma, $tope);
+		}
+
+		// ---- 5. afinidad dominante (empate => neutro) ----
+		$afinidadDom = "neutro";
+		if ($copiasAfinidad) {
+			$maximo = max($copiasAfinidad);
+			$empatadas = array_keys($copiasAfinidad, $maximo);
+			$afinidadDom = count($empatadas) === 1 ? $empatadas[0] : "neutro";
+		}
+
+		// ---- 6. malus de coherencia de rareza ----
+		$compoIndex  = array_sum(array_column($activos, "nivel"));
+		$rarezaIndex = $sumaRareza / count($cartas);
+
+		$umbralLibre = (float) $this->config("coherencia_umbral_libre", 2.5);
+		$rate        = (float) $this->config("coherencia_malus_rate", 3.0);
+		$topeMalus   = (float) $this->config("coherencia_malus_tope", 18);
+
+		$exceso   = max(0.0, $rarezaIndex - $umbralLibre);
+		$exigida  = $exceso * $rate;
+		$deficit  = max(0.0, $exigida - $compoIndex);
+		$malus    = min($deficit * $rate / 3.0, $topeMalus);
+
+		return [
+			"activos"       => $activos,
+			"bonos_linea"   => $bonosLinea,
+			"tension_nivel" => $tensionNivel,
+			"afinidad_dom"  => $afinidadDom,
+			"compo_index"   => $compoIndex,
+			"rareza_index"  => $rarezaIndex,
+			"malus"         => $malus,
+		];
+	}
+
+	/**
+	 * Bonus (%) al total por el ciclo de contra-afinidad. Solo lo gana quien
+	 * contra directamente a la dominante del rival; Neutro ni gana ni pierde.
+	 */
+	public function bonoCicloAfinidad($miDominante, $suDominante) {
+		if ($miDominante === "neutro" || $suDominante === "neutro") { return 0.0; }
+		if ((self::CICLO_AFINIDAD[$miDominante] ?? null) !== $suDominante) { return 0.0; }
+		return (float) $this->config("ciclo_contra_afinidad_bonus", 5.5);
+	}
+
+	/**
+	 * Congela las compos de un jugador en el momento de comprometerse al duelo,
+	 * igual que ya se congela la alineación. Reasignar un rasgo o editar el mazo
+	 * después no cambia un duelo ya empezado.
+	 */
+	public function congelarCompos($id_duelo, $id_usuario, array $compos) {
+		$idsRasgo = [];
+		foreach ($this->rasgosCatalogo() as $clave => $r) { $idsRasgo[$clave] = (int) $r["id_rasgo"]; }
+
+		$stmt = $this->pdo->prepare("
+			INSERT INTO duelo_compos (id_duelo, id_usuario, id_rasgo, copias, nivel, pct_nominal)
+			VALUES (:d, :u, :r, :copias, :nivel, :pct)
+			ON DUPLICATE KEY UPDATE copias = VALUES(copias), nivel = VALUES(nivel), pct_nominal = VALUES(pct_nominal)
+		");
+
+		foreach ($compos["activos"] as $clave => $info) {
+			if (!isset($idsRasgo[$clave])) { continue; }
+			$stmt->execute([
+				":d" => $id_duelo, ":u" => $id_usuario, ":r" => $idsRasgo[$clave],
+				":copias" => $info["copias"], ":nivel" => $info["nivel"], ":pct" => $info["pct"],
+			]);
+		}
+
+		// Tensión se guarda también, con sus "copias" = rasgos distintos, para
+		// que la pantalla de resultado pueda explicar de dónde salió su nivel.
+		if ($compos["tension_nivel"] > 0 && isset($idsRasgo["tension"])) {
+			$stmt->execute([
+				":d" => $id_duelo, ":u" => $id_usuario, ":r" => $idsRasgo["tension"],
+				":copias" => count($compos["activos"]), ":nivel" => $compos["tension_nivel"], ":pct" => 0,
+			]);
+		}
+	}
+
+	/** Compos congeladas de un jugador en un duelo, para la pantalla de resultado. */
+	public function listarComposDuelo($id_duelo, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT dc.copias, dc.nivel, dc.pct_nominal,
+			       r.clave, r.nombre, r.tipo, r.linea_1, r.linea_2
+			FROM duelo_compos dc
+			INNER JOIN rasgos r ON r.id_rasgo = dc.id_rasgo
+			WHERE dc.id_duelo = :d AND dc.id_usuario = :u
+			ORDER BY r.tipo, dc.nivel DESC, r.nombre
+		");
+		$stmt->execute([":d" => $id_duelo, ":u" => $id_usuario]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
 	/**
 	 * Marcador de goles. PROVISIONAL: la especificación (§9.3) lo deja para un
 	 * documento propio. Cumple el contrato que sí fija:
@@ -1977,15 +2356,38 @@ class Tcg
 			$totalBrutoCreador = (float) $fuerzaCreador["total"];
 			$totalBrutoRival   = (float) $fuerzaRival["total"];
 
-			// Fórmula maestra (§8). Los bonos de categoría son hoy solo los del
-			// aumento; cuando exista la Capa 2, los rasgos se sumarán a estos
-			// mismos arrays y el bono de TOTAL dejará de ser 0. La curva de
-			// resolución de abajo no cambiará por ello.
+			// --- Capa 2: se recalcula desde la alineación CONGELADA ---
+			// No se leen los rasgos actuales de las cartas: si alguien reasignó
+			// un rasgo desde el panel mientras el duelo estaba en curso, este
+			// duelo tiene que resolverse con lo que había al comprometerse.
+			$composCreador = $this->calcularCompos($this->listarAlineacionDuelo($id_duelo, $idCreador));
+			$composRival   = $this->calcularCompos($this->listarAlineacionDuelo($id_duelo, $idRival));
+
+			// Fórmula maestra (§8). Los bonos de CATEGORÍA son la suma de las
+			// compos (ya con rendimientos decrecientes y tope de línea) más el
+			// Aumento. El tope de línea acota solo las compos: el Aumento se
+			// suma por encima, porque es un recurso de un solo uso y no forma
+			// parte del apilamiento que el tope viene a contener.
 			$bonosCreador = $this->bonosAumento($id_duelo, $idCreador);
 			$bonosRival   = $this->bonosAumento($id_duelo, $idRival);
 
-			$calcCreador = self::calcularTotalFinal($fuerzaCreador, $bonosCreador, 0.0);
-			$calcRival   = self::calcularTotalFinal($fuerzaRival, $bonosRival, 0.0);
+			foreach (["POR", "DF", "MC", "DC"] as $linea) {
+				$bonosCreador[$linea] = ($bonosCreador[$linea] ?? 0) + ($composCreador["bonos_linea"][$linea] ?? 0);
+				$bonosRival[$linea]   = ($bonosRival[$linea] ?? 0)   + ($composRival["bonos_linea"][$linea] ?? 0);
+			}
+
+			// Bonos de TOTAL: ciclo de contra-afinidad (suma) y malus de
+			// coherencia de rareza (resta). Se aplican sobre la suma de las
+			// líneas ya ajustadas, nunca encadenados sobre un valor ya
+			// multiplicado.
+			$cicloCreador = $this->bonoCicloAfinidad($composCreador["afinidad_dom"], $composRival["afinidad_dom"]);
+			$cicloRival   = $this->bonoCicloAfinidad($composRival["afinidad_dom"], $composCreador["afinidad_dom"]);
+
+			$totalPctCreador = $cicloCreador - $composCreador["malus"];
+			$totalPctRival   = $cicloRival   - $composRival["malus"];
+
+			$calcCreador = self::calcularTotalFinal($fuerzaCreador, $bonosCreador, $totalPctCreador);
+			$calcRival   = self::calcularTotalFinal($fuerzaRival, $bonosRival, $totalPctRival);
 
 			$totalFinalCreador = $calcCreador["final"];
 			$totalFinalRival   = $calcRival["final"];
@@ -2043,9 +2445,17 @@ class Tcg
 					probabilidad_victoria_creador = :p,
 					valor_sorteo = :sorteo,
 					k_utilizado = :k,
+					afinidad_dom_creador = :afc, afinidad_dom_rival = :afr,
+					ciclo_bonus_creador = :cbc, ciclo_bonus_rival = :cbr,
+					malus_coh_creador = :mcc, malus_coh_rival = :mcr,
+					tension_creador = :tc, tension_rival = :tr,
 					resuelto = NOW()
 				WHERE id_duelo = :id_duelo
 			")->execute([
+				":afc" => $composCreador["afinidad_dom"], ":afr" => $composRival["afinidad_dom"],
+				":cbc" => $cicloCreador,                  ":cbr" => $cicloRival,
+				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
+				":tc"  => $composCreador["tension_nivel"], ":tr" => $composRival["tension_nivel"],
 				":id_ganador"    => $idGanador,
 				":goles_creador" => $ganaCreador ? $golesGanador : $golesPerdedor,
 				":goles_rival"   => $ganaCreador ? $golesPerdedor : $golesGanador,

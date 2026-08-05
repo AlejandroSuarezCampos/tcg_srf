@@ -207,6 +207,13 @@
   gap: var(--space-3);
   height: 100%;
   padding: var(--space-3);
+  /* red de seguridad: nada de lo que haya dentro del marco debe poder
+     asomar fuera de él. Sin esto, una etiqueta de rareza larga ("Poco
+     común") empujaba la insignia de cantidad literalmente fuera de la
+     tarjeta —y en el selector de mazos, fuera de la pantalla en móvil—.
+     Seguro: insignias, candado y el aura SRF están posicionados contra
+     .carta, no contra .carta-marco, así que no los recorta. */
+  overflow: hidden;
   border-radius: calc(var(--radius-xl) - 1px);
   background: linear-gradient(180deg, var(--panel), var(--void));
   transition: box-shadow var(--t-media) var(--ease);
@@ -361,6 +368,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  /* nunca cede espacio: si algo tiene que recortarse en .carta-head es la
+     etiqueta de rareza (ver .rz-texto), no la cantidad ni el hexágono */
+  flex-shrink: 0;
 }
 
 /* insignia "×N" para copias repetidas en colección (ver $opts['cantidad']) */
@@ -392,6 +402,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  /* min-width:0 es lo que permite que esta etiqueta se encoja por debajo
+     del ancho de su propio texto dentro de .carta-head (flex). Sin esto,
+     "Poco común" en una tarjeta pequeña empujaba lo que hubiera a su lado
+     fuera de la tarjeta en vez de truncarse. */
+  min-width: 0;
   padding: 4px var(--space-2);
   border: 1px solid color-mix(in srgb, var(--rz) 40%, transparent);
   border-radius: var(--radius-sm);
@@ -401,9 +416,17 @@
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-caption);
   text-transform: uppercase;
-  white-space: nowrap;
 }
-.rz-marcas { display: inline-flex; align-items: center; gap: 2px; line-height: 0; }
+.rz-marcas { display: inline-flex; align-items: center; gap: 2px; line-height: 0; flex-shrink: 0; }
+/* el texto es lo único que se recorta con puntos suspensivos: las marcas no
+   cromáticas (chevrones, corona, destello) siempre se quedan completas, son
+   la señal de accesibilidad que no puede desaparecer */
+.rz-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 /* chevrón dibujado en CSS: sigue siendo legible aunque falle la fuente de iconos */
 .rz-marca {
   width: 5px; height: 5px;

@@ -38,6 +38,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db->crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
     }
 
+    // Capa 2: el rasgo de configuración sale del cruce puesto × afinidad, así
+    // que cambiar cualquiera de los dos lo invalida. Se rederiva aquí para que
+    // una carta nueva nunca se quede sin rasgo y una editada no conserve el que
+    // le correspondía antes. No pisa las asignaciones marcadas como manuales.
+    $db->derivarRasgosConfiguracion();
+
     header('Location: cromos.php');
     exit;
 }

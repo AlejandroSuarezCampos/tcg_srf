@@ -81,6 +81,83 @@ $suAumento = $resuelto ? $db->aumentoElegido($id_duelo, $idRival) : null;
 $miFuerza        = $miAlineacion ? Tcg::fuerzaAlineacion($miAlineacion) : null;
 $suFuerza        = $suAlineacion ? Tcg::fuerzaAlineacion($suAlineacion) : null;
 
+// Capa 2. Se leen las compos CONGELADAS del duelo, no se recalculan: si un
+// rasgo se reasignó después desde el panel, este duelo debe seguir explicándose
+// con lo que había cuando se jugó.
+$misCompos = $resuelto ? $db->listarComposDuelo($id_duelo, $id_usuario) : [];
+$susCompos = $resuelto ? $db->listarComposDuelo($id_duelo, $idRival) : [];
+
+$miCiclo  = $resuelto ? (float) ($soyCreador ? $duelo['ciclo_bonus_creador'] : $duelo['ciclo_bonus_rival']) : 0;
+$suCiclo  = $resuelto ? (float) ($soyCreador ? $duelo['ciclo_bonus_rival'] : $duelo['ciclo_bonus_creador']) : 0;
+$miMalus  = $resuelto ? (float) ($soyCreador ? $duelo['malus_coh_creador'] : $duelo['malus_coh_rival']) : 0;
+$suMalus  = $resuelto ? (float) ($soyCreador ? $duelo['malus_coh_rival'] : $duelo['malus_coh_creador']) : 0;
+$miAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_creador'] : $duelo['afinidad_dom_rival']) : null;
+$suAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_rival'] : $duelo['afinidad_dom_creador']) : null;
+
+$catalogoRasgos = $db->rasgosCatalogo();
+
+/** Pinta el panel de compos de un jugador en la pantalla de resultado. */
+function panel_compos($quien, array $compos, $afinDom, $ciclo, $malus, array $catalogo, array $etiquetaLinea) {
+    ?>
+    <section class="compos compos--duelo">
+      <div class="compos-cabecera">
+        <h3 class="t-h3"><?= htmlspecialchars($quien) ?></h3>
+        <p class="t-caption t-dim">
+          <?= $afinDom && $afinDom !== 'neutro'
+              ? htmlspecialchars($catalogo[$afinDom]['nombre'] ?? $afinDom)
+              : 'Neutro' ?>
+        </p>
+      </div>
+
+      <?php if (!$compos): ?>
+        <p class="t-body-sm t-dim">Ningún rasgo activo en este once.</p>
+      <?php else: ?>
+        <ul class="compos-lista">
+          <?php foreach ($compos as $c): ?>
+            <li class="compo compo--<?= htmlspecialchars($c['tipo']) ?>">
+              <span class="compo-nombre"><?= htmlspecialchars($c['nombre']) ?></span>
+              <span class="compo-nivel" aria-label="Nivel <?= (int) $c['nivel'] ?> de 3">
+                <?php for ($n = 1; $n <= 3; $n++): ?>
+                  <span class="compo-punto<?= $n <= (int) $c['nivel'] ? ' esta-lleno' : '' ?>"></span>
+                <?php endfor; ?>
+              </span>
+              <span class="compo-detalle t-dim">
+                <?php if ($c['clave'] === 'tension'): ?>
+                  <span class="mono"><?= (int) $c['copias'] ?></span> rasgos distintos · mejoró el sorteo de Aumento
+                <?php else: ?>
+                  <span class="mono"><?= (int) $c['copias'] ?></span> en el once
+                  <?php if ((float) $c['pct_nominal'] > 0): ?>
+                    · <span class="mono">+<?= number_format((float) $c['pct_nominal'], 2, ',', '.') ?> %</span>
+                    <?= htmlspecialchars($etiquetaLinea[$c['linea_1']] ?? '') ?><?php
+                      if ($c['linea_2']) echo ' y ' . htmlspecialchars($etiquetaLinea[$c['linea_2']]); ?>
+                  <?php endif; ?>
+                <?php endif; ?>
+              </span>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+      <?php endif; ?>
+
+      <?php if ($ciclo > 0 || $malus > 0): ?>
+        <div class="compos-resumen">
+          <?php if ($ciclo > 0): ?>
+            <div class="dato">
+              <b class="mono">+<?= number_format($ciclo, 2, ',', '.') ?> %</b>
+              <span>Ventaja de afinidad</span>
+            </div>
+          <?php endif; ?>
+          <?php if ($malus > 0): ?>
+            <div class="dato es-malo">
+              <b class="mono">−<?= number_format($malus, 2, ',', '.') ?> %</b>
+              <span>Malus de coherencia</span>
+            </div>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </section>
+    <?php
+}
+
 $misGoles = $resuelto ? (int) ($soyCreador ? $duelo['goles_creador'] : $duelo['goles_rival']) : 0;
 $susGoles = $resuelto ? (int) ($soyCreador ? $duelo['goles_rival'] : $duelo['goles_creador']) : 0;
 $gane     = $resuelto && (int) $duelo['id_ganador'] === $id_usuario;
@@ -199,8 +276,10 @@ include __DIR__ . '/navbar.php';
 
       <!-- El veredicto ES el titular de esta pantalla, así que es el <h1>: no
            hay ningún otro encabezado de nivel 1 aquí y la página no puede
-           quedarse sin él. -->
-      <h1 class="partido-veredicto">
+           quedarse sin él. tabindex="-1" permite que la simulación de abajo
+           mueva el foco aquí al terminar, para que un lector de pantalla
+           anuncie el resultado sin tener que ir a buscarlo. -->
+      <h1 class="partido-veredicto" tabindex="-1">
         <?= $gane ? 'Victoria' : 'Derrota' ?>
         <span class="sr-only">
           contra <?= htmlspecialchars($nombreOtro) ?>,
@@ -260,6 +339,17 @@ include __DIR__ . '/navbar.php';
         </div>
       </div>
 
+      <!-- CAPA 2 — de dónde salió el ajuste sobre la fuerza bruta -->
+      <?php if ($misCompos || $susCompos): ?>
+        <h2 class="t-h3" style="text-align:center;margin-bottom:var(--space-4);">Compos del partido</h2>
+        <div class="compos-enfrentadas">
+          <?php
+          panel_compos($nombreYo, $misCompos, $miAfinDom, $miCiclo, $miMalus, $catalogoRasgos, $etiquetaLinea);
+          panel_compos($nombreOtro, $susCompos, $suAfinDom, $suCiclo, $suMalus, $catalogoRasgos, $etiquetaLinea);
+          ?>
+        </div>
+      <?php endif; ?>
+
       <div class="partido-alineaciones">
         <section>
           <h2 class="t-h3"><?= htmlspecialchars($nombreYo) ?></h2>
@@ -307,6 +397,57 @@ include __DIR__ . '/navbar.php';
   <?php endif; ?>
 
 </main>
+
+<?php if ($resuelto && isset($_GET['nuevo'])): ?>
+<!-- ==========================================================================
+     SIMULACIÓN DEL PARTIDO
+     El resultado ya está decidido en el servidor (arriba, en $duelo). Esto es
+     solo la puesta en escena de "verlo pasar" antes de enseñar la pantalla de
+     resultado, que ya está renderizada debajo, cubierta por este modal.
+     Reloj de partido + goles que van apareciendo: un marcador deportivo, nunca
+     ruleta ni tragaperras (briefing: "evitar estética de casino").
+     Sin JavaScript, este modal nunca se abre y el resultado ya está visible.
+     ========================================================================== -->
+<div class="modal simulacion" id="simulacionPartido" role="dialog" aria-modal="true"
+     aria-labelledby="simulacionTitulo" aria-hidden="true">
+  <div class="modal-caja modal-caja--ancha">
+    <div class="modal-head">
+      <h2 id="simulacionTitulo">Partido en juego</h2>
+      <button type="button" class="modal-cerrar" data-saltar-simulacion aria-label="Ver resultado">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <div class="simulacion-cuerpo">
+      <div class="linea-campo" aria-hidden="true"></div>
+
+      <div class="partido-marcador">
+        <div class="partido-lado">
+          <span class="partido-nombre"><?= htmlspecialchars($nombreYo) ?></span>
+          <b class="partido-goles mono" id="simGolesYo">0</b>
+        </div>
+        <span class="partido-guion" aria-hidden="true">–</span>
+        <div class="partido-lado">
+          <b class="partido-goles mono" id="simGolesOtro">0</b>
+          <span class="partido-nombre"><?= htmlspecialchars($nombreOtro) ?></span>
+        </div>
+      </div>
+
+      <p class="simulacion-reloj mono" id="simReloj" role="timer" aria-live="off">0'</p>
+
+      <div class="progreso simulacion-barra">
+        <div class="progreso-riel"><div class="progreso-relleno" id="simBarra" style="width:0%"></div></div>
+      </div>
+
+      <div class="simulacion-eventos" id="simEventos" aria-hidden="true"></div>
+    </div>
+
+    <div class="modal-pie">
+      <button type="button" class="btn btn-ghost" data-saltar-simulacion>Ver resultado</button>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 

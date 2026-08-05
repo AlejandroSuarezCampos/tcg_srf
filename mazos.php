@@ -78,6 +78,12 @@ foreach ($cartasMazo as $c) { $alineacion[(int) $c['hueco']] = $c; }
 $cromosDentro = [];
 foreach ($cartasMazo as $c) { $cromosDentro[(int) $c['id_cromo']] = true; }
 
+// Capa 2. Se calcula sobre la alineación actual del mazo (aunque esté a
+// medias) para que el jugador vea en vivo qué compos está activando mientras
+// la arma; en el duelo se recalcula sobre la alineación ya congelada.
+$compos = $mazoActivo ? $db->calcularCompos($cartasMazo) : null;
+$catalogoRasgos = $db->rasgosCatalogo();
+
 // Fuerza por líneas: cada carta puntúa con la estadística del hueco donde está,
 // no con la mejor que tenga. Es lo que hace que colocar bien importe.
 $fuerza = Tcg::fuerzaAlineacion($cartasMazo);
@@ -249,6 +255,92 @@ include __DIR__ . '/navbar.php';
               </div>
             <?php endforeach; ?>
           </div>
+
+          <!-- CAPA 2 — COMPOS
+               Se recalcula al guardar, no en vivo con cada clic: el cálculo
+               vive en servidor (es el mismo que resuelve el duelo) y duplicarlo
+               en JavaScript sería tener dos fuentes de la misma verdad, que es
+               justo como se desincronizan estas cosas. -->
+          <section class="compos" aria-labelledby="composTitulo">
+            <div class="compos-cabecera">
+              <h3 id="composTitulo" class="t-h3">Compos activas</h3>
+              <p class="t-caption t-dim">Se recalculan al guardar la alineación</p>
+            </div>
+
+            <?php if (empty($compos['activos'])): ?>
+              <p class="t-body-sm t-dim">
+                Ninguna todavía. Repite un mismo elemento o rasgo en al menos
+                <span class="mono">2</span> jugadores del once para activar su primer nivel.
+              </p>
+            <?php else: ?>
+              <ul class="compos-lista">
+                <?php foreach ($compos['activos'] as $clave => $info): ?>
+                  <?php $r = $catalogoRasgos[$clave] ?? null; if (!$r) continue; ?>
+                  <li class="compo compo--<?= htmlspecialchars($r['tipo']) ?>">
+                    <span class="compo-nombre"><?= htmlspecialchars($r['nombre']) ?></span>
+                    <span class="compo-nivel" aria-label="Nivel <?= $info['nivel'] ?> de 3">
+                      <?php for ($n = 1; $n <= 3; $n++): ?>
+                        <span class="compo-punto<?= $n <= $info['nivel'] ? ' esta-lleno' : '' ?>"></span>
+                      <?php endfor; ?>
+                    </span>
+                    <span class="compo-detalle t-dim">
+                      <span class="mono"><?= $info['copias'] ?></span> en el once
+                      <?php if ($info['pct'] > 0): ?>
+                        · <span class="mono">+<?= number_format($info['pct'], 2, ',', '.') ?> %</span>
+                        <?= htmlspecialchars($etiquetaLinea[$r['linea_1']] ?? '') ?><?php
+                          if ($r['linea_2']) echo ' y ' . htmlspecialchars($etiquetaLinea[$r['linea_2']]); ?>
+                      <?php endif; ?>
+                    </span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+
+            <div class="compos-resumen">
+              <div class="dato">
+                <b class="mono"><?= $compos['afinidad_dom'] === 'neutro'
+                    ? 'Neutro'
+                    : htmlspecialchars($catalogoRasgos[$compos['afinidad_dom']]['nombre'] ?? '—') ?></b>
+                <span>Afinidad dominante</span>
+              </div>
+              <div class="dato">
+                <b class="mono"><?= (int) $compos['tension_nivel'] ?>/3</b>
+                <span>Tensión</span>
+              </div>
+              <div class="dato">
+                <b class="mono"><?= number_format($compos['rareza_index'], 2, ',', '.') ?></b>
+                <span>Rareza media</span>
+              </div>
+              <div class="dato<?= $compos['malus'] > 0 ? ' es-malo' : '' ?>">
+                <b class="mono"><?= $compos['malus'] > 0
+                    ? '−' . number_format($compos['malus'], 2, ',', '.') . ' %'
+                    : '0 %' ?></b>
+                <span>Malus de coherencia</span>
+              </div>
+            </div>
+
+            <?php if ($compos['malus'] > 0): ?>
+              <p class="alerta alerta-warning" role="status">
+                <i class="ph ph-warning" aria-hidden="true"></i>
+                <span>
+                  Tu once es más raro de lo que sus compos justifican, y eso resta
+                  <b class="mono"><?= number_format($compos['malus'], 2, ',', '.') ?> %</b>
+                  a tu fuerza total. Repite más elementos o rasgos entre tus once
+                  para compensarlo.
+                </span>
+              </p>
+            <?php endif; ?>
+
+            <?php if ($compos['tension_nivel'] > 0): ?>
+              <?php $probs = $db->probabilidadesTier($compos['tension_nivel']); ?>
+              <p class="t-caption t-dim">
+                Tensión <?= (int) $compos['tension_nivel'] ?>: no suma fuerza, pero mejora
+                tu sorteo de Aumento a Plata <span class="mono"><?= (int) $probs['plata'] ?> %</span> ·
+                Oro <span class="mono"><?= (int) $probs['oro'] ?> %</span> ·
+                Prisma <span class="mono"><?= (int) $probs['prisma'] ?> %</span>.
+              </p>
+            <?php endif; ?>
+          </section>
 
           <div class="mazo-acciones">
             <button type="submit" class="btn btn-primary" id="mazoGuardar">
