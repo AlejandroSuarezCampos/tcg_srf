@@ -28,6 +28,8 @@
  *   protegida    true  ⇒ insignia de carta bloqueada para venta
  *   precio       int   ⇒ insignia de precio (mercado)
  *   seleccionada true  ⇒ anillo ámbar (deck builder)
+ *   cantidad     int   ⇒ insignia "×N" junto al hexágono de afinidad, para
+ *                colecciones con copias repetidas (ver coleccion.php)
  *   stats        array ['ATA' => 82, ...] hasta 3 pares etiqueta/valor
  *   clase        clases CSS extra
  *   datos        ['nombre' => 'x'] ⇒ atributos data-* para filtros de cliente
@@ -94,6 +96,7 @@ function render_carta(array $c, array $opts = []): void
     $protegida    = $opts['protegida']    ?? false;
     $precio       = $opts['precio']       ?? null;
     $seleccionada = $opts['seleccionada'] ?? false;
+    $cantidad     = $opts['cantidad']     ?? null;
     $stats        = $opts['stats']        ?? null;
     $claseExtra   = $opts['clase']        ?? '';
     $datos        = $opts['datos']        ?? [];
@@ -163,9 +166,16 @@ function render_carta(array $c, array $opts = []): void
 
         <div class="carta-head">
           <?= render_rareza($idRareza, $rareza) ?>
-          <?php if ($tieneAfinidad): ?>
-            <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
-              <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+          <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
+            <span class="carta-head-derecha">
+              <?php if ($cantidad !== null && $cantidad > 1): ?>
+                <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
+              <?php endif; ?>
+              <?php if ($tieneAfinidad): ?>
+                <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
+                  <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+                </span>
+              <?php endif; ?>
             </span>
           <?php endif; ?>
         </div>

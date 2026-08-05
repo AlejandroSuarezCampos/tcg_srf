@@ -314,22 +314,7 @@ include __DIR__ . '/navbar.php';
 </div>
 
 <!-- Confirmación de acciones con consecuencia económica -->
-<div class="modal" id="modalConfirmar" role="dialog" aria-modal="true"
-     aria-labelledby="confirmarTitulo" aria-hidden="true">
-  <div class="modal-caja" style="max-width:440px;">
-    <div class="modal-head">
-      <h2 id="confirmarTitulo">Confirmar</h2>
-      <button class="modal-cerrar" data-cerrar-modal aria-label="Cerrar">
-        <i class="ph ph-x" aria-hidden="true"></i>
-      </button>
-    </div>
-    <p class="t-body-sm t-dim" id="confirmarTexto"></p>
-    <div class="modal-pie">
-      <button type="button" class="btn btn-ghost" data-cerrar-modal>Cancelar</button>
-      <button type="button" class="btn btn-primary" id="confirmarSi">Confirmar</button>
-    </div>
-  </div>
-</div>
+<?php include __DIR__ . '/partials/confirmar.php'; ?>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 

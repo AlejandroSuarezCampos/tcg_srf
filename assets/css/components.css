@@ -354,6 +354,23 @@
 .carta-accion-flotante:hover { color: var(--frost); border-color: var(--line-strong); }
 .carta-accion-flotante.esta-activa { color: var(--amber-light); border-color: var(--amber-line); }
 
+/* agrupa la insignia de cantidad y el hexágono en el lado derecho de la
+   cabecera, para que la rareza (izquierda) y ellos (derecha) se repartan con
+   el space-between de .carta-head sin que la cantidad quede suelta al centro */
+.carta-head-derecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* insignia "×N" para copias repetidas en colección (ver $opts['cantidad']) */
+.carta-cantidad {
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--frost-dim);
+}
+
 /* ---- afinidad (hexágono) ---- */
 .carta-afinidad {
   width: 28px; height: 28px;
@@ -695,7 +712,15 @@
   max-height: 92svh;
   overflow: hidden;          /* el contenido se ajusta, no se desplaza */
 }
-.ceremonia .ceremonia-mesa { min-height: 0; }
+/* La mesa es la única parte que puede crecer más de lo que cabe en pantalla
+   (sobres con muchas cartas). Sin overflow-y aquí, .modal-caja (overflow:
+   hidden, arriba) fuerza a la mesa a encogerse por flexbox, pero su rejilla
+   de cartas —que es overflow:visible por defecto— se desborda igualmente
+   por encima y se solapa con la cabecera y con los botones del pie, que
+   quedan enterrados entre cartas en vez de fijos. Dándole scroll propio, la
+   cabecera y el pie quedan siempre fijos alrededor y el sobre entero, del
+   tamaño que sea, es alcanzable. */
+.ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
 /* dentro de la ceremonia la carta va al grano: rareza, arte y nombre */
 .ceremonia .carta-meta { display: none; }

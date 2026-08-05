@@ -288,13 +288,63 @@
     else mq.addListener(sincronizar);
   }
 
+  /* ------------------------------------------------------------------------
+     CONFIRMACIÓN GENÉRICA
+     Envuelve el modal de partials/confirmar.php para que cualquier pantalla
+     pida confirmación sin volver a montar un modal propio.
+
+     mercado.js gestiona ese mismo modal por su cuenta (además envía por AJAX),
+     así que el manejador de aquí solo actúa si hay una petición viva puesta por
+     SRF.confirmar; si no, se aparta y deja trabajar a mercado.js.
+     ------------------------------------------------------------------------ */
+  var confirmarPendiente = null;
+
+  function confirmar(texto, alAceptar) {
+    var modal = document.getElementById('modalConfirmar');
+    if (!modal) { alAceptar(); return; }   // sin modal no se bloquea la acción
+
+    var parrafo = document.getElementById('confirmarTexto');
+    if (parrafo) parrafo.textContent = texto || '¿Confirmas esta acción?';
+
+    confirmarPendiente = alAceptar;
+    abrirModal(modal);
+  }
+
+  function iniciarConfirmar() {
+    var btnSi = document.getElementById('confirmarSi');
+    if (!btnSi) return;
+
+    btnSi.addEventListener('click', function () {
+      if (!confirmarPendiente) return;      // la petición es de mercado.js
+      var alAceptar = confirmarPendiente;
+      confirmarPendiente = null;
+      cerrarModal(document.getElementById('modalConfirmar'));
+      alAceptar();
+    });
+  }
+
+  /* cancelar (Esc, fondo o botón) descarta la petición: si no, la siguiente
+     confirmación heredaría la anterior y ejecutaría algo que ya se rechazó */
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-cerrar-modal]')) confirmarPendiente = null;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') confirmarPendiente = null;
+  });
+
   document.addEventListener('DOMContentLoaded', function () {
     iniciarReveal();
     iniciarNav();
     iniciarTabs();
     iniciarPlegables();
+    iniciarConfirmar();
   });
 
   /* API pública */
-  window.SRF = { abrirModal: abrirModal, cerrarModal: cerrarModal, toast: toast };
+  window.SRF = {
+    abrirModal: abrirModal,
+    cerrarModal: cerrarModal,
+    toast: toast,
+    confirmar: confirmar
+  };
 })();

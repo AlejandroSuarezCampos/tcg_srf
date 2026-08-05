@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pandoc -t markdown \"branding/Brand-Identity-Briefing-Superliga-Frontier-TCG.docx\" -o /c/Users/assas/AppData/Local/Temp/claude/C--xampp-htdocs-tcg-srf/c1028ff8-e53c-4ed1-9340-b0d4fadb6421/scratchpad/brief.md)"
+      "Bash(pandoc -t markdown \"branding/Brand-Identity-Briefing-Superliga-Frontier-TCG.docx\" -o /c/Users/assas/AppData/Local/Temp/claude/C--xampp-htdocs-tcg-srf/c1028ff8-e53c-4ed1-9340-b0d4fadb6421/scratchpad/brief.md)",
+      "PowerShell(Get-Process httpd -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process mysqld -ErrorAction SilentlyContinue)"
     ]
   }
 }

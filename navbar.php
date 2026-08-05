@@ -56,6 +56,8 @@ if ($haySesion) {
 $navGrupos = [
 	'Jugar' => [
 		['sobres', 'sobres.php', 'Sobres', 'ph-package'],
+		['mazos',  'mazos.php',  'Mazos',  'ph-list-checks'],
+		['duelos', 'duelos.php', 'Duelos', 'ph-sword'],
 	],
 	'Coleccionar' => [
 		['coleccion', 'coleccion.php', 'Colección', 'ph-cards'],

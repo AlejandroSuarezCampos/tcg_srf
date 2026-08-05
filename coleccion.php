@@ -17,6 +17,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
     exit;
 }
 
+// Igual, pero para una carta agrupada en pantalla que representa varias copias
+// repetidas a la vez (ver agrupación más abajo).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'toggle_bloqueo_grupo') {
+    $db->alternarBloqueoGrupoCromo((int) $_POST['id_cromo'], $id_usuario, (int) $_POST['estado_actual']);
+    $query = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: coleccion.php' . ($query !== '' ? '?' . $query : ''));
+    exit;
+}
+
 $equipos     = $db->listarEquipos();
 $expansiones = $db->listarExpansiones();
 $rarezasDB   = $db->listarRarezas();
@@ -42,6 +51,21 @@ $filtros = [
 ];
 
 $cromos = $db->listarColeccionUsuario($id_usuario, $filtros);
+
+// Agrupa copias repetidas del mismo cromo con el mismo estado de protección
+// en una sola carta con insignia "×N": con cientos de copias, renderizar una
+// tarjeta completa por copia es lo que hacía lenta la página. El orden de
+// $cromos ya viene por fecha de obtención (más reciente primero), así que la
+// primera copia de cada grupo que aparece es la que se usa de representante.
+$grupos = [];
+foreach ($cromos as $c) {
+    $clave = $c['id_cromo'] . '-' . $c['bloqueada'];
+    if (!isset($grupos[$clave])) {
+        $grupos[$clave] = ['fila' => $c, 'cantidad' => 0];
+    }
+    $grupos[$clave]['cantidad']++;
+}
+$grupos = array_values($grupos);
 
 $totalColeccion = $db->contarCromosTotales();
 $totalObtenidas = $db->contarColeccionUsuario($id_usuario);
@@ -153,7 +177,7 @@ include __DIR__ . '/navbar.php';
         </p>
       </div>
 
-      <?php if (empty($cromos)): ?>
+      <?php if (empty($grupos)): ?>
         <div class="vacio">
           <span class="vacio-ico"><i class="ph ph-magnifying-glass" aria-hidden="true"></i></span>
           <?php if ($hayFiltros): ?>
@@ -168,19 +192,33 @@ include __DIR__ . '/navbar.php';
         </div>
       <?php else: ?>
         <div class="carta-grid">
-          <?php foreach ($cromos as $c): ?>
+          <?php foreach ($grupos as $g): ?>
             <?php
+            $c = $g['fila'];
+            $cantidad = $g['cantidad'];
             $protegida = (bool) $c['bloqueada'];
-            $accion = '<form method="POST" action="' . $accionForm . '">'
-                . '<input type="hidden" name="accion" value="toggle_bloqueo">'
-                . '<input type="hidden" name="id_coleccion" value="' . (int) $c['id_coleccion'] . '">'
-                . '<button type="submit" class="carta-accion-flotante' . ($protegida ? ' esta-activa' : '') . '">'
-                . '<i class="ph ' . ($protegida ? 'ph-lock-simple' : 'ph-lock-simple-open') . '" aria-hidden="true"></i>'
-                . '<span class="sr-only">' . ($protegida ? 'Quitar protección de ' : 'Proteger ')
-                . htmlspecialchars($c['nombre']) . '</span>'
-                . '</button></form>';
+            if ($cantidad > 1) {
+                $accion = '<form method="POST" action="' . $accionForm . '">'
+                    . '<input type="hidden" name="accion" value="toggle_bloqueo_grupo">'
+                    . '<input type="hidden" name="id_cromo" value="' . (int) $c['id_cromo'] . '">'
+                    . '<input type="hidden" name="estado_actual" value="' . (int) $protegida . '">'
+                    . '<button type="submit" class="carta-accion-flotante' . ($protegida ? ' esta-activa' : '') . '">'
+                    . '<i class="ph ' . ($protegida ? 'ph-lock-simple' : 'ph-lock-simple-open') . '" aria-hidden="true"></i>'
+                    . '<span class="sr-only">' . ($protegida ? 'Quitar protección de las ' : 'Proteger las ')
+                    . $cantidad . ' copias de ' . htmlspecialchars($c['nombre']) . '</span>'
+                    . '</button></form>';
+            } else {
+                $accion = '<form method="POST" action="' . $accionForm . '">'
+                    . '<input type="hidden" name="accion" value="toggle_bloqueo">'
+                    . '<input type="hidden" name="id_coleccion" value="' . (int) $c['id_coleccion'] . '">'
+                    . '<button type="submit" class="carta-accion-flotante' . ($protegida ? ' esta-activa' : '') . '">'
+                    . '<i class="ph ' . ($protegida ? 'ph-lock-simple' : 'ph-lock-simple-open') . '" aria-hidden="true"></i>'
+                    . '<span class="sr-only">' . ($protegida ? 'Quitar protección de ' : 'Proteger ')
+                    . htmlspecialchars($c['nombre']) . '</span>'
+                    . '</button></form>';
+            }
             ?>
-            <?php render_carta($c, ['acciones' => $accion]); ?>
+            <?php render_carta($c, ['acciones' => $accion, 'cantidad' => $cantidad]); ?>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
@@ -190,6 +228,8 @@ include __DIR__ . '/navbar.php';
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
+
+<script src="assets/js/coleccion.js"></script>
 
 </body>
 </html>
