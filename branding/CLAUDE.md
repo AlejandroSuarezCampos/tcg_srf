@@ -1,24 +1,27 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión 3 (2026-08-05, sesión de Capa 2).
+> Documento de traspaso, versión 4 (2026-08-06).
 > Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
 > misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
 > fichero es todo el contexto necesario: no hace falta la conversación anterior.
 >
-> **Sustituye a las versiones anteriores.** Desde la última: la **Capa 2 de
-> combate (Compos) está construida, verificada y funcionando** — ya no es "lo
-> que falta". Si tienes por ahí una copia vieja de este fichero, tírala.
+> **Sustituye a las versiones anteriores.** Desde la v3 se han construido, en
+> los commits `6ce78d3` y `93642b2`: **Misiones**, **Cadenas de Partido (PvE)**,
+> **formaciones alternativas**, **recompensas/loot**, y una **recalibración del
+> modelo de combate** (las líneas pasaron a ponderar las tres estadísticas).
+> La Fase 2 está **cerrada**.
 >
-> Lo siguiente en la cola es **Misiones** (§11).
+> Lo siguiente ya no es Misiones: ver §12.
 
 ---
 
 ## Cómo arrancar en un chat nuevo
 
-Estás recogiendo un proyecto con **Fases 0 y 1 cerradas**, y la **Fase 2 casi
-completa**: migración de BD, Deck Builder, Duelos (Capa 1 + Capa 3) y **Capa 2
-(Compos)** están construidos, probados en navegador contra la base de datos real
-y funcionando. No los rehagas ni los revises salvo que Alejandro lo pida.
+Estás recogiendo un proyecto con **Fases 0, 1 y 2 cerradas**. Está construido y
+funcionando contra la base de datos real: Deck Builder, Duelos PvP completos
+(Capas 1, 2 y 3), simulación de partido, Misiones, formaciones alternativas y
+**Cadenas de Partido (PvE)**. No lo rehagas ni lo revises salvo que Alejandro
+lo pida.
 
 **Lo primero que tienes que hacer, en este orden:**
 
@@ -32,22 +35,26 @@ y funcionando. No los rehagas ni los revises salvo que Alejandro lo pida.
    ```
 4. `git status` y `git log --oneline -5`. El proyecto **está en git** (rama
    `master`, remoto `origin`).
-5. Comprobar que la BD tiene la Capa 2 aplicada:
+5. Comprobar que la BD está al día (todas las migraciones hasta la `012`):
    ```
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"   -- debe dar 9
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cromo_rasgos;" -- debe dar 38
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"        -- 9
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cromo_rasgos;"  -- 38
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cadena_nodos;"  -- 18
    ```
-   Si dan 0 o la tabla no existe, aplica §5.2.
+   Si alguna da 0 o la tabla no existe, aplica §5.2.
+6. Auditar la codificación (§5.3), que ya ha mordido dos veces:
+   `C:\xampp\php\php.exe db/migraciones/004_reparar_codificacion.php`
 
 **Antes de escribir código nuevo, presenta un plan corto y espera el visto
 bueno.** Es la forma de trabajar acordada: plan → aprobación → implementación →
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Si Alejandro no dice por dónde seguir**, pregunta entre: **Misiones** (§11, lo
-siguiente natural y sin dependencias), el **panel para curar rasgos a mano**
-(§10.5), o la **ceremonia 3D de sobres** (§14, autorizada aparte del orden de
-fases y sin empezar).
+**Si Alejandro no dice por dónde seguir**, pregunta entre: la **ceremonia 3D de
+sobres** (§14, autorizada y sin empezar), la **Fase 3** (panel de administración
+al sistema nuevo, §12), o los **mecanismos de sesión que quedan del documento de
+balance** (anti-tilt, pity del Aumento, matchmaking anti-repetición, validador
+de balance — §10.7). Son trabajos independientes entre sí.
 
 ---
 
@@ -76,9 +83,17 @@ entrenadores y escudos reales de una comunidad activa, no personajes de ficción
   **Está en Descargas, no en el repo; pídeselo a Alejandro si lo necesitas.**
 
 **Cuenta de pruebas dedicada:** usuario `Claude` (id 9), contraseña `123456`,
-`dictador=1`, ~1M de monedas, 38 cartas jugadoras (una de cada) y un mazo
-titular "Once titular" completo. La creó Alejandro para que la IA pruebe en
-navegador real. **Úsala siempre** en vez de pedir credenciales o improvisar.
+`dictador=1`, ~1M de monedas, 22 cromos distintos (48 copias) y un mazo titular
+"Once titular" completo en formación 442. **Úsala siempre** en vez de pedir
+credenciales o improvisar. Iniciar sesión desde el navegador de pruebas:
+```js
+await fetch('/tcg_srf/login.php', {method:'POST',
+  body: new URLSearchParams({nombre:'Claude', password:'123456'})});
+```
+
+**`CPU` (id 10) no es una persona:** es el rival virtual del PvE
+(`Tcg::USUARIO_BOT`). No lo borres ni le cambies el nombre — las Cadenas lo
+buscan por nombre.
 
 ---
 
@@ -94,10 +109,18 @@ navegador real. **Úsala siempre** en vez de pedir credenciales o improvisar.
 | **Fase 2 — Duelos Capa 3** | Aumento pre-partido (tiers, plazo, fallback) | ✅ Construido |
 | **Fase 2 — Duelos Capa 2** | **Compos: rasgos, ciclo, malus, Tensión** | ✅ **Construido (§10)** |
 | **Fase 2 — Simulación de partido** | Modal de 7 s con reloj y goles antes del resultado | ✅ Construido |
-| **Fase 2 — Misiones** | 8 misiones sembradas en BD, **nada más** | ⬜ **Siguiente (§11)** |
+| **Fase 2 — Misiones** | `misiones.php`, progreso derivado, reclamo | ✅ **Construido (§11)** |
+| **Fase 2 — Formaciones** | 8 formaciones, desbloqueables por cofre de cadena | ✅ Construido |
+| **Fase 2 — Cadenas de Partido (PvE)** | Mapa de nodos, 5 dificultades, rangos, loot | ✅ **Construido (§11b)** |
 | **Fase 2 — Minijuegos** | Solo la tabla `minijuegos_partidas` | ⬜ Aplazados por Alejandro |
 | **§14 — Ceremonia 3D de sobres** | Vitrina 3D, reveal secuencial, secuencia FUT | ⬜ Sin empezar |
 | **Fase 3 — Pulido y escala** | Panel admin, motion unificado, doc de expansiones | ⬜ Pendiente |
+
+> **El modelo de combate cambió en `93642b2`.** Cada línea ya no puntúa con una
+> sola estadística: pondera las tres (`Tcg::PESOS_LINEA`). Eso movió el peso de
+> Portería del ~8,9 % al ~15,45 % del total y obligó a recalibrar todos los
+> porcentajes de compos (`009_recalibrar_compos.sql`). **Si vuelves a tocar
+> `PESOS_LINEA`, hay que recalcular la tabla de §10.1 con el mismo método.**
 
 **Regla de trabajo:** cada bloque se cierra por completo y deja el sitio
 desplegable antes de abrir el siguiente. Al terminar, resumir qué cambió y por qué.
@@ -660,106 +683,96 @@ alineación congelada y aplica todo.
    son absolutos por diseño (§16 del documento) para que el catálogo crezca sin
    retocar parámetros; es techo aspiracional, no un error.
 
-### 10.7 Qué NO entró (fuera del alcance acordado)
+### 10.7 Qué del documento de balance sigue sin construir
 
-Del documento de balance quedan sin construir: **PvE Cadenas de Partido** (§7),
-**formaciones alternativas** (§8), **anti-tilt de sesión** (§9), **matchmaking
-anti-repetición** (§10), **validador de balance del panel** (§12) y el **pity
-del Aumento** (§5.3). Ninguno bloquea nada de lo construido.
-
----
-
-## 11. MISIONES — lo siguiente (§ para quien lo recoja)
-
-### 11.1 Estado real
-
-- ✅ Esquema en BD (`002`): tablas `misiones` y `misiones_progreso`.
-- ✅ 8 misiones sembradas (texto ya reparado, ver §5.3).
-- ❌ **Cero métodos en `db/consultas.php`.** Comprobado: `grep -n "mision"`
-  no devuelve nada en la capa de datos.
-- ❌ Cero pantalla, cero enlace en la navegación.
-
-### 11.2 Esquema existente
-
-```sql
-misiones(id_mision, nombre, descripcion, tipo, objetivo,
-         recompensa_monedas, activo)
-
-tipo ENUM('cartas_distintas','copias_totales','duelos_jugados',
-          'duelos_ganados','expansiones_completas','mazos_creados')
-
-misiones_progreso(id_progreso, id_usuario, id_mision, fecha_reclamada)
-```
-
-**Fíjate en el diseño:** `misiones_progreso` **solo registra el reclamo**, no un
-contador. Es deliberado y encaja con la regla de §8: el progreso se **deriva**
-de consultas ya existentes, nunca se duplica en un contador que puede
-desincronizarse.
-
-### 11.3 Las 8 misiones sembradas
-
-| id | Nombre | Tipo | Objetivo | Recompensa |
-|---|---|---|---|---|
-| 1 | Primeras fichas | cartas_distintas | 10 | 250 |
-| 2 | Plantilla amplia | cartas_distintas | 25 | 600 |
-| 3 | Archivo completo | cartas_distintas | 40 | 1500 |
-| 4 | Fondo de armario | copias_totales | 100 | 400 |
-| 5 | Alineación inscrita | mazos_creados | 1 | 300 |
-| 6 | Debut en competición | duelos_jugados | 1 | 250 |
-| 7 | Racha de temporada | duelos_ganados | 5 | 900 |
-| 8 | Expansión al día | expansiones_completas | 1 | 1200 |
-
-### 11.4 De dónde sale cada progreso (ya existe, no lo reinventes)
-
-| Tipo | Consulta existente |
-|---|---|
-| `cartas_distintas` | `contarColeccionUsuario($id)` — cuenta distintas |
-| `copias_totales` | `COUNT(*) FROM coleccion WHERE id_usuario = ?` |
-| `expansiones_completas` | `contarExpansionesCompletas($id)` |
-| `mazos_creados` | `listarMazosUsuario($id)` (o un `COUNT`) |
-| `duelos_jugados` | `duelos` donde participa y `estado='resuelto'` |
-| `duelos_ganados` | `duelos` con `id_ganador = ?` |
-
-Solo faltan consultas de conteo para los dos últimos; el resto ya está.
-
-### 11.5 Lo que hay que construir
-
-- [ ] Sección `MISIONES` en `db/consultas.php`: `listarMisionesConProgreso($id)`
-      (devuelve cada misión con su progreso actual, su objetivo y si ya está
-      reclamada) y `reclamarMision($id_mision, $id_usuario)`.
-- [ ] `misiones.php` reutilizando `.panel`, `.progreso`, `.btn`, `.vacio` — sin
-      componentes nuevos.
-- [ ] Enlace en el clúster **"Jugar"** de `navbar.php` (añadir una línea al
-      array `$navGrupos`; ya está montado para recibirlo).
-- [ ] Reclamo con **confirmación y transacción**: comprobar objetivo cumplido y
-      no reclamada antes de pagar, con `FOR UPDATE`, siguiendo el patrón de
-      `comprarAnuncio()` / `resolverDuelo()`.
-
-### 11.6 Decisiones que conviene preguntarle a Alejandro antes
-
-1. **¿El reclamo es manual o automático?** El esquema (`fecha_reclamada`) sugiere
-   manual — el jugador pulsa "Reclamar". Confirmar.
-2. **¿Las misiones se repiten o son de una sola vez?** El esquema actual solo
-   permite una vez por usuario (no hay fecha de ciclo ni contador de repetición).
-3. **¿Misiones diarias/semanales?** No hay columna para ello; añadirlas sería
-   una migración `005` aditiva.
+Ya construidos después: PvE Cadenas de Partido (§7 del balance) y formaciones
+alternativas (§8). **Siguen sin construir:** **anti-tilt de sesión** (§9),
+**matchmaking anti-repetición PvP** (§10), **validador de balance del panel**
+(§12) y el **pity del Aumento** (§5.3). Ninguno bloquea nada.
 
 ---
 
+## 11. Misiones (CONSTRUIDO)
+
+`misiones.php` + sección `MISIONES` en `db/consultas.php`
+(`listarMisionesConProgreso`, `reclamarMision`). Enlace en el clúster "Jugar".
+
+**El progreso NO se guarda en un contador**: `misiones_progreso` solo registra
+el reclamo (`fecha_reclamada`), y el avance se **deriva** en cada carga de
+consultas que ya existían — `contarColeccionUsuario()`,
+`contarExpansionesCompletas()`, `listarMazosUsuario()`, y conteos sobre
+`duelos`. Es deliberado: un contador duplicado se desincroniza.
+
+Reclamo **manual** (el jugador pulsa "Reclamar"), **una sola vez por misión**,
+en transacción que revalida el objetivo antes de pagar. Las 8 misiones
+sembradas cubren colección (10/25/40 distintas, 100 copias), mazos, duelos
+jugados, duelos ganados y expansiones completas.
+
+`005_ciclo_misiones.sql` añadió el soporte de ciclo; si hicieran falta
+misiones diarias o semanales, ese es el sitio.
+
+---
+
+## 11b. Cadenas de Partido — PvE (CONSTRUIDO)
+
+Implementa §7 del documento de balance. `cadenas.php` (listado) y `cadena.php`
+(mapa + partido), con ~1.200 líneas nuevas en `db/consultas.php`.
+
+**Migraciones:** `007_pve_motor.sql`, `008_dificultad_pesos.sql`,
+`010_cadenas.sql`, `011_recompensas.sql`, `012_contenido_real.sql`.
+
+**13 tablas** `cadena_*`: `cadenas`, `cadena_nodos`, `cadena_aristas`,
+`cadena_requisitos`, `cadena_rivales`, `cadena_rival_estilos`,
+`cadena_rival_cartas`, `cadena_progreso`, `cadena_loot`, `cadena_drops`,
+`cadena_cofres`, `cadena_numeracion`.
+
+**Cómo funciona:**
+- Mapa de **nodos no lineal** con aristas: hay rutas alternativas ("Vía alta" /
+  "Vía baja") que confluyen. Nodos de tipo **partido** y de tipo **cofre**.
+- **5 dificultades** (`Tcg::DIFICULTADES`): facil, medio, dificil, muy_dificil,
+  extremo. Elegibles partido a partido. Cada una tiene multiplicador de fuerza,
+  sesgo de tier del Aumento del rival y tope de rareza, **todo en
+  `configuracion`** (`pve_mult_*`, `pve_tiers_*`, `pve_rareza_max_*`).
+- **Rangos S / A / B** por resultado (`rangoPartido()`), que multiplican la
+  recompensa (`pve_recompensa_mult_rango_*`).
+- **Recompensa decreciente por repetición**, solo en fácil y medio
+  (`DIFICULTADES_CON_DECRECIMIENTO`), con suelo y tasa configurables.
+- **Cadenas encadenadas por requisitos**: "Descenso de Frontier" exige haber
+  cerrado "Ruta de ascenso".
+- Los cofres finales **desbloquean formaciones** (`formaciones_usuario`).
+- El rival es el usuario **`CPU` (id 10)**, `Tcg::USUARIO_BOT`. Usa el mismo
+  motor de resolución que el PvP (alineación + compos + aumento + curva Elo);
+  lo que cambia son sus multiplicadores. En PvE **sí puede tener combinaciones
+  de compos imposibles para un jugador real**: es intencionado, es la
+  herramienta para crear dificultad sin salir del sistema base.
+
+**Contenido sembrado hoy:** 2 cadenas, 18 nodos, 6 rivales, 12 estilos,
+132 cartas de rival.
+
+**Formaciones** (`Tcg::FORMACIONES`, `006_formaciones.sql`): 442, 433, 352,
+532, 451, 343, 541, 361. Todas reparten los mismos 11 huecos de otra manera —
+elegir formación es una decisión táctica sobre a qué compos apostar, nunca una
+ventaja de poder.
 ## 12. Pendientes, en orden aproximado
 
-1. **Misiones** (§11). Sin dependencias, el siguiente natural.
-2. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
-   y la derivación nunca lo pisa; falta solo la UI, que es de Fase 3.
-3. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
-4. **Resolver los tres hallazgos de §10.6.**
-5. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
-6. **Algoritmo definitivo del marcador de goles**, hoy placeholder funcional
-   (`marcadorDuelo()`): nunca contradice al ganador ya sorteado, pero el
-   algoritmo no se considera el diseño final.
-7. **`_legacy/` se puede borrar** cuando Alejandro confirme.
-8. **§14, ceremonia 3D de sobres** — extensión autorizada aparte del orden.
-9. **Fase 3** — panel admin al sistema nuevo, motion unificado, doc de expansiones.
+1. **§14, ceremonia 3D de sobres** — autorizada explícitamente, sin empezar.
+2. **Fase 3** — panel de administración al sistema nuevo (hoy sigue con
+   Bootstrap Icons y su propio `admin.css`), motion unificado de las
+   ceremonias, y documentar cómo añadir una expansión de temporada.
+3. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
+   y la derivación nunca lo pisa; falta solo la UI. Va con la Fase 3.
+4. **Lo que queda del documento de balance** (§10.7): anti-tilt de sesión,
+   pity del Aumento, matchmaking anti-repetición PvP, validador de balance.
+5. **Más contenido de Cadenas**: hoy hay 2 cadenas y 18 nodos. El motor
+   aguanta más sin tocar código; es trabajo de datos.
+6. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
+7. **Resolver los hallazgos abiertos de §10.6.**
+8. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
+9. **Algoritmo definitivo del marcador de goles PvP**, hoy placeholder
+   funcional (`marcadorDuelo()`): nunca contradice al ganador ya sorteado,
+   pero no se considera el diseño final. El PvE ya usa su propia fórmula
+   (`pve_goles_*`).
+10. **`_legacy/` se puede borrar** cuando Alejandro confirme.
 
 ---
 

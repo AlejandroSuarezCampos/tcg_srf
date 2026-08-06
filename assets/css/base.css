@@ -162,7 +162,12 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
   gap: var(--gap);
 }
 
-.stack { display: flex; flex-direction: column; }
+/* min-width:0 es necesario para cuando .stack actúa como hijo de un grid o
+   flex ajeno (p. ej. la columna de .con-filtros): sin él, contenido interno
+   que no puede encogerse (un flex row sin wrap más abajo) hace crecer el
+   .stack entero más allá de su columna asignada, y con él se lleva a toda
+   la página a desbordar. Mismo patrón que .rz-texto, .partido-nombre, etc. */
+.stack { display: flex; flex-direction: column; min-width: 0; }
 .stack-2 { gap: var(--space-2); }
 .stack-3 { gap: var(--space-3); }
 .stack-4 { gap: var(--space-4); }

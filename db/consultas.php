@@ -1003,7 +1003,174 @@ class Tcg
 		$stmt = $this->pdo->prepare("DELETE FROM sobre WHERE id_sobre = :id");
 		$stmt->execute([":id" => $id_sobre]);
 	}
-// ==========================================================
+
+	// ==========================================================
+	// PLANTILLAS 3D (cajas y sobres) — prompt-claude-code-sobres-3d.md, Fase 5
+	// Una única plantilla PNG plana por elemento, con zonas fijas predefinidas
+	// aquí (nunca configurables por el admin: si las zonas se movieran, el
+	// render 3D quedaría desalineado con lo ya subido). El recorte se hace con
+	// GD (no hay Node/sharp en esta máquina, ver branding/CLAUDE.md §8).
+	// ==========================================================
+
+	// caja_expansion y caja_sobre comparten geometría (misma "caja", solo
+	// cambia la escala CSS con la que se pinta); sobre tiene la suya.
+	// "interior" es el fondo/base que se ve al levantar la tapa (§Fase 3 del
+	// prompt de sobres 3D): la fila y1024-1024 del lienzo queda libre a
+	// propósito para el aviso LEEME (ver generarGuiaPlantilla()).
+	const ZONAS_CAJA = [
+		"front"    => ["x" => 0,   "y" => 0,   "w" => 512, "h" => 512],
+		"lid"      => ["x" => 512, "y" => 0,   "w" => 512, "h" => 256],
+		"top"      => ["x" => 512, "y" => 256, "w" => 512, "h" => 256],
+		"side"     => ["x" => 0,   "y" => 512, "w" => 512, "h" => 256],
+		"interior" => ["x" => 512, "y" => 512, "w" => 512, "h" => 256],
+	];
+	const LIENZO_CAJA = ["w" => 1024, "h" => 1024];
+
+	const ZONAS_SOBRE = [
+		"frente"  => ["x" => 0,   "y" => 0, "w" => 512, "h" => 512],
+		"reverso" => ["x" => 512, "y" => 0, "w" => 512, "h" => 512],
+	];
+	const LIENZO_SOBRE = ["w" => 1024, "h" => 512];
+
+	// Puramente decorativo (§14 Fase 3 del prompt): cuántos sobres "salen" de
+	// la caja al abrirse. No tiene relación con `sobre.cantidad` (cartas por
+	// sobre) ni con ningún stock real — cada clic compra siempre uno.
+	const SOBRES_POR_CAJA = 50;
+
+	public static function esTipoCaja($tipo) {
+		return $tipo === "caja_expansion" || $tipo === "caja_sobre";
+	}
+	public static function zonasPlantilla($tipo) {
+		return self::esTipoCaja($tipo) ? self::ZONAS_CAJA : self::ZONAS_SOBRE;
+	}
+	public static function lienzoPlantilla($tipo) {
+		return self::esTipoCaja($tipo) ? self::LIENZO_CAJA : self::LIENZO_SOBRE;
+	}
+
+	public function obtenerPlantilla($tipo, $id_referencia) {
+		$stmt = $this->pdo->prepare("SELECT * FROM plantillas_3d WHERE tipo = :tipo AND id_referencia = :id");
+		$stmt->execute([":tipo" => $tipo, ":id" => $id_referencia]);
+		$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$fila) return null;
+		$fila["rutas"] = json_decode($fila["rutas_recortadas"], true) ?: [];
+		return $fila;
+	}
+
+	// Rutas listas para usar como background-image: array vacío si no hay
+	// plantilla subida, y el componente cae al degradado por defecto.
+	public function rutasPlantilla($tipo, $id_referencia) {
+		$plantilla = $this->obtenerPlantilla($tipo, $id_referencia);
+		return $plantilla["rutas"] ?? [];
+	}
+
+	// Dibuja la plantilla-guía descargable: un PNG plano del tamaño exacto del
+	// lienzo, con las zonas marcadas y etiquetadas para recortar en Photoshop.
+	// Devuelve el recurso GD; el llamador decide si lo envía o lo guarda.
+	public function generarGuiaPlantilla($tipo) {
+		$lienzo = self::lienzoPlantilla($tipo);
+		$zonas  = self::zonasPlantilla($tipo);
+
+		$img = imagecreatetruecolor($lienzo["w"], $lienzo["h"]);
+		imagefill($img, 0, 0, imagecolorallocate($img, 22, 24, 29));   // --panel
+
+		$linea = imagecolorallocate($img, 232, 117, 42);  // --amber
+		$texto = imagecolorallocate($img, 237, 238, 241); // --frost
+
+		// las fuentes internas de GD (imagestring) solo entienden ISO-8859-1:
+		// sin esto, cualquier tilde o eñe llega en UTF-8 y sale corrompida
+		// (la misma trampa de codificación de §5.3, aquí aplicada a imagestring)
+		$latin1 = fn($s) => iconv("UTF-8", "ISO-8859-1//TRANSLIT", $s);
+
+		foreach ($zonas as $nombre => $z) {
+			imagerectangle($img, $z["x"], $z["y"], $z["x"] + $z["w"] - 1, $z["y"] + $z["h"] - 1, $linea);
+			imagestring($img, 5, $z["x"] + 14, $z["y"] + 14, strtoupper($nombre), $texto);
+			imagestring($img, 3, $z["x"] + 14, $z["y"] + 34,
+				$z["w"] . "x" . $z["h"] . "px @ (" . $z["x"] . "," . $z["y"] . ")", $texto);
+		}
+
+		// hueco libre del lienzo (para caja: la fila y1024 entera; para sobre:
+		// la franja baja de su propio lienzo): aviso LEEME
+		$lineasLeeme = [
+			"LEEME",
+			"Sustituye cada zona por tu arte real SIN mover ni redimensionarla:",
+			"el recorte del servidor usa estas mismas coordenadas exactas.",
+			"Oculta o borra esta capa de guias antes de exportar.",
+			"Exporta como PNG plano de " . $lienzo["w"] . "x" . $lienzo["h"] . "px,",
+			"igual que este archivo.",
+		];
+		$xLeeme = 14;
+		$yLeeme = self::esTipoCaja($tipo) ? 768 + 14 : $lienzo["h"] - 110;
+		foreach ($lineasLeeme as $i => $linea_texto) {
+			imagestring($img, $i === 0 ? 5 : 2, $xLeeme, $yLeeme + $i * 16, $latin1($linea_texto), $texto);
+		}
+
+		return $img;
+	}
+
+	// Valida, recorta con GD y guarda la plantilla subida por el admin.
+	// $ruta_tmp es la ruta temporal del $_FILES subido (PNG plano).
+	public function subirPlantilla($tipo, $id_referencia, $ruta_tmp) {
+		$lienzo = self::lienzoPlantilla($tipo);
+		$zonas  = self::zonasPlantilla($tipo);
+
+		$info = @getimagesize($ruta_tmp);
+		if (!$info || $info[2] !== IMAGETYPE_PNG) {
+			return ["ok" => false, "error" => "El archivo debe ser un PNG."];
+		}
+		if ((int) $info[0] !== $lienzo["w"] || (int) $info[1] !== $lienzo["h"]) {
+			return ["ok" => false, "error" =>
+				"La plantilla debe medir exactamente {$lienzo['w']}×{$lienzo['h']}px " .
+				"(el archivo subido mide {$info[0]}×{$info[1]}px)."];
+		}
+
+		$origen = @imagecreatefrompng($ruta_tmp);
+		if (!$origen) {
+			return ["ok" => false, "error" => "No se pudo leer el PNG."];
+		}
+		imagealphablending($origen, false);
+		imagesavealpha($origen, true);
+
+		$carpetaRel = "assets/img/plantillas/{$tipo}_{$id_referencia}";
+		$carpetaAbs = __DIR__ . "/../{$carpetaRel}";
+		if (!is_dir($carpetaAbs)) mkdir($carpetaAbs, 0775, true);
+
+		$version  = time();
+		$rutasWeb = [];
+
+		foreach ($zonas as $nombreZona => $z) {
+			$recorte = imagecreatetruecolor($z["w"], $z["h"]);
+			imagealphablending($recorte, false);
+			imagesavealpha($recorte, true);
+			imagecopy($recorte, $origen, 0, 0, $z["x"], $z["y"], $z["w"], $z["h"]);
+
+			$archivo = "{$nombreZona}.png";
+			imagepng($recorte, "{$carpetaAbs}/{$archivo}");
+			imagedestroy($recorte);
+
+			$rutasWeb[$nombreZona] = "./{$carpetaRel}/{$archivo}?v={$version}";
+		}
+		imagedestroy($origen);
+
+		copy($ruta_tmp, "{$carpetaAbs}/original.png");
+		$rutaOriginalWeb = "./{$carpetaRel}/original.png?v={$version}";
+
+		$stmt = $this->pdo->prepare("
+			INSERT INTO plantillas_3d (tipo, id_referencia, ruta_original, rutas_recortadas)
+			VALUES (:tipo, :id, :original, :rutas)
+			ON DUPLICATE KEY UPDATE
+				ruta_original = VALUES(ruta_original),
+				rutas_recortadas = VALUES(rutas_recortadas),
+				actualizado_en = NOW()
+		");
+		$stmt->execute([
+			":tipo" => $tipo, ":id" => $id_referencia,
+			":original" => $rutaOriginalWeb, ":rutas" => json_encode($rutasWeb),
+		]);
+
+		return ["ok" => true, "rutas" => $rutasWeb];
+	}
+
+	// ==========================================================
 	// CONFIGURACIÓN DE PERFIL (configuracion.php)
 	// ==========================================================
 

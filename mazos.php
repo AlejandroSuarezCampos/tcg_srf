@@ -171,17 +171,19 @@ include __DIR__ . '/navbar.php';
               <li class="mazo-fila<?= $mazoActivo && $mazoActivo['id_mazo'] === $m['id_mazo'] ? ' es-activo' : '' ?>">
                 <a href="mazos.php?mazo=<?= $m['id_mazo'] ?>" class="mazo-enlace">
                   <span class="mazo-nombre">
-                    <?= htmlspecialchars($m['nombre']) ?>
-                    <span class="t-caption t-dim mono"><?= htmlspecialchars(
+                    <span class="mazo-nombre-texto"><?= htmlspecialchars($m['nombre']) ?></span>
+                    <span class="t-caption t-dim mono mazo-formacion"><?= htmlspecialchars(
                         Tcg::FORMACIONES[$m['formacion']]['nombre'] ?? $m['formacion']) ?></span>
                   </span>
-                  <span class="pastilla <?= $completo ? 'pastilla-on' : 'pastilla-warn' ?>">
-                    <span class="mono"><?= (int) $m['cartas'] ?>/<?= $TAMANO ?></span>
+                  <span class="mazo-insignias">
+                    <span class="pastilla <?= $completo ? 'pastilla-on' : 'pastilla-warn' ?>">
+                      <span class="mono"><?= (int) $m['cartas'] ?>/<?= $TAMANO ?></span>
+                    </span>
+                    <?php if ((int) $m['titular'] === 1): ?>
+                      <span class="pastilla pastilla-titular">Titular</span>
+                    <?php endif; ?>
                   </span>
                 </a>
-                <?php if ((int) $m['titular'] === 1): ?>
-                  <span class="pastilla pastilla-titular">Titular</span>
-                <?php endif; ?>
               </li>
             <?php endforeach; ?>
           </ul>

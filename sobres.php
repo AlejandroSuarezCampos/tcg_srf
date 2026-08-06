@@ -2,6 +2,29 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/components/caja3d.php';
+
+// Los 50 sobres de un tipo, ya listos para vivir DENTRO de .caja3d-interior
+// (requisito técnico del prompt: mismo árbol preserve-3d que la caja, nunca
+// un contenedor hermano). Se reutiliza tanto si la caja que se abre es la
+// grande (expansión con un solo tipo) como una pequeña del submenú.
+function interiorSobresHtml(Tcg $db, array $s, bool $sinSaldo): string {
+    $rutasSobre = $db->rutasPlantilla('sobre', $s['id_sobre']);
+    $html = '';
+    for ($i = 0; $i < Tcg::SOBRES_POR_CAJA; $i++) {
+        $html .= sobre3d_mini_html($rutasSobre, [
+            'clase' => 'js-sobre-individual',
+            'disabled' => $sinSaldo,
+            'datos' => [
+                'id-sobre' => $s['id_sobre'],
+                'nombre'   => $s['nombre'],
+                'precio'   => (int) $s['precio'],
+                'imagen'   => $s['imagen'] ?? '',
+            ],
+        ]);
+    }
+    return $html;
+}
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -107,52 +130,79 @@ include __DIR__ . '/navbar.php';
   </div>
   <?php endif; ?>
 
-  <?php foreach ($sobresPorExpansion as $grupo): ?>
-  <section class="expansion-grupo reveal">
-    <div class="expansion-cabecera">
-      <div>
-        <h2><?= htmlspecialchars($grupo['nombre']) ?></h2>
-        <span class="t-caption t-dim"><span class="mono"><?= $grupo['total'] ?></span> cartas en esta expansión</span>
+  <?php if (!empty($sobresPorExpansion)): ?>
+  <!-- Fase 1: una caja cerrada de 50 sobres por expansión -->
+  <div class="vitrina-cabecera">
+    <h2>Expansiones</h2>
+    <p class="t-caption t-dim">Elige una caja y ábrela para ver sus sobres.</p>
+  </div>
+  <div class="vitrina-grid" id="vitrina">
+    <?php foreach ($sobresPorExpansion as $idExp => $grupo): ?>
+    <?php $rutasCaja = $db->rutasPlantilla('caja_expansion', $idExp); ?>
+    <?php $tipoUnico = count($grupo['sobres']) === 1 ? $grupo['sobres'][0] : null; ?>
+    <div class="vitrina-item">
+      <div class="caja3d-portal" id="portal-caja-<?= $idExp ?>">
+        <!-- div, no button: el interior lleva hasta 50 <button> de sobre
+             (interiorHtml) y un <button> no puede contener otro <button> —
+             el navegador cerraría este de golpe al primer sobre y rompería
+             toda la caja. role=button + tabindex hacen el mismo trabajo. -->
+        <div class="js-caja-expansion" role="button" tabindex="0"
+                data-expansion="<?= $idExp ?>" data-tipos="<?= count($grupo['sobres']) ?>"
+                <?= $tipoUnico ? 'data-id-sobre-unico="' . $tipoUnico['id_sobre'] . '"' : '' ?>>
+          <?= caja3d_html($rutasCaja, [
+              'datos' => ['expansion' => $idExp],
+              'interiorHtml' => $tipoUnico ? interiorSobresHtml($db, $tipoUnico, $monedasActuales < $tipoUnico['precio']) : '',
+          ]) ?>
+        </div>
+        <?php if ($tipoUnico): ?>
+        <button type="button" class="btn btn-ghost caja3d-portal-cerrar js-cerrar-blister">
+          <i class="ph ph-x" aria-hidden="true"></i> Cerrar
+        </button>
+        <?php endif; ?>
+        <span class="vitrina-item-nombre"><?= htmlspecialchars($grupo['nombre']) ?></span>
+        <span class="t-caption t-dim mono"><?= $grupo['total'] ?> cartas · <?= count($grupo['sobres']) ?> tipos de sobre</span>
       </div>
     </div>
+    <?php endforeach; ?>
+  </div>
 
-    <div class="sobre-grid">
-      <?php foreach ($grupo['sobres'] as $s): ?>
-      <?php $sinSaldo = $monedasActuales < $s['precio']; ?>
-      <article class="sobre">
-        <div class="sobre-arte">
-          <?php if ($s['imagen']): ?>
-          <img src="<?= htmlspecialchars($s['imagen']) ?>" alt="Sobre <?= htmlspecialchars($s['nombre']) ?>">
-          <?php else: ?>
-          <i class="ph ph-package" aria-hidden="true"></i>
-          <?php endif; ?>
+  <!-- Fase 2: submenú de tipos de sobre (solo si la expansión tiene más de uno) -->
+  <?php foreach ($sobresPorExpansion as $idExp => $grupo): ?>
+  <?php if (count($grupo['sobres']) > 1): ?>
+  <div class="submenu-tipos" id="submenu-<?= $idExp ?>" data-expansion="<?= $idExp ?>" hidden>
+    <button type="button" class="btn btn-ghost submenu-tipos-volver js-cerrar-submenu">
+      <i class="ph ph-arrow-left" aria-hidden="true"></i> Expansiones
+    </button>
+    <?php foreach ($grupo['sobres'] as $s): ?>
+    <?php $rutasCajaTipo = $db->rutasPlantilla('caja_sobre', $s['id_sobre']); ?>
+    <div class="submenu-tipo">
+      <div class="caja3d-portal" id="portal-tipo-<?= $s['id_sobre'] ?>">
+        <!-- div, no button: mismo motivo que en la caja de expansión -->
+        <div class="js-tipo-sobre" role="button" tabindex="0" data-id-sobre="<?= $s['id_sobre'] ?>">
+          <?= caja3d_html($rutasCajaTipo, [
+              'escala' => 'pequena',
+              'interiorHtml' => interiorSobresHtml($db, $s, $monedasActuales < $s['precio']),
+          ]) ?>
         </div>
-
-        <h3><?= htmlspecialchars($s['nombre']) ?></h3>
-        <p class="t-caption t-dim"><span class="mono"><?= (int) $s['cantidad'] ?></span> cartas</p>
-        <p class="sobre-precio">
-          <i class="ph ph-coins" aria-hidden="true"></i>
-          <?= number_format($s['precio'], 0, ',', '.') ?>
-        </p>
-
-        <form method="POST" action="sobres.php" class="js-sobre"
-              data-precio="<?= (int) $s['precio'] ?>" data-cantidad="<?= (int) $s['cantidad'] ?>">
-          <input type="hidden" name="accion" value="comprar_sobre">
-          <input type="hidden" name="id_sobre" value="<?= $s['id_sobre'] ?>">
-          <button type="submit" class="btn btn-primary btn-bloque"
-                  <?= $sinSaldo ? 'disabled title="No tienes monedas suficientes"' : '' ?>>
-            Abrir sobre
-          </button>
-        </form>
-      </article>
-      <?php endforeach; ?>
+        <button type="button" class="btn btn-ghost caja3d-portal-cerrar js-cerrar-blister">
+          <i class="ph ph-x" aria-hidden="true"></i> Cerrar
+        </button>
+        <span class="submenu-tipo-nombre"><?= htmlspecialchars($s['nombre']) ?></span>
+        <span class="submenu-tipo-precio">
+          <i class="ph ph-coins" aria-hidden="true"></i> <?= number_format($s['precio'], 0, ',', '.') ?>
+        </span>
+      </div>
     </div>
-  </section>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
   <?php endforeach; ?>
+  <?php endif; ?>
 
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
+<?php include __DIR__ . '/partials/confirmar.php'; ?>
 <?php include __DIR__ . '/partials/ceremonia.php'; ?>
 
 <script src="assets/js/sobres.js"></script>

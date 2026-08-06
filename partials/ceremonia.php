@@ -16,15 +16,30 @@ $base = $base ?? '';
       </button>
     </div>
 
+    <!-- §14.4: el sobre en sí, en 3D, antes de repartir las cartas -->
+    <div class="ceremonia-apertura" id="ceremoniaApertura" hidden>
+      <div class="sobre-3d" id="sobre3d">
+        <div class="sobre-3d-mitad sobre-3d-arriba">
+          <img class="sobre-3d-img" alt="" hidden>
+        </div>
+        <div class="sobre-3d-mitad sobre-3d-abajo">
+          <img class="sobre-3d-img" alt="" hidden>
+        </div>
+        <div class="sobre-3d-destello"></div>
+      </div>
+    </div>
+
     <div class="ceremonia-mesa" id="ceremoniaMesa"></div>
 
     <p class="sr-only" id="ceremoniaAnuncio" role="status" aria-live="polite"></p>
 
     <div class="modal-pie">
-      <button type="button" class="btn btn-ghost" id="ceremoniaSaltar">Mostrar todas</button>
+      <button type="button" class="btn btn-ghost" id="ceremoniaSaltarCarta">Saltar carta</button>
+      <button type="button" class="btn btn-ghost" id="ceremoniaSaltar">Saltar todo</button>
       <button type="button" class="btn btn-primary" data-cerrar-modal>Continuar</button>
     </div>
   </div>
 </div>
 
+<script src="<?= $base ?>assets/js/vendor/gsap/gsap.min.js"></script>
 <script src="<?= $base ?>assets/js/ceremonia.js"></script>

@@ -36,6 +36,9 @@ $activeAdmin = $activeAdmin ?? '';
     <a href="expansiones.php" class="<?= $activeAdmin === 'expansiones' ? 'active' : '' ?>">
       <span class="nav-ico"><i class="bi bi-folder2-open"></i></span> Expansiones
     </a>
+    <a href="plantillas.php" class="<?= $activeAdmin === 'plantillas' ? 'active' : '' ?>">
+      <span class="nav-ico"><i class="bi bi-badge-3d"></i></span> Plantillas 3D
+    </a>
     <a href="usuarios.php" class="<?= $activeAdmin === 'usuarios' ? 'active' : '' ?>">
       <span class="nav-ico"><i class="bi bi-people"></i></span> Usuarios
     </a>
