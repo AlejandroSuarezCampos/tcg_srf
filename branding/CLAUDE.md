@@ -470,10 +470,13 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
 
 - **No hay Python real**: `python`/`python3`/`py` son el stub de Microsoft
   Store. No hay `pandoc`. No hay `node` (no puedes usar `node -c` para validar JS).
-- **El navegador cachea CSS y JS con fuerza.** Tras editar, recarga con Ctrl+F5,
-  o si automatizas pruebas, sustituye el `<link>`/`<script>` con
-  `?cb=timestamp` y espera a `onload` antes de medir. Es el patrón usado en
-  todas las verificaciones de este proyecto.
+- **El navegador cachea CSS y JS con fuerza.** Ya no debería morder: todos los
+  `<link>`/`<script>` del sitio pasan por `assetUrl()`/`assetScript()`
+  (`partials/assets.php`), que les añade `?v=filemtime`. **Si añades un asset
+  nuevo, úsalo también** — el fallo es muy engañoso, porque el PHP no se
+  cachea nunca y por tanto el HTML nuevo llega bien pero contra un .css/.js
+  viejo: parece "he cambiado el código y no pasa nada". Ya pasó con `ui.js`,
+  que se cargaba desde `footer.php` sin versión.
 - **El panel del navegador de pruebas no compone fotogramas si está en segundo
   plano**: `requestAnimationFrame` se pausa y `document.hidden` es `true`. Las
   animaciones no se pueden cronometrar ahí; hay que validar la lógica por
@@ -1022,9 +1025,39 @@ Flujo en `panel/plantillas.php` (solo `dictador=1`):
 3. **Resumen** (`#ceremoniaMesa`): todas las cartas ya reveladas, con el
    anuncio por `aria-live`.
 
-`prefers-reduced-motion` se consulta **en cada apertura**, no al cargar el
-script, para que cambiar la preferencia del sistema surta efecto sin recargar;
-con la preferencia activa se va directo al resumen.
+### 14.2c ⚠️ Movimiento reducido: la trampa que se come TODAS las ceremonias
+
+**Si alguien reporta "he cambiado la animación y no pasa nada", mira esto
+ANTES que el código.** En Windows basta con apagar *Configuración →
+Accesibilidad → Efectos visuales → Efectos de animación* (muchísima gente lo
+hace **por rendimiento**, no por sensibilidad al movimiento) para que Chrome
+reporte `prefers-reduced-motion: reduce`, y entonces la ceremonia salta
+directa al resumen. El síntoma engaña: parece que el código nuevo no se ha
+desplegado, cuando en realidad se está ejecutando su rama correcta.
+
+Comprobarlo desde PowerShell:
+```powershell
+$m = (Get-ItemProperty 'HKCU:\Control Panel\Desktop' -Name UserPreferencesMask).UserPreferencesMask
+[bool]($m[0] -band 0x02)   # False = animaciones DESACTIVADAS
+```
+
+**La preferencia del sistema se sigue respetando por defecto** (WCAG 2.2, §7),
+pero se puede sobrescribir **solo para esta web**:
+
+- `SRF.movimientoReducido()` (en `ui.js`) es la ÚNICA fuente de verdad. Nadie
+  debe volver a llamar a `matchMedia('(prefers-reduced-motion)')` por su
+  cuenta. Manda `localStorage['srf-animaciones']`: `'si'` fuerza animaciones,
+  `'no'` las quita, ausente = automático.
+- Se consulta **en cada uso**, nunca cacheada en una variable al cargar el
+  script: así cambiarla surte efecto sin recargar.
+- Se elige en `configuracion.php` → «Animaciones», que además **explica el
+  estado real** ("tu sistema pide reducir el movimiento, así que ahora mismo
+  NO verás animaciones").
+- Y como nadie va a buscar eso en los ajustes, la ceremonia **ofrece activarlo
+  donde se nota**: si se saltó por la preferencia del sistema y el jugador no
+  ha elegido todavía, el resumen muestra un aviso con «Activar animaciones
+  aquí» que repite la apertura al instante. Quien pulse «No, gracias» guarda
+  `'no'` y no lo vuelve a ver.
 
 ### 14.2b Qué NO se construyó
 

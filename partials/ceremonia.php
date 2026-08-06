@@ -56,6 +56,25 @@ $base = $base ?? '';
     <!-- ESCENA 3: resumen -->
     <div class="ceremonia-mesa" id="ceremoniaMesa"></div>
 
+    <!-- Se te ha saltado la ceremonia por la preferencia del SISTEMA y aún no
+         has elegido nada en configuracion.php: se ofrece aquí, que es donde se
+         nota, en vez de dejarlo enterrado en los ajustes. -->
+    <div class="cer-aviso-motion" id="cerAvisoMotion" hidden>
+      <p>
+        <i class="ph ph-sparkle" aria-hidden="true"></i>
+        Te has saltado la ceremonia porque tu sistema pide reducir el movimiento.
+        Puedes activarla solo para esta web.
+      </p>
+      <div class="cer-aviso-motion-botones">
+        <button type="button" class="btn btn-primary btn-sm" id="cerActivarMotion">
+          Activar animaciones aquí
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="cerRechazarMotion">
+          No, gracias
+        </button>
+      </div>
+    </div>
+
     <p class="sr-only" id="ceremoniaAnuncio" role="status" aria-live="polite"></p>
 
     <div class="modal-pie">

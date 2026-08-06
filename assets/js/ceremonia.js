@@ -42,6 +42,9 @@
   var contador   = document.getElementById('ceremoniaContador');
   var btnSaltarCarta = document.getElementById('ceremoniaSaltarCarta');
   var btnSaltar      = document.getElementById('ceremoniaSaltar');
+  var avisoMotion    = document.getElementById('cerAvisoMotion');
+  var btnActivarMotion  = document.getElementById('cerActivarMotion');
+  var btnRechazarMotion = document.getElementById('cerRechazarMotion');
   if (!mesa || !cerCarta) return;
 
   // Se consulta EN CADA APERTURA, no una vez al cargar: cambiar la preferencia
@@ -66,6 +69,7 @@
   var cartaRevelada = false; // la carta actual ya está boca arriba
   var saltandoTodo = false;
   var avanzar = null;        // resolve() de la carta actual
+  var sobreActual = null;    // para poder repetir la apertura con animación
 
   /* ---------------------------------------------------------------------
      Utilidades
@@ -295,12 +299,38 @@
       (cartas.length === 1 ? ' carta: ' : ' cartas: ') + texto + '.';
   }
 
+  /* Se ofrece activar las animaciones SOLO si la ceremonia se saltó por la
+     preferencia del sistema y el jugador todavía no ha elegido nada aquí.
+     Quien haya puesto "Desactivadas siempre" a mano no vuelve a ver el aviso. */
+  function ofrecerAnimaciones() {
+    if (!avisoMotion) return;
+    var esDelSistema = reducido() && SRF.preferenciaMovimiento && !SRF.preferenciaMovimiento();
+    avisoMotion.hidden = !esDelSistema;
+  }
+
   function terminar() {
     foco.hidden = true;
     pintarMesa();
     anunciar();
     btnSaltarCarta.disabled = true;
     btnSaltar.disabled = true;
+    ofrecerAnimaciones();
+  }
+
+  if (btnActivarMotion) {
+    btnActivarMotion.addEventListener('click', function () {
+      SRF.fijarPreferenciaMovimiento('si');
+      avisoMotion.hidden = true;
+      // se repite la apertura, ahora sí con ceremonia: las cartas ya están
+      // en la colección, esto solo vuelve a reproducir el espectáculo
+      ceremonia(cartas, sobreActual);
+    });
+  }
+  if (btnRechazarMotion) {
+    btnRechazarMotion.addEventListener('click', function () {
+      SRF.fijarPreferenciaMovimiento('no');
+      avisoMotion.hidden = true;
+    });
   }
 
   /* ---------------------------------------------------------------------
@@ -318,6 +348,7 @@
     if (!listaCartas || !listaCartas.length) return;
 
     cartas = listaCartas;
+    sobreActual = sobre || null;
     indice = 0;
     saltandoTodo = false;
     esperandoClic = false;
@@ -330,6 +361,7 @@
     foco.hidden = true;
     apertura.hidden = true;
     walkout.hidden = true;
+    if (avisoMotion) avisoMotion.hidden = true;
     caja.classList.remove('es-legendario', 'es-srf', 'en-walkout');
 
     var maxRareza = cartas.reduce(function (m, c) { return Math.max(m, c.id_rareza); }, 1);
