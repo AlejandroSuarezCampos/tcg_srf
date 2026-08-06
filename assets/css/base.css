@@ -132,14 +132,14 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
    Cubre también las ceremonias de sobre y duelo: las clases de ceremonia
    consultan este mismo criterio, no tienen excepción propia.
    -------------------------------------------------------------------------- */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+:root[data-motion="reduce"], :root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .001ms !important;
     scroll-behavior: auto !important;
   }
-}
 
 /* --------------------------------------------------------------------------
    LAYOUT DE PÁGINA
@@ -214,6 +214,4 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
 }
 .reveal.in { opacity: 1; transform: none; }
 
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; }
-}
+:root[data-motion="reduce"] .reveal { opacity: 1; transform: none; }

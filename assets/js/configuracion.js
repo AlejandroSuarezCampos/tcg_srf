@@ -46,7 +46,14 @@
 
   var select = document.getElementById('selectAnimaciones');
   var estado = document.getElementById('animacionesEstado');
-  if (!select || !SRF.preferenciaMovimiento) return;
+  // SRF.preferenciaMovimiento la define partials/head.php inline, así que a
+  // estas alturas SIEMPRE existe. Si algún día no, es preferible saberlo por
+  // consola que dejar un selector que no guarda nada en silencio.
+  if (!select) return;
+  if (!SRF.preferenciaMovimiento) {
+    console.error('SRF.preferenciaMovimiento no está definida: revisa el bloque inline de partials/head.php');
+    return;
+  }
 
   function describir() {
     var delSistema = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

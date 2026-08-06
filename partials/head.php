@@ -31,6 +31,49 @@ $bodyClass    = $bodyClass    ?? '';
 <meta name="color-scheme" content="dark">
 <link rel="icon" type="image/png" href="<?= $base ?>assets/img/iconos/favicon.ico">
 
+<!-- PREFERENCIA DE MOVIMIENTO — va INLINE y lo primero de todo, a propósito.
+     · Inline: un fichero .js aparte podría servirse cacheado y dejar la
+       página con el modo equivocado (ya pasó con ui.js).
+     · Lo primero: fija data-motion en <html> ANTES del primer pintado, así no
+       se ve un fotograma con las animaciones del modo que no toca.
+     Todo el CSS del sitio cuelga de :root[data-motion="reduce"] en vez de
+     @media (prefers-reduced-motion), porque una media query la decide el
+     sistema y NO se puede sobrescribir desde JavaScript: con ella, activar las
+     animaciones en la web dejaba las ceremonias en display:none y la pantalla
+     muerta. La preferencia propia manda sobre la del sistema. -->
+<script>
+(function () {
+  var SRF = (window.SRF = window.SRF || {});
+  var CLAVE = 'srf-animaciones';   // 'si' | 'no' | ausente = automático
+
+  SRF.preferenciaMovimiento = function () {
+    try { return localStorage.getItem(CLAVE); } catch (e) { return null; }
+  };
+  SRF.movimientoReducido = function () {
+    var p = SRF.preferenciaMovimiento();
+    if (p === 'si') return false;
+    if (p === 'no') return true;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  };
+  SRF.aplicarMovimiento = function () {
+    document.documentElement.dataset.motion = SRF.movimientoReducido() ? 'reduce' : 'full';
+  };
+  SRF.fijarPreferenciaMovimiento = function (valor) {
+    try {
+      if (valor === null) localStorage.removeItem(CLAVE);
+      else localStorage.setItem(CLAVE, valor);
+    } catch (e) { /* modo privado: se queda en automático */ }
+    SRF.aplicarMovimiento();
+  };
+
+  SRF.aplicarMovimiento();
+  // si el jugador cambia la preferencia del SISTEMA con la página abierta y
+  // aquí está en automático, el modo se actualiza solo
+  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (mq.addEventListener) mq.addEventListener('change', SRF.aplicarMovimiento);
+})();
+</script>
+
 <!-- Geist autoalojada: sin dependencia de terceros para la tipografía -->
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>

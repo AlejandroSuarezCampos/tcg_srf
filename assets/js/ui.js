@@ -140,8 +140,7 @@
     var elementos = document.querySelectorAll('.reveal');
     if (!elementos.length) return;
 
-    if (!('IntersectionObserver' in window) ||
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!('IntersectionObserver' in window) || SRF.movimientoReducido()) {
       Array.prototype.forEach.call(elementos, function (el) { el.classList.add('in'); });
       return;
     }
@@ -340,52 +339,13 @@
     iniciarConfirmar();
   });
 
-  /* ------------------------------------------------------------------------
-     ¿Hay que reducir el movimiento?
-
-     Por defecto manda la preferencia del sistema (WCAG 2.2): quien la tenga
-     activada no verá ceremonias ni volteos animados. Pero esa preferencia se
-     activa muchas veces por rendimiento, no por sensibilidad al movimiento —
-     en Windows basta con apagar "Efectos de animación" y Chrome ya reporta
-     `prefers-reduced-motion: reduce`—, y entonces el jugador se pierde la
-     apertura de sobres sin saber por qué. Por eso hay una preferencia propia
-     que puede FORZAR cualquiera de los dos lados desde configuracion.php:
-
-       'si'  -> animaciones completas, ignorando al sistema (opt-in explícito)
-       'no'  -> sin animaciones, aunque el sistema no lo pida
-       null  -> automático: lo que diga el sistema
-
-     Se consulta en cada uso, nunca se cachea: así cambiarla surte efecto sin
-     recargar la página.
-     ------------------------------------------------------------------------ */
-  var CLAVE_MOVIMIENTO = 'srf-animaciones';
-
-  function preferenciaMovimiento() {
-    try { return localStorage.getItem(CLAVE_MOVIMIENTO); } catch (e) { return null; }
-  }
-
-  function movimientoReducido() {
-    var pref = preferenciaMovimiento();
-    if (pref === 'si') return false;
-    if (pref === 'no') return true;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
-  function fijarPreferenciaMovimiento(valor) {
-    try {
-      if (valor === null) localStorage.removeItem(CLAVE_MOVIMIENTO);
-      else localStorage.setItem(CLAVE_MOVIMIENTO, valor);
-    } catch (e) { /* modo privado sin almacenamiento: se queda en automático */ }
-  }
-
-  /* API pública */
-  window.SRF = {
-    abrirModal: abrirModal,
-    cerrarModal: cerrarModal,
-    toast: toast,
-    confirmar: confirmar,
-    movimientoReducido: movimientoReducido,
-    preferenciaMovimiento: preferenciaMovimiento,
-    fijarPreferenciaMovimiento: fijarPreferenciaMovimiento
-  };
+  /* API pública.
+     Se AMPLÍA el objeto existente, nunca se reasigna: partials/head.php ya ha
+     dejado ahí las funciones de preferencia de movimiento (inline, antes del
+     primer pintado) y un `window.SRF = {...}` las borraría. */
+  var SRF = (window.SRF = window.SRF || {});
+  SRF.abrirModal = abrirModal;
+  SRF.cerrarModal = cerrarModal;
+  SRF.toast = toast;
+  SRF.confirmar = confirmar;
 })();

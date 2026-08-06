@@ -50,10 +50,9 @@
   // Se consulta EN CADA APERTURA, no una vez al cargar: cambiar la preferencia
   // (la del sistema o la propia de configuracion.php) surte efecto sin
   // recargar. SRF.movimientoReducido vive en ui.js, que se carga antes.
+  // La define partials/head.php inline, antes que cualquier script externo.
   function reducido() {
-    return SRF.movimientoReducido
-      ? SRF.movimientoReducido()
-      : window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return SRF.movimientoReducido();
   }
 
   var RZ_COLOR = {

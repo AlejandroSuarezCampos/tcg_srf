@@ -1044,12 +1044,26 @@ $m = (Get-ItemProperty 'HKCU:\Control Panel\Desktop' -Name UserPreferencesMask).
 **La preferencia del sistema se sigue respetando por defecto** (WCAG 2.2, §7),
 pero se puede sobrescribir **solo para esta web**:
 
-- `SRF.movimientoReducido()` (en `ui.js`) es la ÚNICA fuente de verdad. Nadie
-  debe volver a llamar a `matchMedia('(prefers-reduced-motion)')` por su
-  cuenta. Manda `localStorage['srf-animaciones']`: `'si'` fuerza animaciones,
-  `'no'` las quita, ausente = automático.
+- **`SRF.movimientoReducido()` es la ÚNICA fuente de verdad**, y se define
+  **inline en `partials/head.php`**, no en un `.js` aparte: un fichero externo
+  puede servirse cacheado y dejar la página en el modo equivocado (pasó con
+  `ui.js`), y además así se aplica antes del primer pintado. Manda
+  `localStorage['srf-animaciones']`: `'si'` fuerza animaciones, `'no'` las
+  quita, ausente = automático. Nadie más debe llamar a
+  `matchMedia('(prefers-reduced-motion)')` — la única excepción legítima es
+  `configuracion.js`, que necesita saber qué dice **el sistema** para
+  explicárselo al jugador.
 - Se consulta **en cada uso**, nunca cacheada en una variable al cargar el
   script: así cambiarla surte efecto sin recargar.
+- **El CSS NO usa `@media (prefers-reduced-motion: reduce)`.** Todas esas
+  reglas cuelgan de `:root[data-motion="reduce"]`, y el atributo lo pone el
+  bootstrap de `head.php`. **Es obligatorio seguir así**: una media query la
+  decide el sistema y **JavaScript no puede sobrescribirla**, así que con ella
+  activar las animaciones en la web dejaba la ceremonia en `display: none` —
+  el JS se ejecutaba pero la pantalla estaba muerta y no se podía ni hacer
+  clic. Si añades una regla de movimiento reducido, cuélgala del atributo.
+- `ui.js` **amplía** `window.SRF` en vez de reasignarlo (`window.SRF = {...}`
+  borraría lo que dejó el bootstrap inline).
 - Se elige en `configuracion.php` → «Animaciones», que además **explica el
   estado real** ("tu sistema pide reducir el movimiento, así que ahora mismo
   NO verás animaciones").

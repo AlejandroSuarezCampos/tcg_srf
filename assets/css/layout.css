@@ -634,9 +634,7 @@
      de saltar, que es lo que hace legible de un vistazo qué se ha movido */
   transition: left var(--t-media) var(--ease), top var(--t-media) var(--ease);
 }
-@media (prefers-reduced-motion: reduce) {
-  .hueco { transition: none; }
-}
+:root[data-motion="reduce"] .hueco { transition: none; }
 /* En pantalla estrecha, una línea de seis medios deja ~52px por jugador: el
    retrato se encoge para que quepan sin pisarse ni salirse del campo. El
    botón entero sigue por encima del objetivo táctil mínimo. */
@@ -872,9 +870,7 @@
 
 /* con reducción de movimiento la sala no parpadea, pero sigue leyéndose que
    está activa */
-@media (prefers-reduced-motion: reduce) {
-  .sala-latido span { animation: none; opacity: .8; }
-}
+:root[data-motion="reduce"] .sala-latido span { animation: none; opacity: .8; }
 
 /* ---- fase de aumento pre-partido ---- */
 .aumento {
@@ -1264,10 +1260,10 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   50%      { filter: drop-shadow(0 0 14px rgba(255, 201, 51, 1))  drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .nodo-hex, a.nodo-boton:hover .nodo-hex, .nodo.es-elegido .nodo-hex { transition: none; }
-  .nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: none; }
-}
+:root[data-motion="reduce"] .nodo-hex,
+:root[data-motion="reduce"] a.nodo-boton:hover .nodo-hex,
+:root[data-motion="reduce"] .nodo.es-elegido .nodo-hex { transition: none; }
+:root[data-motion="reduce"] .nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: none; }
 
 .mapa-leyenda {
   display: flex;
@@ -1452,12 +1448,10 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   80%  { opacity: 1; transform: none; }
   100% { opacity: 0; transform: translateY(-6px) scale(.98); }
 }
-@media (prefers-reduced-motion: reduce) {
-  /* red de seguridad: este modal no debería llegar a abrirse con movimiento
+/* red de seguridad: este modal no debería llegar a abrirse con movimiento
      reducido (el JS lo evita), pero si algo falla, el evento se queda fijo
      en vez de animarse */
-  .simulacion-evento { animation: none; }
-}
+  :root[data-motion="reduce"] .simulacion-evento { animation: none; }
 
 /* entrada del marcador al llegar recién resuelto */
 .partido.es-revelando .partido-marcador,

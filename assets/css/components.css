@@ -574,11 +574,9 @@
 /* Movimiento reducido: se apagan los barridos y el aura queda fija en su
    estado medio. La carta sigue siendo inconfundiblemente SRF —borde
    arcoíris, aura y tinte— pero sin nada en movimiento. */
-@media (prefers-reduced-motion: reduce) {
-  .carta[data-rareza="6"] .carta-placa::before,
-  .rz[data-rareza="6"]::after { display: none; }
-  .carta[data-rareza="6"]::before { opacity: .5; }
-}
+:root[data-motion="reduce"] .carta[data-rareza="6"] .carta-placa::before,
+:root[data-motion="reduce"] .rz[data-rareza="6"]::after { display: none; }
+:root[data-motion="reduce"] .carta[data-rareza="6"]::before { opacity: .5; }
 
 /* ==========================================================================
    3c. TAMAÑOS Y ESTADOS DE LA CARTA
@@ -1037,11 +1035,11 @@
 
 /* sin movimiento: ni flotación, ni tilt, ni levantado al hover — cada fase
    deja su estado final sin transición */
-@media (prefers-reduced-motion: reduce) {
-  .pack3d-volumen { animation: none; }
-  .pack3d-sobre { transition: none; }
-  .pack3d-sobre:hover, .pack3d-sobre:focus-visible, .pack3d-sobre.es-hover-forzado { --alza: -46px; }
-}
+:root[data-motion="reduce"] .pack3d-volumen { animation: none; }
+:root[data-motion="reduce"] .pack3d-sobre { transition: none; }
+:root[data-motion="reduce"] .pack3d-sobre:hover,
+:root[data-motion="reduce"] .pack3d-sobre:focus-visible,
+:root[data-motion="reduce"] .pack3d-sobre.es-hover-forzado { --alza: -46px; }
 
 @media (max-width: 760px) {
   .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-6); }
@@ -1426,17 +1424,21 @@
 
 /* Movimiento reducido: sin volteo, sin fanfarria, sin destello. Las cartas
    ya salen reveladas desde JavaScript, así que aquí solo se anula el 3D. */
-@media (prefers-reduced-motion: reduce) {
-  .ranura, .ranura.esta-volteada { transform: none; transition: none; }
-  .ranura-frente { transform: none; }
-  .ranura-dorso, .ranura.con-fanfarria::after, .ceremonia-destello { display: none; }
-  .ceremonia .modal-caja.es-srf { animation: none; }
-  .ranura-aura, .ceremonia-fut { display: none; }
+:root[data-motion="reduce"] .ranura,
+:root[data-motion="reduce"] .ranura.esta-volteada { transform: none; transition: none; }
+:root[data-motion="reduce"] .ranura-frente { transform: none; }
+:root[data-motion="reduce"] .ranura-dorso,
+:root[data-motion="reduce"] .ranura.con-fanfarria::after,
+:root[data-motion="reduce"] .ceremonia-destello { display: none; }
+:root[data-motion="reduce"] .ceremonia .modal-caja.es-srf { animation: none; }
+:root[data-motion="reduce"] .ranura-aura,
+:root[data-motion="reduce"] .ceremonia-fut { display: none; }
   /* escenas 1 y 2 no llegan a ejecutarse (ceremonia.js va directo al resumen),
      pero se apagan también por CSS por si el modo cambia a mitad de sesión */
-  .ceremonia-apertura, .ceremonia-foco, .cer-walkout { display: none; }
-  .cer-carta { transition: none; }
-}
+  :root[data-motion="reduce"] .ceremonia-apertura,
+:root[data-motion="reduce"] .ceremonia-foco,
+:root[data-motion="reduce"] .cer-walkout { display: none; }
+:root[data-motion="reduce"] .cer-carta { transition: none; }
 
 @media (max-width: 600px) {
   .cer-carta { width: 175px; }

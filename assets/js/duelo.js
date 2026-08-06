@@ -182,7 +182,7 @@
     if (veredicto) veredicto.focus({ preventScroll: false });
   }
 
-  var reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reducido = SRF.movimientoReducido();   // preferencia de la web por encima de la del sistema
   var simulacion = document.getElementById('simulacionPartido');
 
   if (reducido || !simulacion) {
