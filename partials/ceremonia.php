@@ -23,32 +23,35 @@ $base = $base ?? '';
       </button>
     </div>
 
-    <!-- ESCENA 1: el sobre en 3D, rasgado en dos mitades -->
-    <div class="ceremonia-apertura" id="ceremoniaApertura" hidden>
-      <div class="cer-sobre" id="cerSobre">
-        <div class="cer-sobre-mitad cer-sobre-arriba"></div>
-        <div class="cer-sobre-mitad cer-sobre-abajo"></div>
-        <div class="cer-sobre-luz"></div>
-      </div>
-    </div>
+    <!-- ESCENA DE APERTURA — el sobre permanece en pantalla y las cartas
+         SALEN DE ÉL por la boca, de una en una (tipo Pokémon / Adrenalyn).
+         El orden del DOM no decide qué tapa a qué: eso lo fija el z-index en
+         components.css, porque la carta tiene que empezar DETRÁS del cuerpo
+         del sobre (para que se lea que sale de dentro) y acabar DELANTE. -->
+    <div class="cer-escena" id="ceremoniaEscena" hidden>
 
-    <!-- ESCENA 2: carta a carta, boca abajo, clic para voltear -->
-    <div class="ceremonia-foco" id="ceremoniaFoco" hidden>
-      <div class="cer-foco-escena">
-        <div class="cer-walkout" id="cerWalkout" hidden>
-          <div class="cer-walkout-rayos"></div>
-          <div class="cer-walkout-texto">
-            <span class="cer-walkout-rareza" id="cerWalkoutRareza"></span>
-          </div>
+      <div class="cer-walkout" id="cerWalkout" hidden>
+        <div class="cer-walkout-rayos"></div>
+        <div class="cer-walkout-texto">
+          <span class="cer-walkout-rareza" id="cerWalkoutRareza"></span>
         </div>
-        <button type="button" class="cer-carta" id="cerCarta">
-          <span class="cer-carta-aura" aria-hidden="true"></span>
-          <span class="cer-carta-cara cer-carta-dorso">
-            <span class="carta-dorso"><i class="ph ph-soccer-ball" aria-hidden="true"></i></span>
-          </span>
-          <span class="cer-carta-cara cer-carta-frente" id="cerCartaFrente"></span>
-        </button>
       </div>
+
+      <div class="cer-sobre" id="cerSobre">
+        <span class="cer-sobre-boca" aria-hidden="true"></span>
+        <span class="cer-sobre-cuerpo" aria-hidden="true"></span>
+        <span class="cer-sobre-tira" aria-hidden="true"></span>
+        <span class="cer-sobre-brillo" aria-hidden="true"></span>
+      </div>
+
+      <button type="button" class="cer-carta" id="cerCarta">
+        <span class="cer-carta-aura" aria-hidden="true"></span>
+        <span class="cer-carta-cara cer-carta-dorso">
+          <span class="carta-dorso"><i class="ph ph-soccer-ball" aria-hidden="true"></i></span>
+        </span>
+        <span class="cer-carta-cara cer-carta-frente" id="cerCartaFrente"></span>
+      </button>
+
       <p class="cer-pista" id="ceremoniaPista">Toca la carta para darle la vuelta</p>
       <p class="cer-contador mono" id="ceremoniaContador"></p>
     </div>

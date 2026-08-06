@@ -31,9 +31,8 @@
   var caja       = document.getElementById('ceremoniaCaja');
   var mesa       = document.getElementById('ceremoniaMesa');
   var anuncio    = document.getElementById('ceremoniaAnuncio');
-  var apertura   = document.getElementById('ceremoniaApertura');
+  var escena     = document.getElementById('ceremoniaEscena');
   var cerSobre   = document.getElementById('cerSobre');
-  var foco       = document.getElementById('ceremoniaFoco');
   var cerCarta   = document.getElementById('cerCarta');
   var cerFrente  = document.getElementById('cerCartaFrente');
   var walkout    = document.getElementById('cerWalkout');
@@ -69,6 +68,7 @@
   var saltandoTodo = false;
   var avanzar = null;        // resolve() de la carta actual
   var sobreActual = null;    // para poder repetir la apertura con animación
+  var enReparto = false;     // false mientras se abre el sobre, true al repartir
 
   /* ---------------------------------------------------------------------
      Utilidades
@@ -85,57 +85,76 @@
   }
 
   /* ---------------------------------------------------------------------
-     ESCENA 1 — el sobre se rasga en dos mitades.
-     Usa las texturas de la plantilla del propio sobre (sobre.frente /
-     sobre.reverso); sin plantilla subida cae al degradado del CSS.
+     APERTURA DEL SOBRE — el sobre aparece con SU textura, se le arranca la
+     tira de arriba y SE QUEDA en pantalla, abierto, para que las cartas
+     salgan de él. Nada de partirlo en dos y hacerlo desaparecer.
      --------------------------------------------------------------------- */
-  function escenaSobre(sobre) {
+  var sobreCuerpo, sobreTira, sobreBoca, sobreBrillo;
+
+  function partesSobre() {
+    sobreCuerpo = sobreCuerpo || cerSobre.querySelector('.cer-sobre-cuerpo');
+    sobreTira   = sobreTira   || cerSobre.querySelector('.cer-sobre-tira');
+    sobreBoca   = sobreBoca   || cerSobre.querySelector('.cer-sobre-boca');
+    sobreBrillo = sobreBrillo || cerSobre.querySelector('.cer-sobre-brillo');
+  }
+
+  function abrirSobre(sobre) {
     return new Promise(function (resolve) {
-      var arriba = cerSobre.querySelector('.cer-sobre-arriba');
-      var abajo  = cerSobre.querySelector('.cer-sobre-abajo');
-      var luz    = cerSobre.querySelector('.cer-sobre-luz');
+      partesSobre();
 
       var textura = (sobre && (sobre.frente || sobre.imagen)) || '';
-      [arriba, abajo].forEach(function (m) {
-        m.style.backgroundImage = textura ? "url('" + textura + "')" : '';
-      });
+      var url = textura ? "url('" + textura + "')" : '';
+      sobreCuerpo.style.backgroundImage = url;
+      sobreTira.style.backgroundImage   = url;
 
-      apertura.hidden = false;
-      gsap.set(cerSobre, { scale: .55, opacity: 0, rotateY: -22 });
-      gsap.set([arriba, abajo], { clearProps: 'transform', opacity: 1 });
-      gsap.set(luz, { opacity: 0, scale: .5 });
+      gsap.set(cerSobre,  { scale: .62, opacity: 0, rotateY: -26, rotateX: 6, y: 30 });
+      gsap.set(sobreTira, { clearProps: 'transform', opacity: 1 });
+      gsap.set(sobreBoca, { opacity: 0 });
+      gsap.set(sobreBrillo, { opacity: 0, xPercent: -60 });
 
       var tl = gsap.timeline({
-        onComplete: function () {
-          tlActual = null;
-          apertura.hidden = true;
-          resolve();
-        }
+        onComplete: function () { tlActual = null; resolve(); }
       });
       tlActual = tl;
 
-      tl.to(cerSobre, { scale: 1, opacity: 1, rotateY: 0, duration: .5, ease: 'back.out(1.5)' })
-        // temblor de anticipación antes de rasgarse
-        .to(cerSobre, { rotate: -2.5, duration: .07, yoyo: true, repeat: 7, ease: 'none' }, '+=.15')
-        .to(luz, { opacity: 1, scale: 1.6, duration: .25 }, '-=.12')
-        .to(arriba, { yPercent: -85, rotate: -9, opacity: 0, duration: .5, ease: 'power2.in' }, '<+=.05')
-        .to(abajo,  { yPercent: 85,  rotate: 9,  opacity: 0, duration: .5, ease: 'power2.in' }, '<')
-        .call(destelloPantalla, [], '<+=.1')
-        .to(luz, { opacity: 0, duration: .3 }, '-=.2')
-        .to(cerSobre, { opacity: 0, duration: .2 }, '-=.15');
+      tl
+        // 1. el sobre entra girando hasta ponerse de frente
+        .to(cerSobre, { scale: 1, opacity: 1, rotateY: 0, rotateX: 0, y: 0,
+                        duration: .75, ease: 'back.out(1.35)' })
+        // 2. barrido de luz sobre el plástico
+        .to(sobreBrillo, { opacity: 1, xPercent: 60, duration: .7, ease: 'power2.inOut' }, '-=.35')
+        .to(sobreBrillo, { opacity: 0, duration: .25 }, '-=.15')
+        // 3. tensión: dos tirones cortos antes de rasgar
+        .to(cerSobre, { rotate: -1.8, duration: .08, yoyo: true, repeat: 5, ease: 'none' })
+        // 4. la tira se despega por una esquina y sale volando
+        .to(sobreBoca, { opacity: 1, duration: .2 }, '>-.05')
+        .to(sobreTira, { rotateX: 62, y: -6, duration: .22, ease: 'power1.in' }, '<')
+        .to(sobreTira, { y: -130, x: 46, rotate: -26, rotateX: 88, opacity: 0,
+                         duration: .55, ease: 'power2.in' })
+        // 5. respiro: el sobre abierto se asienta un poco más abajo para dejar
+        //    sitio arriba a las cartas que van a salir
+        .to(cerSobre, { y: 14, duration: .4, ease: 'power2.out' }, '-=.3');
     });
   }
 
-  function saltarEscenaSobre() {
+  function saltarAperturaSobre() {
     matarTimeline();
-    apertura.hidden = true;
+    partesSobre();
+    gsap.set(cerSobre, { scale: 1, opacity: 1, rotateY: 0, rotateX: 0, rotate: 0, y: 14 });
+    gsap.set(sobreTira, { opacity: 0 });
+    gsap.set(sobreBoca, { opacity: 1 });
+    gsap.set(sobreBrillo, { opacity: 0 });
   }
 
   /* ---------------------------------------------------------------------
      ESCENA 2 — una carta: aparece boca abajo y ESPERA EL CLIC.
      --------------------------------------------------------------------- */
+  // Estado base de la carta. xPercent/yPercent hacen el centrado DENTRO del
+  // transform de GSAP: si se dejara translate(-50%,-50%) en el CSS, el primer
+  // tween lo machacaría y la carta saltaría de sitio.
+  var CARTA_BASE = { xPercent: -50, yPercent: -50, rotationY: 0, rotate: 0 };
+
   function pintarDorso(carta) {
-    cerCarta.className = 'cer-carta';
     cerCarta.dataset.rareza = carta.id_rareza;
     cerCarta.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
     cerFrente.innerHTML = carta.html;
@@ -146,27 +165,41 @@
     pista.hidden = false;
   }
 
+  /* La carta arranca DENTRO del sobre (y positiva, z-index por debajo del
+     cuerpo) y sube hasta quedar centrada delante. El cambio de z-index a
+     mitad de subida es lo que vende que "sale de dentro". */
   function escenaCarta(carta) {
     return new Promise(function (resolve) {
       avanzar = resolve;
       pintarDorso(carta);
 
-      // entrada del dorso
+      gsap.set(cerCarta, Object.assign({}, CARTA_BASE, {
+        opacity: 1, scale: .58, y: 150, zIndex: 2
+      }));
+      gsap.set(cerCarta.querySelector('.cer-carta-aura'), { opacity: 0 });
+
       var tl = gsap.timeline({
         onComplete: function () { tlActual = null; esperandoClic = true; }
       });
       tlActual = tl;
-      tl.fromTo(cerCarta,
-        { opacity: 0, scale: .7, y: 40, rotateZ: -6 },
-        { opacity: 1, scale: 1, y: 0, rotateZ: 0, duration: .45, ease: 'back.out(1.5)' });
+
+      tl.to(cerCarta, { y: 34, scale: .74, duration: .34, ease: 'power2.out' })
+        // ya asoma por la boca: pasa a estar DELANTE del sobre
+        .set(cerCarta, { zIndex: 6 })
+        .to(cerCarta, { y: -34, scale: 1, duration: .62, ease: 'power3.out' })
+        // pequeño balanceo al asentarse, para que no parezca un sprite pegado
+        .to(cerCarta, { rotate: 1.6, duration: .18, yoyo: true, repeat: 1, ease: 'sine.inOut' }, '-=.16');
     });
   }
 
   /* ---------------------------------------------------------------------
      El volteo. Para rareza >= 5 se antepone el walkout.
      --------------------------------------------------------------------- */
+  /* Marca la carta como revelada. El GIRO en sí lo hace GSAP (rotationY), no
+     una clase: GSAP es el dueño del transform de .cer-carta y su estilo en
+     línea le ganaría siempre a cualquier regla de clase — así es como la
+     carta se quedaba sin voltear aunque tuviera la clase puesta. */
   function voltearAhora(carta) {
-    cerCarta.classList.add('esta-volteada');
     cartaRevelada = true;
     pista.textContent = 'Toca otra vez para continuar';
     if (carta.id_rareza >= 5 && typeof SRF.onExclusiveReveal === 'function') {
@@ -189,8 +222,12 @@
 
     if (!exclusiva) {
       tl.to(aura, { opacity: 1, scale: 1.15, duration: .22, ease: 'power1.out' })
-        .call(function () { voltearAhora(carta); })
-        .to(aura, { opacity: 0, duration: .4 }, '+=.15');
+        // el giro: se levanta un poco al voltear, como una carta de verdad
+        .to(cerCarta, { scale: 1.06, duration: .3, ease: 'power2.out' }, '<')
+        .to(cerCarta, { rotationY: 180, duration: .62, ease: 'power2.inOut' }, '<+=.1')
+        .call(function () { voltearAhora(carta); }, [], '<+=.31')
+        .to(cerCarta, { scale: 1, duration: .3, ease: 'power2.out' })
+        .to(aura, { opacity: 0, duration: .4 }, '<');
       return;
     }
 
@@ -215,29 +252,34 @@
       // latido del texto: es el "aguanta la respiración" del walkout
       .to(texto, { scale: 1.06, duration: .5, yoyo: true, repeat: 2, ease: 'sine.inOut' })
       .to(texto, { opacity: 0, scale: 1.35, duration: .35, ease: 'power2.in' })
-      .to(aura, { opacity: 1, scale: 1.45, duration: .3 }, '<')
-      .call(function () { voltearAhora(carta); destelloPantalla(); })
+      .to(aura, { opacity: 1, scale: 1.5, duration: .3 }, '<')
+      // el giro, amplificado: la carta se lanza hacia cámara mientras rota
+      .to(cerCarta, { scale: 1.18, duration: .45, ease: 'power2.out' }, '<')
+      .to(cerCarta, { rotationY: 180, duration: .8, ease: 'power2.inOut' }, '<')
+      .call(function () { voltearAhora(carta); destelloPantalla(); }, [], '<+=.4')
       // temblor de pantalla al destaparse
       .to(caja, { x: -9, duration: .05, yoyo: true, repeat: 7, ease: 'none' }, '<')
+      .to(cerCarta, { scale: 1, duration: .5, ease: 'power2.out' }, '<')
       .to(walkout, { opacity: 0, duration: .5 }, '<+=.25')
       .to(aura, { opacity: 0, duration: .6 }, '<')
       .call(function () {
         walkout.hidden = true;
         caja.classList.remove('en-walkout');
         gsap.set(caja, { clearProps: 'transform' });
-        gsap.set(cerCarta, { scale: 1 });
       });
   }
 
-  /* Deja la carta actual en su estado final, sin animación. */
+  /* Deja la carta actual en su estado final (fuera del sobre y ya girada),
+     sin animación. Lo usan "Saltar carta" y "Saltar todo". */
   function finalizarCartaActual() {
     matarTimeline();
     walkout.hidden = true;
     caja.classList.remove('en-walkout');
     gsap.set(caja, { clearProps: 'transform' });
-    gsap.set(cerCarta, { clearProps: 'transform,opacity' });
-    var aura = cerCarta.querySelector('.cer-carta-aura');
-    gsap.set(aura, { opacity: 0 });
+    gsap.set(cerCarta, Object.assign({}, CARTA_BASE, {
+      opacity: 1, scale: 1, y: -34, zIndex: 6, rotationY: 180
+    }));
+    gsap.set(cerCarta.querySelector('.cer-carta-aura'), { opacity: 0 });
     if (!cartaRevelada) voltearAhora(cartas[indice]);
   }
 
@@ -256,11 +298,13 @@
     if (!avanzar) return;
     var r = avanzar;
     avanzar = null;
-    // salida de la carta ya vista
+    // la carta vista se aparta hacia un lado y se desvanece, dejando el sobre
+    // libre para la siguiente
     if (reducido()) { r(); return; }
     gsap.to(cerCarta, {
-      opacity: 0, scale: .8, y: -30, duration: .28, ease: 'power2.in',
-      onComplete: r
+      opacity: 0, scale: .82, y: -120, x: 130, rotate: 12,
+      duration: .38, ease: 'power2.in',
+      onComplete: function () { gsap.set(cerCarta, { x: 0, rotate: 0 }); r(); }
     });
   }
 
@@ -308,7 +352,8 @@
   }
 
   function terminar() {
-    foco.hidden = true;
+    escena.hidden = true;
+    enReparto = false;
     pintarMesa();
     anunciar();
     btnSaltarCarta.disabled = true;
@@ -350,6 +395,7 @@
     sobreActual = sobre || null;
     indice = 0;
     saltandoTodo = false;
+    enReparto = false;
     esperandoClic = false;
     cartaRevelada = false;
     avanzar = null;
@@ -357,8 +403,7 @@
 
     mesa.innerHTML = '';
     mesa.hidden = true;
-    foco.hidden = true;
-    apertura.hidden = true;
+    escena.hidden = true;
     walkout.hidden = true;
     if (avisoMotion) avisoMotion.hidden = true;
     caja.classList.remove('es-legendario', 'es-srf', 'en-walkout');
@@ -377,17 +422,18 @@
     btnSaltarCarta.disabled = false;
     btnSaltar.disabled = false;
 
-    escenaSobre(sobre).then(function () {
-      foco.hidden = false;
+    escena.hidden = false;
+    abrirSobre(sobre).then(function () {
+      enReparto = true;
       repartir();
     });
   }
 
   /* ---- saltos ---- */
   btnSaltarCarta.addEventListener('click', function () {
-    if (saltandoTodo) return;
-    if (!apertura.hidden) { saltarEscenaSobre(); return; }
-    if (foco.hidden) return;
+    if (saltandoTodo || escena.hidden) return;
+    // aún rasgando el sobre: lo que se salta es la apertura, no una carta
+    if (!enReparto) { saltarAperturaSobre(); return; }
     if (!cartaRevelada) { finalizarCartaActual(); esperandoClic = true; return; }
     siguienteCarta();
   });
@@ -396,7 +442,6 @@
     saltandoTodo = true;
     matarTimeline();
     walkout.hidden = true;
-    apertura.hidden = true;
     caja.classList.remove('en-walkout');
     gsap.set(caja, { clearProps: 'transform' });
     if (avanzar) { var r = avanzar; avanzar = null; r(); }

@@ -1011,19 +1011,36 @@ Flujo en `panel/plantillas.php` (solo `dictador=1`):
 
 `partials/ceremonia.php` + `assets/js/ceremonia.js`. **Tres escenas**:
 
-1. **El sobre se rasga** (`#ceremoniaApertura`) usando la textura de SU
-   plantilla (`sobre.frente`, que `sobres.php` pasa por `data-frente`). Las dos
-   mitades comparten la misma imagen de fondo al doble de alto, desplazada
-   `-100%` en la de abajo, para que la costura caiga por el centro del arte.
-2. **Carta a carta** (`#ceremoniaFoco`): cada carta aparece **boca abajo y
-   espera el clic** del jugador para voltearse (es un `<button>` real, así que
-   funciona con Enter/Espacio). Un segundo clic pasa a la siguiente.
+1. **El sobre se abre por arriba** (`#ceremoniaEscena`) usando la textura de SU
+   plantilla (`sobre.frente`, que `sobres.php` pasa por `data-frente`): entra
+   girando, le barre un reflejo, tiembla y se le **arranca una tira superior**
+   que sale volando, dejando ver la boca oscura. **El sobre NO desaparece** —
+   se queda abierto en pantalla porque las cartas tienen que salir de él.
+   La tira lleva la misma textura encuadrada en su franja de arriba
+   (`background-size: 100% calc(100%/0.14)`), así que encaja con el cuerpo en
+   vez de parecer un rectángulo pegado encima.
+2. **Carta a carta, saliendo del sobre**: cada carta arranca con `y` positiva y
+   `z-index: 2` (**detrás** del cuerpo del sobre, o sea dentro), sube, y a
+   mitad de recorrido pasa a `z-index: 6`. Ese cambio es lo que vende que sale
+   de dentro. Ya fuera, espera **el clic** del jugador para voltearse (es un
+   `<button>` real, así que funciona con Enter/Espacio). Un segundo clic la
+   aparta y saca la siguiente.
    - Rareza **≥ 5** (legendaria y SRF) no se voltea sin más: dispara antes un
      **walkout** — se oscurece todo, giran rayos cónicos, aparece el nombre de
      la rareza con latido, y la carta se destapa con destello y temblor.
    - `Saltar carta` resuelve la actual al instante; `Saltar todo` va al resumen.
 3. **Resumen** (`#ceremoniaMesa`): todas las cartas ya reveladas, con el
    anuncio por `aria-live`.
+
+> ⚠️ **GSAP es el dueño ÚNICO del `transform` de `.cer-carta`.** El volteo se
+> hace con `rotationY` desde JS, **nunca con una clase CSS**: GSAP deja el
+> transform en línea y un estilo en línea gana siempre a una regla de clase, así
+> que la carta se quedaba con la clase puesta pero **sin girar de verdad**
+> (`matrix(1,0,0,1,0,0)`). Por lo mismo, el centrado va con `xPercent/yPercent`
+> de GSAP, no con `translate(-50%,-50%)` en CSS: el primer tween lo machacaría.
+> **Al verificar un volteo hay que mirar la matriz de `transform`, no la
+> clase** — comprobar la clase es lo que hizo dar este fallo por arreglado sin
+> estarlo.
 
 ### 14.2c ⚠️ Movimiento reducido: la trampa que se come TODAS las ceremonias
 
