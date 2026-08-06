@@ -41,6 +41,7 @@
   var contador   = document.getElementById('ceremoniaContador');
   var btnSaltarCarta = document.getElementById('ceremoniaSaltarCarta');
   var btnSaltar      = document.getElementById('ceremoniaSaltar');
+  var btnSaltarEscena = document.getElementById('cerSaltarEscena');
   var avisoMotion    = document.getElementById('cerAvisoMotion');
   var btnActivarMotion  = document.getElementById('cerActivarMotion');
   var btnRechazarMotion = document.getElementById('cerRechazarMotion');
@@ -89,6 +90,9 @@
      tira de arriba y SE QUEDA en pantalla, abierto, para que las cartas
      salgan de él. Nada de partirlo en dos y hacerlo desaparecer.
      --------------------------------------------------------------------- */
+  // El centrado del sobre vive aquí, no en el CSS: ver nota en components.css.
+  var SOBRE_BASE = { xPercent: -50, yPercent: -50 };
+
   var sobreCuerpo, sobreTira, sobreBoca, sobreBrillo;
 
   function partesSobre() {
@@ -96,6 +100,13 @@
     sobreTira   = sobreTira   || cerSobre.querySelector('.cer-sobre-tira');
     sobreBoca   = sobreBoca   || cerSobre.querySelector('.cer-sobre-boca');
     sobreBrillo = sobreBrillo || cerSobre.querySelector('.cer-sobre-brillo');
+  }
+
+  /* Modo inmersivo: mientras dura la apertura el modal se queda sin caja,
+     cabecera ni pie — solo el fondo negro y el sobre. Al llegar al resumen
+     vuelve el modal normal, con su título y su botón de Continuar. */
+  function inmersivo(activo) {
+    modal.classList.toggle('es-inmersiva', !!activo);
   }
 
   function abrirSobre(sobre) {
@@ -107,7 +118,10 @@
       sobreCuerpo.style.backgroundImage = url;
       sobreTira.style.backgroundImage   = url;
 
-      gsap.set(cerSobre,  { scale: .62, opacity: 0, rotateY: -26, rotateX: 6, y: 30 });
+      // SOBRE_BASE lleva el centrado: GSAP es dueño del transform del sobre
+      gsap.set(cerSobre,  Object.assign({}, SOBRE_BASE, {
+        scale: .62, opacity: 0, rotateY: -26, rotateX: 6, y: 30
+      }));
       gsap.set(sobreTira, { clearProps: 'transform', opacity: 1 });
       gsap.set(sobreBoca, { opacity: 0 });
       gsap.set(sobreBrillo, { opacity: 0, xPercent: -60 });
@@ -140,7 +154,9 @@
   function saltarAperturaSobre() {
     matarTimeline();
     partesSobre();
-    gsap.set(cerSobre, { scale: 1, opacity: 1, rotateY: 0, rotateX: 0, rotate: 0, y: 14 });
+    gsap.set(cerSobre, Object.assign({}, SOBRE_BASE, {
+      scale: 1, opacity: 1, rotateY: 0, rotateX: 0, rotate: 0, y: 14
+    }));
     gsap.set(sobreTira, { opacity: 0 });
     gsap.set(sobreBoca, { opacity: 1 });
     gsap.set(sobreBrillo, { opacity: 0 });
@@ -342,18 +358,21 @@
       (cartas.length === 1 ? ' carta: ' : ' cartas: ') + texto + '.';
   }
 
-  /* Se ofrece activar las animaciones SOLO si la ceremonia se saltó por la
-     preferencia del sistema y el jugador todavía no ha elegido nada aquí.
-     Quien haya puesto "Desactivadas siempre" a mano no vuelve a ver el aviso. */
+  /* El aviso de "puedes activar las animaciones" solo tiene sentido si:
+       · la ceremonia se ha saltado de verdad (movimiento reducido), Y
+       · el jugador NO ha elegido nada todavía en esta web.
+     En cuanto elige cualquier cosa —'si' desde configuracion.php o 'no' desde
+     el propio aviso— no vuelve a aparecer nunca. */
   function ofrecerAnimaciones() {
     if (!avisoMotion) return;
-    var esDelSistema = reducido() && SRF.preferenciaMovimiento && !SRF.preferenciaMovimiento();
-    avisoMotion.hidden = !esDelSistema;
+    var yaEligio = !!SRF.preferenciaMovimiento();
+    avisoMotion.hidden = yaEligio || !reducido();
   }
 
   function terminar() {
     escena.hidden = true;
     enReparto = false;
+    inmersivo(false);
     pintarMesa();
     anunciar();
     btnSaltarCarta.disabled = true;
@@ -405,6 +424,7 @@
     mesa.hidden = true;
     escena.hidden = true;
     walkout.hidden = true;
+    inmersivo(false);
     if (avisoMotion) avisoMotion.hidden = true;
     caja.classList.remove('es-legendario', 'es-srf', 'en-walkout');
 
@@ -423,6 +443,7 @@
     btnSaltar.disabled = false;
 
     escena.hidden = false;
+    inmersivo(true);
     abrirSobre(sobre).then(function () {
       enReparto = true;
       repartir();
@@ -438,7 +459,7 @@
     siguienteCarta();
   });
 
-  btnSaltar.addEventListener('click', function () {
+  function saltarTodo() {
     saltandoTodo = true;
     matarTimeline();
     walkout.hidden = true;
@@ -446,7 +467,11 @@
     gsap.set(caja, { clearProps: 'transform' });
     if (avanzar) { var r = avanzar; avanzar = null; r(); }
     else terminar();
-  });
+  }
+
+  btnSaltar.addEventListener('click', saltarTodo);
+  // el mismo salto, desde el único botón visible durante la escena
+  if (btnSaltarEscena) btnSaltarEscena.addEventListener('click', saltarTodo);
 
   /* al cerrar el modal se corta cualquier animación pendiente */
   function detener() {

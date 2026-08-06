@@ -30,6 +30,12 @@ $base = $base ?? '';
          del sobre (para que se lea que sale de dentro) y acabar DELANTE. -->
     <div class="cer-escena" id="ceremoniaEscena" hidden>
 
+      <!-- Único control visible durante la apertura: todo lo demás (cabecera,
+           pie, botones) se oculta para no competir con la escena. -->
+      <button type="button" class="cer-saltar" id="cerSaltarEscena">
+        Saltar <i class="ph ph-fast-forward" aria-hidden="true"></i>
+      </button>
+
       <div class="cer-walkout" id="cerWalkout" hidden>
         <div class="cer-walkout-rayos"></div>
         <div class="cer-walkout-texto">
@@ -37,11 +43,18 @@ $base = $base ?? '';
         </div>
       </div>
 
+      <!-- El sobre: proporción y acabado de un sobre real (Adrenalyn/Pokémon).
+           · cuerpo   → el plástico con la textura de la plantilla
+           · sellado  → la banda termosellada de abajo, con su estriado fino
+           · boca     → el hueco oscuro que queda al arrancar la tira
+           · tira     → la banda termosellada de ARRIBA, la que se rasga
+           · brillo   → reflejo del film, se barre al aparecer -->
       <div class="cer-sobre" id="cerSobre">
         <span class="cer-sobre-boca" aria-hidden="true"></span>
         <span class="cer-sobre-cuerpo" aria-hidden="true"></span>
-        <span class="cer-sobre-tira" aria-hidden="true"></span>
+        <span class="cer-sobre-sellado" aria-hidden="true"></span>
         <span class="cer-sobre-brillo" aria-hidden="true"></span>
+        <span class="cer-sobre-tira" aria-hidden="true"></span>
       </div>
 
       <button type="button" class="cer-carta" id="cerCarta">

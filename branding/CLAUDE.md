@@ -1032,15 +1032,30 @@ Flujo en `panel/plantillas.php` (solo `dictador=1`):
 3. **Resumen** (`#ceremoniaMesa`): todas las cartas ya reveladas, con el
    anuncio por `aria-live`.
 
-> ⚠️ **GSAP es el dueño ÚNICO del `transform` de `.cer-carta`.** El volteo se
-> hace con `rotationY` desde JS, **nunca con una clase CSS**: GSAP deja el
-> transform en línea y un estilo en línea gana siempre a una regla de clase, así
-> que la carta se quedaba con la clase puesta pero **sin girar de verdad**
-> (`matrix(1,0,0,1,0,0)`). Por lo mismo, el centrado va con `xPercent/yPercent`
-> de GSAP, no con `translate(-50%,-50%)` en CSS: el primer tween lo machacaría.
-> **Al verificar un volteo hay que mirar la matriz de `transform`, no la
-> clase** — comprobar la clase es lo que hizo dar este fallo por arreglado sin
-> estarlo.
+La apertura es **inmersiva**: mientras dura, `#modalSobre` lleva la clase
+`.es-inmersiva`, que le quita caja, borde, cabecera, pie y la mesa, y deja solo
+el fondo negro con el sobre. El único control visible es `.cer-saltar`, arriba
+a la derecha. Al llegar al resumen se quita la clase y vuelve el modal normal.
+
+El sobre se construye con la pinta de uno real: proporción **1 : 1.9**, dos
+**bandas termoselladas** (`.cer-sobre-tira` arriba, `.cer-sobre-sellado` abajo)
+con estriado vertical fino y filo dentado, abombamiento lateral y reflejo de
+film. La banda de arriba es la que se rasga y sale volando.
+
+> ⚠️ **GSAP es el dueño ÚNICO del `transform` de `.cer-carta` y `.cer-sobre`.**
+> Ninguno de los dos lleva `transform` en el CSS. Dos consecuencias que ya han
+> mordido, una por elemento:
+> - **El volteo va con `rotationY` desde JS, nunca con una clase CSS.** GSAP
+>   deja el transform en línea y un estilo en línea gana siempre a una regla de
+>   clase: la carta se quedaba con la clase `esta-volteada` puesta pero **sin
+>   girar** (`matrix(1,0,0,1,0,0)`).
+> - **El centrado va con `xPercent/yPercent` de GSAP, no con
+>   `translate(-50%,-50%)` en CSS**, que el primer tween machacaría. Al sobre
+>   le pasó exactamente eso: perdía el centrado en cuanto se le animaba nada.
+>
+> **Al verificar un volteo o un centrado hay que mirar la matriz de
+> `transform`, no la clase ni el atributo** — comprobar la clase es lo que hizo
+> dar el fallo del volteo por arreglado dos veces sin estarlo.
 
 ### 14.2c ⚠️ Movimiento reducido: la trampa que se come TODAS las ceremonias
 

@@ -1083,126 +1083,191 @@
 .ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
 /* ==========================================================================
-   ESCENA DE APERTURA — el sobre se queda en pantalla y las cartas SALEN DE ÉL
-   por la boca, de una en una (lectura tipo Pokémon / Adrenalyn).
+   ESCENA DE APERTURA — inmersiva y a pantalla completa.
 
-   Claves de la ilusión:
-   · El sobre NO desaparece al abrirse. Se le arranca una tira por arriba y se
-     queda ahí, abierto, mientras las cartas van saliendo.
-   · La carta empieza con z-index POR DEBAJO del cuerpo del sobre y una `y`
-     positiva: está literalmente detrás y dentro. Al subir cruza el borde
-     superior y, a mitad de recorrido, sobres.js le sube el z-index para que
-     pase a estar delante. Eso es lo que se lee como "sale del sobre".
-   · La tira comparte la textura del sobre: es su franja superior real
-     (background-size 100% (100/ALTURA_TIRA)%), así que al arrancarse encaja
-     con el cuerpo y no parece un rectángulo pegado encima.
+   Mientras dura la apertura, el modal deja de parecer un modal: se le quita
+   caja, borde, cabecera y pie, y queda solo el fondo negro con el sobre. Es
+   deliberado: los botones y el marco competían con lo único que importa mirar.
+   El único control es .cer-saltar, discreto, arriba a la derecha. Al llegar al
+   resumen se quita .es-inmersiva y vuelve el modal normal (título, Continuar).
 
-   ⚠ GSAP es el dueño ÚNICO del `transform` de .cer-carta. El giro NO puede
-   hacerse con una clase CSS: GSAP deja el transform en línea y un estilo en
-   línea gana siempre a una regla de clase — la carta se quedaba sin voltear
-   aunque tuviera la clase puesta. El volteo va con rotationY desde JS, y el
-   centrado con xPercent/yPercent (que GSAP compone dentro del mismo
-   transform), nunca con translate(-50%,-50%) en CSS.
+   EL SOBRE está construido como uno real:
+     · proporción 1 : 1.9, como un sobre de Adrenalyn / Pokémon
+     · dos bandas TERMOSELLADAS (arriba y abajo) con su estriado vertical fino
+     · borde dentado en el filo de cada banda (el corte "pinking")
+     · reflejo de film que barre al aparecer
+   La banda de arriba (.cer-sobre-tira) es la que se rasga y sale volando.
    ========================================================================== */
+
+/* ---- el escenario ---- */
+.ceremonia.es-inmersiva { background: radial-gradient(ellipse at 50% 45%, #0d0a08, #000 72%); }
+.ceremonia.es-inmersiva .modal-caja {
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.ceremonia.es-inmersiva .modal-head,
+.ceremonia.es-inmersiva .modal-pie,
+.ceremonia.es-inmersiva .ceremonia-mesa,
+.ceremonia.es-inmersiva .cer-aviso-motion { display: none; }
+
 .cer-escena {
-  --cer-tira: 14%;              /* alto de la tira que se arranca */
+  --cer-crimp: 7%;          /* alto de cada banda termosellada */
+  --cer-diente: 9px;        /* paso del dentado del filo */
   position: relative;
-  min-height: 470px;
-  perspective: 1600px;
-  perspective-origin: 50% 45%;
+  flex: 1;
+  min-height: 0;
+  display: block;
 }
 
+/* control único, discreto */
+.cer-saltar {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 16px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  color: var(--frost-dim);
+  font: inherit;
+  font-size: var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.cer-saltar:hover { color: var(--frost); border-color: var(--line-strong); }
+.cer-saltar:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
 /* ---- el sobre ---- */
+/* Sin `transform` de centrado en CSS: lo escribe GSAP entero (xPercent /
+   yPercent), igual que en .cer-carta. Si se dejara aquí un
+   translate(-50%,-50%), el primer tween lo machacaría y el sobre se iría a
+   la esquina. */
 .cer-sobre {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  width: 190px;
-  aspect-ratio: 165 / 235;
-  transform: translateX(-50%);
+  top: 50%;
+  width: clamp(150px, 21vh, 215px);
+  aspect-ratio: 1 / 1.9;
   transform-style: preserve-3d;
   z-index: 3;
+  filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .8));
 }
-.cer-sobre-cuerpo,
+
+/* plástico: la textura de la plantilla, con un sombreado lateral que le da
+   el abombamiento del sobre lleno */
+.cer-sobre-cuerpo {
+  position: absolute;
+  inset: 0;
+  background-color: var(--panel);
+  background-image:
+    radial-gradient(ellipse 82% 58% at 50% 22%, var(--amber-soft), transparent 70%),
+    linear-gradient(168deg, var(--void-2), #08090C);
+  background-size: cover;
+  background-position: center;
+  z-index: 3;
+}
+/* abombamiento + brillo de film, encima de la textura */
+.cer-sobre-cuerpo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.42) 0 4%, transparent 16% 84%, rgba(0,0,0,.42) 96% 100%),
+    linear-gradient(90deg, transparent 30%, rgba(255,255,255,.09) 42% 50%, transparent 62%);
+  pointer-events: none;
+}
+
+/* bandas termoselladas: estriado vertical fino, el detalle que hace que se
+   lea como un sobre y no como una tarjeta */
+.cer-sobre-sellado,
 .cer-sobre-tira {
   position: absolute;
   left: 0;
   right: 0;
-  background-color: var(--panel);
+  height: var(--cer-crimp);
+  background-color: color-mix(in srgb, var(--panel) 70%, #fff 30%);
   background-image:
-    radial-gradient(ellipse 80% 60% at 50% 15%, var(--amber-soft), transparent 70%),
-    linear-gradient(168deg, var(--void-2), #08090C);
-  background-size: cover;
-  background-position: center;
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-/* cuerpo: de debajo de la tira hasta abajo */
-.cer-sobre-cuerpo {
-  top: 0;
-  bottom: 0;
-  border-radius: 4px 4px var(--radius-md) var(--radius-md);
-  z-index: 3;
-  box-shadow: inset 0 0 0 1px var(--line), 0 24px 46px rgba(0,0,0,.66);
-}
-/* tira superior: MISMA textura, encuadrada en su franja de arriba, para que
-   al arrancarse se vea que era parte del sobre */
-.cer-sobre-tira {
-  top: 0;
-  height: var(--cer-tira);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background-size: 100% calc(100% / 0.14);
-  background-position: top center;
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.34) 0 1px,
+      rgba(255,255,255,.16) 1px 3px);
   z-index: 4;
-  transform-origin: bottom center;
 }
-/* dentado del rasgado, en el borde inferior de la tira */
+.cer-sobre-sellado { bottom: 0; }
+.cer-sobre-tira    { top: 0; transform-origin: bottom center; }
+
+/* filo dentado: triángulos del color del escenario recortando el borde.
+   Se pintan encima en vez de usar mask, para que no dependa del soporte de
+   mask-image en el navegador. */
+.cer-sobre-sellado::after,
 .cer-sobre-tira::after {
   content: '';
   position: absolute;
-  left: 0; right: 0; bottom: -3px;
+  left: -1px;
+  right: -1px;
   height: 6px;
-  background: repeating-linear-gradient(90deg,
-    var(--void) 0 4px, transparent 4px 9px);
+  background:
+    repeating-linear-gradient(90deg,
+      #000 0 calc(var(--cer-diente) * .22),
+      transparent calc(var(--cer-diente) * .22) calc(var(--cer-diente) * .5),
+      #000 calc(var(--cer-diente) * .5) var(--cer-diente));
 }
-/* boca: el hueco oscuro que queda al arrancar la tira */
+.cer-sobre-sellado::after { bottom: -1px; }
+.cer-sobre-tira::after    { top: -1px; }
+
+/* boca: el hueco oscuro que aparece al arrancar la tira */
 .cer-sobre-boca {
   position: absolute;
-  left: 3%;
-  right: 3%;
+  left: 4%;
+  right: 4%;
   top: 0;
-  height: calc(var(--cer-tira) + 5%);
-  border-radius: 0 0 5px 5px;
-  background: linear-gradient(180deg, #000 35%, rgba(0,0,0,.35));
-  box-shadow: inset 0 7px 14px rgba(0,0,0,.9);
+  height: calc(var(--cer-crimp) + 6%);
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #000 40%, rgba(0,0,0,.3));
+  box-shadow: inset 0 8px 16px rgba(0,0,0,.95);
   z-index: 2;
   opacity: 0;
 }
-/* barrido de luz sobre el sobre: le da el acabado "premium" sin arte propio */
+
+/* reflejo que barre el film al aparecer el sobre */
 .cer-sobre-brillo {
   position: absolute;
   inset: 0;
   z-index: 5;
-  border-radius: var(--radius-md);
-  background: linear-gradient(105deg,
-    transparent 38%, rgba(255,255,255,.24) 48%, transparent 58%);
+  background: linear-gradient(102deg,
+    transparent 36%, rgba(255,255,255,.3) 47%, rgba(255,255,255,.06) 53%, transparent 60%);
   pointer-events: none;
   opacity: 0;
 }
 
 /* ---- la carta que sale ---- */
-/* Sin `transform` en CSS a propósito: lo escribe GSAP entero (ver cabecera). */
+/* Sin `transform` en CSS a propósito: lo escribe GSAP entero. El giro va con
+   rotationY desde JS, nunca con una clase — un transform en línea de GSAP le
+   gana siempre a una regla de clase y la carta se quedaría sin girar. */
 .cer-carta {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 232px;
+  width: clamp(170px, 30vh, 260px);
   aspect-ratio: 5 / 7;
   transform-style: preserve-3d;
   border: 0;
   padding: 0;
   background: none;
   cursor: pointer;
-  z-index: 2;              /* DETRÁS del cuerpo del sobre hasta que sale */
+  z-index: 2;              /* DETRÁS del sobre hasta que asoma por la boca */
   opacity: 0;
 }
 .cer-carta:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-lg); }
@@ -1213,6 +1278,7 @@
   display: block;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,.6);
 }
 .cer-carta-dorso .carta-dorso {
   display: grid;
@@ -1226,18 +1292,17 @@
   color: rgba(255,255,255,.2);
   font-size: 54px;
 }
-/* la cara buena vive girada 180: al rotar la carta queda de frente */
 .cer-carta-frente { transform: rotateY(180deg); }
 .cer-carta-frente .carta { width: 100%; height: 100%; }
 .cer-carta-aura {
   position: absolute;
-  inset: -20%;
+  inset: -22%;
   border-radius: 50%;
   background: radial-gradient(circle, var(--rz-aura, var(--amber)), transparent 62%);
   opacity: 0;
   pointer-events: none;
   z-index: -1;
-  filter: blur(16px);
+  filter: blur(18px);
 }
 
 .cer-pista, .cer-contador {
@@ -1250,55 +1315,54 @@
   z-index: 7;
 }
 .cer-pista {
-  bottom: -6px;
+  bottom: var(--space-6);
   text-transform: uppercase;
   letter-spacing: .08em;
 }
-.cer-contador { top: -4px; }
+.cer-contador { top: var(--space-6); }
 
 /* ---- walkout: solo legendaria (5) y SRF (6) ---- */
 .cer-walkout {
   position: absolute;
-  inset: -10% -50%;
+  inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
   z-index: 5;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.4), rgba(0,0,0,.9) 68%);
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.93) 66%);
 }
 .cer-walkout-rayos {
   position: absolute;
-  width: 130%;
+  width: 150vmax;
   aspect-ratio: 1;
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
     transparent 0deg 8deg, var(--rz-aura, var(--amber)) 9deg 11deg, transparent 12deg 26deg,
     transparent 26deg 34deg, var(--rz-aura, var(--amber)) 35deg 37deg, transparent 38deg 52deg);
-  opacity: .5;
-  mask-image: radial-gradient(circle, transparent 20%, #000 40%, #000 68%, transparent 82%);
-  -webkit-mask-image: radial-gradient(circle, transparent 20%, #000 40%, #000 68%, transparent 82%);
+  opacity: .45;
+  mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
+  -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
 }
 .cer-walkout-texto { position: relative; text-align: center; }
 .cer-walkout-rareza {
   display: block;
-  font-size: clamp(30px, 7vw, 62px);
+  font-size: clamp(34px, 9vw, 84px);
   font-weight: var(--fw-bold);
   letter-spacing: .1em;
   text-transform: uppercase;
   color: #fff;
-  text-shadow: 0 0 26px var(--rz-aura, var(--amber)), 0 0 70px var(--rz-aura, var(--amber));
+  text-shadow: 0 0 30px var(--rz-aura, var(--amber)), 0 0 84px var(--rz-aura, var(--amber));
 }
-.ceremonia .modal-caja.en-walkout { background: var(--void); }
 
 @media (max-width: 600px) {
-  .cer-escena { min-height: 380px; }
-  .cer-carta { width: 176px; }
-  .cer-sobre { width: 146px; }
+  .cer-sobre { width: clamp(130px, 19vh, 170px); }
+  .cer-carta { width: clamp(150px, 27vh, 200px); }
+  .cer-saltar { top: var(--space-3); right: var(--space-3); }
 }
 
-/* Con movimiento reducido la escena entera no se usa: ceremonia.js va directo
-   al resumen. Se apaga también por CSS por si el modo cambia a media sesión. */
+/* Con movimiento reducido la escena no se usa: ceremonia.js va directo al
+   resumen. Se apaga también por CSS por si el modo cambia a media sesión. */
 :root[data-motion="reduce"] .cer-escena { display: none; }
 
 /* aviso de "puedes activar las animaciones solo en esta web": aparece en el
