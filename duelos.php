@@ -302,7 +302,7 @@ include __DIR__ . '/navbar.php';
 <?php include __DIR__ . '/partials/confirmar.php'; ?>
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/duelos.js"></script>
+<?= assetScript($base ?? '', 'assets/js/duelos.js') ?>
 
 </body>
 </html>

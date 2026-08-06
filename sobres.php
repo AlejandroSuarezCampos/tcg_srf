@@ -222,7 +222,7 @@ include __DIR__ . '/navbar.php';
 <?php include __DIR__ . '/partials/confirmar.php'; ?>
 <?php include __DIR__ . '/partials/ceremonia.php'; ?>
 
-<script src="assets/js/sobres.js?v=<?= @filemtime(__DIR__ . '/assets/js/sobres.js') ?>"></script>
+<?= assetScript($base ?? '', 'assets/js/sobres.js') ?>
 
 </body>
 </html>

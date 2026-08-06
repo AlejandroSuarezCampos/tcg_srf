@@ -331,7 +331,7 @@ include __DIR__ . '/navbar.php';
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/mercado.js"></script>
+<?= assetScript($base ?? '', 'assets/js/mercado.js') ?>
 
 </body>
 </html>

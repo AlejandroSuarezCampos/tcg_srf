@@ -12,23 +12,14 @@
  *   $cssExtra      -> array de hojas adicionales, relativas a $base
  *   $bodyClass     -> clases del <body>
  */
+require_once __DIR__ . '/assets.php';   // assetUrl() / assetScript()
+
 $base         = $base         ?? '';
 $paginaTitulo = $paginaTitulo ?? 'Superliga Frontier TCG';
 $paginaDesc   = $paginaDesc   ?? 'El registro coleccionable de la Superliga Frontier.';
 $cssExtra     = $cssExtra     ?? [];
 $bodyClass    = $bodyClass    ?? '';
 
-// Cache-busting por fecha de modificación: el navegador cachea CSS/JS con
-// fuerza (§8 de branding/CLAUDE.md, ya mordió más de una vez — la última,
-// tras renombrar caja3d→pack3d en todo el sistema de sobres, dejó HTML con
-// clases nuevas sirviéndose contra un components.css viejo en caché, con el
-// layout roto por completo). "?v=filemtime" cambia solo cuando el fichero
-// cambia de verdad, así que no invalida caché en cada visita sin motivo.
-function assetUrl(string $base, string $ruta): string {
-    $abs = __DIR__ . '/../' . $ruta;
-    $v = @filemtime($abs);
-    return $base . $ruta . ($v ? '?v=' . $v : '');
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">

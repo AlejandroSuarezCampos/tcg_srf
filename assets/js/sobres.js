@@ -16,7 +16,14 @@
 (function () {
   'use strict';
 
-  var reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Se consulta en cada uso, no una vez al cargar: así cambiar la preferencia
+  // (la del sistema o la propia de configuracion.php) surte efecto sin
+  // recargar. SRF.movimientoReducido vive en ui.js, que se carga antes.
+  function reducido() {
+    return SRF.movimientoReducido
+      ? SRF.movimientoReducido()
+      : window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
 
   /* ------------------------------------------------------------------------
      FASE 1 — idle (CSS, @keyframes pack3dFlota) + tilt al cursor con GSAP.
@@ -30,7 +37,7 @@
   var GIRO_X = -18, GIRO_Y = -32;
 
   function initPackBox(cajaEl) {
-    if (reducido) return;
+    if (reducido()) return;
     // tilt sobre .pack3d-tilt, NUNCA sobre .pack3d-volumen: esa capa lleva la
     // animación CSS de idle (@keyframes pack3dFlota) sobre la misma
     // propiedad "transform", y un tween de GSAP ahí competiría con ella.
@@ -85,7 +92,7 @@
     if (vistaExpansiones) vistaExpansiones.hidden = true;
     submenu.hidden = false;
     var cajas = submenu.querySelectorAll('.submenu-tipo');
-    if (reducido) {
+    if (reducido()) {
       gsap.set(cajas, { clearProps: 'transform,opacity' });
     } else {
       gsap.fromTo(cajas, { opacity: 0, y: 30, scale: .8 },
@@ -104,7 +111,7 @@
   function cerrarSubmenu(submenu) {
     submenu.hidden = true;
     if (vistaExpansiones) vistaExpansiones.hidden = false;
-    if (!reducido) {
+    if (!reducido()) {
       gsap.fromTo(vitrina.querySelectorAll('.vitrina-item'),
         { opacity: 0, y: 18 },
         {
@@ -165,7 +172,7 @@
     // interior y los cantos de los sobres, como una caja de cromos real
     // abierta sobre la mesa. La tapa va de 90° (tumbada, cerrada) a 205°
     // (de pie, inclinada hacia atrás) girando sobre su charnela trasera.
-    if (reducido) {
+    if (reducido()) {
       gsap.set(caja, { scale: 1, opacity: 1 });
       gsap.set(tilt, { rotateX: -52, rotateY: -20 });
       gsap.set(tapa, { rotateX: 205 });
@@ -199,7 +206,7 @@
     var sobres = portal.querySelectorAll('.pack3d-sobre');
     // El estado de reposo ya lo da el CSS (.pack3d--abierta .pack3d-sobre):
     // con reduced-motion no hace falta escribir nada.
-    if (reducido) { limpiarInline(sobres); return; }
+    if (reducido()) { limpiarInline(sobres); return; }
 
     // Se anima --alza, NUNCA "transform"/"y": el transform de .pack3d-sobre
     // lleva su translateZ(var(--z)) de colocación, y un transform en línea de

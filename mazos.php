@@ -487,7 +487,7 @@ include __DIR__ . '/navbar.php';
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/mazos.js"></script>
+<?= assetScript($base ?? '', 'assets/js/mazos.js') ?>
 
 </body>
 </html>

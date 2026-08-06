@@ -207,7 +207,7 @@ if ($filtroTexto !== '') {
   </div>
 </div>
 
-<script src="./assets/js/scriptSobres.js"></script>
+<script src="./assets/js/scriptSobres.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptSobres.js') ?>"></script>
 
 </body>
 </html>

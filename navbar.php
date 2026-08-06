@@ -154,4 +154,4 @@ $navGrupos = [
   </div>
 </header>
 
-<script src="<?= $base ?>assets/async/js/scriptsAsync.js"></script>
+<?= assetScript($base ?? '', 'assets/async/js/scriptsAsync.js') ?>

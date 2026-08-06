@@ -169,7 +169,7 @@ include __DIR__ . '/navbar.php';
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/album.js"></script>
+<?= assetScript($base ?? '', 'assets/js/album.js') ?>
 
 </body>
 </html>

@@ -44,11 +44,13 @@
   var btnSaltar      = document.getElementById('ceremoniaSaltar');
   if (!mesa || !cerCarta) return;
 
-  // Se consulta EN CADA APERTURA, no una vez al cargar: si el jugador cambia
-  // la preferencia del sistema a mitad de sesión, el siguiente sobre ya la
-  // respeta sin tener que recargar la página.
+  // Se consulta EN CADA APERTURA, no una vez al cargar: cambiar la preferencia
+  // (la del sistema o la propia de configuracion.php) surte efecto sin
+  // recargar. SRF.movimientoReducido vive en ui.js, que se carga antes.
   function reducido() {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return SRF.movimientoReducido
+      ? SRF.movimientoReducido()
+      : window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
   var RZ_COLOR = {

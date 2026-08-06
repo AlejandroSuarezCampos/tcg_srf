@@ -254,7 +254,7 @@ if ($filtroExpansion !== '') {
   </div>
 </div>
 
-<script src="./assets/js/scriptCromos.js"></script>
+<script src="./assets/js/scriptCromos.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptCromos.js') ?>"></script>
 
 </body>
 </html>
