@@ -12,9 +12,11 @@ function interiorSobresHtml(Tcg $db, array $s, bool $sinSaldo): string {
     $rutasSobre = $db->rutasPlantilla('sobre', $s['id_sobre']);
     $html = '';
     for ($i = 0; $i < Tcg::SOBRES_POR_CAJA; $i++) {
-        $html .= sobre3d_mini_html($rutasSobre, [
+        $html .= pack3d_sobre_html($rutasSobre, [
             'clase' => 'js-sobre-individual',
             'disabled' => $sinSaldo,
+            'indice' => $i,
+            'total'  => Tcg::SOBRES_POR_CAJA,
             'datos' => [
                 'id-sobre' => $s['id_sobre'],
                 'nombre'   => $s['nombre'],
@@ -141,7 +143,7 @@ include __DIR__ . '/navbar.php';
     <?php $rutasCaja = $db->rutasPlantilla('caja_expansion', $idExp); ?>
     <?php $tipoUnico = count($grupo['sobres']) === 1 ? $grupo['sobres'][0] : null; ?>
     <div class="vitrina-item">
-      <div class="caja3d-portal" id="portal-caja-<?= $idExp ?>">
+      <div class="pack3d-portal" id="portal-caja-<?= $idExp ?>">
         <!-- div, no button: el interior lleva hasta 50 <button> de sobre
              (interiorHtml) y un <button> no puede contener otro <button> —
              el navegador cerraría este de golpe al primer sobre y rompería
@@ -149,13 +151,13 @@ include __DIR__ . '/navbar.php';
         <div class="js-caja-expansion" role="button" tabindex="0"
                 data-expansion="<?= $idExp ?>" data-tipos="<?= count($grupo['sobres']) ?>"
                 <?= $tipoUnico ? 'data-id-sobre-unico="' . $tipoUnico['id_sobre'] . '"' : '' ?>>
-          <?= caja3d_html($rutasCaja, [
+          <?= pack3d_caja_html($rutasCaja, [
               'datos' => ['expansion' => $idExp],
               'interiorHtml' => $tipoUnico ? interiorSobresHtml($db, $tipoUnico, $monedasActuales < $tipoUnico['precio']) : '',
           ]) ?>
         </div>
         <?php if ($tipoUnico): ?>
-        <button type="button" class="btn btn-ghost caja3d-portal-cerrar js-cerrar-blister">
+        <button type="button" class="btn btn-ghost pack3d-portal-cerrar js-cerrar-blister">
           <i class="ph ph-x" aria-hidden="true"></i> Cerrar
         </button>
         <?php endif; ?>
@@ -176,15 +178,15 @@ include __DIR__ . '/navbar.php';
     <?php foreach ($grupo['sobres'] as $s): ?>
     <?php $rutasCajaTipo = $db->rutasPlantilla('caja_sobre', $s['id_sobre']); ?>
     <div class="submenu-tipo">
-      <div class="caja3d-portal" id="portal-tipo-<?= $s['id_sobre'] ?>">
+      <div class="pack3d-portal" id="portal-tipo-<?= $s['id_sobre'] ?>">
         <!-- div, no button: mismo motivo que en la caja de expansión -->
         <div class="js-tipo-sobre" role="button" tabindex="0" data-id-sobre="<?= $s['id_sobre'] ?>">
-          <?= caja3d_html($rutasCajaTipo, [
+          <?= pack3d_caja_html($rutasCajaTipo, [
               'escala' => 'pequena',
               'interiorHtml' => interiorSobresHtml($db, $s, $monedasActuales < $s['precio']),
           ]) ?>
         </div>
-        <button type="button" class="btn btn-ghost caja3d-portal-cerrar js-cerrar-blister">
+        <button type="button" class="btn btn-ghost pack3d-portal-cerrar js-cerrar-blister">
           <i class="ph ph-x" aria-hidden="true"></i> Cerrar
         </button>
         <span class="submenu-tipo-nombre"><?= htmlspecialchars($s['nombre']) ?></span>
@@ -205,7 +207,7 @@ include __DIR__ . '/navbar.php';
 <?php include __DIR__ . '/partials/confirmar.php'; ?>
 <?php include __DIR__ . '/partials/ceremonia.php'; ?>
 
-<script src="assets/js/sobres.js"></script>
+<script src="assets/js/sobres.js?v=<?= @filemtime(__DIR__ . '/assets/js/sobres.js') ?>"></script>
 
 </body>
 </html>

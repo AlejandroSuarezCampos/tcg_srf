@@ -675,44 +675,41 @@
 .carta-grid--densa { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-3); }
 
 /* ==========================================================================
-   4. CAJAS Y SOBRES 3D (prompt-claude-code-sobres-3d.md)
+   4. CAJAS Y SOBRES 3D — pack3d (components/caja3d.php)
    Todo el volumen es CSS falso: perspective + transform-style:preserve-3d +
-   rotateX/Y + translateZ sobre capas PLANAS (las texturas son PNG recortados
-   de la plantilla del admin, componente components/caja3d.php). Nunca WebGL,
-   nunca Three.js, nunca un modelo real — así lo pide el prompt.
-   El comportamiento (tilt al cursor, apertura en fases) vive en sobres.js,
-   con GSAP (vendorizado) como orquestador de timing/easing.
+   translateZ/rotateX/rotateY sobre capas PLANAS. Nunca WebGL, nunca Three.js,
+   nunca un modelo real. GSAP solo orquesta timing/easing, en sobres.js.
 
-   Geometría de una caja (front/top/side, más tapa e interior superpuestos):
-   con transform-style:preserve-3d en .caja3d-caras, cada cara de esquina
-   solo necesita plegarse desde la arista que comparte con "front" — sin
-   trasladar nada, el pliegue por sí solo la deja pegada en la costura (mismo
-   principio que .sobre-3d-mitad en la ceremonia):
-     · top:      transform-origin en su borde superior + rotateX(90deg).
-     · side:     transform-origin en su borde derecho  + rotateY(-90deg).
-     · interior: transform-origin en su borde inferior + rotateX(-90deg)
-                 (mismo truco que "top", en espejo: es el suelo de la caja).
-   La tapa y el interior NO seden geometría real de bisagra: la tapa reposa
-   plana sobre "front" (como .sobre-3d-mitad) y solo gira más allá de 90° al
-   abrirse, desvaneciéndose a la vez — es una ilusión de apertura, no una
-   junta física. Los 50 sobres viven DENTRO de .caja3d-interior-scroll, en el
-   mismo árbol preserve-3d que la caja (requisito técnico del prompt): el
-   único punto de toda la caja con overflow-y:auto es ese, porque es la única
-   forma de tener scroll interno y transforms 3D sin que el navegador aplane
-   el resto de caras (overflow≠visible crea un contexto de recorte que solo
-   afecta a los DESCENDIENTES de ese elemento, nunca a sus hermanos).
+   REFERENCIA VISUAL: caja de cromos tipo Panini/blaster. Cerrada se ven tres
+   caras con grosor real (frente + tapa + lateral); abierta, la tapa se
+   levanta por su charnela trasera y los sobres están DE PIE dentro, apretados
+   de delante hacia atrás y sobresaliendo por encima del borde.
 
-   "Portal" (.caja3d-portal): el mismo elemento de caja que vive en la
-   vitrina o el submenú pasa a position:fixed a pantalla completa al abrirse
-   (Fase 3), sin moverlo de sitio en el DOM ni duplicarlo — ninguno de sus
-   ancestros (.submenu-tipo, .vitrina-item) usa transform, así que
-   position:fixed sigue ancorado de verdad al viewport.
+   GEOMETRÍA — cada cara se CENTRA primero en el volumen con
+   translate(-50%,-50%) y luego se empuja a su sitio con translateX/Y/Z +
+   rotate:
+     · front: translateZ(+d/2)
+     · top:   translateY(-h/2) rotateX(90deg)      (tamaño w × d)
+     · side:  translateX(+w/2) rotateY(90deg)      (tamaño d × h)
+     · suelo: translateY(+h/2) rotateX(90deg)      (tamaño w × d)
+   NO plegar las caras desde su arista con transform-origin: es lo que hacía
+   la versión anterior y las dejaba casi de canto — la caja se veía como un
+   rectángulo plano, sin ningún volumen.
+
+   El volumen se orienta con rotateX(-18deg) rotateY(-32deg): con esos signos
+   quedan visibles a la vez frente, tapa y lateral DERECHO (las normales de
+   ambas caras acaban con z positiva, o sea mirando a cámara).
+
+   Los sobres van en .pack3d-interior-sobres, en el MISMO árbol preserve-3d
+   que la caja. Ese contenedor NO puede llevar overflow ni scroll: cualquier
+   overflow≠visible crea un contexto de recorte que APLANA a todos sus
+   descendientes y destruye el 3D (además de pintar barras de scroll sueltas
+   flotando en la escena).
    ========================================================================== */
 
-/* arte común a caja y sobre: si no hay plantilla subida (background-image no
-   se resuelve), este degradado de fondo es lo único que se ve — el render
-   nunca se rompe por falta de assets (Fase 5 del prompt) */
-.caja3d-cara, .caja3d-tapa, .caja3d-interior, .sobre3d-mini-frente, .sobre3d-mini-reverso {
+/* arte común: sin plantilla subida (Fase 5) este degradado es el único fondo,
+   así el render nunca se rompe por falta de assets */
+.pack3d-cara, .pack3d-tapa, .pack3d-interior, .pack3d-sobre-frente {
   background-color: var(--panel);
   background-image:
     radial-gradient(ellipse 75% 55% at 50% 20%, var(--amber-soft), transparent 72%),
@@ -731,7 +728,7 @@
 }
 .vitrina-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-8);
   padding-block: var(--space-6);
 }
@@ -739,147 +736,271 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
+  gap: var(--space-2);
 }
-.js-caja-expansion { cursor: pointer; }
-.js-caja-expansion:focus-visible .caja3d-caras { outline: 2px solid var(--amber); outline-offset: 6px; }
-.vitrina-item-nombre { font-weight: var(--fw-semibold); }
+.js-caja-expansion { cursor: pointer; display: block; }
+.js-caja-expansion:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
+.vitrina-item-nombre { font-weight: var(--fw-semibold); text-align: center; }
 
-/* el portal: en reposo no pinta caja propia (display:contents — el hijo
-   .caja3d se comporta como si el portal no existiera), y solo al abrirse
-   pasa a overlay fijo. Así, abrir/cerrar es un simple toggle de clase, sin
-   mover el nodo en el DOM ni clonar nada. */
-.caja3d-portal { display: contents; }
-.caja3d-portal.esta-abierta {
+/* el portal: en reposo no pinta caja propia (display:contents), y solo al
+   abrirse pasa a overlay fijo. Abrir/cerrar es un toggle de clase, sin mover
+   el nodo en el DOM ni clonar nada. */
+.pack3d-portal { display: contents; }
+.pack3d-portal.esta-abierta {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-5);
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
   padding: var(--space-6);
-  background: rgba(4, 5, 7, .93);
-  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 45%, rgba(24,14,6,.96), rgba(4,5,7,.985) 70%);
 }
-/* display:none por defecto: con el portal en display:contents (caja acoplada
-   en la vitrina/submenú), position:absolute no tendría contexto de quién
-   fiarse y el botón podría aparecer flotando en cualquier parte de la
-   página. Solo cobra sentido — y solo se muestra — con la caja abierta. */
-.caja3d-portal-cerrar { display: none; position: absolute; top: var(--space-5); right: var(--space-5); }
-.caja3d-portal.esta-abierta .caja3d-portal-cerrar { display: inline-flex; }
+.pack3d-portal-cerrar { display: none; position: absolute; top: var(--space-5); right: var(--space-5); z-index: 2; }
+.pack3d-portal.esta-abierta .pack3d-portal-cerrar { display: inline-flex; }
 
-/* caja base: tamaño en variables para poder reescalar sin tocar la geometría.
-   --interior-h es la profundidad (falsa) del hueco interior, independiente
-   de --caja-d: los sobres necesitan una "bahía" mucho más generosa que el
-   grosor real de la caja para no quedar minúsculos. */
-.caja3d {
-  --caja-w: 210px;
-  --caja-h: 260px;
-  --caja-d: 58px;
-  --interior-h: 60%;
+/* ---- el volumen ---- */
+.pack3d {
+  --pack3d-w: 200px;
+  --pack3d-h: 250px;
+  --pack3d-d: 130px;
+  --pack3d-sobre-w: 165px;
+  --pack3d-sobre-h: 235px;
+  --pack3d-giro-x: -18deg;
+  --pack3d-giro-y: -32deg;
   position: relative;
-  width: var(--caja-w);
-  height: var(--caja-h);
-  perspective: 1100px;
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+  /* la caja gira y asoma fuera de su caja de layout: sin este margen, la
+     tapa y el lateral se comen el texto de debajo (nombre/precio) */
+  margin: calc(var(--pack3d-d) * .55) auto var(--space-4);
 }
-.caja3d--pequena { --caja-w: 130px; --caja-h: 160px; --caja-d: 36px; }
-/* tamaño "abierta" (Fase 3): la asigna sobres.js al abrir el portal — mismo
-   componente, solo cambian las variables de tamaño, nunca la estructura */
-.caja3d--abierta { --caja-w: 280px; --caja-h: 320px; --caja-d: 64px; --interior-h: 320px; }
+.pack3d--pequena {
+  --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px;
+  --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px;
+}
 
-.caja3d-caras {
+/* sombra de contacto: elipse aplanada bajo la caja, fuera del preserve-3d
+   para que no herede la rotación del volumen */
+.pack3d-sombra {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + var(--pack3d-d) * .1);
+  width: calc(var(--pack3d-w) * 1.25);
+  height: calc(var(--pack3d-d) * .5);
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.72), transparent 70%);
+  filter: blur(7px);
+  pointer-events: none;
+}
+
+/* idle (Fase 1: animación visible sin interacción). El tilt al cursor vive en
+   .pack3d-tilt, una capa aparte: GSAP escribe "transform" en línea, y sobre
+   esta misma capa competiría con la animación CSS por la misma propiedad. */
+.pack3d-volumen {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform: rotateX(-8deg) rotateY(-24deg);
-  will-change: transform;
-  animation: caja3dFlota 4.6s ease-in-out infinite;
+  animation: pack3dFlota 5.2s ease-in-out infinite;
 }
-@keyframes caja3dFlota {
-  0%, 100% { transform: rotateX(-8deg) rotateY(-24deg) translateY(0); }
-  50%      { transform: rotateX(-6deg) rotateY(-24deg) translateY(-7px); }
+@keyframes pack3dFlota {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
 }
-/* mientras la caja está abierta, sobres.js gira .caja3d-caras a mano con
-   GSAP (ángulo "mirando hacia dentro"): esta clase para la animación CSS de
-   flotación para que no compita por la misma propiedad de la misma capa */
-.caja3d-caras.en-portal { animation: none; }
-/* capa del tilt al cursor: la anima GSAP (sobres.js), nunca CSS — así no
-   compite con la animación de flotación de .caja3d-caras (una animación CSS
-   y un estilo en línea sobre la MISMA propiedad de la MISMA capa se pisarían
-   entre sí, de ahí que el tilt viva en su propia capa anidada) */
-.caja3d-tilt { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.pack3d-volumen.en-portal { animation: none; }
 
-.caja3d-cara {
+.pack3d-tilt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--pack3d-giro-x)) rotateY(var(--pack3d-giro-y));
+}
+
+.pack3d-cara, .pack3d-interior, .pack3d-tapa {
   position: absolute;
-  border: 1px solid var(--line);
-  backface-visibility: hidden;
+  left: 50%;
+  top: 50%;
+  background-size: cover;
+  background-position: center;
 }
-.caja3d-front { inset: 0; }
-.caja3d-top {
-  left: 0; top: 0; width: 100%; height: var(--caja-d);
-  transform-origin: top; transform: rotateX(90deg);
+
+/* frente */
+.pack3d-cara--front {
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%) translateZ(calc(var(--pack3d-d) / 2));
+  box-shadow: inset 0 0 0 1px var(--line), inset 0 -60px 90px rgba(0,0,0,.45);
 }
-.caja3d-side {
-  right: 0; top: 0; width: var(--caja-d); height: 100%;
-  transform-origin: right; transform: rotateY(-90deg);
+/* tapa superior (la cara fija; la que se abre es .pack3d-tapa) */
+.pack3d-cara--top {
+  width: var(--pack3d-w);
+  height: var(--pack3d-d);
+  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / -2)) rotateX(90deg);
+  filter: brightness(1.22);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-/* tapa: en reposo, tira decorativa sobre el propio front (misma técnica que
-   .sobre-3d-mitad). sobres.js la abre girándola más allá de 90° y
-   desvaneciéndola — "desaparece de la vista" en vez de perseguir una
-   bisagra física exacta */
-.caja3d-tapa {
+/* lateral derecho */
+.pack3d-cara--side {
+  width: var(--pack3d-d);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%) translateX(calc(var(--pack3d-w) / 2)) rotateY(90deg);
+  filter: brightness(.62);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* suelo interior: solo se ve con la caja abierta */
+.pack3d-interior {
+  width: var(--pack3d-w);
+  height: var(--pack3d-d);
+  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / 2)) rotateX(90deg);
+  filter: brightness(.4);
+}
+
+/* charnela: div de altura 0 colocado en la arista TRASERA-SUPERIOR. La tapa
+   cuelga de ella con transform-origin en su propio borde superior, así que
+   rotarla es literalmente abrir una bisagra:
+     · rotateX(90deg)  → tumbada hacia delante, tapando la boca (cerrada)
+     · rotateX(205deg) → de pie e inclinada hacia atrás (abierta) */
+.pack3d-bisagra {
   position: absolute;
-  left: 0; top: 0; width: 100%; height: 38%;
-  transform-origin: top;
-  border: 1px solid var(--amber-line);
-  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-w);
+  height: 0;
+  transform: translateX(-50%)
+             translateY(calc(var(--pack3d-h) / -2))
+             translateZ(calc(var(--pack3d-d) / -2));
+  transform-style: preserve-3d;
 }
-/* interior/suelo: plegado en espejo al de "top" (ver comentario de arriba de
-   sección). z-index negativo: en reposo, con la tapa cerrada delante, no
-   debe robarle el clic ni el foco a nada de la cara frontal */
-.caja3d-interior {
+.pack3d-tapa {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: var(--pack3d-d);
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+  /* al abrirse pasa de 180°, así que se ve su reverso: sin esto desaparecería */
+  backface-visibility: visible;
+  filter: brightness(1.3);
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+
+/* ---- Fase 3/4: los sobres, DE PIE dentro de la caja ----
+   Sin overflow de ningún tipo (aplanaría el 3D). Cada sobre se coloca en
+   profundidad con --i (su índice) y --n (cuántos hay): se reparten simétricos
+   respecto al centro, ocupando ~el 88% del fondo de la caja. */
+.pack3d-interior-sobres {
   position: absolute;
-  left: 0; bottom: 0; width: 100%; height: var(--interior-h);
-  transform-origin: bottom; transform: rotateX(-90deg);
-  overflow: hidden;
-  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+  pointer-events: none;   /* solo los sobres reciben clic, no el hueco */
 }
-.caja3d-interior-scroll {
+.pack3d-sobre {
+  --paso: calc(var(--pack3d-d) * .88 / var(--n));
+  --z: calc((var(--i) - (var(--n) - 1) / 2) * var(--paso));
+  /* apoyado en el suelo: su base coincide con el fondo de la caja, así que
+     asoma por arriba tanto como su alto exceda al de la caja */
+  --y: calc((var(--pack3d-h) - var(--pack3d-sobre-h)) / 2);
+  --alza: 0px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-sobre-w);
+  height: var(--pack3d-sobre-h);
+  transform: translate(-50%, -50%)
+             translateY(calc(var(--y) + var(--alza)))
+             translateZ(var(--z));
+  transform-style: preserve-3d;
+  transition: transform 200ms var(--ease), filter 200ms var(--ease);
+  border: 0;
+  padding: 0;
+  font: inherit;
+  background: none;
+  cursor: pointer;
+  opacity: 0;               /* invisibles hasta que la caja se abre */
+  pointer-events: none;
+}
+.pack3d--abierta .pack3d-sobre { opacity: 1; pointer-events: auto; }
+
+.pack3d-sobre-frente {
   position: absolute;
   inset: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
 }
-/* al elegir un sobre, los demás se difuminan para que el elegido destaque, y
-   toda la caja se atenúa para no competir con el modal de confirmación */
-.caja3d-interior-scroll.con-seleccion .sobre3d-mini:not(.es-seleccionado) { opacity: 0; pointer-events: none; }
-.caja3d-portal.con-seleccion .caja3d-cara,
-.caja3d-portal.con-seleccion .caja3d-tapa { opacity: .2; }
+/* canto brillante en el borde superior: es lo que de verdad da la lectura de
+   "muchos sobres apretados" al mirarlos desde arriba */
+.pack3d-sobre-canto {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.06));
+  border-radius: 3px 3px 0 0;
+}
+
+/* Fase 4: levantar SOLO el sobre bajo el cursor (o con foco de teclado) */
+@media (hover: hover) {
+  .pack3d--abierta .pack3d-sobre:hover { --alza: -46px; filter: brightness(1.35); }
+}
+.pack3d--abierta .pack3d-sobre:focus-visible {
+  --alza: -46px;
+  filter: brightness(1.35);
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+/* mismo efecto forzado por JS (SRF.pack3d.liftEnvelopeOnHover), para la vista
+   previa del panel y para poder demostrarlo sin ratón */
+.pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -46px; filter: brightness(1.35); }
+.pack3d-sobre:disabled { cursor: not-allowed; filter: grayscale(.7) brightness(.55); }
+
+/* seleccionado: sale del todo de la caja, hacia cámara */
+.pack3d-sobre.es-seleccionado {
+  --alza: -150px;
+  transform: translate(-50%, -50%)
+             translateY(calc(var(--y) + var(--alza)))
+             translateZ(calc(var(--pack3d-d) / 2 + 140px))
+             rotateY(8deg);
+  filter: brightness(1.5) drop-shadow(0 26px 40px rgba(0,0,0,.7));
+  transition: transform 420ms var(--ease), filter 420ms var(--ease);
+}
+/* al elegir uno, el resto y la propia caja se apartan visualmente */
+.pack3d-interior-sobres.con-seleccion .pack3d-sobre:not(.es-seleccionado) { opacity: 0; pointer-events: none; }
+.pack3d-portal.con-seleccion .pack3d-cara,
+.pack3d-portal.con-seleccion .pack3d-interior,
+.pack3d-portal.con-seleccion .pack3d-tapa { opacity: .18; }
+
+/* ---- Fase 3: tamaño de la caja abierta ---- */
+/* Mucho más honda que cerrada: los sobres se reparten en ESE fondo, así que
+   la profundidad es lo que decide si se ven apretados o sueltos. */
+.pack3d--abierta {
+  --pack3d-w: 300px;
+  --pack3d-h: 235px;
+  --pack3d-d: 400px;
+  --pack3d-sobre-w: 250px;
+  --pack3d-sobre-h: 300px;
+  margin: 0;
+}
 
 /* ---- Fase 2: submenú de tipos de sobre de una expansión ---- */
-.submenu-tipos {
+/* [hidden] tiene la MISMA especificidad que .submenu-tipos (0-1-0): sin el
+   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
+   "display:none" del navegador y el submenú se queda visible siempre,
+   superpuesto a la vitrina, aunque sobres.js ponga/quite el atributo bien. */
+.submenu-tipos:not([hidden]) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-8);
-  padding-block: var(--space-8);
+  padding-block: var(--space-6);
 }
 .submenu-tipos-volver { flex-basis: 100%; }
 .submenu-tipo {
@@ -887,65 +1008,39 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
 }
-.js-tipo-sobre { cursor: pointer; }
-.js-tipo-sobre:focus-visible .caja3d-caras { outline: 2px solid var(--amber); outline-offset: 6px; }
-.submenu-tipo-nombre { font-weight: var(--fw-semibold); }
+.js-tipo-sobre { cursor: pointer; display: block; }
+.js-tipo-sobre:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
+.submenu-tipo-nombre { font-weight: var(--fw-semibold); text-align: center; }
 .submenu-tipo-precio {
   display: flex; align-items: center; gap: var(--space-1);
   font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--amber-light);
 }
 
-/* ---- Fase 4: sobre individual dentro del hueco ---- */
-.sobre3d-mini {
-  position: relative;
-  width: 76px;
-  aspect-ratio: 4 / 5;
-  transform-style: preserve-3d;
-  will-change: transform;
-  transition: transform 200ms var(--ease);
-  cursor: pointer;
-  border: 0;
-  padding: 0;
-  font: inherit;
+/* rótulo de la caja abierta, dentro del portal */
+.pack3d-portal-titulo {
+  display: none;
+  text-align: center;
+  margin-top: var(--space-6);
 }
-/* "levantarse" al pasar el cursor o llegar el foco por teclado (§Fase 4):
-   CSS puro, no JS — más fiable que rastrear 50 mousemove */
-@media (hover: hover) {
-  .sobre3d-mini:hover { transform: translateY(-10px) scale(1.08); z-index: 2; }
-}
-/* mismo efecto que :hover, forzado por JS (SRF.sobres3d.liftEnvelopeOnHover) —
-   lo usa el modo "Vista previa" del panel para demostrar el efecto sin ratón */
-.sobre3d-mini.es-hover-forzado { transform: translateY(-10px) scale(1.08); z-index: 2; }
-.sobre3d-mini:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; transform: translateY(-10px) scale(1.08); z-index: 2; }
-.sobre3d-mini:disabled { opacity: .45; cursor: not-allowed; }
-.sobre3d-mini.es-seleccionado { transform: scale(1.15); z-index: 3; }
-.sobre3d-mini-frente, .sobre3d-mini-reverso {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  backface-visibility: hidden;
-}
-.sobre3d-mini-reverso { transform: rotateY(180deg); }
+.pack3d-portal.esta-abierta .pack3d-portal-titulo { display: block; }
 
-/* sin movimiento: nada de flotación, tilt, lift al hover ni apertura animada
-   — cada fase deja el estado final fijado por CSS/JS sin transición */
+/* sin movimiento: ni flotación, ni tilt, ni levantado al hover — cada fase
+   deja su estado final sin transición */
 @media (prefers-reduced-motion: reduce) {
-  .caja3d-caras { animation: none; }
-  .caja3d-caras, .caja3d-tapa, .sobre3d-mini { transition: none; }
-  .sobre3d-mini:hover, .sobre3d-mini:focus-visible { transform: none; }
+  .pack3d-volumen { animation: none; }
+  .pack3d-sobre { transition: none; }
+  .pack3d-sobre:hover, .pack3d-sobre:focus-visible, .pack3d-sobre.es-hover-forzado { --alza: -46px; }
 }
-@media (max-width: 640px) {
-  .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-6); }
-  .caja3d--abierta { --caja-w: 220px; --caja-h: 260px; --caja-d: 50px; --interior-h: 240px; }
-  .sobre3d-mini { width: 64px; }
+
+@media (max-width: 760px) {
+  .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-6); }
+  .pack3d { --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px; --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px; }
+  .pack3d--abierta {
+    --pack3d-w: 215px; --pack3d-h: 170px; --pack3d-d: 280px;
+    --pack3d-sobre-w: 180px; --pack3d-sobre-h: 215px;
+  }
+  .pack3d--abierta .pack3d-sobre:hover, .pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -34px; }
 }
 
 /* ==========================================================================

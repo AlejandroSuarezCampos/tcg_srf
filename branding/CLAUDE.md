@@ -35,14 +35,13 @@ lo rehagas ni lo revises salvo que Alejandro lo pida.
    ```
    for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done
    ```
-4. **⚠️ Este directorio NO es un repositorio git** (`git status` da "not a git
-   repository"), aunque el nombre de la carpeta raíz sea `tcg_srf-master`
-   —típico de un ZIP descargado de GitHub, no de un `git clone`—. No asumas
-   que hay commits, ramas ni remoto que consultar; no hay forma de ver diffs
-   ni historial salvo lo que cuenta este documento. **Si vas a hacer cambios
-   grandes, considera `git init` primero** (pídeselo a Alejandro, no lo hagas
-   sin avisar) para tener red de seguridad. Si en tu sesión SÍ hay `.git`,
-   ignora este punto y usa `git status` / `git log` con normalidad.
+4. **Ya hay `.git`** (se inicializó como red de seguridad antes de reescribir
+   §14 — ver la nota de "Control de versiones" más abajo), pero **sin
+   remoto**: `git log` no cuenta la historia completa del proyecto, solo lo
+   que ha pasado desde ese checkpoint. Si en tu copia NO hay `.git` (por
+   ejemplo, si Alejandro volvió a descomprimir un ZIP), sigue aplicando el
+   aviso antiguo: no asumas commits/ramas/remoto, y considera `git init` antes
+   de cambios grandes, avisando primero.
 5. Comprobar que la BD está al día (todas las migraciones hasta la `013`):
    ```
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"        -- 9
@@ -81,12 +80,14 @@ entrenadores y escudos reales de una comunidad activa, no personajes de ficción
   `C:\xampp\htdocs\tcg_srf-master`; el resto del documento usa `tcg_srf` como
   nombre corto porque así se sirve normalmente: `http://localhost/tcg_srf/`
   o `http://localhost/tcg_srf-master/` según cómo esté montada la copia local).
-- **Control de versiones:** **no hay `.git` en esta copia** — es una carpeta
-  suelta, no un clon. Documentos anteriores de este proyecto hablaban de un
-  repo en `github.com/AlejandroSuarezCampos/tcg_srf`; si retomas ese remoto,
-  haz `git init` + añade el remoto explícitamente, nunca asumas que ya existe.
-  Si en algún momento hay `.git`: nunca `--force`, nunca reescribir historial
-  sin que lo pida explícitamente Alejandro.
+- **Control de versiones:** **ahora sí hay `.git`** — se creó como red de
+  seguridad antes de una reescritura destructiva del sistema de cajas/sobres
+  (§14). Es un repo **local, sin remoto configurado** (no
+  `github.com/AlejandroSuarezCampos/tcg_srf` ni ningún otro); si retomas ese
+  remoto, añádelo explícitamente, nunca asumas que ya existe. El primer commit
+  (`"Checkpoint antes de reescribir..."`) es el estado previo a esa
+  reescritura — útil si algo hay que revertir. Nunca `--force`, nunca
+  reescribir historial sin que lo pida explícitamente Alejandro.
 - **Ejecutado por una sola persona** (Alejandro), sin fecha de lanzamiento fija.
 - **Gratuito**, sin monetización, exclusivo para participantes de la liga.
 - **Legal:** proyecto fan-made sin ánimo de lucro. Inazuma Eleven es propiedad
@@ -177,8 +178,8 @@ tcg_srf/
 │   └── confirmar.php     ← modal de confirmación compartido (SRF.confirmar)
 ├── components/
 │   ├── carta.php         ← EL componente de tarjeta (render_carta, carta_html)
-│   └── caja3d.php        ← cajas/sobres en pseudo-3D CSS (§14): caja3d_html,
-│                            sobre3d_mini_html. Compartido por sobres.php y
+│   └── caja3d.php        ← cajas/sobres en pseudo-3D CSS (§14): pack3d_caja_html,
+│                            pack3d_sobre_html. Compartido por sobres.php y
 │                            panel/plantillas.php.
 ├── navbar.php            ← clúster "Jugar": Sobres / Mazos / Duelos
 ├── mazos.php             ← constructor de mazos + panel de COMPOS (§10.4)
@@ -478,7 +479,16 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
   animaciones no se pueden cronometrar ahí; hay que validar la lógica por
   partes (estado final, algoritmos aislados) y decir honestamente que el ritmo
   visual no se ha visto.
-- PHP CLI en `C:\xampp\php\php.exe`. `extension=gd` ya está descomentada.
+- PHP CLI en `C:\xampp\php\php.exe`. **`extension=gd` estaba comentada tanto
+  para CLI como para el PHP que carga Apache** (contradice lo que decía esta
+  misma línea en versiones anteriores del documento — verificado con
+  `php -m`, ninguno de los dos la traía activa). Se descomentó en
+  `C:\xampp\php\php.ini`, pero **Apache corre como servicio de Windows
+  (`Apache2.4`) y una sesión sin privilegios de administrador no puede
+  reiniciarlo** (`Restart-Service` da "Acceso denegado"). Si `panel/plantillas.php`
+  da `Fatal error: Call to undefined function imagecreatetruecolor()`, ese es
+  el motivo: reinicia Apache a mano (XAMPP Control Panel: Stop → Start, o
+  `services.msc` → Apache2.4 → Reiniciar) para que recoja el cambio.
 - Apache y MariaDB a veces están parados. Si XAMPP los deja a medias, mata los
   procesos `httpd`/`mysqld` y relanza desde `C:\xampp\`.
 
@@ -864,17 +874,19 @@ v4: nada de vitrina con scroll horizontal, nada de reveal por aura anticipatoria
 ni de secuencia FUT independiente. Lo construido es:
 
 - Cada expansión se pinta como una **caja 3D** (`components/caja3d.php`,
-  `caja3d_html()`) hecha enteramente con **CSS falso 3D**: `perspective` +
+  función `pack3d_caja_html()` — nombres "pack3d", no "caja3d": el componente
+  se reescribió por completo en un rediseño posterior, ver nota al final de
+  este apartado) hecha enteramente con **CSS falso 3D**: `perspective` +
   `transform-style: preserve-3d` + `rotate`/`translateZ` sobre capas planas.
   **Nunca WebGL ni modelos reales** — Three.js sigue sin vendorizar y sin usar.
 - Las texturas de cada cara (`front`, `top`, `side`, `lid`, `interior`) salen
   de `Tcg::rutasPlantilla($tipo, $id)`; si el admin no subió plantilla, las
   claves faltan en el array y el CSS cae solo al degradado por defecto — el
   render **nunca se rompe** por falta de assets.
-- Clicar una caja la abre en un "portal" (`.caja3d-portal`): la tapa gira más
+- Clicar una caja la abre en un "portal" (`.pack3d-portal`): la tapa gira más
   allá de 90° (`rotateX` hasta ~-170) desvaneciéndose a la vez, dejando ver el
   interior con hasta `Tcg::SOBRES_POR_CAJA` (50) sobres individuales
-  (`sobre3d_mini_html()`), dentro del **mismo árbol `preserve-3d`** que la
+  (`pack3d_sobre_html()`), dentro del **mismo árbol `preserve-3d`** que la
   caja — nunca en un contenedor hermano, o se pierde la percepción de "sacar
   el sobre de dentro".
 - Si una expansión tiene varios tipos de sobre, la caja grande abre a un
@@ -888,6 +900,29 @@ ni de secuencia FUT independiente. Lo construido es:
 - **GSAP sí se usa aquí** (`assets/js/vendor/gsap/gsap.min.js`,
   `gsap.quickTo()` para el tilt al cursor de cada caja, `gsap.timeline()` para
   abrir/cerrar la tapa). Es el primer uso real de GSAP en el proyecto.
+
+**Rediseño posterior (mismo día):** todo `components/caja3d.php`,
+`assets/js/sobres.js` y el bloque `pack3d` de `components.css` se reescribieron
+de cero a petición de Alejandro, contra un prompt de 5 fases más estricto
+(idle + tilt / submenú con callback `onEnvelopeTypeSelected` / apertura con
+stagger / hover+selección / plantillas). El resultado es funcionalmente
+equivalente al descrito arriba (misma técnica, mismas zonas de plantilla), con
+las clases renombradas de `caja3d`/`sobre3d-mini` a `pack3d`/`pack3d-sobre`, y
+**tres bugs reales corregidos** en esa reescritura que probablemente seguían
+latentes en cualquier copia previa:
+1. Clicar un sobre individual burbujeaba hasta el `.js-tipo-sobre` que lo
+   envuelve (mismo árbol DOM, requisito técnico de §14) y volvía a disparar la
+   apertura de la caja, que resetea la selección — falta un
+   `e.stopPropagation()` en el listener de `.js-sobre-individual`.
+2. El `gsap.fromTo()` del stagger de los 50 sobres dejaba `opacity`/`transform`
+   como estilo en línea (más específico que cualquier clase CSS) sin limpiarlo
+   nunca — bloqueaba para siempre la regla `.con-seleccion` que debe atenuar
+   al resto de sobres al elegir uno. Se arregla con
+   `onComplete: () => gsap.set(sobres, { clearProps: 'all' })`.
+3. La rama `prefers-reduced-motion` escribía el mismo `opacity`/`transform`
+   inline "por si acaso", sin necesidad (el estado de reposo por defecto ya es
+   ese) y con el mismo efecto bloqueante que el bug anterior — se eliminó, esa
+   rama ahora no toca los sobres en absoluto.
 
 ### 14.1 Sistema de plantillas (arte de cajas y sobres)
 
@@ -913,8 +948,8 @@ Flujo en `panel/plantillas.php` (solo `dictador=1`):
    recorta cada zona con GD (`imagecopy` con alpha preservado), guarda en
    `assets/img/plantillas/{tipo}_{id}/` con nombre versionado por
    `time()`, y escribe las rutas como JSON en `plantillas_3d.rutas_recortadas`.
-4. La **vista previa reutiliza el componente real** (`caja3d_html()` /
-   `sobre3d_mini_html()`), incluida la apertura de tapa con 6 sobres de
+4. La **vista previa reutiliza el componente real** (`pack3d_caja_html()` /
+   `pack3d_sobre_html()`), incluida la apertura de tapa con 6 sobres de
    muestra — el admin valida contra el motor de producción, no una maqueta.
 
 ### 14.2 Qué NO se construyó (respecto al plan de la v4 de este documento)

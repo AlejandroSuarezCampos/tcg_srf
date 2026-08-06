@@ -86,9 +86,9 @@ function rutasPanel(array $rutas): array {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="../assets/css/tokens.css">
-<link rel="stylesheet" href="../assets/css/components.css">
-<link rel="stylesheet" href="./assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/tokens.css?v=<?= @filemtime(__DIR__ . '/../assets/css/tokens.css') ?>">
+<link rel="stylesheet" href="../assets/css/components.css?v=<?= @filemtime(__DIR__ . '/../assets/css/components.css') ?>">
+<link rel="stylesheet" href="./assets/css/admin.css?v=<?= @filemtime(__DIR__ . '/assets/css/admin.css') ?>">
 <style>
   /* layout propio de esta página, no un componente del sistema de diseño */
   .plantillas-expansion { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; }
@@ -133,7 +133,7 @@ function rutasPanel(array $rutas): array {
       <div class="plantillas-fila">
         <div class="plantillas-item">
           <h4>Caja de la expansión</h4>
-          <div class="preview"><?= caja3d_html(rutasPanel($rutasCajaExp), ['escala' => 'pequena']) ?></div>
+          <div class="preview"><?= pack3d_caja_html(rutasPanel($rutasCajaExp), ['escala' => 'pequena']) ?></div>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=caja_expansion">
               <i class="bi bi-download"></i> Guía
@@ -160,21 +160,28 @@ function rutasPanel(array $rutas): array {
           // motor real sin tener que ir al juego a comprar nada.
           $rutasSobrePanel = rutasPanel($rutasSobre);
           $interiorPreview = '';
-          for ($i = 0; $i < 6; $i++) {
-              $interiorPreview .= sobre3d_mini_html($rutasSobrePanel);
+          for ($i = 0; $i < 12; $i++) {
+              $interiorPreview .= pack3d_sobre_html($rutasSobrePanel, ['indice' => $i, 'total' => 12]);
           }
         ?>
+        <?php $idPreview = 'preview-' . $idSobre; ?>
         <div class="plantillas-item">
           <h4><?= htmlspecialchars($s['nombre']) ?> — caja pequeña</h4>
           <div class="preview">
-            <div class="caja3d-portal">
-              <?= caja3d_html(rutasPanel($rutasCajaTipo), ['escala' => 'pequena', 'interiorHtml' => $interiorPreview]) ?>
-              <button type="button" class="btn btn-ghost btn-sm js-preview-abrir">Vista previa: abrir tapa</button>
-              <button type="button" class="btn btn-ghost caja3d-portal-cerrar js-preview-cerrar">
+            <div class="pack3d-portal">
+              <!-- data-id-sobre="preview-N": misma convención que sobres.php,
+                   así SRF.pack3d.onEnvelopeTypeSelected() (sin modificar) la
+                   encuentra sin ningún código nuevo. El prefijo evita
+                   colisionar con un id_sobre real. -->
+              <div class="js-tipo-sobre" role="button" tabindex="0" data-id-sobre="<?= htmlspecialchars($idPreview) ?>">
+                <?= pack3d_caja_html(rutasPanel($rutasCajaTipo), ['escala' => 'pequena', 'interiorHtml' => $interiorPreview]) ?>
+              </div>
+              <button type="button" class="btn btn-ghost pack3d-portal-cerrar js-cerrar-blister">
                 <i class="bi bi-x-lg"></i> Cerrar
               </button>
             </div>
           </div>
+          <p class="t-caption t-dim" style="margin:0;">Clic en la caja para previsualizar la apertura con el motor real.</p>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=caja_sobre">
               <i class="bi bi-download"></i> Guía
@@ -191,7 +198,7 @@ function rutasPanel(array $rutas): array {
 
         <div class="plantillas-item">
           <h4><?= htmlspecialchars($s['nombre']) ?> — sobre</h4>
-          <div class="preview"><?= sobre3d_mini_html(rutasPanel($rutasSobre)) ?></div>
+          <div class="preview"><?= pack3d_sobre_html(rutasPanel($rutasSobre)) ?></div>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=sobre">
               <i class="bi bi-download"></i> Guía
@@ -221,56 +228,12 @@ function rutasPanel(array $rutas): array {
 </div>
 
 <script src="../assets/js/vendor/gsap/gsap.min.js"></script>
-<script>
-  /* vista previa con comportamiento real (tilt + flotación): mismo helper
-     que sobres.js, sin duplicar la lógica del tilt aquí */
-  document.querySelectorAll('.caja3d').forEach(function (caja) {
-    var tilt = caja.querySelector('.caja3d-tilt');
-    if (!tilt) return;
-    var girarX = gsap.quickTo(tilt, 'rotateX', { duration: .3, ease: 'power2.out' });
-    var girarY = gsap.quickTo(tilt, 'rotateY', { duration: .3, ease: 'power2.out' });
-    caja.addEventListener('mousemove', function (e) {
-      var r = caja.getBoundingClientRect();
-      girarY(((e.clientX - r.left) / r.width - .5) * 26);
-      girarX(((e.clientY - r.top) / r.height - .5) * -22);
-    });
-    caja.addEventListener('mouseleave', function () { girarX(0); girarY(0); });
-  });
-
-  /* vista previa de la apertura de tapa + sobres dentro (Fase 5 del prompt):
-     versión mínima de openBlisterLid()/cerrarBlister() de sobres.js — aquí no
-     hay compra real detrás, solo se demuestra la animación con el motor real */
-  document.querySelectorAll('.js-preview-abrir').forEach(function (btnAbrir) {
-    var portal = btnAbrir.closest('.caja3d-portal');
-    var caja   = portal.querySelector('.caja3d');
-    var caras  = portal.querySelector('.caja3d-caras');
-    var tapa   = portal.querySelector('.caja3d-tapa');
-    var btnCerrar = portal.querySelector('.js-preview-cerrar');
-
-    btnAbrir.addEventListener('click', function () {
-      portal.classList.add('esta-abierta');
-      caja.classList.add('caja3d--abierta');
-      caras.classList.add('en-portal');
-      gsap.set(caja, { scale: .55, opacity: 0 });
-      gsap.timeline()
-        .to(caja, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(1.4)' })
-        .to(caras, { rotateX: -50, rotateY: -12, duration: .6, ease: 'power2.inOut' }, '-=.3')
-        .to(tapa, { rotateX: -165, opacity: 0, duration: .5, ease: 'power2.inOut' }, '-=.3')
-        .call(function () {
-          gsap.fromTo(portal.querySelectorAll('.sobre3d-mini'),
-            { opacity: 0, scale: .5, y: 14 },
-            { opacity: 1, scale: 1, y: 0, duration: .35, stagger: .04, ease: 'back.out(1.5)' });
-        });
-    });
-    btnCerrar.addEventListener('click', function () {
-      portal.classList.remove('esta-abierta');
-      caja.classList.remove('caja3d--abierta');
-      caras.classList.remove('en-portal');
-      gsap.set(caras, { clearProps: 'transform' });
-      gsap.set(tapa, { rotateX: 0, opacity: 1 });
-    });
-  });
-</script>
+<!-- Fase 5, restricción explícita: "no reescribir el componente 3D del juego
+     que ya funciona". La vista previa carga el MISMO sobres.js del juego: el
+     tilt (initPackBox), el click de caja → apertura de tapa → stagger de
+     sobres (onEnvelopeTypeSelected) y el cierre (js-cerrar-blister) quedan
+     cableados solos, sin una sola línea de JS propia de este panel. -->
+<script src="../assets/js/sobres.js?v=<?= @filemtime(__DIR__ . '/../assets/js/sobres.js') ?>"></script>
 
 </body>
 </html>

@@ -17,6 +17,18 @@ $paginaTitulo = $paginaTitulo ?? 'Superliga Frontier TCG';
 $paginaDesc   = $paginaDesc   ?? 'El registro coleccionable de la Superliga Frontier.';
 $cssExtra     = $cssExtra     ?? [];
 $bodyClass    = $bodyClass    ?? '';
+
+// Cache-busting por fecha de modificación: el navegador cachea CSS/JS con
+// fuerza (§8 de branding/CLAUDE.md, ya mordió más de una vez — la última,
+// tras renombrar caja3d→pack3d en todo el sistema de sobres, dejó HTML con
+// clases nuevas sirviéndose contra un components.css viejo en caché, con el
+// layout roto por completo). "?v=filemtime" cambia solo cuando el fichero
+// cambia de verdad, así que no invalida caché en cada visita sin motivo.
+function assetUrl(string $base, string $ruta): string {
+    $abs = __DIR__ . '/../' . $ruta;
+    $v = @filemtime($abs);
+    return $base . $ruta . ($v ? '?v=' . $v : '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -32,12 +44,12 @@ $bodyClass    = $bodyClass    ?? '';
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 
-<link rel="stylesheet" href="<?= $base ?>assets/css/tokens.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/base.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/components.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/layout.css">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/tokens.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/base.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/components.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/layout.css') ?>">
 <?php foreach ($cssExtra as $hoja): ?>
-<link rel="stylesheet" href="<?= $base . htmlspecialchars($hoja) ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars(assetUrl($base, $hoja)) ?>">
 <?php endforeach; ?>
 
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
