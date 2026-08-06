@@ -3,6 +3,13 @@
  * MARCADO DE LA CEREMONIA DE APERTURA
  * Lo usan sobres.php (apertura real) y styleguide.php (previsualización).
  * El comportamiento vive en assets/js/ceremonia.js.
+ *
+ * Tres escenas, en este orden:
+ *   1. #ceremoniaApertura — el sobre (con SU plantilla) rasgándose en dos.
+ *   2. #ceremoniaFoco     — las cartas de una en una, boca abajo; el jugador
+ *                           hace clic para darles la vuelta. Las rarezas
+ *                           altas disparan antes la secuencia tipo "walkout".
+ *   3. #ceremoniaMesa     — resumen con todas las cartas ya reveladas.
  */
 $base = $base ?? '';
 ?>
@@ -16,19 +23,37 @@ $base = $base ?? '';
       </button>
     </div>
 
-    <!-- §14.4: el sobre en sí, en 3D, antes de repartir las cartas -->
+    <!-- ESCENA 1: el sobre en 3D, rasgado en dos mitades -->
     <div class="ceremonia-apertura" id="ceremoniaApertura" hidden>
-      <div class="sobre-3d" id="sobre3d">
-        <div class="sobre-3d-mitad sobre-3d-arriba">
-          <img class="sobre-3d-img" alt="" hidden>
-        </div>
-        <div class="sobre-3d-mitad sobre-3d-abajo">
-          <img class="sobre-3d-img" alt="" hidden>
-        </div>
-        <div class="sobre-3d-destello"></div>
+      <div class="cer-sobre" id="cerSobre">
+        <div class="cer-sobre-mitad cer-sobre-arriba"></div>
+        <div class="cer-sobre-mitad cer-sobre-abajo"></div>
+        <div class="cer-sobre-luz"></div>
       </div>
     </div>
 
+    <!-- ESCENA 2: carta a carta, boca abajo, clic para voltear -->
+    <div class="ceremonia-foco" id="ceremoniaFoco" hidden>
+      <div class="cer-foco-escena">
+        <div class="cer-walkout" id="cerWalkout" hidden>
+          <div class="cer-walkout-rayos"></div>
+          <div class="cer-walkout-texto">
+            <span class="cer-walkout-rareza" id="cerWalkoutRareza"></span>
+          </div>
+        </div>
+        <button type="button" class="cer-carta" id="cerCarta">
+          <span class="cer-carta-aura" aria-hidden="true"></span>
+          <span class="cer-carta-cara cer-carta-dorso">
+            <span class="carta-dorso"><i class="ph ph-soccer-ball" aria-hidden="true"></i></span>
+          </span>
+          <span class="cer-carta-cara cer-carta-frente" id="cerCartaFrente"></span>
+        </button>
+      </div>
+      <p class="cer-pista" id="ceremoniaPista">Toca la carta para darle la vuelta</p>
+      <p class="cer-contador mono" id="ceremoniaContador"></p>
+    </div>
+
+    <!-- ESCENA 3: resumen -->
     <div class="ceremonia-mesa" id="ceremoniaMesa"></div>
 
     <p class="sr-only" id="ceremoniaAnuncio" role="status" aria-live="polite"></p>
@@ -42,4 +67,4 @@ $base = $base ?? '';
 </div>
 
 <script src="<?= $base ?>assets/js/vendor/gsap/gsap.min.js"></script>
-<script src="<?= $base ?>assets/js/ceremonia.js"></script>
+<script src="<?= $base ?>assets/js/ceremonia.js?v=<?= @filemtime(__DIR__ . '/../assets/js/ceremonia.js') ?>"></script>

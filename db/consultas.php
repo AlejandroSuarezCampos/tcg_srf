@@ -1014,23 +1014,36 @@ class Tcg
 
 	// caja_expansion y caja_sobre comparten geometría (misma "caja", solo
 	// cambia la escala CSS con la que se pinta); sobre tiene la suya.
-	// "interior" es el fondo/base que se ve al levantar la tapa (§Fase 3 del
-	// prompt de sobres 3D): la fila y1024-1024 del lienzo queda libre a
-	// propósito para el aviso LEEME (ver generarGuiaPlantilla()).
+	//
+	// ⚠ LAS PROPORCIONES DE CADA ZONA COINCIDEN CON LAS DE LA CARA QUE PINTAN.
+	// La caja del juego mide ancho:alto:fondo = 200:250:130 (--pack3d-w/h/d en
+	// components.css). Con 400px = "ancho" en la plantilla:
+	//     alto  = 400 · 250/200 = 500     fondo = 400 · 130/200 = 260
+	// Antes todas las zonas eran cuadradas (512×512) o mitades (512×256), así
+	// que el arte se estiraba al pintarse sobre caras con otra proporción y la
+	// plantilla NO correspondía con el resultado. Si cambias --pack3d-w/h/d,
+	// hay que recalcular estas zonas con la misma regla de tres.
+	//   · front    ancho × alto
+	//   · top/lid  ancho × fondo   (la tapa cubre la boca entera)
+	//   · side     fondo × alto
+	//   · interior ancho × fondo   (el suelo, se ve al abrir)
 	const ZONAS_CAJA = [
-		"front"    => ["x" => 0,   "y" => 0,   "w" => 512, "h" => 512],
-		"lid"      => ["x" => 512, "y" => 0,   "w" => 512, "h" => 256],
-		"top"      => ["x" => 512, "y" => 256, "w" => 512, "h" => 256],
-		"side"     => ["x" => 0,   "y" => 512, "w" => 512, "h" => 256],
-		"interior" => ["x" => 512, "y" => 512, "w" => 512, "h" => 256],
+		"front"    => ["x" => 0,   "y" => 0,   "w" => 400, "h" => 500],
+		"side"     => ["x" => 400, "y" => 0,   "w" => 260, "h" => 500],
+		"top"      => ["x" => 0,   "y" => 500, "w" => 400, "h" => 260],
+		"lid"      => ["x" => 400, "y" => 500, "w" => 400, "h" => 260],
+		"interior" => ["x" => 0,   "y" => 760, "w" => 400, "h" => 260],
 	];
 	const LIENZO_CAJA = ["w" => 1024, "h" => 1024];
 
+	// El sobre del juego mide 165×235 (--pack3d-sobre-w/h): con 400 de ancho,
+	// alto = 400 · 235/165 = 570.
 	const ZONAS_SOBRE = [
-		"frente"  => ["x" => 0,   "y" => 0, "w" => 512, "h" => 512],
-		"reverso" => ["x" => 512, "y" => 0, "w" => 512, "h" => 512],
+		"frente"  => ["x" => 0,   "y" => 0, "w" => 400, "h" => 570],
+		"reverso" => ["x" => 400, "y" => 0, "w" => 400, "h" => 570],
 	];
-	const LIENZO_SOBRE = ["w" => 1024, "h" => 512];
+	// 720 de alto y no 570: la franja de abajo queda libre para el aviso LEEME.
+	const LIENZO_SOBRE = ["w" => 1024, "h" => 720];
 
 	// Puramente decorativo (§14 Fase 3 del prompt): cuántos sobres "salen" de
 	// la caja al abrirse. No tiene relación con `sobre.cantidad` (cartas por
@@ -1088,18 +1101,18 @@ class Tcg
 				$z["w"] . "x" . $z["h"] . "px @ (" . $z["x"] . "," . $z["y"] . ")", $texto);
 		}
 
-		// hueco libre del lienzo (para caja: la fila y1024 entera; para sobre:
-		// la franja baja de su propio lienzo): aviso LEEME
+		// hueco libre del lienzo (a la derecha de las zonas en ambos tipos)
 		$lineasLeeme = [
 			"LEEME",
 			"Sustituye cada zona por tu arte real SIN mover ni redimensionarla:",
 			"el recorte del servidor usa estas mismas coordenadas exactas.",
+			"Cada zona ya tiene la PROPORCION exacta de su cara en el juego,",
+			"asi que lo que dibujes aqui es lo que se vera, sin deformarse.",
 			"Oculta o borra esta capa de guias antes de exportar.",
-			"Exporta como PNG plano de " . $lienzo["w"] . "x" . $lienzo["h"] . "px,",
-			"igual que este archivo.",
+			"Exporta como PNG plano de " . $lienzo["w"] . "x" . $lienzo["h"] . "px.",
 		];
-		$xLeeme = 14;
-		$yLeeme = self::esTipoCaja($tipo) ? 768 + 14 : $lienzo["h"] - 110;
+		$xLeeme = self::esTipoCaja($tipo) ? 414 : 14;
+		$yLeeme = self::esTipoCaja($tipo) ? 790 : 586;
 		foreach ($lineasLeeme as $i => $linea_texto) {
 			imagestring($img, $i === 0 ? 5 : 2, $xLeeme, $yLeeme + $i * 16, $latin1($linea_texto), $texto);
 		}

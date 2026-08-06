@@ -924,6 +924,48 @@ latentes en cualquier copia previa:
    ese) y con el mismo efecto bloqueante que el bug anterior — se eliminó, esa
    rama ahora no toca los sobres en absoluto.
 
+### 14.0b Geometría 3D — cómo se arma la caja (no lo "simplifiques")
+
+Cada cara se **centra** primero en el volumen con `translate(-50%,-50%)` y luego
+se empuja a su sitio con `translateX/Y/Z` + `rotate`:
+
+| Cara | Tamaño | Transform tras centrar |
+|---|---|---|
+| `front` | w × h | `translateZ(+d/2)` |
+| `top` | w × d | `translateY(-h/2) rotateX(90deg)` |
+| `side` | d × h | `translateX(+w/2) rotateY(90deg)` |
+| `interior` (suelo) | w × d | `translateY(+h/2) rotateX(90deg)` |
+
+**No plegar las caras desde su arista con `transform-origin`.** Es lo que hacía
+la primera versión y las dejaba casi de canto: la caja se veía como un
+rectángulo plano, sin volumen. El volumen se orienta con
+`rotateX(-18deg) rotateY(-32deg)` (así quedan visibles frente + tapa + lateral
+derecho: las normales de ambas acaban con z positiva).
+
+La **tapa** cuelga de `.pack3d-bisagra`, un div de altura 0 colocado en la
+arista trasera-superior; con `transform-origin: 50% 0` girarla es literalmente
+abrir una bisagra: `rotateX(90deg)` cerrada (tumbada tapando la boca) →
+`rotateX(205deg)` abierta (de pie, inclinada hacia atrás).
+
+Los **sobres van de pie** dentro, escalonados en profundidad con
+`translateZ` a partir de `--i` (índice) y `--n` (total), que `pack3d_sobre_html()`
+escribe en el atributo `style`. Tres trampas que ya mordieron:
+
+1. **Nada de `overflow` en el contenedor de los sobres.** Cualquier
+   `overflow≠visible` crea un contexto de recorte que **aplana en 2D a todos
+   sus descendientes** y destruye el `preserve-3d` (además de pintar barras de
+   scroll sueltas flotando en la escena).
+2. **GSAP no puede animar `transform` sobre `.pack3d-sobre`**: ese transform
+   lleva su `translateZ(var(--z))` de colocación y un transform en línea lo
+   sustituiría entero, apilando los 50 sobres en el mismo punto. Se anima la
+   variable `--alza`. Por lo mismo, **nunca `clearProps: 'all'`** sobre un
+   sobre: borraría `--i`/`--n`.
+3. **Un ancestro con `transform` es el bloque contenedor de sus descendientes
+   `position: fixed`.** GSAP dejaba un transform inline en `.submenu-tipo`
+   (ancestro de `.pack3d-portal`) y el overlay a pantalla completa se encogía
+   al tamaño de la cajita del submenú. Toda animación sobre un ancestro del
+   portal debe terminar con `clearProps: 'transform'`.
+
 ### 14.1 Sistema de plantillas (arte de cajas y sobres)
 
 Cada caja/sobre necesita un **único PNG plano** con zonas fijas predefinidas en
@@ -931,9 +973,19 @@ Cada caja/sobre necesita un **único PNG plano** con zonas fijas predefinidas en
 movieran, el render 3D quedaría desalineado con lo ya subido):
 
 - **Caja** (`caja_expansion` y `caja_sobre` comparten geometría, solo cambia la
-  escala CSS): lienzo `1024×1024`, zonas `front`/`lid`/`top`/`side`/`interior`
-  de 512×512 o 512×256 cada una.
-- **Sobre**: lienzo `1024×512`, zonas `frente`/`reverso` de 512×512.
+  escala CSS): lienzo `1024×1024` — `front` 400×500, `side` 260×500,
+  `top` 400×260, `lid` 400×260, `interior` 400×260.
+- **Sobre**: lienzo `1024×720`, `frente` y `reverso` de 400×570.
+
+> **Las proporciones de cada zona son las de la cara que pintan**, derivadas de
+> `--pack3d-w/h/d` (200:250:130) y `--pack3d-sobre-w/h` (165:235). Antes eran
+> todas cuadradas (512×512) o mitades (512×256), así que el arte se estiraba al
+> pintarse y **la plantilla no correspondía con el resultado**. Si tocas esas
+> variables CSS, hay que recalcular las zonas con la misma regla de tres.
+> Cambiar las zonas **invalida el arte ya subido**: hay que volver a descargar
+> la guía y resubir. El lienzo del sobre cambió de tamaño, así que las
+> plantillas de sobre antiguas las rechaza `subirPlantilla()` con su mensaje de
+> medidas — es la validación funcionando, no un fallo.
 
 Flujo en `panel/plantillas.php` (solo `dictador=1`):
 1. **Descargar la guía** (`Tcg::generarGuiaPlantilla()`, dibujada con GD — no
@@ -952,14 +1004,34 @@ Flujo en `panel/plantillas.php` (solo `dictador=1`):
    `pack3d_sobre_html()`), incluida la apertura de tapa con 6 sobres de
    muestra — el admin valida contra el motor de producción, no una maqueta.
 
-### 14.2 Qué NO se construyó (respecto al plan de la v4 de este documento)
+### 14.2 La ceremonia de apertura (reescrita)
 
-Si en algún momento se retoma la idea de la vitrina 3D con scroll, aura
-anticipatoria por rareza, reveal secuencial con skip propio, o secuencia FUT
-para legendaria/SRF: **nada de eso existe hoy**. El reveal de cartas sigue
-siendo el de la Fase 1 (`partials/ceremonia.php`), sin aura anticipatoria ni
-secuencia especial por rareza. Decisión de Alejandro: el sistema de cajas
-físicas resultó suficiente y no se ha pedido ampliarlo.
+`partials/ceremonia.php` + `assets/js/ceremonia.js`. **Tres escenas**:
+
+1. **El sobre se rasga** (`#ceremoniaApertura`) usando la textura de SU
+   plantilla (`sobre.frente`, que `sobres.php` pasa por `data-frente`). Las dos
+   mitades comparten la misma imagen de fondo al doble de alto, desplazada
+   `-100%` en la de abajo, para que la costura caiga por el centro del arte.
+2. **Carta a carta** (`#ceremoniaFoco`): cada carta aparece **boca abajo y
+   espera el clic** del jugador para voltearse (es un `<button>` real, así que
+   funciona con Enter/Espacio). Un segundo clic pasa a la siguiente.
+   - Rareza **≥ 5** (legendaria y SRF) no se voltea sin más: dispara antes un
+     **walkout** — se oscurece todo, giran rayos cónicos, aparece el nombre de
+     la rareza con latido, y la carta se destapa con destello y temblor.
+   - `Saltar carta` resuelve la actual al instante; `Saltar todo` va al resumen.
+3. **Resumen** (`#ceremoniaMesa`): todas las cartas ya reveladas, con el
+   anuncio por `aria-live`.
+
+`prefers-reduced-motion` se consulta **en cada apertura**, no al cargar el
+script, para que cambiar la preferencia del sistema surta efecto sin recargar;
+con la preferencia activa se va directo al resumen.
+
+### 14.2b Qué NO se construyó
+
+La **vitrina 3D con scroll horizontal** entre expansiones (el plan de la v4 de
+este documento) nunca se hizo: las expansiones van en una rejilla normal.
+Tampoco hay aura anticipatoria *antes* de ver el dorso — el aura se enciende al
+pedir el volteo, no antes.
 
 ### 14.3 Comprobaciones
 

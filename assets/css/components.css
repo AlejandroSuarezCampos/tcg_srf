@@ -774,9 +774,11 @@
   height: var(--pack3d-h);
   perspective: 1500px;
   perspective-origin: 50% 42%;
-  /* la caja gira y asoma fuera de su caja de layout: sin este margen, la
-     tapa y el lateral se comen el texto de debajo (nombre/precio) */
-  margin: calc(var(--pack3d-d) * .55) auto var(--space-4);
+  /* La caja gira y su tapa/lateral asoman FUERA de su caja de layout, y la
+     sombra de contacto cae otro medio "fondo" por debajo. Sin reservar ese
+     hueco arriba y abajo, la tapa se comía lo que hubiera encima y la sombra
+     oscurecía el nombre/precio de debajo. */
+  margin: calc(var(--pack3d-d) * .55) auto calc(var(--pack3d-d) * .5 + var(--space-4));
 }
 .pack3d--pequena {
   --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px;
@@ -1002,7 +1004,15 @@
   gap: var(--space-8);
   padding-block: var(--space-6);
 }
-.submenu-tipos-volver { flex-basis: 100%; }
+.submenu-tipos-cabecera {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.submenu-tipos-cabecera h2 { margin: 0; }
+.submenu-tipos-cabecera p { margin: 0; }
 .submenu-tipo {
   display: flex;
   flex-direction: column;
@@ -1074,39 +1084,58 @@
    tamaño que sea, es alcanzable. */
 .ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
-/* §14.4: el sobre se abre en 3D antes de repartir — dos mitades que se
-   separan a lo largo de la costura central, con destello detrás. */
+/* ---- ESCENA 1: el sobre se rasga en dos ----
+   Cada mitad enseña SU trozo de la textura del sobre: la misma imagen de
+   fondo en las dos, al doble de alto, desplazada -100% en la de abajo. Así la
+   costura cae justo por el centro del arte y al separarse se lee como un
+   sobre partido, no como dos rectángulos distintos. */
 .ceremonia-apertura {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 280px;
+  min-height: 300px;
   perspective: 1400px;
 }
-.sobre-3d {
+.cer-sobre {
   position: relative;
-  width: 190px;
-  aspect-ratio: 4 / 5;
+  width: 200px;
+  aspect-ratio: 165 / 235;   /* misma proporción que el sobre de la caja 3D */
   transform-style: preserve-3d;
 }
-.sobre-3d-mitad {
+.cer-sobre-mitad {
   position: absolute;
   left: 0;
   right: 0;
   height: 50%;
   overflow: hidden;
-  backface-visibility: hidden;
   box-shadow: var(--shadow-lg);
-  background:
+  background-color: var(--panel);
+  background-image:
     radial-gradient(ellipse 75% 90% at 50% 0%, var(--amber-soft), transparent 72%),
     linear-gradient(170deg, var(--void-2), #08090C);
+  background-size: 100% 200%;
+  background-repeat: no-repeat;
 }
-.sobre-3d-arriba { top: 0; transform-origin: bottom center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-.sobre-3d-abajo  { bottom: 0; transform-origin: top center; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
-.sobre-3d-img { position: absolute; left: 0; width: 100%; height: 200%; object-fit: cover; }
-.sobre-3d-arriba .sobre-3d-img { top: 0; }
-.sobre-3d-abajo .sobre-3d-img { top: -100%; }
-.sobre-3d-destello {
+.cer-sobre-arriba {
+  top: 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background-position: top center;
+}
+.cer-sobre-abajo {
+  bottom: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background-position: bottom center;
+}
+/* borde dentado de la costura: es lo que hace que se lea "rasgado" */
+.cer-sobre-arriba::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--amber) 0 5px, transparent 5px 11px);
+  opacity: .55;
+}
+.cer-sobre-luz {
   position: absolute;
   inset: -45%;
   border-radius: 50%;
@@ -1114,6 +1143,118 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* ---- ESCENA 2: carta a carta, boca abajo, clic para voltear ---- */
+.ceremonia-foco {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-4);
+}
+.cer-foco-escena {
+  position: relative;
+  display: grid;
+  place-items: center;
+  perspective: 1500px;
+  min-height: 340px;
+  width: 100%;
+}
+.cer-carta {
+  position: relative;
+  width: 230px;
+  aspect-ratio: 5 / 7;
+  transform-style: preserve-3d;
+  transition: transform var(--t-media) var(--ease);
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 2;
+}
+.cer-carta:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-lg); }
+.cer-carta.esta-volteada { transform: rotateY(180deg); }
+.cer-carta-cara {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  display: block;
+}
+.cer-carta-dorso { transform: rotateY(0deg); }
+.cer-carta-dorso .carta-dorso {
+  display: grid;
+  place-items: center;
+  width: 100%; height: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg, var(--panel), var(--void));
+  color: rgba(255,255,255,.2);
+  font-size: 52px;
+}
+/* la cara buena va girada 180: al rotar la carta queda de frente */
+.cer-carta-frente { transform: rotateY(180deg); }
+.cer-carta-frente .carta { width: 100%; height: 100%; }
+/* aura de rareza: se enciende justo antes del volteo (§14.4) */
+.cer-carta-aura {
+  position: absolute;
+  inset: -18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rz-aura, var(--amber)), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(14px);
+}
+.cer-pista {
+  margin: 0;
+  color: var(--frost-dim);
+  font-size: var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.cer-contador { margin: 0; color: var(--frost-dim); font-size: var(--fs-caption); }
+
+/* ---- walkout: solo legendaria (5) y SRF (6) ---- */
+.cer-walkout {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.86) 70%);
+}
+.cer-walkout-rayos {
+  position: absolute;
+  width: 190%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 8deg, var(--rz-aura, var(--amber)) 9deg 11deg, transparent 12deg 26deg,
+    transparent 26deg 34deg, var(--rz-aura, var(--amber)) 35deg 37deg, transparent 38deg 52deg);
+  background-size: 100% 100%;
+  opacity: .5;
+  mask-image: radial-gradient(circle, transparent 22%, #000 42%, #000 68%, transparent 82%);
+  -webkit-mask-image: radial-gradient(circle, transparent 22%, #000 42%, #000 68%, transparent 82%);
+}
+.cer-walkout-texto {
+  position: relative;
+  text-align: center;
+}
+.cer-walkout-rareza {
+  display: block;
+  font-size: clamp(30px, 7vw, 62px);
+  font-weight: var(--fw-bold);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 26px var(--rz-aura, var(--amber)), 0 0 70px var(--rz-aura, var(--amber));
+}
+/* mientras dura el walkout, el marco del modal se apaga para no competir */
+.ceremonia .modal-caja.en-walkout { background: var(--void); }
 
 /* dentro de la ceremonia la carta va al grano: rareza, arte y nombre */
 .ceremonia .carta-meta { display: none; }
@@ -1267,6 +1408,16 @@
   .ranura-dorso, .ranura.con-fanfarria::after, .ceremonia-destello { display: none; }
   .ceremonia .modal-caja.es-srf { animation: none; }
   .ranura-aura, .ceremonia-fut { display: none; }
+  /* escenas 1 y 2 no llegan a ejecutarse (ceremonia.js va directo al resumen),
+     pero se apagan también por CSS por si el modo cambia a mitad de sesión */
+  .ceremonia-apertura, .ceremonia-foco, .cer-walkout { display: none; }
+  .cer-carta { transition: none; }
+}
+
+@media (max-width: 600px) {
+  .cer-carta { width: 175px; }
+  .cer-foco-escena { min-height: 270px; }
+  .cer-sobre { width: 155px; }
 }
 
 /* ==========================================================================

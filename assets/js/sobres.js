@@ -65,6 +65,7 @@
      callback que dispara la Fase 3 en ambos casos.
      ------------------------------------------------------------------------ */
   var vitrina = document.getElementById('vitrina');
+  var vistaExpansiones = document.getElementById('vistaExpansiones');
 
   function onExpansionBoxClick(expansionId, cajaBtn) {
     if (cajaBtn.dataset.idSobreUnico) {
@@ -78,15 +79,10 @@
     var submenu = document.getElementById('submenu-' + expansionId);
     if (!submenu) return;
 
-    Array.prototype.forEach.call(vitrina.querySelectorAll('.js-caja-expansion'), function (btn) {
-      if (btn === cajaBtn) {
-        gsap.to(btn, { x: -60, scale: .75, duration: reducido ? 0 : .4, ease: 'power2.out' });
-      } else {
-        gsap.to(btn, { opacity: .15, duration: reducido ? 0 : .3 });
-      }
-      btn.disabled = true;
-    });
-
+    // Al entrar en una expansión se OCULTA la vista de expansiones entera
+    // (cabecera + rejilla de cajas): la pantalla pasa a ser solo los tipos de
+    // sobre, sin repetir debajo la caja de la que vienes.
+    if (vistaExpansiones) vistaExpansiones.hidden = true;
     submenu.hidden = false;
     var cajas = submenu.querySelectorAll('.submenu-tipo');
     if (reducido) {
@@ -107,13 +103,17 @@
 
   function cerrarSubmenu(submenu) {
     submenu.hidden = true;
-    Array.prototype.forEach.call(vitrina.querySelectorAll('.js-caja-expansion'), function (btn) {
-      gsap.to(btn, {
-        x: 0, scale: 1, opacity: 1, duration: reducido ? 0 : .35, ease: 'power2.out',
-        onComplete: function () { gsap.set(btn, { clearProps: 'transform,opacity' }); }
-      });
-      btn.disabled = false;
-    });
+    if (vistaExpansiones) vistaExpansiones.hidden = false;
+    if (!reducido) {
+      gsap.fromTo(vitrina.querySelectorAll('.vitrina-item'),
+        { opacity: 0, y: 18 },
+        {
+          opacity: 1, y: 0, duration: .35, stagger: .05, ease: 'power2.out',
+          onComplete: function () {
+            gsap.set(vitrina.querySelectorAll('.vitrina-item'), { clearProps: 'transform,opacity' });
+          }
+        });
+    }
   }
 
   Array.prototype.forEach.call(document.querySelectorAll('.js-caja-expansion'), function (btn) {
@@ -332,7 +332,12 @@
 
       if (typeof data.monedas === 'number') actualizarSaldo(data.monedas);
       cerrarPortal(portal);
-      SRF.ceremonia(data.cartas || [], { nombre: btn.dataset.nombre, imagen: btn.dataset.imagen });
+      SRF.ceremonia(data.cartas || [], {
+        nombre:  btn.dataset.nombre,
+        imagen:  btn.dataset.imagen,
+        frente:  btn.dataset.frente,
+        reverso: btn.dataset.reverso
+      });
     } catch (err) {
       console.error(err);
       revertirSeleccion(btn, bahia, portal);

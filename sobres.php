@@ -22,6 +22,10 @@ function interiorSobresHtml(Tcg $db, array $s, bool $sinSaldo): string {
                 'nombre'   => $s['nombre'],
                 'precio'   => (int) $s['precio'],
                 'imagen'   => $s['imagen'] ?? '',
+                // texturas de la plantilla: la ceremonia abre EL MISMO sobre
+                // que acabas de coger, no un genérico
+                'frente'   => $rutasSobre['frente'] ?? '',
+                'reverso'  => $rutasSobre['reverso'] ?? '',
             ],
         ]);
     }
@@ -133,7 +137,11 @@ include __DIR__ . '/navbar.php';
   <?php endif; ?>
 
   <?php if (!empty($sobresPorExpansion)): ?>
-  <!-- Fase 1: una caja cerrada de 50 sobres por expansión -->
+  <!-- Fase 1: una caja cerrada de 50 sobres por expansión.
+       Todo el bloque va en #vistaExpansiones para poder ocultarlo entero al
+       entrar en una expansión: al elegir caja se ve SOLO el submenú de tipos
+       de sobre, sin repetir debajo la caja de la expansión ni su cabecera. -->
+  <div id="vistaExpansiones">
   <div class="vitrina-cabecera">
     <h2>Expansiones</h2>
     <p class="t-caption t-dim">Elige una caja y ábrela para ver sus sobres.</p>
@@ -167,14 +175,21 @@ include __DIR__ . '/navbar.php';
     </div>
     <?php endforeach; ?>
   </div>
+  </div><!-- /#vistaExpansiones -->
 
   <!-- Fase 2: submenú de tipos de sobre (solo si la expansión tiene más de uno) -->
   <?php foreach ($sobresPorExpansion as $idExp => $grupo): ?>
   <?php if (count($grupo['sobres']) > 1): ?>
   <div class="submenu-tipos" id="submenu-<?= $idExp ?>" data-expansion="<?= $idExp ?>" hidden>
-    <button type="button" class="btn btn-ghost submenu-tipos-volver js-cerrar-submenu">
-      <i class="ph ph-arrow-left" aria-hidden="true"></i> Expansiones
-    </button>
+    <div class="submenu-tipos-cabecera">
+      <button type="button" class="btn btn-ghost btn-sm js-cerrar-submenu">
+        <i class="ph ph-arrow-left" aria-hidden="true"></i> Expansiones
+      </button>
+      <div>
+        <h2><?= htmlspecialchars($grupo['nombre']) ?></h2>
+        <p class="t-caption t-dim">Elige un tipo de sobre.</p>
+      </div>
+    </div>
     <?php foreach ($grupo['sobres'] as $s): ?>
     <?php $rutasCajaTipo = $db->rutasPlantilla('caja_sobre', $s['id_sobre']); ?>
     <div class="submenu-tipo">

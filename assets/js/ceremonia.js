@@ -1,317 +1,389 @@
 /* ==========================================================================
    CEREMONIA DE APERTURA DE SOBRES
-   Tres tiempos: dorsos en la mesa → volteo secuencial (carta a carta) →
-   resultado. Cada carta enciende su aura de rareza justo antes de voltearse
-   (§14.4); legendaria y SRF disparan además una secuencia FUT propia (§14.6).
-   Orquestado con GSAP (vendorizado en assets/js/vendor/gsap/), sin build.
+   Tres escenas: el sobre se rasga → las cartas salen DE UNA EN UNA boca abajo
+   y el jugador hace clic para voltearlas → resumen con todas.
+
+   Las rarezas altas (legendaria=5, SRF=6) no se voltean sin más: al pedir el
+   volteo se dispara antes una secuencia tipo "walkout" (oscurecido, rayos de
+   luz girando, nombre de la rareza) y la carta se da la vuelta al final, con
+   destello y temblor. Todo saltable.
+
+   Orquestado con GSAP (vendorizado), sin build.
 
    Compromisos que no se negocian:
    · Saltable carta a carta ("Saltar carta") o de golpe ("Saltar todo").
-   · Con prefers-reduced-motion no hay aura, FUT ni volteo animado: las
-     cartas aparecen ya reveladas.
+   · Operable por teclado: la carta es un <button> real (Enter/Espacio).
+   · Con prefers-reduced-motion no hay rasgado, walkout ni volteo animado:
+     se va directo al resumen con todas las cartas ya reveladas.
    · El resultado se anuncia por una región aria-live.
 
-   Expone SRF.ceremonia(cartas), donde cada carta es
-   { nombre, rareza, id_rareza, html }. El `html` lo genera en servidor el
-   mismo componente de tarjeta que usa el resto del sitio.
-   Expone además el hook SRF.onExclusiveReveal(carta), vacío por defecto,
-   listo para engancharle audio en el futuro sin tocar esta timeline.
-
-   Requiere en la página el marcado de partials/ceremonia.php (que ya carga
-   gsap.min.js antes que este fichero).
+   Expone SRF.ceremonia(cartas, sobre), donde cada carta es
+   { nombre, rareza, id_rareza, html } — el `html` lo genera en servidor el
+   mismo componente de tarjeta que usa el resto del sitio — y `sobre` es
+   { nombre, imagen, frente, reverso } con las texturas de SU plantilla.
+   Expone también el hook SRF.onExclusiveReveal(carta), vacío por defecto,
+   listo para engancharle audio sin tocar esta timeline.
    ========================================================================== */
 (function () {
   'use strict';
 
-  var mesa = document.getElementById('ceremoniaMesa');
-  var caja = document.getElementById('ceremoniaCaja');
-  var anuncio = document.getElementById('ceremoniaAnuncio');
+  var modal      = document.getElementById('modalSobre');
+  var caja       = document.getElementById('ceremoniaCaja');
+  var mesa       = document.getElementById('ceremoniaMesa');
+  var anuncio    = document.getElementById('ceremoniaAnuncio');
+  var apertura   = document.getElementById('ceremoniaApertura');
+  var cerSobre   = document.getElementById('cerSobre');
+  var foco       = document.getElementById('ceremoniaFoco');
+  var cerCarta   = document.getElementById('cerCarta');
+  var cerFrente  = document.getElementById('cerCartaFrente');
+  var walkout    = document.getElementById('cerWalkout');
+  var walkoutRz  = document.getElementById('cerWalkoutRareza');
+  var pista      = document.getElementById('ceremoniaPista');
+  var contador   = document.getElementById('ceremoniaContador');
   var btnSaltarCarta = document.getElementById('ceremoniaSaltarCarta');
-  var btnSaltar = document.getElementById('ceremoniaSaltar');
-  var apertura = document.getElementById('ceremoniaApertura');
-  var sobre3d = document.getElementById('sobre3d');
-  if (!mesa) return;
+  var btnSaltar      = document.getElementById('ceremoniaSaltar');
+  if (!mesa || !cerCarta) return;
 
-  var reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Se consulta EN CADA APERTURA, no una vez al cargar: si el jugador cambia
+  // la preferencia del sistema a mitad de sesión, el siguiente sobre ya la
+  // respeta sin tener que recargar la página.
+  function reducido() {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
 
-  /* Ritmo por rareza: cuanto más rara, más se hace esperar la carta. */
-  var ESPERA = { 1: .26, 2: .3, 3: .38, 4: .52, 5: 2.4, 6: 3 };
-  var RZ_COLOR = { 1: 'var(--rz1)', 2: 'var(--rz2)', 3: 'var(--rz3)', 4: 'var(--rz4)', 5: 'var(--rz5)', 6: 'var(--rz6)' };
+  var RZ_COLOR = {
+    1: 'var(--rz1)', 2: 'var(--rz2)', 3: 'var(--rz3)',
+    4: 'var(--rz4)', 5: 'var(--rz5)', 6: 'var(--rz6)'
+  };
 
-  var cartaActualTl = null;
-  var resolverActual = null;
-  var aperturaTl = null;
-  var resolverApertura = null;
-  var saltarTodo = false;
+  // Estado de la sesión de apertura en curso
+  var cartas = [];
+  var indice = 0;
+  var tlActual = null;       // timeline de la escena en curso (saltable)
+  var esperandoClic = false; // true mientras la carta espera el clic del jugador
+  var cartaRevelada = false; // la carta actual ya está boca arriba
+  var saltandoTodo = false;
+  var avanzar = null;        // resolve() de la carta actual
 
-  /* ---- construcción de la mesa: una ranura por carta, boca abajo ---- */
-  function prepararMesa(cartas) {
+  /* ---------------------------------------------------------------------
+     Utilidades
+     --------------------------------------------------------------------- */
+  function destelloPantalla() {
+    var d = document.createElement('div');
+    d.className = 'ceremonia-destello';
+    document.body.appendChild(d);
+    d.addEventListener('animationend', function () { d.remove(); });
+  }
+
+  function matarTimeline() {
+    if (tlActual) { tlActual.kill(); tlActual = null; }
+  }
+
+  /* ---------------------------------------------------------------------
+     ESCENA 1 — el sobre se rasga en dos mitades.
+     Usa las texturas de la plantilla del propio sobre (sobre.frente /
+     sobre.reverso); sin plantilla subida cae al degradado del CSS.
+     --------------------------------------------------------------------- */
+  function escenaSobre(sobre) {
+    return new Promise(function (resolve) {
+      var arriba = cerSobre.querySelector('.cer-sobre-arriba');
+      var abajo  = cerSobre.querySelector('.cer-sobre-abajo');
+      var luz    = cerSobre.querySelector('.cer-sobre-luz');
+
+      var textura = (sobre && (sobre.frente || sobre.imagen)) || '';
+      [arriba, abajo].forEach(function (m) {
+        m.style.backgroundImage = textura ? "url('" + textura + "')" : '';
+      });
+
+      apertura.hidden = false;
+      gsap.set(cerSobre, { scale: .55, opacity: 0, rotateY: -22 });
+      gsap.set([arriba, abajo], { clearProps: 'transform', opacity: 1 });
+      gsap.set(luz, { opacity: 0, scale: .5 });
+
+      var tl = gsap.timeline({
+        onComplete: function () {
+          tlActual = null;
+          apertura.hidden = true;
+          resolve();
+        }
+      });
+      tlActual = tl;
+
+      tl.to(cerSobre, { scale: 1, opacity: 1, rotateY: 0, duration: .5, ease: 'back.out(1.5)' })
+        // temblor de anticipación antes de rasgarse
+        .to(cerSobre, { rotate: -2.5, duration: .07, yoyo: true, repeat: 7, ease: 'none' }, '+=.15')
+        .to(luz, { opacity: 1, scale: 1.6, duration: .25 }, '-=.12')
+        .to(arriba, { yPercent: -85, rotate: -9, opacity: 0, duration: .5, ease: 'power2.in' }, '<+=.05')
+        .to(abajo,  { yPercent: 85,  rotate: 9,  opacity: 0, duration: .5, ease: 'power2.in' }, '<')
+        .call(destelloPantalla, [], '<+=.1')
+        .to(luz, { opacity: 0, duration: .3 }, '-=.2')
+        .to(cerSobre, { opacity: 0, duration: .2 }, '-=.15');
+    });
+  }
+
+  function saltarEscenaSobre() {
+    matarTimeline();
+    apertura.hidden = true;
+  }
+
+  /* ---------------------------------------------------------------------
+     ESCENA 2 — una carta: aparece boca abajo y ESPERA EL CLIC.
+     --------------------------------------------------------------------- */
+  function pintarDorso(carta) {
+    cerCarta.className = 'cer-carta';
+    cerCarta.dataset.rareza = carta.id_rareza;
+    cerCarta.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
+    cerFrente.innerHTML = carta.html;
+    cerCarta.disabled = false;
+    cartaRevelada = false;
+    contador.textContent = (indice + 1) + ' / ' + cartas.length;
+    pista.textContent = 'Toca la carta para darle la vuelta';
+    pista.hidden = false;
+  }
+
+  function escenaCarta(carta) {
+    return new Promise(function (resolve) {
+      avanzar = resolve;
+      pintarDorso(carta);
+
+      // entrada del dorso
+      var tl = gsap.timeline({
+        onComplete: function () { tlActual = null; esperandoClic = true; }
+      });
+      tlActual = tl;
+      tl.fromTo(cerCarta,
+        { opacity: 0, scale: .7, y: 40, rotateZ: -6 },
+        { opacity: 1, scale: 1, y: 0, rotateZ: 0, duration: .45, ease: 'back.out(1.5)' });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     El volteo. Para rareza >= 5 se antepone el walkout.
+     --------------------------------------------------------------------- */
+  function voltearAhora(carta) {
+    cerCarta.classList.add('esta-volteada');
+    cartaRevelada = true;
+    pista.textContent = 'Toca otra vez para continuar';
+    if (carta.id_rareza >= 5 && typeof SRF.onExclusiveReveal === 'function') {
+      SRF.onExclusiveReveal(carta);
+    }
+  }
+
+  function pedirVolteo(carta) {
+    if (!esperandoClic) return;
+    esperandoClic = false;
+    pista.hidden = true;
+
+    var exclusiva = carta.id_rareza >= 5;
+    var aura = cerCarta.querySelector('.cer-carta-aura');
+
+    var tl = gsap.timeline({
+      onComplete: function () { tlActual = null; esperandoClic = true; }
+    });
+    tlActual = tl;
+
+    if (!exclusiva) {
+      tl.to(aura, { opacity: 1, scale: 1.15, duration: .22, ease: 'power1.out' })
+        .call(function () { voltearAhora(carta); })
+        .to(aura, { opacity: 0, duration: .4 }, '+=.15');
+      return;
+    }
+
+    // ---- WALKOUT (rareza 5 y 6) ----
+    walkout.hidden = false;
+    walkoutRz.textContent = carta.rareza;
+    walkout.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
+    caja.classList.add('en-walkout');
+
+    var rayos = walkout.querySelector('.cer-walkout-rayos');
+    var texto = walkout.querySelector('.cer-walkout-texto');
+
+    tl.set(walkout, { opacity: 0 })
+      .set([rayos, texto], { opacity: 0 })
+      // la carta se hunde y se oscurece mientras sube la tensión
+      .to(cerCarta, { scale: .82, duration: .5, ease: 'power2.out' }, 0)
+      .to(walkout, { opacity: 1, duration: .45 }, 0)
+      .to(rayos, { opacity: 1, duration: .6 }, '<')
+      .to(rayos, { rotate: 360, duration: 3.4, ease: 'none' }, '<')
+      .fromTo(texto, { opacity: 0, scale: .75, y: 14 },
+        { opacity: 1, scale: 1, y: 0, duration: .55, ease: 'back.out(1.7)' }, '<+=.35')
+      // latido del texto: es el "aguanta la respiración" del walkout
+      .to(texto, { scale: 1.06, duration: .5, yoyo: true, repeat: 2, ease: 'sine.inOut' })
+      .to(texto, { opacity: 0, scale: 1.35, duration: .35, ease: 'power2.in' })
+      .to(aura, { opacity: 1, scale: 1.45, duration: .3 }, '<')
+      .call(function () { voltearAhora(carta); destelloPantalla(); })
+      // temblor de pantalla al destaparse
+      .to(caja, { x: -9, duration: .05, yoyo: true, repeat: 7, ease: 'none' }, '<')
+      .to(walkout, { opacity: 0, duration: .5 }, '<+=.25')
+      .to(aura, { opacity: 0, duration: .6 }, '<')
+      .call(function () {
+        walkout.hidden = true;
+        caja.classList.remove('en-walkout');
+        gsap.set(caja, { clearProps: 'transform' });
+        gsap.set(cerCarta, { scale: 1 });
+      });
+  }
+
+  /* Deja la carta actual en su estado final, sin animación. */
+  function finalizarCartaActual() {
+    matarTimeline();
+    walkout.hidden = true;
+    caja.classList.remove('en-walkout');
+    gsap.set(caja, { clearProps: 'transform' });
+    gsap.set(cerCarta, { clearProps: 'transform,opacity' });
+    var aura = cerCarta.querySelector('.cer-carta-aura');
+    gsap.set(aura, { opacity: 0 });
+    if (!cartaRevelada) voltearAhora(cartas[indice]);
+  }
+
+  /* ---------------------------------------------------------------------
+     Clic / teclado sobre la carta: primero la voltea, después avanza.
+     --------------------------------------------------------------------- */
+  cerCarta.addEventListener('click', function () {
+    if (saltandoTodo) return;
+    if (!cartaRevelada) { pedirVolteo(cartas[indice]); return; }
+    if (!esperandoClic) return;      // walkout aún en curso
+    siguienteCarta();
+  });
+
+  function siguienteCarta() {
+    esperandoClic = false;
+    if (!avanzar) return;
+    var r = avanzar;
+    avanzar = null;
+    // salida de la carta ya vista
+    if (reducido()) { r(); return; }
+    gsap.to(cerCarta, {
+      opacity: 0, scale: .8, y: -30, duration: .28, ease: 'power2.in',
+      onComplete: r
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     ESCENA 3 — resumen: todas las cartas ya reveladas
+     --------------------------------------------------------------------- */
+  function pintarMesa() {
     mesa.innerHTML = '';
-
     cartas.forEach(function (carta) {
       var ranura = document.createElement('div');
-      ranura.className = 'ranura';
+      ranura.className = 'ranura esta-volteada';
       ranura.dataset.rareza = carta.id_rareza;
-
-      var aura = document.createElement('div');
-      aura.className = 'ranura-aura';
-
-      var dorso = document.createElement('div');
-      dorso.className = 'ranura-cara ranura-dorso';
-      dorso.innerHTML = '<div class="carta-dorso"><i class="ph ph-soccer-ball"></i></div>';
 
       var frente = document.createElement('div');
       frente.className = 'ranura-cara ranura-frente';
       frente.innerHTML = carta.html;
 
-      ranura.appendChild(aura);
-      ranura.appendChild(dorso);
       ranura.appendChild(frente);
       mesa.appendChild(ranura);
     });
-  }
-
-  function destelloPantalla() {
-    var destello = document.createElement('div');
-    destello.className = 'ceremonia-destello';
-    document.body.appendChild(destello);
-    destello.addEventListener('animationend', function () { destello.remove(); });
-  }
-
-  function voltear(ranura) {
-    ranura.classList.add('esta-volteada');
-    var rareza = parseInt(ranura.dataset.rareza, 10);
-    if (rareza >= 5) {
-      ranura.classList.add('con-fanfarria');
-      if (rareza === 6) destelloPantalla();
+    mesa.hidden = false;
+    if (!reducido()) {
+      gsap.fromTo(mesa.children,
+        { opacity: 0, y: 16 },
+        {
+          opacity: 1, y: 0, duration: .3, stagger: .04, ease: 'power2.out',
+          onComplete: function () { gsap.set(mesa.children, { clearProps: 'transform,opacity' }); }
+        });
     }
   }
 
-  /* ---- estado final instantáneo de una carta: usado por ambos saltos ---- */
-  function finalizarCarta(ranura) {
-    var aura = ranura.querySelector('.ranura-aura');
-    if (aura) gsap.set(aura, { opacity: 0 });
-    var fut = mesa.querySelector('.ceremonia-fut');
-    if (fut) fut.remove();
-    voltear(ranura);
-  }
-
-  /* ---- secuencia FUT (§14.6): solo legendaria y SRF ---- */
-  function construirSecuenciaFut(tl, ranura, carta, aura) {
-    var overlay = document.createElement('div');
-    overlay.className = 'ceremonia-fut';
-    overlay.style.setProperty('--aura-color', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
-    overlay.innerHTML =
-      '<div class="ceremonia-fut-rayos"></div>' +
-      '<div class="ceremonia-fut-nombre">' +
-        '<span class="fut-rareza"></span>' +
-        '<span class="fut-nombre"></span>' +
-      '</div>';
-    overlay.querySelector('.fut-rareza').textContent = carta.rareza;
-    overlay.querySelector('.fut-nombre').textContent = carta.nombre;
-    mesa.appendChild(overlay);
-
-    var rayos   = overlay.querySelector('.ceremonia-fut-rayos');
-    var nombre  = overlay.querySelector('.ceremonia-fut-nombre');
-
-    tl.set(overlay, { opacity: 0 })
-      .to(overlay, { opacity: 1, duration: .4 })
-      .to(rayos, { rotate: 360, duration: 2.6, ease: 'none' }, '<')
-      .fromTo(nombre, { scale: .82, opacity: 0 }, { scale: 1, opacity: 1, duration: .5 }, '<+=.2')
-      .to(overlay, { opacity: 0, duration: .35 }, '+=.5')
-      .call(function () { overlay.remove(); })
-      .to(aura, { opacity: 1, scale: 1.3, duration: .3 })
-      .call(function () {
-        voltear(ranura);
-        if (typeof SRF.onExclusiveReveal === 'function') SRF.onExclusiveReveal(carta);
-      })
-      .to(caja, { x: -6, duration: .045, yoyo: true, repeat: 5, ease: 'none' }, '<')
-      .to(aura, { opacity: 0, duration: .5 }, '+=.25');
-  }
-
-  /* ---- apertura del sobre en 3D (§14.4): rasgado en dos mitades + destello,
-     antes de que aparezca la mesa. `sobre` es { nombre, imagen } o undefined. ---- */
-  function reproducirApertura(sobre) {
-    return new Promise(function (resolve) {
-      var mitadArriba = sobre3d.querySelector('.sobre-3d-arriba');
-      var mitadAbajo  = sobre3d.querySelector('.sobre-3d-abajo');
-      var imgArriba   = mitadArriba.querySelector('.sobre-3d-img');
-      var imgAbajo    = mitadAbajo.querySelector('.sobre-3d-img');
-      var destello    = sobre3d.querySelector('.sobre-3d-destello');
-
-      if (sobre && sobre.imagen) {
-        imgArriba.src = sobre.imagen;
-        imgAbajo.src = sobre.imagen;
-        imgArriba.hidden = false;
-        imgAbajo.hidden = false;
-      } else {
-        imgArriba.hidden = true;
-        imgAbajo.hidden = true;
-      }
-
-      apertura.hidden = false;
-      gsap.set(sobre3d, { scale: .4, opacity: 0, rotateY: -25, rotateZ: 0 });
-      gsap.set([mitadArriba, mitadAbajo], { rotateX: 0, y: 0 });
-      gsap.set(destello, { opacity: 0, scale: .6 });
-
-      var tl = gsap.timeline({
-        onComplete: function () {
-          aperturaTl = null;
-          resolverApertura = null;
-          apertura.hidden = true;
-          resolve();
-        }
-      });
-      aperturaTl = tl;
-      resolverApertura = resolve;
-
-      tl.to(sobre3d, { scale: 1, opacity: 1, rotateY: 0, duration: .5, ease: 'back.out(1.6)' })
-        .to(sobre3d, { rotateZ: -3, duration: .09, yoyo: true, repeat: 5, ease: 'none' }, '+=.12')
-        .to(destello, { opacity: 1, scale: 1.5, duration: .22 }, '-=.08')
-        .to(mitadArriba, { rotateX: -110, y: -26, duration: .45, ease: 'power2.in' }, '<')
-        .to(mitadAbajo, { rotateX: 110, y: 26, duration: .45, ease: 'power2.in' }, '<')
-        .call(destelloPantalla, [], '<+=.08')
-        .to(destello, { opacity: 0, duration: .3 }, '-=.15')
-        .to(sobre3d, { opacity: 0, duration: .25 }, '-=.1');
-    });
-  }
-
-  /* ---- salto instantáneo de la apertura: usado por "Saltar todo" ---- */
-  function finalizarApertura() {
-    if (!aperturaTl) return;
-    aperturaTl.kill();
-    aperturaTl = null;
-    apertura.hidden = true;
-    if (resolverApertura) { var r = resolverApertura; resolverApertura = null; r(); }
-  }
-
-  /* ---- una carta: aura → volteo → (opcional) pausa. Saltable a mitad ---- */
-  function reproducirCarta(carta, ranura) {
-    return new Promise(function (resolve) {
-      var aura = ranura.querySelector('.ranura-aura');
-      var exclusiva = carta.id_rareza >= 5;
-
-      var tl = gsap.timeline({
-        onComplete: function () {
-          cartaActualTl = null;
-          resolverActual = null;
-          resolve();
-        }
-      });
-      cartaActualTl = tl;
-      resolverActual = resolve;
-
-      if (exclusiva) {
-        construirSecuenciaFut(tl, ranura, carta, aura);
-        return;
-      }
-
-      var total = ESPERA[carta.id_rareza] || .3;
-      var resto = Math.max(total - .28 - .35, .15);
-      tl.to(aura, { opacity: 1, scale: 1.12, duration: .28, ease: 'power1.out' })
-        .call(function () { voltear(ranura); })
-        .to(aura, { opacity: 0, duration: .35 }, '+=.1')
-        .to({}, { duration: resto });
-    });
-  }
-
-  var indice = 0;
-
-  async function reproducirTodas(cartas) {
-    var ranuras = mesa.querySelectorAll('.ranura');
-    for (indice = 0; indice < cartas.length; indice++) {
-      if (saltarTodo) {
-        finalizarCarta(ranuras[indice]);
-        continue;
-      }
-      await reproducirCarta(cartas[indice], ranuras[indice]);
-    }
-    anunciar(cartas);
-    btnSaltarCarta.disabled = true;
-    btnSaltar.disabled = true;
-  }
-
-  function anunciar(cartas) {
+  function anunciar() {
     var texto = cartas.map(function (c) { return c.nombre + ', ' + c.rareza; }).join('. ');
     anuncio.textContent = 'Has conseguido ' + cartas.length +
       (cartas.length === 1 ? ' carta: ' : ' cartas: ') + texto + '.';
   }
 
-  /* `sobre` es opcional: { nombre, imagen } del sobre comprado, para que la
-     apertura 3D muestre su propio arte. Sin él, la escena usa el degradado
-     por defecto (caso de la previsualización de styleguide.php). */
-  function ceremonia(cartas, sobre) {
-    if (!cartas || !cartas.length) return;
+  function terminar() {
+    foco.hidden = true;
+    pintarMesa();
+    anunciar();
+    btnSaltarCarta.disabled = true;
+    btnSaltar.disabled = true;
+  }
 
-    saltarTodo = false;
+  /* ---------------------------------------------------------------------
+     Orquestación
+     --------------------------------------------------------------------- */
+  async function repartir() {
+    for (indice = 0; indice < cartas.length; indice++) {
+      if (saltandoTodo) break;
+      await escenaCarta(cartas[indice]);
+    }
+    terminar();
+  }
+
+  function ceremonia(listaCartas, sobre) {
+    if (!listaCartas || !listaCartas.length) return;
+
+    cartas = listaCartas;
+    indice = 0;
+    saltandoTodo = false;
+    esperandoClic = false;
+    cartaRevelada = false;
+    avanzar = null;
+    matarTimeline();
+
     mesa.innerHTML = '';
-    caja.classList.remove('es-legendario', 'es-srf');
+    mesa.hidden = true;
+    foco.hidden = true;
+    apertura.hidden = true;
+    walkout.hidden = true;
+    caja.classList.remove('es-legendario', 'es-srf', 'en-walkout');
 
-    var maxRareza = cartas.reduce(function (max, c) { return Math.max(max, c.id_rareza); }, 1);
+    var maxRareza = cartas.reduce(function (m, c) { return Math.max(m, c.id_rareza); }, 1);
     if (maxRareza === 5) caja.classList.add('es-legendario');
     if (maxRareza === 6) caja.classList.add('es-srf');
 
     SRF.abrirModal('modalSobre');
 
-    if (reducido) {
-      prepararMesa(cartas);
-      Array.prototype.forEach.call(mesa.querySelectorAll('.ranura'), function (r) { r.classList.add('esta-volteada'); });
-      anunciar(cartas);
-      btnSaltarCarta.disabled = true;
-      btnSaltar.disabled = true;
+    if (reducido()) {
+      terminar();
       return;
     }
 
-    btnSaltarCarta.disabled = true;   // solo tiene sentido durante el reparto
-    btnSaltar.disabled = false;       // puede saltar la apertura entera
+    btnSaltarCarta.disabled = false;
+    btnSaltar.disabled = false;
 
-    reproducirApertura(sobre).then(function () {
-      prepararMesa(cartas);
-      btnSaltarCarta.disabled = false;
-      reproducirTodas(cartas);
+    escenaSobre(sobre).then(function () {
+      foco.hidden = false;
+      repartir();
     });
   }
 
-  function detener() {
-    finalizarApertura();
-    if (cartaActualTl) { cartaActualTl.kill(); cartaActualTl = null; resolverActual = null; }
-    saltarTodo = true;
-    var fut = mesa.querySelector('.ceremonia-fut');
-    if (fut) fut.remove();
-  }
-
+  /* ---- saltos ---- */
   btnSaltarCarta.addEventListener('click', function () {
-    if (!cartaActualTl) return;
-    var ranuras = mesa.querySelectorAll('.ranura');
-    var ranura = ranuras[indice];
-    cartaActualTl.kill();
-    cartaActualTl = null;
-    finalizarCarta(ranura);
-    if (resolverActual) { var r = resolverActual; resolverActual = null; r(); }
+    if (saltandoTodo) return;
+    if (!apertura.hidden) { saltarEscenaSobre(); return; }
+    if (foco.hidden) return;
+    if (!cartaRevelada) { finalizarCartaActual(); esperandoClic = true; return; }
+    siguienteCarta();
   });
 
   btnSaltar.addEventListener('click', function () {
-    saltarTodo = true;
-    if (aperturaTl) {
-      finalizarApertura();
-      return;
-    }
-    if (cartaActualTl) {
-      var ranuras = mesa.querySelectorAll('.ranura');
-      var ranura = ranuras[indice];
-      cartaActualTl.kill();
-      cartaActualTl = null;
-      finalizarCarta(ranura);
-      if (resolverActual) { var r = resolverActual; resolverActual = null; r(); }
-    }
+    saltandoTodo = true;
+    matarTimeline();
+    walkout.hidden = true;
+    apertura.hidden = true;
+    caja.classList.remove('en-walkout');
+    gsap.set(caja, { clearProps: 'transform' });
+    if (avanzar) { var r = avanzar; avanzar = null; r(); }
+    else terminar();
   });
 
   /* al cerrar el modal se corta cualquier animación pendiente */
+  function detener() {
+    saltandoTodo = true;
+    matarTimeline();
+    walkout.hidden = true;
+    caja.classList.remove('en-walkout');
+    gsap.set(caja, { clearProps: 'transform' });
+    if (avanzar) { var r = avanzar; avanzar = null; r(); }
+  }
   document.addEventListener('click', function (e) {
     if (e.target.closest && e.target.closest('[data-cerrar-modal]')) detener();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') detener();
+    if (e.key === 'Escape' && modal && !modal.hasAttribute('hidden')) detener();
   });
 
   SRF.onExclusiveReveal = SRF.onExclusiveReveal || function () {};
