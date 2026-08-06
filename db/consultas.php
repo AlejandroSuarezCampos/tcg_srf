@@ -143,6 +143,7 @@ class Tcg
 				c.descripcion,
 				c.imagen,
 				c.posicion,
+				c.ataque, c.defensa, c.tecnica,
 				c.id_expansion,
 				e.nombre AS expansion,
 				e.fecha_salida,
@@ -150,7 +151,9 @@ class Tcg
 				r.id_rareza,
 				r.nombre AS rareza,
 				af.nombre AS afinidad,
-				af.imagen AS afinidad_imagen
+				af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM cromos c
 			INNER JOIN expansiones e ON c.id_expansion = e.id_expansion
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -375,10 +378,13 @@ class Tcg
 			SELECT
 				col.id_coleccion, col.obtenida, col.bloqueada,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
+				c.ataque, c.defensa, c.tecnica,
 				eq.id_equipo, eq.nombre AS equipo,
 				e.id_expansion, e.nombre AS expansion,
 				r.id_rareza, r.nombre AS rareza,
-				af.nombre AS afinidad, af.imagen AS afinidad_imagen
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -624,11 +630,17 @@ class Tcg
 	// Cromos que el usuario puede poner a la venta (suyos, no bloqueados y sin anuncio activo ya puesto)
 	public function listarColeccionVendible($id_usuario) {
 		$sql = "
-			SELECT col.id_coleccion, c.nombre, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
+			SELECT col.id_coleccion, c.id_cromo, c.nombre, c.imagen,
+				c.ataque, c.defensa, c.tecnica,
+				eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza,
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
 			INNER JOIN rarezas r ON c.id_rareza = r.id_rareza
+			INNER JOIN afinidad af ON c.id_afinidad = af.id
 			WHERE col.id_usuario = :id_usuario
 				AND col.bloqueada = 0
 				AND col.id_coleccion NOT IN (
@@ -1110,25 +1122,172 @@ class Tcg
 	const POSICIONES_JUGABLES = ["POR", "DF", "MC", "DC"];
 
 	/**
-	 * La alineación es un 1-4-4-2 de huecos fijos. El índice del array ES el
-	 * valor de `mazo_cartas.hueco`.
+	 * Cuánto pesa cada estadística de la carta según la línea donde la pongas.
+	 * Decisión de Alejandro: antes cada línea puntuaba con UNA sola estadística
+	 * (Portería/Defensa con defensa, Medio con técnica, Ataque con ataque); ahora
+	 * las tres estadísticas de la carta cuentan siempre, pero con distinto peso
+	 * según dónde la coloques — así que un portero con buen ataque ya no es un
+	 * dato irrelevante, aporta un poco, pero mucho menos que su defensa.
+	 *
+	 * Los pesos NO están normalizados a que sumen 1: son los que pidió
+	 * Alejandro literalmente, y siguen dejando clara cuál es la estadística
+	 * "dueña" de cada línea (la de peso más alto) sin que las otras dos sean
+	 * cero. Ver aportarCarta().
+	 */
+	const PESOS_LINEA = [
+		"POR" => ["ataque" => 0,    "defensa" => 2,    "tecnica" => 1],
+		"DF"  => ["ataque" => 0.25, "defensa" => 1,    "tecnica" => 0.5],
+		"MC"  => ["ataque" => 0.5,  "defensa" => 0.5,  "tecnica" => 1],
+		"DC"  => ["ataque" => 1.25, "defensa" => 0.15, "tecnica" => 0.75],
+	];
+
+	/** Cuánto aporta UNA carta a la línea en la que está colocada. */
+	public static function aportarCarta(array $carta, $linea) {
+		$pesos = self::PESOS_LINEA[$linea] ?? self::PESOS_LINEA["MC"];
+		return (float) ($carta["ataque"]  ?? 0) * $pesos["ataque"]
+			 + (float) ($carta["defensa"] ?? 0) * $pesos["defensa"]
+			 + (float) ($carta["tecnica"] ?? 0) * $pesos["tecnica"];
+	}
+
+	/**
+	 * Las formaciones jugables. La clave es lo que se guarda en
+	 * `mazos.formacion` y en la formación congelada de un duelo.
+	 *
+	 * `lineas` es [nº de DF, nº de MC, nº de DC]. El portero es siempre uno,
+	 * así que las tres cifras suman 10 y la alineación son siempre 11 huecos:
+	 * cambiar de formación reparte los mismos once de otra manera, nunca da
+	 * más jugadores ni menos.
 	 *
 	 * Cualquier carta puede ocupar cualquier hueco a propósito: no hay reglas
 	 * de posición. Lo que decide cuánto aporta no es la posición impresa en la
-	 * carta sino DÓNDE la coloques, porque cada línea puntúa con una
-	 * estadística distinta (ver ESTADISTICA_LINEA). Poner un defensa de
-	 * delantero está permitido y rinde su ATA, que es mala: ahí está el
+	 * carta sino DÓNDE la coloques, porque cada línea pesa las tres
+	 * estadísticas de otra manera (ver PESOS_LINEA). Poner un defensa de
+	 * delantero está permitido y rinde según su ataque/técnica/defensa
+	 * ponderados como delantero, que para él suele ser malo: ahí está el
 	 * metajuego, en decidir esas colocaciones.
 	 */
-	const HUECOS = ["POR", "DF", "DF", "DF", "DF", "MC", "MC", "MC", "MC", "DC", "DC"];
-
-	/** Con qué estadística puntúa cada línea. */
-	const ESTADISTICA_LINEA = [
-		"POR" => "defensa",
-		"DF"  => "defensa",
-		"MC"  => "tecnica",
-		"DC"  => "ataque",
+	const FORMACIONES = [
+		"442" => ["nombre" => "1-4-4-2", "lineas" => [4, 4, 2]],
+		"433" => ["nombre" => "1-4-3-3", "lineas" => [4, 3, 3]],
+		"352" => ["nombre" => "1-3-5-2", "lineas" => [3, 5, 2]],
+		"532" => ["nombre" => "1-5-3-2", "lineas" => [5, 3, 2]],
+		"451" => ["nombre" => "1-4-5-1", "lineas" => [4, 5, 1]],
+		"343" => ["nombre" => "1-3-4-3", "lineas" => [3, 4, 3]],
+		"541" => ["nombre" => "1-5-4-1", "lineas" => [5, 4, 1]],
+		"361" => ["nombre" => "1-3-6-1", "lineas" => [3, 6, 1]],
 	];
+
+	/** La de siempre. Es la que se asume cuando no consta ninguna. */
+	const FORMACION_BASE = "442";
+
+	/** Disponibles para todos sin desbloquear nada (ver migración 006). */
+	const FORMACIONES_LIBRES = ["442", "433"];
+
+	/**
+	 * Reparto horizontal de una línea según cuántos jugadores tenga, en % del
+	 * ancho del campo. Los valores de 2 y 4 son los que ya tenía el 1-4-4-2
+	 * escritos a mano en el CSS, así que esa formación se sigue pintando
+	 * exactamente igual que antes de existir las demás.
+	 */
+	const REPARTO_X = [
+		1 => [50],
+		2 => [35, 65],
+		3 => [22, 50, 78],
+		4 => [14, 38, 62, 86],
+		// Las líneas de 5 y 6 no llegan hasta la banda: el retrato mide 60px de
+		// ancho como mínimo y se dibuja centrado en su coordenada, así que a un
+		// 8% el borde se salía del campo y quedaba recortado en móvil (el campo
+		// lleva overflow:hidden). Medido a 375px y a 320px de pantalla.
+		5 => [12, 31, 50, 69, 88],
+		6 => [11, 26, 42, 58, 74, 89],
+	];
+
+	/**
+	 * Altura de cada línea sobre el campo: [y base, coeficiente de arco,
+	 * término independiente], donde la y final es `base + a·d + b` y `d` es lo
+	 * lejos del centro que está el jugador (0 en el eje, 1 en la banda).
+	 *
+	 * El arco no es decorativo: la defensa se comba hacia adelante por las
+	 * bandas (los laterales suben) y el medio se comba hacia adelante por el
+	 * centro (los interiores pisan área). Es lo que hace que un 1-5-3-2 se lea
+	 * como una defensa de cinco y no como una fila recta de cinco puntos.
+	 */
+	const LINEA_Y = [
+		"POR" => [91, 0, 0],
+		"DF"  => [77, -25 / 3, 4.5],
+		"MC"  => [47, 25 / 3, -4.5],
+		"DC"  => [16, 0, 0],
+	];
+
+	/** Línea de cada hueco. El índice del array ES `mazo_cartas.hueco`. */
+	public static function huecosDe($formacion) {
+		$lineas = self::FORMACIONES[$formacion]["lineas"]
+			?? self::FORMACIONES[self::FORMACION_BASE]["lineas"];
+
+		$huecos = ["POR"];
+		foreach (["DF", "MC", "DC"] as $i => $linea) {
+			$huecos = array_merge($huecos, array_fill(0, $lineas[$i], $linea));
+		}
+		return $huecos;
+	}
+
+	/**
+	 * Coordenadas de cada hueco sobre el campo, en % — [hueco => [x, y]].
+	 *
+	 * Viven aquí y no en el CSS a propósito: con ocho formaciones serían 88
+	 * reglas `:nth-child` escritas a mano, y el orden de HUECOS y el del CSS
+	 * podrían desincronizarse sin que nada fallase de forma visible. Al
+	 * derivarse ambas cosas de la misma definición, añadir una formación es
+	 * una línea en FORMACIONES y nada más.
+	 */
+	public static function coordenadasDe($formacion) {
+		$huecos = self::huecosDe($formacion);
+
+		$porLinea = [];
+		foreach ($huecos as $i => $linea) { $porLinea[$linea][] = $i; }
+
+		$coords = [];
+		foreach ($porLinea as $linea => $indices) {
+			$xs = self::REPARTO_X[count($indices)] ?? self::REPARTO_X[4];
+			[$base, $a, $b] = self::LINEA_Y[$linea];
+
+			foreach ($indices as $n => $hueco) {
+				$x = $xs[$n];
+				$d = abs($x - 50) / 40;
+				$coords[$hueco] = ["x" => $x, "y" => round($base + $a * $d + $b, 1)];
+			}
+		}
+		ksort($coords);
+		return $coords;
+	}
+
+	/** Formaciones que puede usar un jugador: las libres más las ganadas. */
+	public function formacionesDisponibles($id_usuario) {
+		$stmt = $this->pdo->prepare("SELECT formacion FROM formaciones_usuario WHERE id_usuario = :id");
+		$stmt->execute([":id" => $id_usuario]);
+		$ganadas = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+		$claves = array_merge(self::FORMACIONES_LIBRES, $ganadas);
+
+		// strval() no es cosmético: "442" es una cadena numérica, así que PHP la
+		// guarda como el ENTERO 442 al usarla de clave de array. Sin convertirla
+		// de vuelta, la comparación estricta contra la cadena de la base de datos
+		// no casa nunca y el selector sale vacío.
+		$orden = array_map("strval", array_keys(self::FORMACIONES));
+
+		// se devuelven en el orden de FORMACIONES, no en el de desbloqueo, para
+		// que el selector no baile de sitio según lo que hayas ganado
+		return array_values(array_filter($orden, fn($c) => in_array($c, $claves, true)));
+	}
+
+	/** Concede una formación. Repetir la concesión no falla ni duplica. */
+	public function desbloquearFormacion($id_usuario, $formacion) {
+		if (!isset(self::FORMACIONES[$formacion])) { return false; }
+		$this->pdo->prepare("
+			INSERT IGNORE INTO formaciones_usuario (id_usuario, formacion) VALUES (:id, :f)
+		")->execute([":id" => $id_usuario, ":f" => $formacion]);
+		return true;
+	}
 
 	/**
 	 * Fuerza de una alineación, línea a línea. Recibe lo que devuelve
@@ -1138,16 +1297,26 @@ class Tcg
 	 * No se suma "la mejor estadística" de cada carta: se suma la de la línea
 	 * en la que está puesta. Es lo que hace que colocar mal salga caro sin
 	 * necesidad de prohibir nada.
+	 *
+	 * La formación se pasa explícitamente y no se adivina de las cartas: el
+	 * mismo hueco 7 es medio en un 1-4-4-2 y delantero en un 1-3-4-3, así que
+	 * dar por supuesta la formación equivocada daría un total plausible pero
+	 * falso, del tipo que no revienta y por eso no se detecta.
 	 */
-	public static function fuerzaAlineacion(array $cartas) {
+	public static function fuerzaAlineacion(array $cartas, $formacion = self::FORMACION_BASE) {
 		$lineas = ["POR" => 0, "DF" => 0, "MC" => 0, "DC" => 0];
+		$huecos = self::huecosDe($formacion);
 
 		foreach ($cartas as $carta) {
 			$hueco = (int) ($carta["hueco"] ?? 0);
-			$linea = self::HUECOS[$hueco] ?? "MC";
-			$lineas[$linea] += (int) $carta[self::ESTADISTICA_LINEA[$linea]];
+			$linea = $huecos[$hueco] ?? "MC";
+			$lineas[$linea] += self::aportarCarta($carta, $linea);
 		}
 
+		// Ya no son enteros: con pesos como 0.15 o 0.25 la suma exacta es un
+		// decimal casi siempre. Se guarda con precisión (lo usa la curva Elo,
+		// que sí nota la diferencia) y quien lo enseñe en pantalla redondea al
+		// pintarlo, no aquí.
 		$lineas["total"] = array_sum($lineas);
 		return $lineas;
 	}
@@ -1156,7 +1325,7 @@ class Tcg
 	// la lista si están completos sin una consulta por mazo.
 	public function listarMazosUsuario($id_usuario) {
 		$stmt = $this->pdo->prepare("
-			SELECT m.id_mazo, m.nombre, m.titular, m.creado,
+			SELECT m.id_mazo, m.nombre, m.formacion, m.titular, m.creado,
 			       COUNT(mc.id_mazo_carta) AS cartas
 			FROM mazos m
 			LEFT JOIN mazo_cartas mc ON mc.id_mazo = m.id_mazo
@@ -1172,7 +1341,7 @@ class Tcg
 	// enseñar (ni editar) el mazo de otra persona pasando un id a mano.
 	public function obtenerMazo($id_mazo, $id_usuario) {
 		$stmt = $this->pdo->prepare("
-			SELECT id_mazo, id_usuario, nombre, titular, creado
+			SELECT id_mazo, id_usuario, nombre, formacion, titular, creado
 			FROM mazos WHERE id_mazo = :id_mazo AND id_usuario = :id_usuario
 		");
 		$stmt->execute([":id_mazo" => $id_mazo, ":id_usuario" => $id_usuario]);
@@ -1189,7 +1358,9 @@ class Tcg
 				c.ataque, c.defensa, c.tecnica,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
-				af.nombre AS afinidad, af.imagen AS afinidad_imagen
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM mazo_cartas mc
 			INNER JOIN coleccion col ON col.id_coleccion = mc.id_coleccion
 			INNER JOIN cromos c ON c.id_cromo = col.id_cromo
@@ -1215,7 +1386,9 @@ class Tcg
 				c.ataque, c.defensa, c.tecnica,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
-				af.nombre AS afinidad, af.imagen AS afinidad_imagen
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM coleccion col
 			INNER JOIN cromos c ON c.id_cromo = col.id_cromo
 			INNER JOIN equipos eq ON eq.id_equipo = c.id_equipo
@@ -1258,7 +1431,7 @@ class Tcg
 	 */
 	public function obtenerMazoTitular($id_usuario) {
 		$stmt = $this->pdo->prepare("
-			SELECT id_mazo, id_usuario, nombre, titular, creado
+			SELECT id_mazo, id_usuario, nombre, formacion, titular, creado
 			FROM mazos WHERE id_usuario = :id_usuario AND titular = 1
 			LIMIT 1
 		");
@@ -1302,9 +1475,15 @@ class Tcg
 	 * en cualquier hueco es legal. Colocar mal se paga en la fuerza resultante,
 	 * no con un rechazo.
 	 */
-	public function guardarCartasMazo($id_mazo, $id_usuario, array $porHueco) {
+	public function guardarCartasMazo($id_mazo, $id_usuario, array $porHueco, $formacion = null) {
 		if (!$this->obtenerMazo($id_mazo, $id_usuario)) {
 			return ["ok" => false, "error" => "Ese mazo no es tuyo."];
+		}
+
+		// La formación se valida contra las que ESTE jugador tiene: que el
+		// selector solo pinte las suyas no impide mandar otra clave a mano.
+		if ($formacion !== null && !in_array($formacion, $this->formacionesDisponibles($id_usuario), true)) {
+			return ["ok" => false, "error" => "Todavía no has desbloqueado esa formación."];
 		}
 
 		// Normalizamos a [hueco => id_coleccion] quedándonos solo con huecos
@@ -1356,6 +1535,12 @@ class Tcg
 
 		try {
 			$this->pdo->beginTransaction();
+
+			if ($formacion !== null) {
+				$this->pdo->prepare("UPDATE mazos SET formacion = :f WHERE id_mazo = :id_mazo")
+					->execute([":f" => $formacion, ":id_mazo" => $id_mazo]);
+			}
+
 			$this->pdo->prepare("DELETE FROM mazo_cartas WHERE id_mazo = :id_mazo")
 				->execute([":id_mazo" => $id_mazo]);
 
@@ -1396,11 +1581,26 @@ class Tcg
 
 	// La especificación de combate exige que K y el acotado de probabilidad se
 	// puedan tocar sin desplegar código, así que viven en BD, no en constantes.
+	private $configCache = null;
+
+	/**
+	 * Un parámetro de balance. Se lee la tabla ENTERA en la primera llamada y
+	 * se guarda en memoria durante la petición: son una veintena de filas, y
+	 * antes cada consulta de un parámetro era una consulta suelta a la base de
+	 * datos —resolverDuelo() encadena decenas entre compos, curva y marcador—.
+	 *
+	 * La caché vive solo lo que dura la petición. Nada escribe en
+	 * `configuracion` en tiempo de ejecución (se siembra por SQL), así que no
+	 * puede quedarse obsoleta; si algún día el panel la edita, hay que vaciarla
+	 * al guardar.
+	 */
 	public function config($clave, $porDefecto = null) {
-		$stmt = $this->pdo->prepare("SELECT valor FROM configuracion WHERE clave = :clave");
-		$stmt->execute([":clave" => $clave]);
-		$valor = $stmt->fetchColumn();
-		return $valor === false ? $porDefecto : $valor;
+		if ($this->configCache === null) {
+			$this->configCache = $this->pdo
+				->query("SELECT clave, valor FROM configuracion")
+				->fetchAll(PDO::FETCH_KEY_PAIR);
+		}
+		return $this->configCache[$clave] ?? $porDefecto;
 	}
 
 	// ==========================================================
@@ -1420,7 +1620,9 @@ class Tcg
 				c.ataque, c.defensa, c.tecnica,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
-				af.nombre AS afinidad, af.imagen AS afinidad_imagen
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM coleccion col
 			INNER JOIN cromos c ON c.id_cromo = col.id_cromo
 			INNER JOIN equipos eq ON eq.id_equipo = c.id_equipo
@@ -1482,7 +1684,9 @@ class Tcg
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
-				af.nombre AS afinidad, af.imagen AS afinidad_imagen
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
 			FROM duelo_alineaciones da
 			INNER JOIN cromos c ON c.id_cromo = da.id_cromo
 			INNER JOIN equipos eq ON eq.id_equipo = c.id_equipo
@@ -1535,11 +1739,12 @@ class Tcg
 			// ultimo_latido arranca ya: el creador entra en la sala en el mismo
 			// acto de crearla, y desde ese momento tiene que seguir latiendo.
 			$this->pdo->prepare("
-				INSERT INTO duelos (id_creador, id_mazo_creador, tipo_apuesta, monedas, id_rareza_apuesta, estado, ultimo_latido)
-				VALUES (:id_creador, :id_mazo, :tipo, :monedas, :id_rareza, 'creado', NOW())
+				INSERT INTO duelos (id_creador, id_mazo_creador, formacion_creador, tipo_apuesta, monedas, id_rareza_apuesta, estado, ultimo_latido)
+				VALUES (:id_creador, :id_mazo, :formacion, :tipo, :monedas, :id_rareza, 'creado', NOW())
 			")->execute([
 				":id_creador" => $id_usuario,
 				":id_mazo"    => $id_mazo,
+				":formacion"  => $mazo["formacion"] ?? self::FORMACION_BASE,
 				":tipo"       => $tipoApuesta,
 				":monedas"    => $monedas,
 				":id_rareza"  => $tipoApuesta === "carta" ? $idRareza : null,
@@ -1671,14 +1876,16 @@ class Tcg
 			$this->pdo->prepare("
 				UPDATE duelos SET
 					id_rival = :id_rival, id_mazo_rival = :id_mazo,
+					formacion_rival = :formacion,
 					estado = 'aumento_pendiente',
 					aumento_vence = DATE_ADD(NOW(), INTERVAL :plazo SECOND)
 				WHERE id_duelo = :id_duelo
 			")->execute([
-				":id_rival" => $id_usuario,
-				":id_mazo"  => $id_mazo,
-				":plazo"    => $plazo,
-				":id_duelo" => $id_duelo,
+				":id_rival"   => $id_usuario,
+				":id_mazo"    => $id_mazo,
+				":formacion"  => $mazo["formacion"] ?? self::FORMACION_BASE,
+				":plazo"      => $plazo,
+				":id_duelo"   => $id_duelo,
 			]);
 
 			// --- Capa 2: las compos se congelan junto a la alineación ---
@@ -1751,8 +1958,13 @@ class Tcg
 	 * regenerarlas convertiría recargar la página en tiradas gratis hasta sacar
 	 * un Prisma. La clave única (id_duelo, id_usuario, opcion) lo blinda además
 	 * a nivel de base de datos.
+	 *
+	 * $probsOverride existe para el rival de las cadenas, cuya tabla de tiers la
+	 * fija la dificultad y no su Tensión. El resto de la generación es el mismo
+	 * a propósito: un aumento del bot tiene que salir del mismo bombo que el de
+	 * una persona, o dejaría de ser comparable.
 	 */
-	public function generarAumentos($id_duelo, $id_usuario, $tensionNivel = 0) {
+	public function generarAumentos($id_duelo, $id_usuario, $tensionNivel = 0, array $probsOverride = null) {
 		$stmt = $this->pdo->prepare("
 			SELECT COUNT(*) FROM duelo_aumentos WHERE id_duelo = :d AND id_usuario = :u
 		");
@@ -1766,7 +1978,7 @@ class Tcg
 		// Capa 2 (§3.6): la Tensión no da fuerza, mejora estas probabilidades.
 		// Nivel 0 devuelve exactamente la tabla base (60/30/10), así que un
 		// jugador sin Tensión no nota ninguna diferencia respecto a antes.
-		$probs = $this->probabilidadesTier($tensionNivel);
+		$probs = $probsOverride ?? $this->probabilidadesTier($tensionNivel);
 
 		$insertar = $this->pdo->prepare("
 			INSERT IGNORE INTO duelo_aumentos (id_duelo, id_usuario, opcion, stat, tier, porcentaje, tension_nivel)
@@ -2350,8 +2562,29 @@ class Tcg
 			$idCreador = (int) $duelo["id_creador"];
 			$idRival   = (int) $duelo["id_rival"];
 
-			$fuerzaCreador = self::fuerzaAlineacion($this->listarAlineacionDuelo($id_duelo, $idCreador));
-			$fuerzaRival   = self::fuerzaAlineacion($this->listarAlineacionDuelo($id_duelo, $idRival));
+			// Las formaciones también están congeladas: el mismo hueco puntúa con
+			// otra estadística según la formación, así que releerla del mazo
+			// dejaría que editarlo después cambiase un duelo ya comprometido.
+			$formCreador = $duelo["formacion_creador"] ?: self::FORMACION_BASE;
+			$formRival   = $duelo["formacion_rival"]   ?: self::FORMACION_BASE;
+
+			$fuerzaCreador = self::fuerzaAlineacion($this->listarAlineacionDuelo($id_duelo, $idCreador), $formCreador);
+			$fuerzaRival   = self::fuerzaAlineacion($this->listarAlineacionDuelo($id_duelo, $idRival), $formRival);
+
+			// --- PvE: la dificultad escala al rival ---
+			// El multiplicador se aplica LÍNEA A LÍNEA y no al total, para que la
+			// dificultad se note igual en quién gana y en el marcador. Aplicado
+			// solo al total, un Extremo daría muchas derrotas pero con resultados
+			// de partido igualado, que es justo la sensación contraria.
+			$esPve = $duelo["dificultad"] !== null;
+			if ($esPve) {
+				$mult = (float) $this->config("pve_mult_" . $duelo["dificultad"], 1.0);
+				foreach (["POR", "DF", "MC", "DC"] as $linea) {
+					$fuerzaRival[$linea] = $fuerzaRival[$linea] * $mult;
+				}
+				$fuerzaRival["total"] = $fuerzaRival["POR"] + $fuerzaRival["DF"]
+					+ $fuerzaRival["MC"] + $fuerzaRival["DC"];
+			}
 
 			$totalBrutoCreador = (float) $fuerzaCreador["total"];
 			$totalBrutoRival   = (float) $fuerzaRival["total"];
@@ -2371,9 +2604,18 @@ class Tcg
 			$bonosCreador = $this->bonosAumento($id_duelo, $idCreador);
 			$bonosRival   = $this->bonosAumento($id_duelo, $idRival);
 
+			// En dificultad alta el rival exprime más sus compos (§3.2 del
+			// briefing: "puede usar niveles de Compo más altos"). Se multiplica
+			// el bonus ya calculado en vez de inventarle rasgos que no tiene, así
+			// que el desglose que ve el jugador sigue cuadrando con su alineación.
+			$multCompos = $esPve
+				? (float) $this->config("pve_compos_mult_" . $duelo["dificultad"], 1.0)
+				: 1.0;
+
 			foreach (["POR", "DF", "MC", "DC"] as $linea) {
 				$bonosCreador[$linea] = ($bonosCreador[$linea] ?? 0) + ($composCreador["bonos_linea"][$linea] ?? 0);
-				$bonosRival[$linea]   = ($bonosRival[$linea] ?? 0)   + ($composRival["bonos_linea"][$linea] ?? 0);
+				$bonosRival[$linea]   = ($bonosRival[$linea] ?? 0)
+					+ ($composRival["bonos_linea"][$linea] ?? 0) * $multCompos;
 			}
 
 			// Bonos de TOTAL: ciclo de contra-afinidad (suma) y malus de
@@ -2407,11 +2649,26 @@ class Tcg
 			$idGanador  = $ganaCreador ? $idCreador : $idRival;
 			$idPerdedor = $ganaCreador ? $idRival : $idCreador;
 
-			[$golesGanador, $golesPerdedor] = $this->marcadorDuelo(
-				$ganaCreador ? $fuerzaCreador : $fuerzaRival,
-				$ganaCreador ? $fuerzaRival : $fuerzaCreador,
-				$sorteo
-			);
+			// El PvP conserva su marcador; las cadenas usan el suyo, que sí puede
+			// dejar la portería a cero y por tanto permite el rango S.
+			[$golesGanador, $golesPerdedor] = $esPve
+				? $this->marcadorCadena(
+					$ganaCreador ? $fuerzaCreador : $fuerzaRival,
+					$ganaCreador ? $fuerzaRival : $fuerzaCreador,
+					$ganaCreador ? $formCreador : $formRival,
+					$ganaCreador ? $formRival : $formCreador
+				)
+				: $this->marcadorDuelo(
+					$ganaCreador ? $fuerzaCreador : $fuerzaRival,
+					$ganaCreador ? $fuerzaRival : $fuerzaCreador,
+					$sorteo
+				);
+
+			// En una cadena el jugador es siempre el creador, así que su rango se
+			// lee de los goles del creador.
+			$golesCreador = $ganaCreador ? $golesGanador : $golesPerdedor;
+			$golesRival   = $ganaCreador ? $golesPerdedor : $golesGanador;
+			$rango = $esPve ? $this->rangoPartido($golesCreador, $golesRival) : null;
 
 			// --- mover las apuestas ---
 			if ($duelo["tipo_apuesta"] === "monedas") {
@@ -2449,16 +2706,18 @@ class Tcg
 					ciclo_bonus_creador = :cbc, ciclo_bonus_rival = :cbr,
 					malus_coh_creador = :mcc, malus_coh_rival = :mcr,
 					tension_creador = :tc, tension_rival = :tr,
+					rango = :rango,
 					resuelto = NOW()
 				WHERE id_duelo = :id_duelo
 			")->execute([
+				":rango" => $rango,
 				":afc" => $composCreador["afinidad_dom"], ":afr" => $composRival["afinidad_dom"],
 				":cbc" => $cicloCreador,                  ":cbr" => $cicloRival,
 				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
 				":tc"  => $composCreador["tension_nivel"], ":tr" => $composRival["tension_nivel"],
 				":id_ganador"    => $idGanador,
-				":goles_creador" => $ganaCreador ? $golesGanador : $golesPerdedor,
-				":goles_rival"   => $ganaCreador ? $golesPerdedor : $golesGanador,
+				":goles_creador" => $golesCreador,
+				":goles_rival"   => $golesRival,
 				":tbc" => $totalBrutoCreador, ":tbr" => $totalBrutoRival,
 				":tfc" => $totalFinalCreador, ":tfr" => $totalFinalRival,
 				":p"      => $p,
@@ -2466,6 +2725,29 @@ class Tcg
 				":k"      => $k,
 				":id_duelo" => $id_duelo,
 			]);
+
+			// Progreso y recompensas de cadena: dentro de la misma transacción
+			// que el resultado, para que no pueda quedar un duelo resuelto
+			// cuyo nodo no conste como jugado o cuyas monedas no se cobraran.
+			if ($esPve && $duelo["id_nodo"]) {
+				$gano = $idGanador === $idCreador;
+				$vecesPrevias = $this->registrarProgresoNodo(
+					$idCreador,                    // en una cadena el jugador es siempre el creador
+					(int) $duelo["id_nodo"],
+					$duelo["dificultad"],
+					$gano,
+					$rango
+				);
+
+				if ($gano) {
+					$monedas = $this->calcularRecompensaMonedas($duelo["dificultad"], $rango, $vecesPrevias);
+					$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :u")
+						->execute([":m" => $monedas, ":u" => $idCreador]);
+					$this->registrarDrop($idCreador, $id_duelo, (int) $duelo["id_nodo"], "monedas", null, null, $monedas, null);
+
+					$this->otorgarLootNodo((int) $duelo["id_nodo"], $idCreador, $rango, $id_duelo);
+				}
+			}
 
 			$this->pdo->commit();
 			return ["ok" => true, "error" => null, "id_ganador" => $idGanador];
@@ -2601,7 +2883,11 @@ class Tcg
 			INNER JOIN usuarios uc ON uc.id_usuario = d.id_creador
 			LEFT JOIN usuarios ur ON ur.id_usuario = d.id_rival
 			LEFT JOIN rarezas r ON r.id_rareza = d.id_rareza_apuesta
-			WHERE d.id_creador = :id_usuario OR d.id_rival = :id_usuario
+			WHERE (d.id_creador = :id_usuario OR d.id_rival = :id_usuario)
+				-- los partidos de cadena tienen su propio historial: mezclarlos
+				-- aquí llenaría la lista de duelos con partidas contra el sistema
+				-- en las que no se apostó nada
+				AND d.dificultad IS NULL
 			ORDER BY d.creado DESC
 			LIMIT " . (int) $limite . "
 		");
@@ -2611,19 +2897,909 @@ class Tcg
 
 	// Un duelo concreto, solo si el usuario participa en él.
 	public function obtenerDuelo($id_duelo, $id_usuario) {
+		// En un duelo de cadena el rival es la cuenta de sistema 'CPU', que no se
+		// enseña nunca: el nombre que ve el jugador es el del equipo rival. Se
+		// resuelve con COALESCE aquí y no en la pantalla para que cualquier sitio
+		// que lea un duelo obtenga ya el nombre correcto.
 		$stmt = $this->pdo->prepare("
 			SELECT d.*,
-				uc.nombre AS creador, ur.nombre AS rival,
+				uc.nombre AS creador,
+				COALESCE(cr.nombre, ur.nombre) AS rival,
+				cr.nombre AS equipo_rival, cr.escudo AS escudo_rival,
 				r.nombre AS rareza_apuesta
 			FROM duelos d
 			INNER JOIN usuarios uc ON uc.id_usuario = d.id_creador
 			LEFT JOIN usuarios ur ON ur.id_usuario = d.id_rival
+			LEFT JOIN cadena_rival_estilos ce ON ce.id_estilo = d.id_estilo_rival
+			LEFT JOIN cadena_rivales cr ON cr.id_rival = ce.id_rival
 			LEFT JOIN rarezas r ON r.id_rareza = d.id_rareza_apuesta
 			WHERE d.id_duelo = :id_duelo
 				AND (d.id_creador = :id_usuario OR d.id_rival = :id_usuario)
 		");
 		$stmt->execute([":id_duelo" => $id_duelo, ":id_usuario" => $id_usuario]);
 		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	// ==========================================================
+	// CADENAS DE PARTIDO (PvE) — bloque B
+	//
+	// No hay un motor de combate paralelo. El rival es un "jugador virtual":
+	// se congela en duelo_alineaciones igual que una persona, así que
+	// fuerzaAlineacion(), las compos, el aumento y la curva Elo son
+	// literalmente los mismos que en PvP. Lo único propio del PvE es CÓMO se
+	// construye ese rival (dificultad) y CÓMO se cuenta el marcador.
+	// ==========================================================
+
+	const DIFICULTADES = ["facil", "medio", "dificil", "muy_dificil", "extremo"];
+
+	/**
+	 * Orden real de los rangos, de mejor a peor. Existe porque comparar las
+	 * letras directamente ENGAÑA: alfabéticamente es 'A' < 'B' < 'S', así que
+	 * un min() sobre las letras daría la A como mejor que la S.
+	 */
+	const ORDEN_RANGO = ["S" => 1, "A" => 2, "B" => 3];
+
+	/** Cuenta de sistema que hace de rival. No puede iniciar sesión (007). */
+	const USUARIO_BOT = "CPU";
+
+	private $idBotCache = null;
+
+	public function idBot() {
+		if ($this->idBotCache === null) {
+			$stmt = $this->pdo->prepare("SELECT id_usuario FROM usuarios WHERE nombre = :n");
+			$stmt->execute([":n" => self::USUARIO_BOT]);
+			$this->idBotCache = (int) $stmt->fetchColumn();
+		}
+		return $this->idBotCache;
+	}
+
+	public function listarRivales() {
+		return $this->pdo->query("
+			SELECT * FROM cadena_rivales WHERE activo = 1 ORDER BY id_rival
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	/**
+	 * Un estilo al azar del rival. Es el corazón de que el PvE no se memorice:
+	 * el mismo equipo sale con alineaciones distintas y al jugador no se le
+	 * dice cuál le ha tocado hasta que termina el partido.
+	 */
+	public function estiloAleatorioDeRival($id_rival) {
+		$stmt = $this->pdo->prepare("
+			SELECT * FROM cadena_rival_estilos WHERE id_rival = :r ORDER BY RAND() LIMIT 1
+		");
+		$stmt->execute([":r" => $id_rival]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	/**
+	 * Las 11 cartas de un estilo, en el mismo formato que listarCartasMazo():
+	 * así valen tal cual para fuerzaAlineacion(), calcularCompos() y el
+	 * componente de tarjeta, sin adaptadores por el medio.
+	 */
+	public function listarCartasEstilo($id_estilo) {
+		$stmt = $this->pdo->prepare("
+			SELECT
+				rc.hueco,
+				c.id_cromo, c.nombre, c.posicion, c.imagen,
+				c.ataque, c.defensa, c.tecnica,
+				eq.nombre AS equipo,
+				r.id_rareza, r.nombre AS rareza,
+				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
+				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS rasgo
+			FROM cadena_rival_cartas rc
+			INNER JOIN cromos c ON c.id_cromo = rc.id_cromo
+			INNER JOIN equipos eq ON eq.id_equipo = c.id_equipo
+			INNER JOIN rarezas r ON r.id_rareza = c.id_rareza
+			INNER JOIN afinidad af ON af.id = c.id_afinidad
+			WHERE rc.id_estilo = :e
+			ORDER BY rc.hueco
+		");
+		$stmt->execute([":e" => $id_estilo]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	/** Congela la alineación del rival copiando las cifras, igual que la humana. */
+	private function congelarAlineacionRival($id_duelo, $id_estilo) {
+		$cartas = $this->listarCartasEstilo($id_estilo);
+		if (count($cartas) !== self::MAZO_TAMANO) {
+			return false;
+		}
+		$insertar = $this->pdo->prepare("
+			INSERT INTO duelo_alineaciones (id_duelo, id_usuario, hueco, id_cromo, ataque, defensa, tecnica)
+			VALUES (:id_duelo, :id_usuario, :hueco, :id_cromo, :ataque, :defensa, :tecnica)
+		");
+		foreach ($cartas as $c) {
+			$insertar->execute([
+				":id_duelo"   => $id_duelo,
+				":id_usuario" => $this->idBot(),
+				":hueco"      => (int) $c["hueco"],
+				":id_cromo"   => (int) $c["id_cromo"],
+				":ataque"     => (int) $c["ataque"],
+				":defensa"    => (int) $c["defensa"],
+				":tecnica"    => (int) $c["tecnica"],
+			]);
+		}
+		return true;
+	}
+
+	/**
+	 * Cartas del mazo titular que superan la rareza admitida en esa dificultad.
+	 * Devuelve [] si no hay límite o si el mazo cumple.
+	 *
+	 * No se corrige la alineación por su cuenta: como se duela SIEMPRE con el
+	 * titular, tocarlo aquí cambiaría en silencio el mazo con el que la persona
+	 * también juega en PvP. Se bloquea la entrada y se dice por qué.
+	 */
+	public function cartasQueExcedenRareza(array $cartas, $dificultad) {
+		$max = (int) $this->config("pve_rareza_max_" . $dificultad, 0);
+		if ($max <= 0) { return []; }
+
+		return array_values(array_filter($cartas, fn($c) => (int) $c["id_rareza"] > $max));
+	}
+
+	/**
+	 * Arranca un partido de cadena contra un rival.
+	 *
+	 * A diferencia del PvP no hay sala ni espera —no hay a quién esperar— así
+	 * que el duelo nace ya en fase de aumento. Tampoco hay plazo: el briefing
+	 * (§5) dice explícitamente que el PvE no tiene límite de tiempo, así que
+	 * `aumento_vence` se queda a NULL y el fallback por vencimiento nunca entra.
+	 */
+	public function crearPartidoCadena($id_usuario, $id_nodo, $dificultad) {
+		if (!in_array($dificultad, self::DIFICULTADES, true)) {
+			return ["ok" => false, "error" => "Dificultad no válida."];
+		}
+
+		// --- validación del nodo, fuera de la transacción porque solo lee ---
+		$nodo = $this->obtenerNodo($id_nodo);
+		if (!$nodo || $nodo["tipo"] !== "partido" || !$nodo["id_rival"]) {
+			return ["ok" => false, "error" => "Ese nodo no es un partido jugable."];
+		}
+		if ((int) $nodo["activa"] !== 1 || ($nodo["fecha_fin"] !== null && strtotime($nodo["fecha_fin"]) <= time())) {
+			return ["ok" => false, "error" => "Esta cadena ya no está disponible."];
+		}
+
+		$pendientes = $this->requisitosPendientes((int) $nodo["id_cadena"], $id_usuario);
+		if ($pendientes) {
+			return ["ok" => false, "error" => "Esta cadena está bloqueada.", "requisitos" => $pendientes];
+		}
+
+		// Que el nodo esté abierto se revalida aquí y no solo en el mapa: el
+		// mapa es comodidad, esto es la garantía.
+		$mapa = $this->mapaCadena((int) $nodo["id_cadena"], $id_usuario);
+		if (empty($mapa["nodos"][(int) $id_nodo]["disponible"])) {
+			return ["ok" => false, "error" => "Todavía no has llegado a este partido."];
+		}
+
+		$id_rival = (int) $nodo["id_rival"];
+
+		try {
+			$this->pdo->beginTransaction();
+
+			$mazo = $this->obtenerMazoTitular($id_usuario);
+			if (!$mazo) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Necesitas un mazo titular con los 11 huecos cubiertos."];
+			}
+
+			$cartasMazo = $this->listarCartasMazo($mazo["id_mazo"]);
+			$excedidas  = $this->cartasQueExcedenRareza($cartasMazo, $dificultad);
+			if ($excedidas) {
+				$this->pdo->rollBack();
+				return [
+					"ok" => false,
+					"error" => "Tu mazo titular lleva cartas por encima de la rareza permitida en esta dificultad.",
+					"cartas_excedidas" => $excedidas,
+				];
+			}
+
+			$estilo = $this->estiloAleatorioDeRival($id_rival);
+			if (!$estilo) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Ese rival no tiene ninguna alineación preparada."];
+			}
+
+			$idBot = $this->idBot();
+
+			// Apuesta a cero: en las cadenas no se juega nada del bolsillo, las
+			// recompensas van por la tabla de botín (bloque D). Se reutiliza el
+			// tipo 'monedas' con 0 para no meter un tipo de apuesta que solo
+			// existiría para decir "ninguna".
+			$this->pdo->prepare("
+				INSERT INTO duelos (
+					id_creador, id_mazo_creador, formacion_creador,
+					id_rival, formacion_rival,
+					tipo_apuesta, monedas, estado, dificultad, id_estilo_rival, id_nodo
+				) VALUES (
+					:id_creador, :id_mazo, :form_creador,
+					:id_rival, :form_rival,
+					'monedas', 0, 'aumento_pendiente', :dificultad, :id_estilo, :id_nodo
+				)
+			")->execute([
+				":id_creador"   => $id_usuario,
+				":id_mazo"      => (int) $mazo["id_mazo"],
+				":form_creador" => $mazo["formacion"] ?: self::FORMACION_BASE,
+				":id_rival"     => $idBot,
+				":form_rival"   => $estilo["formacion"],
+				":dificultad"   => $dificultad,
+				":id_estilo"    => (int) $estilo["id_estilo"],
+				":id_nodo"      => (int) $id_nodo,
+			]);
+			$idDuelo = (int) $this->pdo->lastInsertId();
+
+			if (!$this->congelarAlineacion($idDuelo, $id_usuario, (int) $mazo["id_mazo"])
+				|| !$this->congelarAlineacionRival($idDuelo, (int) $estilo["id_estilo"])) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "No se pudo preparar el partido."];
+			}
+
+			// Compos congeladas de ambos, igual que en PvP y por el mismo motivo:
+			// la Tensión decide con qué probabilidades se sortea el aumento.
+			$composJugador = $this->calcularCompos($this->listarAlineacionDuelo($idDuelo, $id_usuario));
+			$composRival   = $this->calcularCompos($this->listarAlineacionDuelo($idDuelo, $idBot));
+			$this->congelarCompos($idDuelo, $id_usuario, $composJugador);
+			$this->congelarCompos($idDuelo, $idBot, $composRival);
+
+			// El aumento del JUGADOR sale de su Tensión, exactamente como en PvP.
+			$this->generarAumentos($idDuelo, $id_usuario, (int) $composJugador["tension_nivel"]);
+
+			// El del RIVAL sale de la dificultad. Se elige en el acto porque el
+			// bot no tiene pantalla donde decidir; sigue sin poder verlo el
+			// jugador hasta la resolución, que es la regla anti-abuso de §6.3.
+			$this->generarAumentos($idDuelo, $idBot, 0, $this->tiersDificultad($dificultad));
+			$opciones = $this->listarAumentos($idDuelo, $idBot);
+			if ($opciones) {
+				$this->elegirAumento($idDuelo, $idBot, (int) $opciones[mt_rand(0, count($opciones) - 1)]["opcion"]);
+			}
+
+			$this->pdo->commit();
+			return ["ok" => true, "error" => null, "id_duelo" => $idDuelo];
+
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return ["ok" => false, "error" => "No se pudo crear el partido."];
+		}
+	}
+
+	// ----------------------------------------------------------
+	// Cadenas: recompensas (bloque D)
+	// ----------------------------------------------------------
+
+	/** Solo estas dos decrecen por repetición (§12 del briefing). */
+	const DIFICULTADES_CON_DECRECIMIENTO = ["facil", "medio"];
+
+	/**
+	 * Monedas por ganar un partido de cadena.
+	 *
+	 * `$vecesPrevias` es cuántas veces se había jugado YA ese nodo a esa
+	 * dificultad (0 = primera vez, que es la que cobra completo). Solo decrece
+	 * en Fácil/Medio: en Difícil/Muy difícil/Extremo la recompensa se mantiene
+	 * alta siempre, para no castigar rejugar lo difícil de verdad.
+	 */
+	public function calcularRecompensaMonedas($dificultad, $rango, $vecesPrevias) {
+		$base = (float) $this->config("pve_recompensa_" . $dificultad, 100);
+		$multRango = (float) $this->config("pve_recompensa_mult_rango_" . strtolower($rango ?: "b"), 1.0);
+
+		$factor = 1.0;
+		if ($vecesPrevias > 0 && in_array($dificultad, self::DIFICULTADES_CON_DECRECIMIENTO, true)) {
+			$tasa = (float) $this->config("pve_recompensa_decrecimiento_tasa", 0.55);
+			$piso = (float) $this->config("pve_recompensa_decrecimiento_piso", 0.15);
+			$factor = max($piso, pow($tasa, $vecesPrevias));
+		}
+
+		return (int) round($base * $multRango * $factor);
+	}
+
+	/** Da de alta una copia normal. Es lo mismo que hace un sobre, reutilizado. */
+	private function otorgarCromo($id_usuario, $id_cromo) {
+		$this->pdo->prepare("
+			INSERT INTO coleccion (id_usuario, id_cromo, obtenida, bloqueada) VALUES (:u, :c, NOW(), 0)
+		")->execute([":u" => $id_usuario, ":c" => $id_cromo]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	/**
+	 * Da de alta una copia NUMERADA, si queda cupo. Devuelve
+	 * ["numero_serie" => n, "cupo_total" => n] o null si el cupo ya está
+	 * agotado (no es un error: simplemente esa tirada no entrega nada).
+	 *
+	 * `FOR UPDATE` sobre la fila del cromo es lo que evita la doble emisión:
+	 * si dos jugadores ganan la última copia a la vez, el segundo espera a que
+	 * el primero termine y entonces ve el cupo ya a cero.
+	 */
+	private function otorgarCromoLimitado($id_usuario, $id_cromo) {
+		$cromo = $this->pdo->prepare("SELECT cupo_numerado FROM cromos WHERE id_cromo = :c FOR UPDATE");
+		$cromo->execute([":c" => $id_cromo]);
+		$cupo = (int) $cromo->fetchColumn();
+		if ($cupo <= 0) { return null; }   // no está configurada como limitada
+
+		$emitidas = $this->pdo->prepare("SELECT COUNT(*) FROM cadena_numeracion WHERE id_cromo = :c");
+		$emitidas->execute([":c" => $id_cromo]);
+		$n = (int) $emitidas->fetchColumn();
+		if ($n >= $cupo) { return null; }   // cupo agotado
+
+		$idColeccion = $this->otorgarCromo($id_usuario, $id_cromo);
+		$numeroSerie = $n + 1;
+		$this->pdo->prepare("
+			INSERT INTO cadena_numeracion (id_cromo, numero_serie, id_coleccion, otorgado)
+			VALUES (:c, :n, :col, NOW())
+		")->execute([":c" => $id_cromo, ":n" => $numeroSerie, ":col" => $idColeccion]);
+
+		return ["numero_serie" => $numeroSerie, "cupo_total" => $cupo];
+	}
+
+	private function registrarDrop($id_usuario, $id_duelo, $id_nodo, $tipo, $idCromo, $numeroSerie, $monedas, $formacion) {
+		$this->pdo->prepare("
+			INSERT INTO cadena_drops (id_usuario, id_duelo, id_nodo, tipo, id_cromo, numero_serie, monedas, formacion, creado)
+			VALUES (:u, :d, :n, :t, :c, :s, :m, :f, NOW())
+		")->execute([
+			":u" => $id_usuario, ":d" => $id_duelo, ":n" => $id_nodo, ":t" => $tipo,
+			":c" => $idCromo, ":s" => $numeroSerie, ":m" => $monedas, ":f" => $formacion,
+		]);
+	}
+
+	/**
+	 * Sortea y entrega la loot table de un nodo (partido o cofre). Cada fila
+	 * de `cadena_loot` es una tirada independiente: pueden caer varias, o
+	 * ninguna, según su probabilidad. `$rango` es null en los cofres (no
+	 * puntúan) y en ese caso solo se consideran las filas SIN rango mínimo.
+	 *
+	 * Devuelve la lista de lo entregado, en el mismo formato que espera la
+	 * pantalla de resultado.
+	 */
+	public function otorgarLootNodo($id_nodo, $id_usuario, $rango, $id_duelo = null) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadena_loot WHERE id_nodo = :n");
+		$stmt->execute([":n" => $id_nodo]);
+
+		$otorgado = [];
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+			if ($item["rango_minimo"] !== null) {
+				if ($rango === null) { continue; }
+				if (self::ORDEN_RANGO[$rango] > self::ORDEN_RANGO[$item["rango_minimo"]]) { continue; }
+			}
+			if ((mt_rand(0, 9999) / 100) >= (float) $item["probabilidad"]) { continue; }
+
+			if ($item["tipo"] === "monedas") {
+				$cantidad = (int) $item["monedas"];
+				$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :u")
+					->execute([":m" => $cantidad, ":u" => $id_usuario]);
+				$this->registrarDrop($id_usuario, $id_duelo, $id_nodo, "monedas", null, null, $cantidad, null);
+				$otorgado[] = ["tipo" => "monedas", "monedas" => $cantidad];
+
+			} elseif ($item["tipo"] === "cromo") {
+				$this->otorgarCromo($id_usuario, (int) $item["id_cromo"]);
+				$this->registrarDrop($id_usuario, $id_duelo, $id_nodo, "cromo", (int) $item["id_cromo"], null, null, null);
+				$otorgado[] = ["tipo" => "cromo", "id_cromo" => (int) $item["id_cromo"]];
+
+			} elseif ($item["tipo"] === "cromo_limitado") {
+				$r = $this->otorgarCromoLimitado($id_usuario, (int) $item["id_cromo"]);
+				if ($r === null) { continue; }   // cupo agotado: tirada sin premio, no es un fallo
+				$this->registrarDrop(
+					$id_usuario, $id_duelo, $id_nodo, "cromo_limitado",
+					(int) $item["id_cromo"], $r["numero_serie"], null, null
+				);
+				$otorgado[] = [
+					"tipo" => "cromo_limitado", "id_cromo" => (int) $item["id_cromo"],
+					"numero_serie" => $r["numero_serie"], "cupo_total" => $r["cupo_total"],
+				];
+			}
+		}
+		return $otorgado;
+	}
+
+	/** Lo que se entregó en un duelo de cadena concreto, para la pantalla de resultado. */
+	public function listarDropsDuelo($id_duelo) {
+		$stmt = $this->pdo->prepare("
+			SELECT d.*, c.nombre AS cromo_nombre, c.cupo_numerado
+			FROM cadena_drops d
+			LEFT JOIN cromos c ON c.id_cromo = d.id_cromo
+			WHERE d.id_duelo = :id
+			ORDER BY d.id_drop
+		");
+		$stmt->execute([":id" => $id_duelo]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	/** Lo que se entregó al reclamar un cofre concreto. */
+	public function listarDropsCofre($id_nodo, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT d.*, c.nombre AS cromo_nombre, c.cupo_numerado
+			FROM cadena_drops d
+			LEFT JOIN cromos c ON c.id_cromo = d.id_cromo
+			WHERE d.id_nodo = :n AND d.id_usuario = :u AND d.id_duelo IS NULL
+			ORDER BY d.id_drop
+		");
+		$stmt->execute([":n" => $id_nodo, ":u" => $id_usuario]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// ----------------------------------------------------------
+	// Cadenas: mapa, progreso y desbloqueo (bloque C)
+	// ----------------------------------------------------------
+
+	/** Cadenas publicadas y no caducadas, en orden de presentación. */
+	public function listarCadenas() {
+		return $this->pdo->query("
+			SELECT * FROM cadenas
+			WHERE activa = 1 AND (fecha_fin IS NULL OR fecha_fin > NOW())
+			ORDER BY orden, id_cadena
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function obtenerCadena($id_cadena) {
+		$stmt = $this->pdo->prepare("
+			SELECT * FROM cadenas
+			WHERE id_cadena = :id AND activa = 1 AND (fecha_fin IS NULL OR fecha_fin > NOW())
+		");
+		$stmt->execute([":id" => $id_cadena]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	/**
+	 * Requisitos que este jugador NO cumple todavía, ya redactados para poder
+	 * enseñarlos tal cual en el modal de bloqueo. Devuelve [] si puede entrar.
+	 *
+	 * Se comprueba al intentar entrar, no al listar (§5 del briefing): así la
+	 * cadena se ve y se sabe que existe, pero no se puede jugar.
+	 */
+	public function requisitosPendientes($id_cadena, $id_usuario) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadena_requisitos WHERE id_cadena = :c");
+		$stmt->execute([":c" => $id_cadena]);
+
+		$pendientes = [];
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $req) {
+			if ($req["tipo"] === "cadena") {
+				if (!$this->cadenaCompletada((int) $req["valor"], $id_usuario)) {
+					$nombre = $this->pdo->prepare("SELECT nombre FROM cadenas WHERE id_cadena = :c");
+					$nombre->execute([":c" => $req["valor"]]);
+					$pendientes[] = "Completar la cadena «" . ($nombre->fetchColumn() ?: "anterior") . "»";
+				}
+			} elseif ($req["tipo"] === "cromo") {
+				$tiene = $this->pdo->prepare("
+					SELECT 1 FROM coleccion WHERE id_usuario = :u AND id_cromo = :c LIMIT 1
+				");
+				$tiene->execute([":u" => $id_usuario, ":c" => $req["valor"]]);
+				if (!$tiene->fetchColumn()) {
+					$nombre = $this->pdo->prepare("SELECT nombre FROM cromos WHERE id_cromo = :c");
+					$nombre->execute([":c" => $req["valor"]]);
+					$pendientes[] = "Tener la carta «" . ($nombre->fetchColumn() ?: "requerida") . "»";
+				}
+			}
+		}
+		return $pendientes;
+	}
+
+	/** Una cadena está completa cuando su cofre final está reclamado. */
+	public function cadenaCompletada($id_cadena, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT 1 FROM cadena_nodos n
+			INNER JOIN cadena_cofres c ON c.id_nodo = n.id_nodo AND c.id_usuario = :u
+			WHERE n.id_cadena = :c AND n.es_final = 1
+			LIMIT 1
+		");
+		$stmt->execute([":u" => $id_usuario, ":c" => $id_cadena]);
+		return (bool) $stmt->fetchColumn();
+	}
+
+	/**
+	 * Los nodos de una cadena con su estado para este jugador.
+	 *
+	 * Un nodo está DISPONIBLE si no tiene aristas de entrada (es un inicio) o si
+	 * alguno de sus predecesores está superado. "Superado" es ganar el partido a
+	 * cualquier dificultad, o haber abierto el cofre si es un nodo de cofre: por
+	 * eso hay que recoger un cofre para seguir avanzando, aunque recogerlo sea
+	 * gratis.
+	 *
+	 * Devuelve además `aristas` para que el mapa dibuje las líneas sin volver a
+	 * consultar, y `rangos` con el mejor rango por dificultad de cada nodo.
+	 */
+	public function mapaCadena($id_cadena, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT n.*, r.nombre AS rival, r.escudo AS escudo_rival
+			FROM cadena_nodos n
+			LEFT JOIN cadena_rivales r ON r.id_rival = n.id_rival
+			WHERE n.id_cadena = :c
+			ORDER BY n.columna, n.fila
+		");
+		$stmt->execute([":c" => $id_cadena]);
+		$nodos = [];
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $n) { $nodos[(int) $n["id_nodo"]] = $n; }
+		if (!$nodos) { return ["nodos" => [], "aristas" => []]; }
+
+		$ids = array_keys($nodos);
+		$marcadores = implode(",", array_fill(0, count($ids), "?"));
+
+		$aristas = $this->pdo->prepare("
+			SELECT id_origen, id_destino FROM cadena_aristas WHERE id_destino IN ($marcadores)
+		");
+		$aristas->execute($ids);
+		$aristas = $aristas->fetchAll(PDO::FETCH_ASSOC);
+
+		// progreso del jugador en estos nodos
+		$prog = $this->pdo->prepare("
+			SELECT id_nodo, dificultad, veces, victorias, mejor_rango
+			FROM cadena_progreso WHERE id_usuario = ? AND id_nodo IN ($marcadores)
+		");
+		$prog->execute(array_merge([$id_usuario], $ids));
+
+		$porNodo = [];
+		foreach ($prog->fetchAll(PDO::FETCH_ASSOC) as $p) {
+			$porNodo[(int) $p["id_nodo"]][$p["dificultad"]] = $p;
+		}
+
+		$cofres = $this->pdo->prepare("
+			SELECT id_nodo FROM cadena_cofres WHERE id_usuario = ? AND id_nodo IN ($marcadores)
+		");
+		$cofres->execute(array_merge([$id_usuario], $ids));
+		$reclamados = array_flip(array_map("intval", $cofres->fetchAll(PDO::FETCH_COLUMN)));
+
+		// superado = ganado alguna vez (partido) o cofre ya abierto
+		$superado = [];
+		foreach ($nodos as $id => $n) {
+			$superado[$id] = $n["tipo"] === "cofre"
+				? isset($reclamados[$id])
+				: (bool) array_filter($porNodo[$id] ?? [], fn($p) => $p["mejor_rango"] !== null);
+		}
+
+		$entrantes = [];
+		foreach ($aristas as $a) { $entrantes[(int) $a["id_destino"]][] = (int) $a["id_origen"]; }
+
+		foreach ($nodos as $id => &$n) {
+			$previos = $entrantes[$id] ?? [];
+			$disponible = !$previos;
+			foreach ($previos as $p) {
+				if (!empty($superado[$p])) { $disponible = true; break; }
+			}
+
+			$n["superado"]   = $superado[$id];
+			$n["disponible"] = $disponible;
+			$n["reclamado"]  = isset($reclamados[$id]);
+			$n["progreso"]   = $porNodo[$id] ?? [];
+
+			// mejor rango conseguido en cualquier dificultad, para la insignia
+			$n["mejor_rango"] = null;
+			foreach ($n["progreso"] as $p) {
+				if ($p["mejor_rango"] === null) { continue; }
+				if ($n["mejor_rango"] === null
+					|| self::ORDEN_RANGO[$p["mejor_rango"]] < self::ORDEN_RANGO[$n["mejor_rango"]]) {
+					$n["mejor_rango"] = $p["mejor_rango"];
+				}
+			}
+		}
+		unset($n);
+
+		return ["nodos" => $nodos, "aristas" => $aristas];
+	}
+
+	/** Un nodo suelto, con su cadena, para validar antes de jugarlo. */
+	public function obtenerNodo($id_nodo) {
+		$stmt = $this->pdo->prepare("
+			SELECT n.*, c.nombre AS cadena, c.formacion_recompensa, c.activa, c.fecha_fin
+			FROM cadena_nodos n
+			INNER JOIN cadenas c ON c.id_cadena = n.id_cadena
+			WHERE n.id_nodo = :n
+		");
+		$stmt->execute([":n" => $id_nodo]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	/**
+	 * Guarda el resultado de un partido de cadena. Devuelve cuántas veces se
+	 * había jugado YA este nodo a esta dificultad ANTES de esta partida (0 la
+	 * primera vez), que es lo que necesita calcularRecompensaMonedas() para
+	 * decidir si esta victoria decrece o es la primera.
+	 *
+	 * `veces` cuenta también las derrotas (lo necesita la recompensa decreciente
+	 * del bloque D) y `mejor_rango` NUNCA empeora: rejugar para probar otra
+	 * dificultad no puede costarte la S que ya tenías. Decisión de Alejandro.
+	 */
+	public function registrarProgresoNodo($id_usuario, $id_nodo, $dificultad, $gano, $rango) {
+		// FOR UPDATE: la misma fila que se va a tocar a continuación, para que
+		// leer "veces previas" y escribir el incremento sea una operación
+		// atómica y no una carrera entre dos peticiones del mismo jugador.
+		$actual = $this->pdo->prepare("
+			SELECT veces FROM cadena_progreso WHERE id_usuario = :u AND id_nodo = :n AND dificultad = :d FOR UPDATE
+		");
+		$actual->execute([":u" => $id_usuario, ":n" => $id_nodo, ":d" => $dificultad]);
+		$vecesPrevias = (int) ($actual->fetchColumn() ?: 0);
+
+		$this->pdo->prepare("
+			INSERT INTO cadena_progreso (id_usuario, id_nodo, dificultad, veces, victorias, mejor_rango, primera_victoria)
+			VALUES (:u, :n, :d, 1, :v, :r, :pv)
+			ON DUPLICATE KEY UPDATE
+				veces = veces + 1,
+				victorias = victorias + VALUES(victorias),
+				-- OJO: no vale LEAST() sobre el CHAR. Alfabéticamente es
+				-- 'A' < 'B' < 'S', así que LEAST() elegiría una A por encima de
+				-- una S y el rango EMPEORARÍA al rejugar. FIELD() da el orden
+				-- real de mejor a peor (S=1, A=2, B=3).
+				mejor_rango = IF(VALUES(mejor_rango) IS NULL, mejor_rango,
+					IF(mejor_rango IS NULL, VALUES(mejor_rango),
+						IF(FIELD(VALUES(mejor_rango), 'S','A','B') < FIELD(mejor_rango, 'S','A','B'),
+							VALUES(mejor_rango), mejor_rango))),
+				primera_victoria = COALESCE(primera_victoria, VALUES(primera_victoria))
+		")->execute([
+			":u" => $id_usuario,
+			":n" => $id_nodo,
+			":d" => $dificultad,
+			":v" => $gano ? 1 : 0,
+			":r" => $rango,
+			":pv" => $gano ? date("Y-m-d H:i:s") : null,
+		]);
+
+		return $vecesPrevias;
+	}
+
+	/**
+	 * Abre un cofre alcanzado. Entrega la formación de la cadena si es el cofre
+	 * final, y la loot table del nodo (monedas, cartas, numeradas). Idempotente:
+	 * reclamar dos veces no entrega dos veces (lo impide `$estado['reclamado']`
+	 * arriba, antes de llegar aquí).
+	 */
+	public function reclamarCofre($id_nodo, $id_usuario) {
+		$nodo = $this->obtenerNodo($id_nodo);
+		if (!$nodo || $nodo["tipo"] !== "cofre") {
+			return ["ok" => false, "error" => "Ese nodo no es un cofre."];
+		}
+
+		$mapa = $this->mapaCadena((int) $nodo["id_cadena"], $id_usuario);
+		$estado = $mapa["nodos"][(int) $id_nodo] ?? null;
+		if (!$estado || !$estado["disponible"]) {
+			return ["ok" => false, "error" => "Todavía no has llegado a este cofre."];
+		}
+		if ($estado["reclamado"]) {
+			return ["ok" => false, "error" => "Ya habías abierto este cofre."];
+		}
+
+		try {
+			$this->pdo->beginTransaction();
+
+			$this->pdo->prepare("
+				INSERT IGNORE INTO cadena_cofres (id_usuario, id_nodo) VALUES (:u, :n)
+			")->execute([":u" => $id_usuario, ":n" => $id_nodo]);
+
+			$formacion = null;
+			if ((int) $nodo["es_final"] === 1 && $nodo["formacion_recompensa"]) {
+				$formacion = $nodo["formacion_recompensa"];
+				$this->desbloquearFormacion($id_usuario, $formacion);
+				$this->registrarDrop($id_usuario, null, $id_nodo, "formacion", null, null, null, $formacion);
+			}
+
+			// Los cofres no puntúan: se reclaman, no se juegan. $rango = null
+			// hace que otorgarLootNodo() solo considere las filas sin rango
+			// mínimo, que es la única clase de loot que tiene sentido aquí.
+			$loot = $this->otorgarLootNodo($id_nodo, $id_usuario, null);
+
+			$this->pdo->commit();
+			return ["ok" => true, "error" => null, "formacion" => $formacion, "loot" => $loot];
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return ["ok" => false, "error" => "No se pudo abrir el cofre."];
+		}
+	}
+
+	/** Tabla Plata/Oro/Prisma del aumento del rival según dificultad. */
+	public function tiersDificultad($dificultad) {
+		$crudo  = (string) $this->config("pve_tiers_" . $dificultad, "");
+		$partes = array_map("floatval", array_filter(explode(",", $crudo), "strlen"));
+		if (count($partes) !== 3) {
+			return ["plata" => 60, "oro" => 30, "prisma" => 10];
+		}
+		return ["plata" => $partes[0], "oro" => $partes[1], "prisma" => $partes[2]];
+	}
+
+	/**
+	 * Marcador de un partido de cadena.
+	 *
+	 * Sustituye a marcadorDuelo() SOLO en PvE; el PvP se queda con el suyo por
+	 * decisión de Alejandro. El motivo de existir es concreto: con la fórmula
+	 * del PvP la portería a cero era imposible (0 de 200.000 simulaciones), y
+	 * sin portería a cero el rango S no se puede conseguir nunca.
+	 *
+	 * Cada lado marca según un Poisson cuya media es su ataque contra el muro
+	 * rival. Poisson es el modelo estándar de goles en fútbol y, a diferencia
+	 * de la fórmula anterior, da al 0 una probabilidad real: una defensa que
+	 * domina al ataque contrario deja la portería a cero de vez en cuando.
+	 *
+	 * El ganador ya viene decidido por la curva Elo y NO se toca: si el sorteo
+	 * de goles contradijera el resultado, se ajusta el marcador, nunca el
+	 * ganador.
+	 */
+	private function marcadorCadena(array $fuerzaGanador, array $fuerzaPerdedor, $formGanador, $formPerdedor) {
+		$escala   = (float) $this->config("pve_goles_escala", 2.6);
+		$exponente = (float) $this->config("pve_goles_exponente", 1.6);
+		$tope     = (int) $this->config("pve_goles_max", 9);
+
+		// Se compara la media POR JUGADOR, no el total de la línea. Sumar sin
+		// normalizar comparaba dos delanteros contra cinco defensas, así que el
+		// cociente salía bajo siempre y casi todos los partidos acababan 1-0.
+		// Además hace la cifra independiente de la formación: un 1-3-6-1 no
+		// marca menos por tener un delantero, marca según lo bueno que sea.
+		$ataqueGanador  = $this->mediaLinea($fuerzaGanador,  $formGanador,  ["DC"]);
+		$ataquePerdedor = $this->mediaLinea($fuerzaPerdedor, $formPerdedor, ["DC"]);
+		$muroGanador    = $this->mediaLinea($fuerzaGanador,  $formGanador,  ["POR", "DF"]);
+		$muroPerdedor   = $this->mediaLinea($fuerzaPerdedor, $formPerdedor, ["POR", "DF"]);
+
+		// El exponente hace que las diferencias de calidad se noten más de lo
+		// proporcional: un ataque muy superior no marca un poco más, golea. Es
+		// lo que separa una victoria de rango S de una de rango B.
+		$lambdaGanador  = $escala * pow($ataqueGanador  / max(0.01, $muroPerdedor), $exponente);
+		$lambdaPerdedor = $escala * pow($ataquePerdedor / max(0.01, $muroGanador),  $exponente);
+
+		// El ganador ya viene decidido por la curva Elo, así que el marcador se
+		// construye alrededor de él: primero cuánto marca el ganador según su
+		// propio ritmo, y después el perdedor con su Poisson TRUNCADO por debajo
+		// de esa cifra.
+		//
+		// Se hizo así tras descartar dos alternativas peores. Recortar al
+		// perdedor a "ganador − 1" amontonaba los resultados en un gol de
+		// diferencia (3-2, 4-3, 5-4). Y volver a sortear a los dos hasta que el
+		// ganador superase al otro reventaba en los desequilibrios: cuando el
+		// perdedor es mucho más fuerte —una victoria por sorpresa en Extremo—
+		// solo pasaban los sorteos altísimos y salían 9-8 en el 18 % de los
+		// partidos. Truncando, una victoria por sorpresa sale 1-0, que es
+		// exactamente como se gana un partido así.
+		$golesGanador = max(1, min($tope, self::poisson($lambdaGanador)));
+
+		$golesPerdedor = $golesGanador - 1;
+		for ($intento = 0; $intento < 32; $intento++) {
+			$tirada = self::poisson($lambdaPerdedor);
+			if ($tirada < $golesGanador) { $golesPerdedor = $tirada; break; }
+		}
+
+		return [$golesGanador, $golesPerdedor];
+	}
+
+	/** Fuerza media POR JUGADOR de unas líneas dentro de una formación. */
+	private function mediaLinea(array $fuerza, $formacion, array $lineas) {
+		$huecos = self::huecosDe($formacion);
+		$suma = 0.0;
+		$n = 0;
+		foreach ($lineas as $linea) {
+			$suma += (float) ($fuerza[$linea] ?? 0);
+			$n += count(array_keys($huecos, $linea, true));
+		}
+		return $n > 0 ? $suma / $n : 0.0;
+	}
+
+	/** Poisson por el método de Knuth. Suficiente para lambdas pequeñas. */
+	private static function poisson($lambda) {
+		$lambda = max(0.0, min(12.0, (float) $lambda));
+		$limite = exp(-$lambda);
+		$k = 0;
+		$p = 1.0;
+		do {
+			$k++;
+			$p *= mt_rand() / mt_getrandmax();
+		} while ($p > $limite);
+		return $k - 1;
+	}
+
+	/**
+	 * Rango del partido, con los umbrales que fijó Alejandro:
+	 *   S = ganar 5-0 (o más) sin encajar · A = ganar por 3+ · B = ganar.
+	 * Devuelve null si no se ganó: perder no tiene rango, tiene reintento.
+	 */
+	public function rangoPartido($golesJugador, $golesRival) {
+		if ($golesJugador <= $golesRival) {
+			return null;
+		}
+		$sGoles  = (int) $this->config("pve_rango_s_goles", 5);
+		$aMargen = (int) $this->config("pve_rango_a_margen", 3);
+
+		if ($golesJugador >= $sGoles && $golesRival === 0) { return "S"; }
+		if ($golesJugador - $golesRival >= $aMargen)       { return "A"; }
+		return "B";
+	}
+
+	// ==========================================================
+	// MISIONES
+	// ==========================================================
+
+	// Progreso actual de un usuario para un TIPO de misión. Nunca se guarda en
+	// un contador propio (misiones_progreso solo registra el reclamo): se
+	// deriva siempre de las consultas que ya existen, para no tener una
+	// segunda fuente de verdad que se pueda desincronizar.
+	private function progresoMision($tipo, $id_usuario) {
+		switch ($tipo) {
+			case "cartas_distintas":
+				return $this->contarColeccionUsuario($id_usuario);
+			case "copias_totales":
+				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM coleccion WHERE id_usuario = :id");
+				$stmt->execute([":id" => $id_usuario]);
+				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+			case "expansiones_completas":
+				return $this->contarExpansionesCompletas($id_usuario);
+			case "mazos_creados":
+				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM mazos WHERE id_usuario = :id");
+				$stmt->execute([":id" => $id_usuario]);
+				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+			case "duelos_jugados":
+				$stmt = $this->pdo->prepare("
+					SELECT COUNT(*) AS total FROM duelos
+					WHERE estado = 'resuelto' AND (id_creador = :id OR id_rival = :id)
+				");
+				$stmt->execute([":id" => $id_usuario]);
+				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+			case "duelos_ganados":
+				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM duelos WHERE id_ganador = :id");
+				$stmt->execute([":id" => $id_usuario]);
+				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+		}
+		return 0;
+	}
+
+	// Misiones activas con el progreso YA calculado y si están reclamadas.
+	// `periodo = ''` es el valor fijo de las misiones de una sola vez (ver 005);
+	// una misión reclamada no vuelve a recalcular progreso, se queda en el
+	// objetivo para no hacer trabajo de más.
+	public function listarMisionesConProgreso($id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT m.*, mp.fecha_reclamada
+			FROM misiones m
+			LEFT JOIN misiones_progreso mp
+				ON mp.id_mision = m.id_mision AND mp.id_usuario = :id_usuario AND mp.periodo = ''
+			WHERE m.activo = 1
+			ORDER BY m.id_mision
+		");
+		$stmt->execute([":id_usuario" => $id_usuario]);
+		$misiones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		foreach ($misiones as &$m) {
+			$m["reclamada"] = $m["fecha_reclamada"] !== null;
+			$m["progreso"]  = $m["reclamada"] ? (int) $m["objetivo"] : $this->progresoMision($m["tipo"], $id_usuario);
+			$m["completada"] = $m["progreso"] >= (int) $m["objetivo"];
+		}
+		return $misiones;
+	}
+
+	// Reclamo manual: comprueba objetivo y que no se haya reclamado ya antes de
+	// pagar, bloqueando las filas implicadas (mismo patrón que comprarAnuncio()
+	// y canjearCodigo()) para que dos clics simultáneos no paguen dos veces.
+	public function reclamarMision($id_mision, $id_usuario) {
+		try {
+			$this->pdo->beginTransaction();
+
+			$stmt = $this->pdo->prepare("SELECT * FROM misiones WHERE id_mision = :id AND activo = 1 FOR UPDATE");
+			$stmt->execute([":id" => $id_mision]);
+			$mision = $stmt->fetch(PDO::FETCH_ASSOC);
+			if (!$mision) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Esa misión no existe."];
+			}
+
+			$stmtYa = $this->pdo->prepare("
+				SELECT 1 FROM misiones_progreso
+				WHERE id_mision = :id_mision AND id_usuario = :id_usuario AND periodo = ''
+				FOR UPDATE
+			");
+			$stmtYa->execute([":id_mision" => $id_mision, ":id_usuario" => $id_usuario]);
+			if ($stmtYa->fetch()) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Ya has reclamado esta misión."];
+			}
+
+			if ($this->progresoMision($mision["tipo"], $id_usuario) < (int) $mision["objetivo"]) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Todavía no cumples el objetivo."];
+			}
+
+			$this->pdo->prepare("
+				INSERT INTO misiones_progreso (id_usuario, id_mision, periodo, fecha_reclamada)
+				VALUES (:id_usuario, :id_mision, '', NOW())
+			")->execute([":id_usuario" => $id_usuario, ":id_mision" => $id_mision]);
+
+			$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :id")
+				->execute([":m" => (int) $mision["recompensa_monedas"], ":id" => $id_usuario]);
+
+			$this->pdo->commit();
+			return ["ok" => true, "recompensa" => (int) $mision["recompensa_monedas"]];
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return ["ok" => false, "error" => "Error al reclamar la misión."];
+		}
 	}
 }
 

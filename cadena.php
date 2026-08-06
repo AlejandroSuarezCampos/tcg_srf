@@ -1,0 +1,374 @@
+<?php
+session_start();
+require_once __DIR__ . '/db/conexion.php';
+
+if (empty($_SESSION['id_usuario'])) {
+    header('Location: login.php');
+    exit;
+}
+$id_usuario = (int) $_SESSION['id_usuario'];
+$id_cadena  = (int) ($_GET['id'] ?? 0);
+
+$cadena = $db->obtenerCadena($id_cadena);
+if (!$cadena) {
+    header('Location: cadenas.php');
+    exit;
+}
+
+// El bloqueo se comprueba al entrar, no al listar (§5 del briefing).
+$pendientes = $db->requisitosPendientes($id_cadena, $id_usuario);
+if ($pendientes) {
+    header('Location: cadenas.php');
+    exit;
+}
+
+$aviso = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $accion = $_POST['accion'] ?? '';
+
+    if ($accion === 'jugar') {
+        $res = $db->crearPartidoCadena($id_usuario, (int) ($_POST['id_nodo'] ?? 0), $_POST['dificultad'] ?? '');
+        if ($res['ok']) {
+            header('Location: duelo.php?id=' . $res['id_duelo']);
+            exit;
+        }
+        $_SESSION['cadena_error'] = $res['error']
+            . (!empty($res['cartas_excedidas'])
+                ? ' Quita de tu mazo titular: ' . implode(', ', array_map(
+                    fn($c) => $c['nombre'] . ' (' . $c['rareza'] . ')', $res['cartas_excedidas'])) . '.'
+                : '');
+        header('Location: cadena.php?id=' . $id_cadena . '&nodo=' . (int) ($_POST['id_nodo'] ?? 0));
+        exit;
+    }
+
+    if ($accion === 'reclamar') {
+        $idNodoReclamado = (int) ($_POST['id_nodo'] ?? 0);
+        $res = $db->reclamarCofre($idNodoReclamado, $id_usuario);
+
+        if ($res['ok']) {
+            $partes = ['Cofre abierto.'];
+            if (!empty($res['formacion']) && isset(Tcg::FORMACIONES[$res['formacion']])) {
+                $partes[] = 'Has desbloqueado la formación ' . Tcg::FORMACIONES[$res['formacion']]['nombre'] . '.';
+            }
+            // Se relee con nombres ya resueltos (listarDropsCofre hace el JOIN
+            // con cromos) en vez de formatear a mano el array de reclamarCofre.
+            foreach ($db->listarDropsCofre($idNodoReclamado, $id_usuario) as $d) {
+                if ($d['tipo'] === 'monedas') {
+                    $partes[] = '+' . number_format((int) $d['monedas'], 0, ',', '.') . ' monedas.';
+                } elseif ($d['tipo'] === 'cromo_limitado') {
+                    // sin htmlspecialchars aquí: $aviso['texto'] entero se escapa
+                    // una sola vez al pintarlo, escaparlo ya en este punto lo
+                    // habría escapado dos veces
+                    $partes[] = $d['cromo_nombre'] . ' (#' . (int) $d['numero_serie']
+                        . ($d['cupo_numerado'] ? '/' . (int) $d['cupo_numerado'] : '') . ').';
+                } elseif ($d['tipo'] === 'cromo') {
+                    $partes[] = $d['cromo_nombre'] . '.';
+                }
+            }
+            $_SESSION['cadena_ok'] = implode(' ', $partes);
+        } else {
+            $_SESSION['cadena_error'] = $res['error'];
+        }
+        header('Location: cadena.php?id=' . $id_cadena);
+        exit;
+    }
+}
+
+if (!empty($_SESSION['cadena_error'])) {
+    $aviso = ['tipo' => 'danger', 'texto' => $_SESSION['cadena_error']];
+    unset($_SESSION['cadena_error']);
+} elseif (!empty($_SESSION['cadena_ok'])) {
+    $aviso = ['tipo' => 'success', 'texto' => $_SESSION['cadena_ok']];
+    unset($_SESSION['cadena_ok']);
+}
+
+$mapa  = $db->mapaCadena($id_cadena, $id_usuario);
+$nodos = $mapa['nodos'];
+
+// Nodo seleccionado: se elige navegando, sin JS, igual que el resto del sitio.
+$idSel = (int) ($_GET['nodo'] ?? 0);
+$sel   = $nodos[$idSel] ?? null;
+if ($sel && !$sel['disponible']) { $sel = null; }
+
+// --- geometría del mapa ---
+// Celda fija en píxeles (no en %): el mapa se desplaza en horizontal cuando la
+// cadena es larga, así que su ancho lo manda el contenido, no la pantalla.
+$CELDA_X = 146;
+$CELDA_Y = 124;
+$maxCol = 0;
+$maxFila = 0;
+foreach ($nodos as $n) {
+    $maxCol  = max($maxCol,  (int) $n['columna']);
+    $maxFila = max($maxFila, (int) $n['fila']);
+}
+$ancho = ($maxCol + 1) * $CELDA_X;
+$alto  = ($maxFila + 1) * $CELDA_Y;
+
+$centro = function ($n) use ($CELDA_X, $CELDA_Y) {
+    return [
+        'x' => (int) $n['columna'] * $CELDA_X + $CELDA_X / 2,
+        'y' => (int) $n['fila']    * $CELDA_Y + $CELDA_Y / 2,
+    ];
+};
+
+// Nodos de arranque: los que no tienen ningún camino entrante. Llevan su
+// marca de INICIO, como la casilla de salida del mapa de rutas de la DS.
+$conEntrada = [];
+foreach ($mapa['aristas'] as $a) { $conEntrada[(int) $a['id_destino']] = true; }
+$inicios = array_values(array_diff(array_keys($nodos), array_keys($conEntrada)));
+
+$etiquetaDificultad = [
+    'facil'       => 'Fácil',
+    'medio'       => 'Medio',
+    'dificil'     => 'Difícil',
+    'muy_dificil' => 'Muy difícil',
+    'extremo'     => 'Extremo',
+];
+$rarezaMax = [];
+foreach (Tcg::DIFICULTADES as $d) {
+    $rarezaMax[$d] = (int) $db->config('pve_rareza_max_' . $d, 0);
+}
+$rarezasNombre = [];
+foreach ($db->listarRarezas() as $r) {
+    $rarezasNombre[(int) $r['id_rareza']] = $r['nombre'];
+}
+
+$paginaTitulo = $cadena['nombre'];
+$paginaDesc   = $cadena['descripcion'] ?: 'Ruta de partidos de la Superliga Frontier.';
+include __DIR__ . '/partials/head.php';
+
+$activePage = 'cadenas';
+include __DIR__ . '/navbar.php';
+?>
+
+<header class="cabecera">
+  <div class="linea-campo" aria-hidden="true"></div>
+  <div class="wrap cabecera-contenido">
+    <p class="t-caption t-dim"><a href="cadenas.php">Cadenas</a></p>
+    <h1><?= htmlspecialchars($cadena['nombre']) ?></h1>
+    <?php if ($cadena['descripcion']): ?>
+      <p><?= htmlspecialchars($cadena['descripcion']) ?></p>
+    <?php endif; ?>
+  </div>
+</header>
+
+<main id="contenido" class="seccion wrap">
+
+  <?php if ($aviso): ?>
+    <p class="alerta alerta-<?= $aviso['tipo'] ?>" role="status"><?= htmlspecialchars($aviso['texto']) ?></p>
+  <?php endif; ?>
+
+  <!-- MAPA DE LA RUTA
+       Nodos colocados por (columna, fila) y unidos por las aristas de la base
+       de datos. Los caminos van en un SVG por debajo, con la misma aritmética
+       de coordenadas que los nodos, para que no puedan descuadrarse entre sí.
+
+       El trazado es ORTOGONAL (horizontal → vertical → horizontal) y no en
+       diagonal: así es como se ven las rutas del Inazuma Eleven de DS, con
+       aspecto de tubería/circuito en vez de un grafo suelto. Cada camino se
+       dibuja dos veces, una de carcasa oscura y otra de "energía" encima, que
+       es lo que le da el grosor de tubo. -->
+  <div class="mapa-marco">
+    <div class="mapa" style="width:<?= $ancho ?>px; height:<?= $alto ?>px;">
+
+      <svg class="mapa-lineas" viewBox="0 0 <?= $ancho ?> <?= $alto ?>"
+           width="<?= $ancho ?>" height="<?= $alto ?>" aria-hidden="true">
+        <?php
+        // Se pintan primero TODAS las carcasas y luego todas las energías, para
+        // que en un cruce la carcasa de un camino no tape la energía de otro.
+        $rutas = [];
+        foreach ($mapa['aristas'] as $a) {
+            $o = $nodos[(int) $a['id_origen']] ?? null;
+            $d = $nodos[(int) $a['id_destino']] ?? null;
+            if (!$o || !$d) { continue; }
+            $po = $centro($o);
+            $pd = $centro($d);
+            $mx = (int) (($po['x'] + $pd['x']) / 2);
+            $rutas[] = [
+                'd' => $po['y'] === $pd['y']
+                    ? "M {$po['x']} {$po['y']} H {$pd['x']}"
+                    : "M {$po['x']} {$po['y']} H $mx V {$pd['y']} H {$pd['x']}",
+                // un camino "recorrido" es el que ya has abierto al superar su origen
+                'recorrida' => (bool) $o['superado'],
+            ];
+        }
+        ?>
+        <?php foreach ($rutas as $r): ?>
+          <path class="mapa-carcasa" d="<?= $r['d'] ?>" />
+        <?php endforeach; ?>
+        <?php foreach ($rutas as $r): ?>
+          <path class="mapa-energia <?= $r['recorrida'] ? 'es-recorrida' : '' ?>" d="<?= $r['d'] ?>" />
+        <?php endforeach; ?>
+      </svg>
+
+      <?php foreach ($nodos as $id => $n): ?>
+        <?php
+        $p = $centro($n);
+        $clases = ['nodo', 'nodo--' . $n['tipo']];
+        if ($n['superado'])        { $clases[] = 'es-superado'; }
+        elseif ($n['disponible'])  { $clases[] = 'es-disponible'; }
+        else                       { $clases[] = 'es-bloqueado'; }
+        if ($id === $idSel)        { $clases[] = 'es-elegido'; }
+        if (in_array($id, $inicios, true)) { $clases[] = 'es-inicio'; }
+
+        $descripcion = $n['tipo'] === 'cofre' ? 'Cofre' : 'Partido';
+        $estadoTexto = $n['superado'] ? 'superado' : ($n['disponible'] ? 'disponible' : 'bloqueado');
+        ?>
+        <div class="<?= implode(' ', $clases) ?>"
+             style="left:<?= $p['x'] ?>px; top:<?= $p['y'] ?>px;">
+          <?php if ($n['disponible']): ?>
+            <a class="nodo-boton" href="cadena.php?id=<?= $id_cadena ?>&nodo=<?= $id ?>#seleccion">
+          <?php else: ?>
+            <span class="nodo-boton" aria-disabled="true">
+          <?php endif; ?>
+
+            <span class="nodo-pieza" aria-hidden="true">
+              <span class="nodo-hex">
+                <span class="nodo-hex-int">
+                  <?php if ($n['tipo'] === 'cofre'): ?>
+                    <i class="ph<?= $n['reclamado'] ? '' : '-fill' ?> ph-treasure-chest"></i>
+                  <?php elseif (!$n['disponible']): ?>
+                    <i class="ph ph-lock-simple"></i>
+                  <?php else: ?>
+                    <i class="ph-fill ph-sword"></i>
+                  <?php endif; ?>
+                </span>
+              </span>
+
+              <?php if ($n['mejor_rango']): ?>
+                <!-- Sello de rango en la esquina, como los círculos de rango
+                     del mapa de rutas del Inazuma Eleven de DS. -->
+                <span class="nodo-sello rango-<?= strtolower($n['mejor_rango']) ?>"><?= $n['mejor_rango'] ?></span>
+              <?php endif; ?>
+            </span>
+
+            <span class="nodo-nombre"><?= htmlspecialchars($n['nombre'] ?? '') ?></span>
+            <span class="sr-only">
+              <?= $descripcion ?>, <?= $estadoTexto ?><?php
+                if ($n['mejor_rango']) { echo ', mejor rango ' . $n['mejor_rango']; } ?>
+            </span>
+
+          <?= $n['disponible'] ? '</a>' : '</span>' ?>
+        </div>
+      <?php endforeach; ?>
+
+    </div>
+
+    <p class="mapa-rotulo"><?= htmlspecialchars($cadena['nombre']) ?></p>
+  </div>
+
+  <p class="mapa-leyenda t-caption t-dim">
+    <span><i class="ph ph-sword" aria-hidden="true"></i> Partido</span>
+    <span><i class="ph-fill ph-treasure-chest" aria-hidden="true"></i> Cofre</span>
+    <span><i class="ph ph-lock-simple" aria-hidden="true"></i> Aún no alcanzado</span>
+  </p>
+
+  <!-- SELECCIÓN -->
+  <section id="seleccion" class="panel" style="margin-top:var(--space-6);">
+    <?php if (!$sel): ?>
+      <p class="t-body-sm t-dim">
+        Elige un nodo abierto del mapa para ver qué hay en él. Perder no cuesta
+        nada: puedes reintentar las veces que quieras y el progreso se guarda
+        partido a partido.
+      </p>
+
+    <?php elseif ($sel['tipo'] === 'cofre'): ?>
+      <div class="panel-head">
+        <h2 class="panel-titulo"><?= htmlspecialchars($sel['nombre']) ?></h2>
+        <?php if ($sel['reclamado']): ?>
+          <span class="pastilla pastilla-on">Abierto</span>
+        <?php endif; ?>
+      </div>
+
+      <?php if ($sel['reclamado']): ?>
+        <p class="t-body-sm t-dim">Ya abriste este cofre.</p>
+      <?php else: ?>
+        <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+          Has llegado hasta aquí. Ábrelo para seguir avanzando por la ruta.
+          <?php if ((int) $sel['es_final'] === 1 && $cadena['formacion_recompensa']
+                    && isset(Tcg::FORMACIONES[$cadena['formacion_recompensa']])): ?>
+            Este es el cofre final: desbloquea la formación
+            <b><?= htmlspecialchars(Tcg::FORMACIONES[$cadena['formacion_recompensa']]['nombre']) ?></b>.
+          <?php endif; ?>
+        </p>
+        <form method="POST">
+          <input type="hidden" name="accion" value="reclamar">
+          <input type="hidden" name="id_nodo" value="<?= (int) $sel['id_nodo'] ?>">
+          <button type="submit" class="btn btn-primary">
+            <i class="ph ph-treasure-chest" aria-hidden="true"></i> Abrir cofre
+          </button>
+        </form>
+      <?php endif; ?>
+
+    <?php else: ?>
+      <div class="panel-head">
+        <h2 class="panel-titulo"><?= htmlspecialchars($sel['nombre']) ?></h2>
+        <span class="pastilla"><?= htmlspecialchars($sel['rival'] ?? '') ?></span>
+      </div>
+
+      <!-- Ficha pre-partido: solo el rival. Ni su estilo ni sus compos, que es
+           lo que evita que el PvE se memorice (§10 del briefing). -->
+      <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+        No se sabe con qué alineación saldrá: este equipo tiene varias y elige
+        una al azar en cada partido.
+      </p>
+
+      <?php if ($sel['progreso']): ?>
+        <div class="tabla-wrap" style="margin-bottom:var(--space-4);">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th scope="col">Dificultad</th>
+                <th scope="col">Jugado</th>
+                <th scope="col">Ganado</th>
+                <th scope="col">Mejor rango</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach (Tcg::DIFICULTADES as $d): ?>
+                <?php $p = $sel['progreso'][$d] ?? null; if (!$p) { continue; } ?>
+                <tr>
+                  <td><?= $etiquetaDificultad[$d] ?></td>
+                  <td><span class="mono"><?= (int) $p['veces'] ?></span></td>
+                  <td><span class="mono"><?= (int) $p['victorias'] ?></span></td>
+                  <td>
+                    <?php if ($p['mejor_rango']): ?>
+                      <b class="mono rango-<?= strtolower($p['mejor_rango']) ?>"><?= $p['mejor_rango'] ?></b>
+                    <?php else: ?>
+                      <span class="t-dim">—</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+
+      <div class="dificultades">
+        <?php foreach (Tcg::DIFICULTADES as $d): ?>
+          <form method="POST">
+            <input type="hidden" name="accion" value="jugar">
+            <input type="hidden" name="id_nodo" value="<?= (int) $sel['id_nodo'] ?>">
+            <input type="hidden" name="dificultad" value="<?= $d ?>">
+            <button type="submit" class="btn btn-ghost dificultad dificultad--<?= $d ?>">
+              <span class="dificultad-nombre"><?= $etiquetaDificultad[$d] ?></span>
+              <?php if ($rarezaMax[$d] > 0): ?>
+                <span class="dificultad-nota">
+                  hasta <?= htmlspecialchars($rarezasNombre[$rarezaMax[$d]] ?? '') ?>
+                </span>
+              <?php endif; ?>
+            </button>
+          </form>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </section>
+
+</main>
+
+<?php include __DIR__ . '/partials/footer.php'; ?>
+
+</body>
+</html>

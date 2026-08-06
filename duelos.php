@@ -60,7 +60,7 @@ foreach ($db->listarCopiasApostables($id_usuario) as $c) {
 }
 
 $fuerzaTitular = $titular
-    ? Tcg::fuerzaAlineacion($db->listarCartasMazo($titular['id_mazo']))
+    ? Tcg::fuerzaAlineacion($db->listarCartasMazo($titular['id_mazo']), $titular['formacion'])
     : null;
 
 $paginaTitulo = 'Duelos';
@@ -79,7 +79,7 @@ include __DIR__ . '/navbar.php';
     <div class="cabecera-datos">
       <div class="dato"><b class="mono"><?= number_format($saldo, 0, ',', '.') ?></b><span>Monedas</span></div>
       <?php if ($fuerzaTitular): ?>
-        <div class="dato"><b class="mono"><?= $fuerzaTitular['total'] ?></b><span>Fuerza titular</span></div>
+        <div class="dato"><b class="mono"><?= (int) round($fuerzaTitular['total']) ?></b><span>Fuerza titular</span></div>
       <?php endif; ?>
       <div class="dato"><b class="mono"><?= count($abiertos) ?></b><span>Salas abiertas</span></div>
     </div>

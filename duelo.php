@@ -24,9 +24,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'cance
 }
 
 // Elegir aumento. Es definitivo: elegirAumento() ignora un segundo intento.
+//
+// Se vuelve con `nuevo=1` para pedir la ceremonia de partido. En un duelo de
+// cadena es la única forma de que se vea: el rival es el bot y ya eligió al
+// crearse el partido, así que esta elección cierra la fase y el duelo se
+// resuelve en la carga siguiente, sin que llegue a correr el sondeo de
+// duelo.js que en PvP es quien añade ese parámetro.
+//
+// En PvP también hacía falta: quien elegía SEGUNDO resolvía el duelo en esta
+// misma carga y se quedaba sin ceremonia, porque ya no había sondeo que la
+// pidiera. Si el rival aún no ha elegido, el parámetro no molesta: el modal
+// solo se renderiza con el duelo resuelto.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'elegir_aumento') {
     $db->elegirAumento($id_duelo, $id_usuario, (int) ($_POST['opcion'] ?? 0));
-    header('Location: duelo.php?id=' . $id_duelo);
+    header('Location: duelo.php?id=' . $id_duelo . '&nuevo=1');
     exit;
 }
 
@@ -53,6 +64,24 @@ $esperando = $duelo['estado'] === 'creado';
 $resuelto  = $duelo['estado'] === 'resuelto';
 $eligiendo = $duelo['estado'] === 'aumento_pendiente';
 
+// Un partido de cadena (PvE) no tiene plazo: el briefing lo dice explícitamente
+// y, además, no hay nadie esperando al otro lado a quien hacer esperar. Sin
+// esto el reloj arrancaría en cero y el JS recargaría la pantalla en bucle.
+$esCadena = $duelo['dificultad'] !== null;
+
+// Volver de un partido de cadena lleva al MAPA de su ruta, no a la lista: es
+// donde estaba el jugador y donde se ve el nodo que acaba de superar.
+$volverUrl = 'duelos.php';
+$volverTexto = 'Volver a duelos';
+if ($esCadena) {
+    $nodoDuelo = $duelo['id_nodo'] ? $db->obtenerNodo((int) $duelo['id_nodo']) : null;
+    $volverUrl = $nodoDuelo
+        ? 'cadena.php?id=' . (int) $nodoDuelo['id_cadena'] . '&nodo=' . (int) $duelo['id_nodo']
+        : 'cadenas.php';
+    $volverTexto = 'Volver a la ruta';
+}
+$conPlazo = !$esCadena && $duelo['aumento_vence'] !== null;
+
 // Fase de aumento: solo se piden LAS PROPIAS opciones. Las del rival no se
 // consultan siquiera, para que no puedan filtrarse al HTML (§6.3).
 $misAumentos  = $eligiendo ? $db->listarAumentos($id_duelo, $id_usuario) : [];
@@ -78,8 +107,13 @@ $suAlineacion    = $resuelto ? $db->listarAlineacionDuelo($id_duelo, $idRival) :
 // antes daría ventaja a quien eligiera después (§6.3 lo marca como anti-abuso).
 $miAumento = $resuelto ? $db->aumentoElegido($id_duelo, $id_usuario) : null;
 $suAumento = $resuelto ? $db->aumentoElegido($id_duelo, $idRival) : null;
-$miFuerza        = $miAlineacion ? Tcg::fuerzaAlineacion($miAlineacion) : null;
-$suFuerza        = $suAlineacion ? Tcg::fuerzaAlineacion($suAlineacion) : null;
+// Formaciones CONGELADAS. Un duelo anterior a que existieran las formaciones
+// no tiene ninguna guardada y fue, por definición, un 1-4-4-2.
+$miFormacion = ($soyCreador ? $duelo['formacion_creador'] : $duelo['formacion_rival']) ?: Tcg::FORMACION_BASE;
+$suFormacion = ($soyCreador ? $duelo['formacion_rival'] : $duelo['formacion_creador']) ?: Tcg::FORMACION_BASE;
+
+$miFuerza        = $miAlineacion ? Tcg::fuerzaAlineacion($miAlineacion, $miFormacion) : null;
+$suFuerza        = $suAlineacion ? Tcg::fuerzaAlineacion($suAlineacion, $suFormacion) : null;
 
 // Capa 2. Se leen las compos CONGELADAS del duelo, no se recalculan: si un
 // rasgo se reasignó después desde el panel, este duelo debe seguir explicándose
@@ -95,6 +129,12 @@ $miAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_creador'] : $duelo[
 $suAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_rival'] : $duelo['afinidad_dom_creador']) : null;
 
 $catalogoRasgos = $db->rasgosCatalogo();
+
+// Recompensas de cadena (bloque D): solo tiene sentido pedirlas si se ganó,
+// que es la única vez que resolverDuelo() reparte algo. $gane se calcula más
+// abajo; aquí se repite la misma condición porque todavía no existe.
+$drops = ($esCadena && $resuelto && (int) $duelo['id_ganador'] === $id_usuario)
+    ? $db->listarDropsDuelo($id_duelo) : [];
 
 /** Pinta el panel de compos de un jugador en la pantalla de resultado. */
 function panel_compos($quien, array $compos, $afinDom, $ciclo, $malus, array $catalogo, array $etiquetaLinea) {
@@ -175,7 +215,10 @@ $paginaTitulo = $esperando ? 'Sala de duelo' : 'Duelo';
 $paginaDesc   = 'Sala de duelo de la Superliga Frontier.';
 include __DIR__ . '/partials/head.php';
 
-$activePage = 'duelos';
+// Un partido de cadena marca "Cadenas" activo en la nav, no "Duelos": es
+// la sección en la que realmente está el jugador, aunque el archivo que
+// renderiza la pantalla (sala/aumento/resultado) se comparta con PvP.
+$activePage = $esCadena ? 'cadenas' : 'duelos';
 include __DIR__ . '/navbar.php';
 ?>
 
@@ -186,7 +229,7 @@ include __DIR__ . '/navbar.php';
       <span class="vacio-ico"><i class="ph ph-x-circle" aria-hidden="true"></i></span>
       <h1>Sala cancelada</h1>
       <p>Se ha devuelto lo que hubiera apostado.</p>
-      <a class="btn btn-primary" href="duelos.php">Volver a duelos</a>
+      <a class="btn btn-primary" href="<?= htmlspecialchars($volverUrl) ?>"><?= htmlspecialchars($volverTexto) ?></a>
     </div>
 
   <?php elseif ($esperando): ?>
@@ -220,18 +263,25 @@ include __DIR__ . '/navbar.php';
     <!-- FASE DE AUMENTO
          Ambos jugadores están aquí a la vez. Cada uno ve SOLO sus 3 opciones;
          las del rival no se consultan ni llegan al HTML. -->
-    <div class="aumento" id="faseAumento"
+    <div class="aumento" <?= $conPlazo ? 'id="faseAumento"' : '' ?>
          data-duelo="<?= $id_duelo ?>" data-restante="<?= $segundosRest ?>">
 
       <h1>Elige tu aumento</h1>
       <p class="t-body-sm t-dim">
-        Vale solo para este duelo. Si no eliges a tiempo, se elegirá una al azar
-        para no parar el partido.
+        <?php if ($conPlazo): ?>
+          Vale solo para este duelo. Si no eliges a tiempo, se elegirá una al azar
+          para no parar el partido.
+        <?php else: ?>
+          Vale solo para este partido. Tómate el tiempo que quieras: aquí no
+          hay nadie esperando.
+        <?php endif; ?>
       </p>
 
-      <p class="aumento-reloj" id="aumentoReloj" role="timer" aria-live="off">
-        <span class="mono" id="aumentoSegundos"><?= $segundosRest ?></span> s
-      </p>
+      <?php if ($conPlazo): ?>
+        <p class="aumento-reloj" id="aumentoReloj" role="timer" aria-live="off">
+          <span class="mono" id="aumentoSegundos"><?= $segundosRest ?></span> s
+        </p>
+      <?php endif; ?>
 
       <?php if ($yaElegi): ?>
         <p class="alerta alerta-info" role="status">
@@ -284,8 +334,54 @@ include __DIR__ . '/navbar.php';
         <span class="sr-only">
           contra <?= htmlspecialchars($nombreOtro) ?>,
           <?= $misGoles ?> a <?= $susGoles ?>
+          <?php if ($esCadena && $duelo['rango']): ?>, rango <?= $duelo['rango'] ?><?php endif; ?>
         </span>
       </h1>
+
+      <?php if ($esCadena && $duelo['rango']): ?>
+        <p class="rango-sello rango-<?= strtolower($duelo['rango']) ?>">
+          <span class="rango-letra" aria-hidden="true"><?= $duelo['rango'] ?></span>
+          <span class="rango-texto">
+            <?php
+            // El rango no es decorativo: decide qué tabla de botín se aplica,
+            // así que se dice en qué consiste y no solo qué letra ha tocado.
+            echo [
+                'S' => 'Victoria total: goleada sin encajar.',
+                'A' => 'Victoria clara.',
+                'B' => 'Victoria ajustada.',
+            ][$duelo['rango']] ?? '';
+            ?>
+          </span>
+        </p>
+      <?php endif; ?>
+
+      <?php if ($drops): ?>
+        <!-- Recompensas del partido. Las monedas y cada carta son un drop
+             aparte (uno por fila de cadena_loot que tocó), así que se listan
+             sueltas en vez de intentar resumirlas en una frase. -->
+        <div class="panel recompensas" style="max-width:420px;margin:0 auto var(--space-6);">
+          <h2 class="t-h3" style="margin-bottom:var(--space-3);">Recompensas</h2>
+          <ul class="lista-recompensas">
+            <?php foreach ($drops as $d): ?>
+              <li>
+                <?php if ($d['tipo'] === 'monedas'): ?>
+                  <i class="ph-fill ph-coins" aria-hidden="true"></i>
+                  <span class="mono">+<?= number_format((int) $d['monedas'], 0, ',', '.') ?></span> monedas
+                <?php elseif ($d['tipo'] === 'cromo_limitado'): ?>
+                  <i class="ph-fill ph-seal-star" aria-hidden="true"></i>
+                  <?= htmlspecialchars($d['cromo_nombre']) ?>
+                  <span class="pastilla pastilla-titular">
+                    #<?= (int) $d['numero_serie'] ?><?= $d['cupo_numerado'] ? '/' . (int) $d['cupo_numerado'] : '' ?>
+                  </span>
+                <?php elseif ($d['tipo'] === 'cromo'): ?>
+                  <i class="ph ph-cards" aria-hidden="true"></i>
+                  <?= htmlspecialchars($d['cromo_nombre']) ?>
+                <?php endif; ?>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
+      <?php endif; ?>
 
       <?php if ($miProbabilidad !== null): ?>
         <p class="t-body-sm t-dim" style="text-align:center;">
@@ -352,14 +448,17 @@ include __DIR__ . '/navbar.php';
 
       <div class="partido-alineaciones">
         <section>
-          <h2 class="t-h3"><?= htmlspecialchars($nombreYo) ?></h2>
+          <h2 class="t-h3">
+            <?= htmlspecialchars($nombreYo) ?>
+            <span class="pastilla"><?= htmlspecialchars(Tcg::FORMACIONES[$miFormacion]['nombre']) ?></span>
+          </h2>
           <div class="carta-grid carta-grid--compacta">
             <?php foreach ($miAlineacion as $c): ?>
               <?php
-              $linea = Tcg::HUECOS[(int) $c['hueco']];
-              $stat  = Tcg::ESTADISTICA_LINEA[$linea];
+              $linea = Tcg::huecosDe($miFormacion)[(int) $c['hueco']];
+              $aporte = (int) round(Tcg::aportarCarta($c, $linea));
               render_carta($c, ['tamano' => 'sm', 'pie' =>
-                  '<span class="carta-aporte"><b class="mono">' . (int) $c[$stat] . '</b> '
+                  '<span class="carta-aporte"><b class="mono">' . $aporte . '</b> '
                   . htmlspecialchars($etiquetaLinea[$linea]) . '</span>']);
               ?>
             <?php endforeach; ?>
@@ -367,14 +466,17 @@ include __DIR__ . '/navbar.php';
         </section>
 
         <section>
-          <h2 class="t-h3"><?= htmlspecialchars($nombreOtro) ?></h2>
+          <h2 class="t-h3">
+            <?= htmlspecialchars($nombreOtro) ?>
+            <span class="pastilla"><?= htmlspecialchars(Tcg::FORMACIONES[$suFormacion]['nombre']) ?></span>
+          </h2>
           <div class="carta-grid carta-grid--compacta">
             <?php foreach ($suAlineacion as $c): ?>
               <?php
-              $linea = Tcg::HUECOS[(int) $c['hueco']];
-              $stat  = Tcg::ESTADISTICA_LINEA[$linea];
+              $linea = Tcg::huecosDe($suFormacion)[(int) $c['hueco']];
+              $aporte = (int) round(Tcg::aportarCarta($c, $linea));
               render_carta($c, ['tamano' => 'sm', 'pie' =>
-                  '<span class="carta-aporte"><b class="mono">' . (int) $c[$stat] . '</b> '
+                  '<span class="carta-aporte"><b class="mono">' . $aporte . '</b> '
                   . htmlspecialchars($etiquetaLinea[$linea]) . '</span>']);
               ?>
             <?php endforeach; ?>
@@ -383,7 +485,7 @@ include __DIR__ . '/navbar.php';
       </div>
 
       <p style="text-align:center;margin-top:var(--space-6);">
-        <a class="btn btn-primary" href="duelos.php">Volver a duelos</a>
+        <a class="btn btn-primary" href="<?= htmlspecialchars($volverUrl) ?>"><?= htmlspecialchars($volverTexto) ?></a>
       </p>
     </div>
 
@@ -392,7 +494,7 @@ include __DIR__ . '/navbar.php';
       <span class="vacio-ico"><i class="ph ph-hourglass" aria-hidden="true"></i></span>
       <h1>Duelo en curso</h1>
       <p>Este duelo todavía no se ha resuelto.</p>
-      <a class="btn btn-primary" href="duelos.php">Volver a duelos</a>
+      <a class="btn btn-primary" href="<?= htmlspecialchars($volverUrl) ?>"><?= htmlspecialchars($volverTexto) ?></a>
     </div>
   <?php endif; ?>
 

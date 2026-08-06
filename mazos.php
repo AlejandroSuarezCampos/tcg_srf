@@ -39,7 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     } elseif ($accion === 'guardar_cartas') {
         $idMazo = (int) $_POST['id_mazo'];
-        $res = $db->guardarCartasMazo($idMazo, $id_usuario, $_POST['huecos'] ?? []);
+        $res = $db->guardarCartasMazo(
+            $idMazo,
+            $id_usuario,
+            $_POST['huecos'] ?? [],
+            $_POST['formacion'] ?? null
+        );
         $destino = 'mazos.php?mazo=' . $idMazo . ($res['ok'] ? '&ok=1' : '&error=' . urlencode($res['error']));
     }
 
@@ -84,19 +89,41 @@ foreach ($cartasMazo as $c) { $cromosDentro[(int) $c['id_cromo']] = true; }
 $compos = $mazoActivo ? $db->calcularCompos($cartasMazo) : null;
 $catalogoRasgos = $db->rasgosCatalogo();
 
-// Fuerza por líneas: cada carta puntúa con la estadística del hueco donde está,
-// no con la mejor que tenga. Es lo que hace que colocar bien importe.
-$fuerza = Tcg::fuerzaAlineacion($cartasMazo);
+// Formación del mazo y las que este jugador puede usar. La lista se valida
+// otra vez al guardar: que el selector solo pinte las suyas no basta.
+$formacion   = $mazoActivo ? ($mazoActivo['formacion'] ?: Tcg::FORMACION_BASE) : Tcg::FORMACION_BASE;
+$disponibles = $db->formacionesDisponibles($id_usuario);
+$huecos      = Tcg::huecosDe($formacion);
+$coords      = Tcg::coordenadasDe($formacion);
+
+// Huecos y coordenadas de TODAS las formaciones disponibles, para que cambiar
+// de formación se vea al instante sin recargar y sin perder lo ya colocado.
+// Es dato serializado, no lógica duplicada: lo genera el mismo PHP que manda.
+$formacionesJs = [];
+foreach ($disponibles as $clave) {
+    $huecosDe = Tcg::huecosDe($clave);
+    $formacionesJs[$clave] = [
+        'nombre' => Tcg::FORMACIONES[$clave]['nombre'],
+        'huecos' => $huecosDe,
+        'coords' => array_values(Tcg::coordenadasDe($clave)),
+        // el peso de cada hueco viaja ya resuelto para que el JS no tenga que
+        // llevar su propia copia de PESOS_LINEA
+        'pesos'  => array_map(fn($l) => Tcg::PESOS_LINEA[$l], $huecosDe),
+    ];
+}
+
+// Fuerza por líneas: cada carta puntúa según los pesos del hueco donde está,
+// no con la mejor estadística que tenga. Es lo que hace que colocar bien importe.
+$fuerza = Tcg::fuerzaAlineacion($cartasMazo, $formacion);
 
 // Cuántas cartas están jugando fuera de su posición natural. No es un error
 // (es legal y puede ser deliberado), pero conviene que se vea.
 $fueraDePosicion = 0;
 foreach ($cartasMazo as $c) {
-    if (Tcg::HUECOS[(int) $c['hueco']] !== $c['posicion']) { $fueraDePosicion++; }
+    if ($huecos[(int) $c['hueco']] !== $c['posicion']) { $fueraDePosicion++; }
 }
 
 $etiquetaLinea = ['POR' => 'Portería', 'DF' => 'Defensa', 'MC' => 'Medio', 'DC' => 'Ataque'];
-$etiquetaStat  = ['defensa' => 'DEF', 'tecnica' => 'TÉC', 'ataque' => 'ATA'];
 
 $aviso = null;
 if (isset($_GET['ok']))    { $aviso = ['tipo' => 'success', 'texto' => 'Mazo guardado.']; }
@@ -143,7 +170,11 @@ include __DIR__ . '/navbar.php';
               <?php $completo = (int) $m['cartas'] === $TAMANO; ?>
               <li class="mazo-fila<?= $mazoActivo && $mazoActivo['id_mazo'] === $m['id_mazo'] ? ' es-activo' : '' ?>">
                 <a href="mazos.php?mazo=<?= $m['id_mazo'] ?>" class="mazo-enlace">
-                  <span class="mazo-nombre"><?= htmlspecialchars($m['nombre']) ?></span>
+                  <span class="mazo-nombre">
+                    <?= htmlspecialchars($m['nombre']) ?>
+                    <span class="t-caption t-dim mono"><?= htmlspecialchars(
+                        Tcg::FORMACIONES[$m['formacion']]['nombre'] ?? $m['formacion']) ?></span>
+                  </span>
                   <span class="pastilla <?= $completo ? 'pastilla-on' : 'pastilla-warn' ?>">
                     <span class="mono"><?= (int) $m['cartas'] ?>/<?= $TAMANO ?></span>
                   </span>
@@ -191,17 +222,38 @@ include __DIR__ . '/navbar.php';
               <p class="t-body-sm t-dim">
                 <span class="mono" id="mazoConteo"><?= count($cartasMazo) ?></span> de
                 <span class="mono"><?= $TAMANO ?></span> huecos cubiertos
-                <?php if ($fueraDePosicion > 0): ?>
-                  · <span class="mono"><?= $fueraDePosicion ?></span>
+                <span id="mazoDesubicadosBloque" <?= $fueraDePosicion > 0 ? '' : 'hidden' ?>>
+                  · <span class="mono" id="mazoDesubicados"><?= $fueraDePosicion ?></span>
                   fuera de su posición
-                <?php endif; ?>
+                </span>
               </p>
+
+              <!-- Cambiar de formación NO mueve las cartas: los once siguen en
+                   sus huecos y lo que cambia es con qué estadística puntúa cada
+                   uno. Por eso se puede probar una formación y volver atrás sin
+                   perder la alineación. Se guarda con el botón de abajo. -->
+              <div class="campo campo-formacion">
+                <label for="m-formacion">Formación</label>
+                <select name="formacion" id="m-formacion">
+                  <?php foreach ($disponibles as $clave): ?>
+                    <option value="<?= $clave ?>" <?= $clave === $formacion ? 'selected' : '' ?>>
+                      <?= htmlspecialchars(Tcg::FORMACIONES[$clave]['nombre']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+                <?php if (count($disponibles) < count(Tcg::FORMACIONES)): ?>
+                  <span class="campo-hint">
+                    Te quedan <span class="mono"><?= count(Tcg::FORMACIONES) - count($disponibles) ?></span>
+                    por desbloquear jugando cadenas.
+                  </span>
+                <?php endif; ?>
+              </div>
             </div>
 
             <div class="mazo-totales">
               <?php foreach (['POR', 'DF', 'MC', 'DC'] as $linea): ?>
                 <div class="dato">
-                  <b class="mono"><?= $fuerza[$linea] ?></b>
+                  <b class="mono"><?= (int) round($fuerza[$linea]) ?></b>
                   <span><?= $etiquetaLinea[$linea] ?></span>
                 </div>
               <?php endforeach; ?>
@@ -211,27 +263,34 @@ include __DIR__ . '/navbar.php';
           <!-- Los 11 huecos, colocados como en un campo de fútbol real: el
                portero abajo, la defensa y el medio en sus líneas, el ataque
                arriba. Cualquier carta puede ir en cualquier hueco (lo que
-               cambia es con qué estadística puntúa una vez colocada, ver
-               $etiquetaStat más arriba); aquí solo se ve un retrato compacto
-               con el nombre, porque a este tamaño la tarjeta completa no
-               cabría legible en 11 sitios a la vez. La tarjeta completa, con
-               rareza y estadísticas, sigue viéndose en el selector de abajo,
-               que es donde de verdad hace falta el detalle para elegir. -->
-          <div class="alineacion" id="m-alineacion">
-            <?php foreach (Tcg::HUECOS as $i => $linea): ?>
+               cambia es cuánto puntúa una vez colocada, ver Tcg::PESOS_LINEA);
+               aquí solo se ve un retrato compacto con el nombre, porque a este
+               tamaño la tarjeta completa no cabría legible en 11 sitios a la
+               vez. La tarjeta completa, con rareza y estadísticas, sigue
+               viéndose en el selector de abajo, que es donde de verdad hace
+               falta el detalle para elegir.
+
+               Las coordenadas vienen de Tcg::coordenadasDe(), no del CSS: con
+               ocho formaciones el CSS tendría 88 reglas que mantener a mano en
+               sincronía con el orden de los huecos. -->
+          <div class="alineacion" id="m-alineacion"
+               data-formaciones="<?= htmlspecialchars(json_encode($formacionesJs), ENT_QUOTES) ?>">
+            <?php foreach ($huecos as $i => $linea): ?>
               <?php
-              $stat = Tcg::ESTADISTICA_LINEA[$linea];
               $carta = $alineacion[$i] ?? null;
               $desubicado = $carta && $carta['posicion'] !== $linea;
+              $aporte = $carta ? (int) round(Tcg::aportarCarta($carta, $linea)) : null;
               ?>
               <div class="hueco<?= $carta ? ' esta-lleno' : '' ?><?= $desubicado ? ' es-desubicado' : '' ?>"
-                   data-hueco="<?= $i ?>" data-linea="<?= $linea ?>" data-stat="<?= $stat ?>"
+                   style="left:<?= $coords[$i]['x'] ?>%; top:<?= $coords[$i]['y'] ?>%;"
+                   data-hueco="<?= $i ?>" data-linea="<?= $linea ?>"
+                   data-pesos="<?= htmlspecialchars(json_encode(Tcg::PESOS_LINEA[$linea]), ENT_QUOTES) ?>"
                    <?= $carta ? 'data-rareza="' . (int) $carta['id_rareza'] . '"' : '' ?>>
                 <input type="hidden" name="huecos[<?= $i ?>]"
                        value="<?= $carta ? (int) $carta['id_coleccion'] : '' ?>">
 
                 <button type="button" class="hueco-boton"
-                        aria-label="Hueco de <?= $etiquetaLinea[$linea] ?><?= $carta ? ': ' . htmlspecialchars($carta['nombre']) . ', ' . (int) $carta[$stat] . ' ' . $etiquetaStat[$stat] : ', vacío' ?>">
+                        aria-label="Hueco de <?= $etiquetaLinea[$linea] ?><?= $carta ? ': ' . htmlspecialchars($carta['nombre']) . ', ' . $aporte . ' puntos' : ', vacío' ?>">
                   <span class="hueco-avatar">
                     <span class="hueco-avatar-int">
                       <?php if ($carta && $carta['imagen'] !== ''): ?>
@@ -365,7 +424,7 @@ include __DIR__ . '/navbar.php';
               <a class="btn btn-primary" href="sobres.php">Ir a sobres</a>
             </div>
           <?php else: ?>
-            <div class="selector-cartas" id="m-lista" role="group" aria-label="Jugadores disponibles">
+            <div class="selector-cartas selector-cartas--grande" id="m-lista" role="group" aria-label="Jugadores disponibles">
               <?php foreach ($porCromo as $idCromo => $grupo): ?>
                 <?php
                 $c = $grupo['fila'];
@@ -389,7 +448,6 @@ include __DIR__ . '/navbar.php';
                         data-tecnica="<?= (int) $c['tecnica'] ?>"
                         <?= $bloqueada ? 'disabled' : '' ?>>
                   <?php render_carta($c, [
-                      'tamano'   => 'sm',
                       'stats'    => ['ATA' => $c['ataque'], 'DEF' => $c['defensa'], 'TÉC' => $c['tecnica']],
                       'cantidad' => $cantidad,
                   ]); ?>

@@ -218,7 +218,16 @@ include __DIR__ . '/navbar.php';
                     . '</button></form>';
             }
             ?>
-            <?php render_carta($c, ['acciones' => $accion, 'cantidad' => $cantidad]); ?>
+            <?php
+            $esJugador = in_array($c['posicion'], Tcg::POSICIONES_JUGABLES, true);
+            render_carta($c, [
+                'acciones' => $accion,
+                'cantidad' => $cantidad,
+                'stats'    => $esJugador
+                    ? ['ATA' => $c['ataque'], 'DEF' => $c['defensa'], 'TÉC' => $c['tecnica']]
+                    : null,
+            ]);
+            ?>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>

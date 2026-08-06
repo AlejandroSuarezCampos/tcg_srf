@@ -1,9 +1,9 @@
 /* ==========================================================================
    DECK BUILDER — asignación de jugadores a huecos
-   La alineación son 11 huecos fijos (1-4-4-2) y CUALQUIER carta puede ir en
-   CUALQUIER hueco: no hay reglas de posición. Lo que cambia según dónde la
-   pongas es con qué estadística puntúa, así que colocar es la decisión
-   interesante, no un trámite.
+   La alineación son siempre 11 huecos, repartidos según la formación elegida,
+   y CUALQUIER carta puede ir en CUALQUIER hueco: no hay reglas de posición.
+   Lo que cambia según dónde la pongas es con qué estadística puntúa, así que
+   colocar es la decisión interesante, no un trámite.
 
    Interacción: elegir hueco → elegir jugador. Todo con tap/clic y con teclado
    (huecos y jugadores son <button>), sin ningún gesto de arrastre que haya que
@@ -84,8 +84,19 @@
     guardar.disabled = n !== TAMANO;
   }
 
-  var ETIQUETA_STAT  = { defensa: 'DEF', tecnica: 'TÉC', ataque: 'ATA' };
   var ETIQUETA_LINEA = { POR: 'Portería', DF: 'Defensa', MC: 'Medio', DC: 'Ataque' };
+
+  /* Cuánto aporta una carta a la línea del hueco donde se coloca. Los tres
+     pesos vienen del servidor (Tcg::PESOS_LINEA vía data-pesos), así que esto
+     no es una segunda definición del balance, solo la misma cuenta hecha aquí
+     para no tener que recargar la página cada vez que cambias a un jugador. */
+  function aporte(item, pesos) {
+    return Math.round(
+      (parseFloat(item.dataset.ataque)  || 0) * pesos.ataque +
+      (parseFloat(item.dataset.defensa) || 0) * pesos.defensa +
+      (parseFloat(item.dataset.tecnica) || 0) * pesos.tecnica
+    );
+  }
 
   /* El hueco pinta un retrato compacto (no la tarjeta completa: en 11 sitios
      de un campo no cabría legible). La tarjeta completa, con rareza y
@@ -93,7 +104,7 @@
      detalle para elegir, no aquí. */
   function pintarHueco(hueco, item) {
     var linea = hueco.dataset.linea;
-    var stat  = hueco.dataset.stat;
+    var pesos = JSON.parse(hueco.dataset.pesos);
 
     campo(hueco).value = item.dataset.carta;
     hueco.dataset.rareza = item.dataset.rareza;
@@ -123,7 +134,7 @@
     boton.appendChild(nombre);
 
     boton.setAttribute('aria-label', 'Hueco de ' + (ETIQUETA_LINEA[linea] || linea) + ': ' + item.dataset.nombre
-      + ', ' + item.dataset[stat] + ' ' + (ETIQUETA_STAT[stat] || stat));
+      + ', ' + aporte(item, pesos) + ' puntos');
 
     hueco.classList.add('esta-lleno');
     hueco.classList.toggle('es-desubicado', item.dataset.posicion !== linea);
@@ -217,6 +228,63 @@
   }
 
   if (buscar) buscar.addEventListener('input', filtrar);
+
+  /* ---- cambio de formación ----
+     No mueve a nadie de hueco: los once se quedan donde están y lo que cambia
+     es la línea de cada hueco, o sea con qué estadística puntúa cada carta y
+     dónde se dibuja sobre el campo. Así se puede probar una formación y volver
+     atrás sin perder la alineación que llevabas montada.
+
+     Huecos, coordenadas y estadísticas vienen serializados desde PHP: aquí no
+     se recalcula ninguna, para que no haya una segunda definición de las
+     formaciones que se pueda desincronizar de la de servidor. */
+  var selectorFormacion = document.getElementById('m-formacion');
+  var desubicados       = document.getElementById('mazoDesubicados');
+  var bloqueDesubicados = document.getElementById('mazoDesubicadosBloque');
+
+  var formaciones = {};
+  try { formaciones = JSON.parse(alineacion.dataset.formaciones || '{}'); } catch (err) { formaciones = {}; }
+
+  function itemDeCopia(idCopia) {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].dataset.carta === idCopia) return items[i];
+    }
+    return null;
+  }
+
+  function refrescarDesubicados() {
+    var n = huecos.filter(function (h) { return h.classList.contains('es-desubicado'); }).length;
+    if (desubicados) desubicados.textContent = n;
+    if (bloqueDesubicados) bloqueDesubicados.hidden = n === 0;
+  }
+
+  function aplicarFormacion(clave) {
+    var f = formaciones[clave];
+    if (!f) return;
+
+    huecos.forEach(function (hueco, i) {
+      hueco.style.left = f.coords[i].x + '%';
+      hueco.style.top  = f.coords[i].y + '%';
+      hueco.dataset.linea = f.huecos[i];
+      hueco.dataset.pesos = JSON.stringify(f.pesos[i]);
+
+      /* se repinta aunque la carta no cambie: un hueco lleno puede pasar a
+         estar fuera de posición, y uno vacío cambia de etiqueta */
+      var copia = campo(hueco).value;
+      if (copia === '') { vaciarHueco(hueco); return; }
+
+      var item = itemDeCopia(copia);
+      if (item) pintarHueco(hueco, item);
+    });
+
+    refrescarDesubicados();
+  }
+
+  if (selectorFormacion) {
+    selectorFormacion.addEventListener('change', function () {
+      aplicarFormacion(selectorFormacion.value);
+    });
+  }
 
   marcarActivo(primerVacio() || huecos[0]);
   refrescarDisponibles();

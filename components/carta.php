@@ -19,7 +19,9 @@
  *
  * $cromo espera las claves que ya devuelven las consultas existentes:
  *   nombre, imagen, posicion, equipo, id_rareza, rareza, afinidad,
- *   afinidad_imagen. Todo lo demás es opcional.
+ *   afinidad_imagen, rasgo (el rasgo de CONFIGURACIÓN de la Capa 2 —
+ *   Contraataque/Justicia/Vínculo/Brecha—, si la consulta lo trae).
+ *   Todo lo demás es opcional.
  *
  * Opciones ($opts):
  *   tamano       'sm' | 'md' (por defecto) | 'lg'
@@ -112,6 +114,7 @@ function render_carta(array $c, array $opts = []): void
     $posicion = (string) ($c['posicion'] ?? '');
     $afinidad = (string) ($c['afinidad'] ?? '');
     $afinidadImg = (string) ($c['afinidad_imagen'] ?? '');
+    $rasgo = (string) ($c['rasgo'] ?? '');
 
     // "No-afi" es el valor que usa la base de datos para las cartas sin
     // afinidad (escudos, presidentes): no se pinta el hexágono.
@@ -201,6 +204,12 @@ function render_carta(array $c, array $opts = []): void
           <p class="carta-meta">
             <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
           </p>
+
+          <?php if ($rasgo !== ''): ?>
+            <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
+              <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
+            </p>
+          <?php endif; ?>
 
           <?php if (!empty($stats)): ?>
             <div class="carta-stats">

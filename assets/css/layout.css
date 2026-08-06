@@ -547,12 +547,13 @@
 .selector-item { position: relative; }
 
 /* ---- los 11 huecos, dispuestos como en un campo de fútbol real ----
-   La formación es fija (1 portero, 4 defensas, 4 medios, 2 delanteros,
-   Tcg::HUECOS en db/consultas.php) y el orden del DOM la sigue exactamente:
-   por eso las coordenadas de cada hueco se dan por :nth-child, no hace falta
-   ninguna clase ni dato extra por hueco. El terreno se dibuja con un SVG de
-   líneas de campo en el fondo (banda, círculo central, áreas), en tonos
-   apagados para no pelear con el resto del sistema de color del sitio. */
+   Las coordenadas NO están aquí: las calcula Tcg::coordenadasDe() y llegan
+   como `style` en cada hueco. Con ocho formaciones, tenerlas en CSS serían 88
+   reglas :nth-child que habría que mantener en sincronía a mano con el orden
+   de los huecos de PHP — y desincronizarlas no rompe nada visible, solo coloca
+   a la gente en el sitio equivocado. El terreno se dibuja con un SVG de líneas
+   de campo en el fondo (banda, círculo central, áreas), en tonos apagados para
+   no pelear con el resto del sistema de color del sitio. */
 .alineacion {
   position: relative;
   width: 100%;
@@ -578,20 +579,23 @@
   align-items: center;
   gap: 4px;
   width: clamp(60px, 15%, 84px);
+  /* al cambiar de formación los huecos se deslizan a su nueva posición en vez
+     de saltar, que es lo que hace legible de un vistazo qué se ha movido */
+  transition: left var(--t-media) var(--ease), top var(--t-media) var(--ease);
 }
-/* Coordenadas de la formación 1-4-4-2. El índice de :nth-child sigue el
-   orden de Tcg::HUECOS: 1=POR, 2-5=DF, 6-9=MC, 10-11=DC. */
-.hueco:nth-child(1)  { left: 50%; top: 91%; }
-.hueco:nth-child(2)  { left: 14%; top: 74%; }
-.hueco:nth-child(3)  { left: 38%; top: 79%; }
-.hueco:nth-child(4)  { left: 62%; top: 79%; }
-.hueco:nth-child(5)  { left: 86%; top: 74%; }
-.hueco:nth-child(6)  { left: 14%; top: 50%; }
-.hueco:nth-child(7)  { left: 38%; top: 45%; }
-.hueco:nth-child(8)  { left: 62%; top: 45%; }
-.hueco:nth-child(9)  { left: 86%; top: 50%; }
-.hueco:nth-child(10) { left: 35%; top: 16%; }
-.hueco:nth-child(11) { left: 65%; top: 16%; }
+@media (prefers-reduced-motion: reduce) {
+  .hueco { transition: none; }
+}
+/* En pantalla estrecha, una línea de seis medios deja ~52px por jugador: el
+   retrato se encoge para que quepan sin pisarse ni salirse del campo. El
+   botón entero sigue por encima del objetivo táctil mínimo. */
+@media (max-width: 430px) {
+  .hueco { width: clamp(52px, 15%, 84px); }
+}
+
+/* El selector de formación va bajo el nombre del mazo, no en la barra de
+   totales: es una decisión de plantilla, no un dato de resultado. */
+.campo-formacion { margin-top: var(--space-3); max-width: 240px; }
 
 .hueco-boton {
   display: flex;
@@ -940,6 +944,338 @@
 }
 .partido.es-victoria .partido-veredicto { color: var(--success); }
 .partido.es-derrota  .partido-veredicto { color: var(--frost-dim); }
+
+/* ---- sello de rango (S/A/B) de las cadenas ----
+   Primer guiño retro de las Cadenas: letra grande y maciza, borde duro y sin
+   degradados, como el rango de un marcador de recreativa. La paleta sigue
+   siendo la del sitio, así que hace de homenaje sin desentonar con el resto
+   de la pantalla, que es lo que pidió Alejandro. */
+.rango-sello {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: 0 auto var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  width: fit-content;
+  max-width: 100%;
+  border: 2px solid var(--rango-color, var(--line-strong));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--rango-color, var(--panel)) 10%, transparent);
+}
+.rango-letra {
+  font-family: var(--font-mono);
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--rango-color, var(--frost));
+  /* el "relieve" de recreativa es una sombra dura, sin desenfoque */
+  text-shadow: 2px 2px 0 color-mix(in srgb, var(--rango-color, var(--frost)) 30%, transparent);
+}
+.rango-texto { font-size: var(--fs-body-sm); color: var(--frost-dim); text-align: left; }
+
+/* La letra ya distingue el rango por sí sola: el color solo lo refuerza, así
+   que quien no perciba la diferencia cromática no pierde información. */
+.rango-s { --rango-color: var(--amber); }
+.rango-a { --rango-color: var(--frost); }
+.rango-b { --rango-color: var(--frost-dim); }
+
+/* ==========================================================================
+   MAPA DE CADENA — pantalla de ruta estilo Inazuma Eleven
+   Esta pantalla ROMPE a propósito con la paleta oscura del sitio. Las dos
+   capturas de referencia (rutas de la DS y de la era GO) se definen ante todo
+   por su fondo cian brillante con panal hexagonal y sus piezas claras de borde
+   grueso: en oscuro es imposible parecerse a ellas, por muy hexagonales que
+   sean los nodos. Se trata como lo que es, una pantalla de juego embebida,
+   con su propio marco; el resto del sitio no se toca.
+
+   Sus colores viven aquí y no en tokens.css justamente porque son locales de
+   esta pantalla y no forman parte del sistema de diseño.
+   ========================================================================== */
+.mapa-marco {
+  --ruta-cian:      #45CFE8;
+  --ruta-cian-hondo:#1F9CC4;
+  --ruta-borde:     #12557A;
+  --ruta-pieza:     #EAF7FD;   /* relleno claro de las piezas */
+  --ruta-tinta:     #12405C;   /* icono/letra sobre pieza clara */
+  --ruta-oro:       #FFC933;
+  --ruta-camino:    #F2FBFF;
+
+  position: relative;
+  overflow-x: auto;             /* solo aquí: el body sigue con overflow-x clip */
+  overscroll-behavior-x: contain;
+  padding: var(--space-5) var(--space-4) 0;
+  border: 3px solid var(--ruta-borde);
+  border-radius: var(--radius-lg);
+  /* Panal hexagonal sobre el degradado cian: es la textura de fondo de la
+     captura de la era GO. El panal va en un SVG en línea porque es un patrón
+     que se repite, no una imagen que haya que descargar. */
+  background-color: var(--ruta-cian);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='96' viewBox='0 0 56 96'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.30' stroke-width='2'%3E%3Cpath d='M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z'/%3E%3Cpath d='M28 64 L56 80 L56 112 L28 128 L0 112 L0 80 Z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 50% 25%, rgba(255,255,255,.38), transparent 65%),
+    linear-gradient(180deg, var(--ruta-cian) 0%, var(--ruta-cian-hondo) 100%);
+  background-size: 56px 96px, auto, auto;
+}
+.mapa { position: relative; margin: 0 auto; }
+
+.mapa-lineas { position: absolute; inset: 0; overflow: visible; }
+
+/* Los caminos son cintas claras: una carcasa azul oscura y encima una banda
+   casi blanca. Dos trazos del MISMO path, así que no pueden desalinearse. */
+.mapa-carcasa {
+  fill: none;
+  stroke: var(--ruta-borde);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mapa-energia {
+  fill: none;
+  stroke: #A9D8EA;              /* tramo aún no abierto: apagado */
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* tramo ya recorrido: cinta blanca encendida, como en las capturas */
+.mapa-energia.es-recorrida {
+  stroke: var(--ruta-camino);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, .9));
+}
+
+/* Rótulo inferior con el nombre de la ruta, como la barra azul de
+   "Cadena Refriega" de la captura de la era GO. */
+.mapa-rotulo {
+  position: sticky;
+  left: 0;
+  margin: var(--space-4) calc(var(--space-4) * -1) 0;
+  padding: 6px var(--space-4);
+  background: var(--ruta-borde);
+  color: #EAF7FD;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.nodo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nodo-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+.nodo-boton[aria-disabled="true"] { cursor: default; }
+.nodo-boton:focus-visible { outline: 3px solid #123A5A; outline-offset: 2px; }
+
+/* La pieza envuelve hexágono y sello para poder colgar el sello de la esquina. */
+.nodo-pieza { position: relative; display: block; }
+
+/* El hexágono usa la misma técnica de borde que las cartas del sitio: relleno
+   por debajo y una capa interior encima que deja ver el borde. Con clip-path
+   no se puede usar `border`, así que esto no es un capricho.
+   Borde grueso (4px) y relleno CLARO: así son las piezas de las capturas,
+   fichas macizas sobre el cian, no cajas oscuras. */
+.nodo-hex {
+  display: block;
+  width: 70px; height: 62px;
+  padding: 4px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: var(--nodo-borde, var(--ruta-borde));
+  filter: var(--nodo-brillo, drop-shadow(0 3px 0 rgba(9, 52, 78, .45)));
+  transition: transform var(--t-micro) var(--ease), filter var(--t-media) var(--ease);
+}
+.nodo-hex-int {
+  display: grid;
+  place-items: center;
+  width: 100%; height: 100%;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* brillo arriba: da el volumen de ficha que tienen las piezas del original */
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--nodo-fondo, var(--ruta-pieza)) 55%,
+              color-mix(in srgb, var(--nodo-fondo, var(--ruta-pieza)) 86%, var(--ruta-cian-hondo)) 100%);
+  color: var(--nodo-tinta, var(--ruta-tinta));
+  font-size: 26px;
+}
+
+/* Sello de rango: disco dorado en la esquina con borde oscuro y sombra dura,
+   exactamente como marca el rango el mapa de rutas de la DS. */
+.nodo-sello {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ruta-borde);
+  background: var(--rango-color, var(--ruta-oro));
+  color: #3A2600;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);   /* sombra dura, sin desenfoque */
+}
+/* En el mapa los tres rangos van en oro, como en el original; la letra es la
+   que los distingue. El color por rango se reserva al sello grande del
+   resultado, donde sí hay sitio para leerlo. */
+.nodo-sello.rango-s { background: var(--ruta-oro); }
+.nodo-sello.rango-a { background: #E4E9EE; }
+.nodo-sello.rango-b { background: #C79A6B; }
+
+.nodo-nombre {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(18, 64, 92, .82);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .07em;
+  text-transform: uppercase;   /* rotulación de mapa, no texto de web */
+  line-height: 1.25;
+  text-align: center;
+  color: #EAF7FD;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Casilla de salida, como el "Inicio" rojo del mapa de la DS. */
+.nodo.es-inicio .nodo-pieza::after {
+  content: 'INICIO';
+  position: absolute;
+  left: 50%; top: -11px;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--ruta-borde);
+  background: #E33B2E;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  letter-spacing: .08em;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);
+}
+
+/* Los estados se distinguen por icono ADEMÁS de por color (candado, espada,
+   cofre, sello de rango), así que no dependen de percibir el matiz. */
+/* El nodo bloqueado se apaga con un relleno grisáceo, NO con opacity: bajar la
+   opacidad lo mezclaba con el cian del fondo y el candado se quedaba en 3,04:1
+   de contraste, justo en el límite. Con relleno propio el icono se lee bien y
+   la pieza sigue viéndose claramente apagada. */
+.nodo.es-bloqueado {
+  --nodo-borde: #2C6E8E;
+  --nodo-fondo: #9FB4BF;
+  --nodo-tinta: #22414F;
+  --nodo-brillo: drop-shadow(0 3px 0 rgba(9, 52, 78, .35));
+}
+
+.nodo.es-disponible {
+  --nodo-borde: var(--ruta-oro);
+  --nodo-fondo: #FFF6DE;
+  --nodo-tinta: #7A4B00;
+}
+.nodo.es-superado {
+  --nodo-borde: var(--ruta-borde);
+  --nodo-fondo: var(--ruta-pieza);
+  --nodo-tinta: var(--ruta-tinta);
+}
+.nodo.es-elegido {
+  --nodo-borde: #FFFFFF;
+  --nodo-brillo: drop-shadow(0 0 9px rgba(255, 255, 255, .95)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45));
+}
+.nodo.es-elegido .nodo-hex { transform: scale(1.12); }
+
+a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
+
+/* Latido del nodo que toca jugar: es el "aquí estás" de los mapas de la saga.
+   Solo lo lleva el disponible sin elegir, para que no compitan dos cosas
+   parpadeando a la vez. */
+.nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: nodoLatido 1.9s var(--ease) infinite; }
+@keyframes nodoLatido {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 201, 51, .65)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(255, 201, 51, 1))  drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nodo-hex, a.nodo-boton:hover .nodo-hex, .nodo.es-elegido .nodo-hex { transition: none; }
+  .nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: none; }
+}
+
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- lista de cadenas ---- */
+.lista-cadenas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+.cadena-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.cadena-tarjeta.es-bloqueada { opacity: .72; }
+.cadena-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cadena-pie { margin-top: auto; }
+
+.lista-requisitos { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; }
+.lista-requisitos li { display: flex; align-items: center; gap: var(--space-2); color: var(--frost-dim); }
+
+/* ---- recompensas de un partido/cofre de cadena ---- */
+.lista-recompensas { display: flex; flex-direction: column; gap: var(--space-2); }
+.lista-recompensas li { display: flex; align-items: center; gap: var(--space-2); }
+.lista-recompensas .ph-fill.ph-coins { color: var(--amber); }
+.lista-recompensas .ph-fill.ph-seal-star { color: var(--rz5); }
+
+/* ---- selector de dificultad de una cadena ---- */
+.dificultades {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+.dificultad {
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  border-left: 3px solid var(--dif-color, var(--line-strong));
+}
+.dificultad-nombre { font-weight: var(--fw-semibold); }
+.dificultad-nota { font-size: var(--fs-caption-sm); color: var(--frost-dim); }
+
+/* La dificultad se lee en el texto; el color solo acompaña. */
+.dificultad--facil       { --dif-color: var(--success); }
+.dificultad--medio       { --dif-color: var(--info); }
+.dificultad--dificil     { --dif-color: var(--warning); }
+.dificultad--muy_dificil { --dif-color: var(--amber); }
+.dificultad--extremo     { --dif-color: var(--danger); }
 
 /* ---- desglose por líneas ---- */
 .partido-lineas {

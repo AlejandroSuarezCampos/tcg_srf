@@ -138,8 +138,12 @@ include __DIR__ . '/navbar.php';
               // Sin sesión el álbum es un catálogo: todo se muestra normal.
               $tienePoseida = empty($_SESSION['id_usuario'])
                   || isset($poseidas[(int) $cromo['id_cromo']]);
+              $esJugador = in_array($cromo['posicion'], Tcg::POSICIONES_JUGABLES, true);
               render_carta($cromo, [
                   'poseida' => $tienePoseida,
+                  'stats'   => $esJugador
+                      ? ['ATA' => $cromo['ataque'], 'DEF' => $cromo['defensa'], 'TÉC' => $cromo['tecnica']]
+                      : null,
                   'datos'   => [
                       'nombre'   => $cromo['nombre'],
                       'equipo'   => $cromo['equipo'],

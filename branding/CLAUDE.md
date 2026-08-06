@@ -532,19 +532,34 @@ bonus sobre una o dos líneas. **Umbrales 2 / 5 / 11 copias** para todos.
 
 | Rasgo | Tipo | Línea(s) | N1 | N2 | N3 |
 |---|---|---|---|---|---|
-| Fuego | afinidad | Ataque | 2,99 % | 6,97 % | 13,94 % |
-| Bosque | afinidad | Medio | 1,60 % | 3,74 % | 7,49 % |
-| Viento | afinidad | Defensa | 1,79 % | 4,17 % | 8,33 % |
-| Montaña | afinidad | Portería | 6,75 % | 15,75 % | 31,50 % |
-| Contraataque | configuración | Ataque | 2,99 % | 6,97 % | 13,94 % |
-| Vínculo | configuración | Medio | 1,60 % | 3,74 % | 7,49 % |
-| Justicia | configuración | Ataque + Defensa | 0,75 % | 1,68 % | 3,35 % |
-| Brecha | configuración | Ataque + Portería | 1,38 % | 3,11 % | 6,21 % |
+| Fuego | afinidad | Ataque | 2,70 % | 6,30 % | 12,59 % |
+| Bosque | afinidad | Medio | 1,70 % | 3,97 % | 7,94 % |
+| Viento | afinidad | Defensa | 2,23 % | 5,19 % | 10,36 % |
+| Montaña | afinidad | Portería | 3,88 % | 9,06 % | 18,13 % |
+| Contraataque | configuración | Ataque | 2,70 % | 6,30 % | 12,59 % |
+| Vínculo | configuración | Medio | 1,70 % | 3,97 % | 7,94 % |
+| Justicia | configuración | Ataque + Defensa | 0,82 % | 1,83 % | 3,65 % |
+| Brecha | configuración | Ataque + Portería | 1,06 % | 2,39 % | 4,77 % |
 | Tensión | derivado | — (mejora el Aumento) | 3 rasgos | 5 rasgos | 7 rasgos |
 
-Los porcentajes **no son uniformes a propósito**: Portería pesa ~9 % del total
-y Medio ~37 %, así que Montaña necesita un % mucho mayor para tener el mismo
-impacto real. Están calibrados para equivaler, no para parecer iguales.
+Los porcentajes **no son uniformes a propósito**: con el peso ponderado por
+línea (`Tcg::PESOS_LINEA`, ver §Formaciones/PvE), Portería pesa ~15,45 % del
+total y Medio ~35,27 %, así que Montaña sigue necesitando un % mayor para
+tener el mismo impacto real, solo que ya no tan extremo como antes. Están
+calibrados para equivaler, no para parecer iguales: los seis rasgos de una
+sola línea maximizados dan exactamente 2,80 % de la fuerza total cada uno;
+Justicia y Brecha (dos líneas) dan 1,80 % cada uno.
+
+**Recalibrados en `009_recalibrar_compos.sql`** cuando el deck builder pasó de
+puntuar cada línea con una sola estadística a las tres ponderadas (decisión de
+Alejandro sobre el cálculo de fuerza). Antes del cambio, Portería pesaba solo
+~8,9 % del total y Medio ~37,4 %; con la fórmula nueva Portería casi se
+duplica, así que el +31,5 % original de Montaña habría pasado a valer más del
+doble que un Vínculo maximizado (una inversión real, no solo un desajuste
+cosmético). Si `Tcg::PESOS_LINEA` vuelve a cambiar, esta tabla hay que
+recalcularla otra vez con el mismo método: reparto real por línea (catálogo
+completo, formación 1-4-4-2, cartas en su posición natural) → factor de
+reescalado por línea → aplicar a cada % existente.
 
 **La afinidad NO se duplica en `cromo_rasgos`**: vive solo en
 `cromos.id_afinidad`, para que no haya dos fuentes de la misma verdad. Solo los
@@ -616,10 +631,14 @@ alineación congelada y aplica todo.
 | Comprobación | Documento | Implementación |
 |---|---|---|
 | Fuego vence a Bosque (ciclo 5,5 %) | 57,78 % | **57,75 %** |
-| 4 rasgos apilados en Ataque, bruto | «supera el 30 %» | 37,44 % |
-| …con rendimientos decrecientes | — | 27,33 % |
+| 4 rasgos apilados en Ataque, bruto (Fuego+Contraataque+Brecha+Justicia, N3) | «supera el 30 %» | 33,60 % |
+| …con rendimientos decrecientes | — | 24,46 % |
 | …con tope de línea | 20 % | **20,00 %** |
 | Probabilidades de tier por Tensión | 60/30/10 → 43/36/21 | idénticas |
+
+> Remedido tras `009_recalibrar_compos.sql` (antes: bruto 37,44 % / con
+> decrecientes 27,33 %). El tope de línea sigue absorbiendo la diferencia en
+> ambos casos, así que el comportamiento final no cambia.
 
 ### 10.6 Tres hallazgos abiertos (decisiones para Alejandro)
 

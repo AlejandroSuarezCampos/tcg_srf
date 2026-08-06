@@ -295,6 +295,21 @@
 }
 .carta-equipo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ---- rasgo de configuración (Capa 2 — Compos): Contraataque, Justicia,
+   Vínculo o Brecha. La afinidad ya se ve como hexágono; este es el otro
+   ingrediente de las Compos y hasta ahora no se veía en ningún sitio. ---- */
+.carta-rasgo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-caption-sm);
+  color: var(--amber-light);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.carta-rasgo i { font-size: 11px; flex-shrink: 0; }
+
 /* ---- bloque de estadísticas de combate ----
    Espacio reservado desde ya (briefing, sección 32). Se rellena cuando el
    diseño de los duelos fije las estadísticas; el marco no cambia. */
@@ -1195,12 +1210,21 @@
   background: var(--line-strong);
 }
 
+/* Selector de jugadores del mazo: cartas más grandes que el resto de
+   selectores (apuesta de duelo, venta en mercado) porque aquí hace falta
+   leer la afinidad y las estadísticas para decidir la alineación. */
+.selector-cartas--grande { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+
 .selector-item { display: block; cursor: pointer; border-radius: var(--radius-lg); }
 .selector-item[hidden] { display: none; }
 .selector-item .carta-meta,
 .selector-item .carta-afinidad { display: none; }
 .selector-item .carta-nombre { font-size: 11px; -webkit-line-clamp: 1; }
 .selector-item .rz { font-size: 8.5px; padding: 3px 5px; }
+
+.selector-cartas--grande .carta-afinidad { display: grid; }
+.selector-cartas--grande .carta-nombre { font-size: var(--fs-body-sm); -webkit-line-clamp: 2; }
+.selector-cartas--grande .rz { font-size: var(--fs-caption-sm); padding: 3px var(--space-2); }
 
 /* el foco del teclado se ve sobre la tarjeta entera, no sobre el radio oculto */
 .selector-item:focus-within { outline: 2px solid var(--amber-light); outline-offset: 3px; }

@@ -58,6 +58,8 @@ $navGrupos = [
 		['sobres', 'sobres.php', 'Sobres', 'ph-package'],
 		['mazos',  'mazos.php',  'Mazos',  'ph-list-checks'],
 		['duelos', 'duelos.php', 'Duelos', 'ph-sword'],
+		['misiones', 'misiones.php', 'Misiones', 'ph-target'],
+		['cadenas',  'cadenas.php',  'Cadenas',  'ph-path'],
 	],
 	'Coleccionar' => [
 		['coleccion', 'coleccion.php', 'Colección', 'ph-cards'],

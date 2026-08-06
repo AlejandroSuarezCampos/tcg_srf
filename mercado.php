@@ -101,7 +101,19 @@ $anuncios = $db->listarMercadoActivo([
     'orden'     => $orden,
 ]);
 
-$cromosVendibles = $db->listarColeccionVendible($id_usuario);
+// Copias agrupadas por cromo: para vender da igual cuál copia concreta se
+// publique (son intercambiables), así que no tiene sentido pintar una tarjeta
+// completa por cada una. Con muchas copias de comunes (sobres grandes) pintar
+// una por copia llegaba a cientos de nodos y colgaba el navegador al abrir el
+// modal. Mismo criterio que ya usan coleccion.php y mazos.php.
+$porCromoVendible = [];
+foreach ($db->listarColeccionVendible($id_usuario) as $c) {
+    $idCromo = (int) $c['id_cromo'];
+    if (!isset($porCromoVendible[$idCromo])) {
+        $porCromoVendible[$idCromo] = ['fila' => $c, 'cantidad' => 0];
+    }
+    $porCromoVendible[$idCromo]['cantidad']++;
+}
 $monedasActuales = $_SESSION['monedas'] ?? 0;
 $hayFiltros = $filtroNombre !== '' || $filtroRareza !== '' || $orden !== '';
 
@@ -253,7 +265,7 @@ include __DIR__ . '/navbar.php';
       </button>
     </div>
 
-    <?php if (empty($cromosVendibles)): ?>
+    <?php if (empty($porCromoVendible)): ?>
       <div class="vacio">
         <span class="vacio-ico"><i class="ph ph-lock-simple" aria-hidden="true"></i></span>
         <h3>No tienes cartas disponibles</h3>
@@ -273,19 +285,20 @@ include __DIR__ . '/navbar.php';
           <input type="search" id="v-buscar" placeholder="Buscar entre tus cartas"
                  autocomplete="off" aria-describedby="v-conteo">
           <span class="campo-hint" id="v-conteo" role="status" aria-live="polite">
-            <?= count($cromosVendibles) ?> cartas disponibles
+            <?= count($porCromoVendible) ?> cartas disponibles
           </span>
         </div>
 
         <div class="selector-cartas" id="v-lista" role="radiogroup" aria-label="Cartas disponibles para vender">
-          <?php foreach ($cromosVendibles as $c): ?>
+          <?php foreach ($porCromoVendible as $grupo): ?>
+            <?php $c = $grupo['fila']; ?>
             <label class="selector-item"
                    data-nombre="<?= htmlspecialchars($c['nombre']) ?>"
                    data-equipo="<?= htmlspecialchars($c['equipo']) ?>"
                    data-rareza-nombre="<?= htmlspecialchars($c['rareza']) ?>">
               <input type="radio" name="seleccion_carta" class="sr-only"
                      value="<?= $c['id_coleccion'] ?>">
-              <?php render_carta($c, ['tamano' => 'sm']); ?>
+              <?php render_carta($c, ['tamano' => 'sm', 'cantidad' => $grupo['cantidad']]); ?>
             </label>
           <?php endforeach; ?>
 
