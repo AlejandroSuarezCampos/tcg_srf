@@ -4076,6 +4076,91 @@ class Tcg
 
 		return $mapa;
 	}
+
+	private const IMPORT_BASE_TOTAL = ['comun' => 165, 'poco_comun' => 190, 'raro' => 215, 'epico' => 240];
+	private const IMPORT_RAREZA_CLAVE = [1 => 'comun', 2 => 'poco_comun', 3 => 'raro', 4 => 'epico'];
+	private const IMPORT_SPLIT_POSICION = [
+		'POR' => ['ataque' => 0.20, 'defensa' => 0.45, 'tecnica' => 0.35],
+		'DF'  => ['ataque' => 0.25, 'defensa' => 0.45, 'tecnica' => 0.30],
+		'MC'  => ['ataque' => 0.33, 'defensa' => 0.30, 'tecnica' => 0.37],
+		'DC'  => ['ataque' => 0.45, 'defensa' => 0.25, 'tecnica' => 0.30],
+	];
+
+	// Tres rankings independientes (goleadores temporada anterior, goleadores
+	// actuales, mejor jugador por equipo); top 1-3 -> Épico, top 4-10 -> Raro.
+	// Si un jugador cae en varias listas, se queda con la rareza más alta.
+	public function rankearRarezasImportacion(array $datosJson): array {
+		$resultado = [];
+
+		$ubicacionActual = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$ubicacionActual[$jugador['nombre']] = $equipo['id'];
+			}
+		}
+
+		$aplicarRanking = function (array $lista) use (&$resultado, $ubicacionActual) {
+			usort($lista, fn($a, $b) => $b['puntos'] <=> $a['puntos']);
+			foreach ($lista as $i => $item) {
+				if (!isset($ubicacionActual[$item['nombre']])) { continue; } // ya no juega
+				$idRareza = $i < 3 ? 4 : ($i < 10 ? 3 : null);
+				if ($idRareza === null) { continue; }
+				$clave = $ubicacionActual[$item['nombre']] . '|' . $item['nombre'];
+				if ($idRareza > ($resultado[$clave] ?? 0)) { $resultado[$clave] = $idRareza; }
+			}
+		};
+
+		$actuales = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$actuales[] = ['nombre' => $jugador['nombre'], 'puntos' => (int) ($jugador['goles'] ?? 0)];
+			}
+		}
+		$aplicarRanking($actuales);
+
+		$numeroActual = (int) ($datosJson['config']['temporada'] ?? 0);
+		$etiquetaAnterior = 'Temporada ' . ($numeroActual - 1);
+		foreach ($datosJson['historial_temporadas'] ?? [] as $temporada) {
+			if (($temporada['nombre'] ?? '') !== $etiquetaAnterior) { continue; }
+			$anteriores = [];
+			foreach ($temporada['equipos'] ?? [] as $equipo) {
+				foreach ($equipo['jugadores'] ?? [] as $jugador) {
+					$anteriores[] = ['nombre' => $jugador['nombre'], 'puntos' => (int) ($jugador['goles'] ?? 0)];
+				}
+			}
+			$aplicarRanking($anteriores);
+			break;
+		}
+
+		$mejoresPorEquipo = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			$mejor = null;
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$puntos = (int) ($jugador['goles'] ?? 0) + (int) ($jugador['asistencias'] ?? 0);
+				if ($mejor === null || $puntos > $mejor['puntos']) {
+					$mejor = ['nombre' => $jugador['nombre'], 'puntos' => $puntos];
+				}
+			}
+			if ($mejor !== null) { $mejoresPorEquipo[] = $mejor; }
+		}
+		$aplicarRanking($mejoresPorEquipo);
+
+		return $resultado;
+	}
+
+	public function statsBaseImportacion(string $posicion, int $idRareza): array {
+		if (!isset(self::IMPORT_SPLIT_POSICION[$posicion])) {
+			return ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0]; // ENT/GER/ESCUDO
+		}
+		$clave = self::IMPORT_RAREZA_CLAVE[$idRareza] ?? 'comun';
+		$total = self::IMPORT_BASE_TOTAL[$clave] * (mt_rand(92, 108) / 100);
+		$split = self::IMPORT_SPLIT_POSICION[$posicion];
+		return [
+			'ataque'  => max(1, min(99, (int) round($total * $split['ataque']))),
+			'defensa' => max(1, min(99, (int) round($total * $split['defensa']))),
+			'tecnica' => max(1, min(99, (int) round($total * $split['tecnica']))),
+		];
+	}
 }
 
 ?>
