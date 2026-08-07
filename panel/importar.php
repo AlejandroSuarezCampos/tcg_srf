@@ -10,7 +10,8 @@ if (isset($_SESSION['dictador'])) {
 
 // ----- Borrado de cartas importadas (?borrar_importadas=1) -----
 if (isset($_GET['borrar_importadas'])) {
-    $borradoResultado = $db->borrarCartasImportadas();
+    $id_expansion_borrar = isset($_GET['id_expansion']) ? (int) $_GET['id_expansion'] : null;
+    $borradoResultado = $db->borrarCartasImportadas($id_expansion_borrar);
     header('Location: importar.php?importados_borrados=1&n=' . $borradoResultado['borrados'] . '&retenidas=' . $borradoResultado['en_uso']);
     exit;
 }
@@ -36,7 +37,7 @@ $previsualizacion = isset($_SESSION['import_datos'])
     : null;
 
 $expansiones = $db->listarExpansiones();
-$totalImportadas = $db->contarCartasImportadas();
+$expansionesImportadas = $db->listarExpansionesConCartasImportadas();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -148,10 +149,23 @@ $totalImportadas = $db->contarCartasImportadas();
         </div>
       </form>
 
-      <?php if ($totalImportadas > 0): ?>
+      <?php if (!empty($expansionesImportadas)): ?>
       <div class="field-full">
-        <p><?= $totalImportadas ?> cartas importadas actualmente.</p>
-        <button type="button" class="btn btn-ghost" onclick="if(confirm('¿Borrar las <?= htmlspecialchars((string) $totalImportadas) ?> cartas importadas? Esta acción no se puede deshacer.')) window.location.href='importar.php?borrar_importadas=1'">Borrar cartas importadas</button>
+        <h3>Cartas importadas por expansión</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Expansión</th><th>Cartas importadas</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($expansionesImportadas as $exImp): ?>
+            <tr>
+              <td><?= htmlspecialchars($exImp['nombre']) ?></td>
+              <td><?= (int) $exImp['total'] ?></td>
+              <td><button type="button" class="btn btn-ghost" onclick="if(confirm('¿Borrar las <?= htmlspecialchars((string) $exImp['total']) ?> cartas importadas de \'<?= htmlspecialchars(addslashes($exImp['nombre'])) ?>\'? Esta acción no se puede deshacer.')) window.location.href='importar.php?borrar_importadas=1&id_expansion=<?= (int) $exImp['id_expansion'] ?>'">Borrar</button></td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
       <?php endif; ?>
     <?php endif; ?>

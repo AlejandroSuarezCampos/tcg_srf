@@ -4394,8 +4394,18 @@ class Tcg
 		return (int) $stmt->fetchColumn();
 	}
 
-	public function borrarCartasImportadas(): array {
-		$stmt = $this->pdo->query("SELECT id_cromo FROM cromos WHERE origen_importacion = 1");
+	public function listarExpansionesConCartasImportadas(): array {
+		$stmt = $this->pdo->query("SELECT c.id_expansion, e.nombre, COUNT(*) AS total FROM cromos c JOIN expansiones e ON e.id_expansion = c.id_expansion WHERE c.origen_importacion = 1 GROUP BY c.id_expansion, e.nombre ORDER BY e.nombre");
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function borrarCartasImportadas(?int $id_expansion = null): array {
+		if ($id_expansion !== null) {
+			$stmt = $this->pdo->prepare("SELECT id_cromo FROM cromos WHERE origen_importacion = 1 AND id_expansion = :id_expansion");
+			$stmt->execute(['id_expansion' => $id_expansion]);
+		} else {
+			$stmt = $this->pdo->query("SELECT id_cromo FROM cromos WHERE origen_importacion = 1");
+		}
 		$ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 		if (empty($ids)) {
 			return ['borrados' => 0, 'en_uso' => 0];
