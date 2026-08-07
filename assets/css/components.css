@@ -453,6 +453,25 @@
 .carta-stat-pildora[data-stat="DEF"] { background: var(--danger); }
 .carta-stat-pildora[data-stat="TÉC"] { background: var(--info); }
 
+/* §16.14.1: aviso de "ver estadísticas en el modal" — sustituye a las
+   píldoras/bloque de stats cuando la carta abre el modal de detalle. */
+.carta--detalle { cursor: pointer; }
+.carta-ver-stats {
+  display: block;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  text-align: center;
+}
+.carta-ver-stats--flotante {
+  position: absolute;
+  left: var(--space-2); right: var(--space-2);
+  bottom: 78px;
+  z-index: 3;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
+}
+.carta--lg .carta-ver-stats--flotante { bottom: 92px; }
+
 /* placa de nombre: sobre el degradado, sustituye a .carta-cuerpo (nombre +
    equipo) para este modo — el rasgo de Compos, si lo hay, sigue debajo de
    la placa como un .carta-cuerpo normal, eso no cambia. */

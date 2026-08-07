@@ -111,6 +111,7 @@ function render_carta(array $c, array $opts = []): void
     $lazy         = $opts['lazy']         ?? true;
     $acciones     = $opts['acciones']     ?? '';
     $pie          = $opts['pie']          ?? '';
+    $detalle      = $opts['detalle']      ?? false;
 
     $idRareza = (int) ($c['id_rareza'] ?? 1);
     $nombre   = (string) ($c['nombre'] ?? 'Carta sin nombre');
@@ -132,17 +133,31 @@ function render_carta(array $c, array $opts = []): void
     $tieneAfinidad = $afinidad !== '' && strcasecmp($afinidad, 'No-afi') !== 0 && $afinidadImg !== '';
     $esJugador = in_array($posicion, ['POR', 'DF', 'MC', 'DC'], true);
 
+    // §16.14.1: modal de detalle — solo tiene sentido para cartas de jugador
+    // con estadísticas que mostrar.
+    $mostrarDetalle = $detalle && $esJugador && !empty($stats);
+
     $clases = ['carta'];
     if ($tamano !== 'md')  { $clases[] = 'carta--' . $tamano; }
     if ($href !== null)    { $clases[] = 'carta--accion'; }
     if (!$poseida)         { $clases[] = 'is-nopos'; }
     if ($seleccionada)     { $clases[] = 'is-seleccionada'; }
     if ($modo !== 'debajo') { $clases[] = 'carta--artwork'; }
+    if ($mostrarDetalle)   { $clases[] = 'carta--detalle'; }
     if ($claseExtra !== '') { $clases[] = $claseExtra; }
 
     $attrs = '';
     foreach ($datos as $clave => $valor) {
         $attrs .= ' data-' . htmlspecialchars($clave) . '="' . htmlspecialchars((string) $valor) . '"';
+    }
+    if ($mostrarDetalle) {
+        $attrs .= ' data-detalle-foto="' . htmlspecialchars($imagen) . '"'
+            . ' data-detalle-nombre="' . htmlspecialchars($nombre) . '"'
+            . ' data-detalle-equipo="' . htmlspecialchars($equipo) . '"'
+            . ' data-detalle-posicion="' . htmlspecialchars($posicion) . '"'
+            . ' data-detalle-ata="' . htmlspecialchars((string) $stats['ATA']) . '"'
+            . ' data-detalle-def="' . htmlspecialchars((string) $stats['DEF']) . '"'
+            . ' data-detalle-tec="' . htmlspecialchars((string) $stats['TÉC']) . '"';
     }
 
     $etiqueta = $href !== null ? 'a' : 'article';
@@ -226,7 +241,9 @@ function render_carta(array $c, array $opts = []): void
               </p>
             <?php endif; ?>
 
-            <?php if (!empty($stats)): ?>
+            <?php if ($mostrarDetalle): ?>
+              <span class="carta-ver-stats">Haz clic aquí para ver las estadísticas</span>
+            <?php elseif (!empty($stats)): ?>
               <div class="carta-stats">
                 <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
                   <div class="carta-stat">
@@ -274,7 +291,9 @@ function render_carta(array $c, array $opts = []): void
               <?php endif; ?>
             </div>
 
-            <?php if ($modo === 'artwork' && !empty($stats)): ?>
+            <?php if ($modo === 'artwork' && $mostrarDetalle): ?>
+              <span class="carta-ver-stats carta-ver-stats--flotante">Haz clic aquí para ver las estadísticas</span>
+            <?php elseif ($modo === 'artwork' && !empty($stats)): ?>
               <div class="carta-stats-flotantes">
                 <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
                   <span class="carta-stat-pildora" data-stat="<?= htmlspecialchars((string) $etiquetaStat) ?>">
