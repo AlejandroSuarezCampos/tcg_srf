@@ -1748,6 +1748,77 @@
   transform: rotate(45deg);
 }
 
+/* Selector de mazos: filas horizontales en vez de tarjetas — contexto de
+   selección rápida, no un catálogo (§16.14.2). Misma altura de fila para
+   cualquier jugador, sin depender de mostrar_stats del cromo. */
+.selector-cartas--filas {
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  gap: var(--space-1);
+}
+.selector-cartas--filas .selector-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  text-align: left;
+}
+.selector-fila-foto {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  overflow: hidden;
+}
+.selector-fila-foto img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.selector-fila-foto .carta-placa-vacia { font-size: 20px; }
+.selector-fila-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.selector-fila-nombre {
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selector-fila-equipo {
+  font-size: var(--fs-caption-sm);
+  color: var(--frost-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selector-fila-stats {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+.selector-cartas--filas .carta-stat-pildora {
+  position: static;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 3px;
+  width: auto;
+  height: auto;
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+}
+
 .selector-vacio {
   grid-column: 1 / -1;
   padding: var(--space-6) var(--space-4);
