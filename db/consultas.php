@@ -217,10 +217,10 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0, $origen_importacion = 0) {
+	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0, $origen_importacion = 0, $mostrar_stats = 'artwork') {
 		$sql = "
-			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica, origen_importacion)
-			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica, :origen_importacion)
+			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica, origen_importacion, mostrar_stats)
+			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica, :origen_importacion, :mostrar_stats)
 		";
 		$stmt = $this->pdo->prepare($sql);
 		$stmt->execute([
@@ -236,11 +236,12 @@ class Tcg
 			":defensa" => $defensa,
 			":tecnica" => $tecnica,
 			":origen_importacion" => $origen_importacion,
+			":mostrar_stats" => $mostrar_stats,
 		]);
 		return $this->pdo->lastInsertId();
 	}
 
-	public function actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad) {
+	public function actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $mostrar_stats = 'artwork') {
 		$sql = "
 			UPDATE cromos SET
 				nombre = :nombre,
@@ -250,7 +251,8 @@ class Tcg
 				id_expansion = :id_expansion,
 				id_equipo = :id_equipo,
 				id_rareza = :id_rareza,
-				id_afinidad = :id_afinidad
+				id_afinidad = :id_afinidad,
+				mostrar_stats = :mostrar_stats
 			WHERE id_cromo = :id_cromo
 		";
 		$stmt = $this->pdo->prepare($sql);
@@ -263,6 +265,7 @@ class Tcg
 			":id_equipo" => $id_equipo,
 			":id_rareza" => $id_rareza,
 			":id_afinidad" => $id_afinidad,
+			":mostrar_stats" => $mostrar_stats,
 			":id_cromo" => $id_cromo,
 		]);
 	}
