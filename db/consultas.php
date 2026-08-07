@@ -610,6 +610,7 @@ class Tcg
 				m.id_anuncio, m.precio, m.fecha_publicacion,
 				col.id_coleccion, col.id_usuario AS id_vendedor,
 				c.id_cromo, c.nombre AS carta, c.imagen, c.posicion, c.mostrar_stats,
+				c.ataque, c.defensa, c.tecnica,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				u.nombre AS vendedor

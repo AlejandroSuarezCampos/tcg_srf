@@ -242,9 +242,13 @@ include __DIR__ . '/navbar.php';
             . '<input type="hidden" name="id_anuncio" value="' . (int) $a['id_anuncio'] . '">'
             . $boton . '</form>';
 
+        $esJugador = in_array($a['posicion'], Tcg::POSICIONES_JUGABLES, true);
         render_carta($datosCarta, [
             'precio' => (int) $a['precio'],
             'pie'    => $pie,
+            'stats'  => $esJugador
+                ? ['ATA' => $a['ataque'], 'DEF' => $a['defensa'], 'TÉC' => $a['tecnica']]
+                : null,
             'datos'  => ['anuncio' => (int) $a['id_anuncio']],
         ]);
         ?>
