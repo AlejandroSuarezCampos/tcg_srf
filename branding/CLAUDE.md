@@ -1088,7 +1088,7 @@ preparado siempre; `htmlspecialchars()` en toda salida a HTML.
 
 ---
 
-#### Tarea 1 — Extender `crearCromo()` con stats de combate
+#### Task 1 — Extender `crearCromo()` con stats de combate
 
 **Archivos:** Modifica `db/consultas.php:220-237` (`crearCromo`).
 
@@ -1133,7 +1133,7 @@ git commit -m "Añade stats de combate opcionales a crearCromo()"
 
 ---
 
-#### Tarea 2 — Helpers puros de mapeo (posición, afinidad, texto)
+#### Task 2 — Helpers puros de mapeo (posición, afinidad, texto)
 
 **Archivos:** Modifica `db/consultas.php`, nueva sección al final de la
 clase (antes del `}` que cierra `Tcg`, hoy línea 3971).
@@ -1188,7 +1188,7 @@ git commit -m "Añade helpers puros de mapeo para el importador de datos oficial
 
 ---
 
-#### Tarea 3 — Emparejamiento y resolución de equipos
+#### Task 3 — Emparejamiento y resolución de equipos
 
 **Archivos:** Modifica `db/consultas.php`, dentro de la sección de la Tarea 2.
 
@@ -1282,7 +1282,7 @@ git commit -m "Añade emparejamiento y resolución de equipos al importador"
 
 ---
 
-#### Tarea 4 — Ranking de rarezas y fórmula de stats
+#### Task 4 — Ranking de rarezas y fórmula de stats
 
 **Archivos:** Modifica `db/consultas.php`, misma sección.
 
@@ -1388,7 +1388,7 @@ git commit -m "Añade ranking de rarezas y fórmula de stats al importador"
 
 ---
 
-#### Tarea 5 — Self-check de las funciones puras
+#### Task 5 — Self-check de las funciones puras
 
 **Archivos:** Crea `db/test_importar_datos_oficiales.php`.
 
@@ -1475,7 +1475,7 @@ git commit -m "Añade self-check de las funciones puras del importador"
 
 ---
 
-#### Tarea 6 — Descarga de fotos, dedupe y orquestadores
+#### Task 6 — Descarga de fotos, dedupe y orquestadores
 
 **Archivos:** Modifica `db/consultas.php`, misma sección.
 
@@ -1621,7 +1621,7 @@ git commit -m "Añade orquestadores de previsualización y ejecución del import
 
 ---
 
-#### Tarea 7 — Página del panel (`panel/importar.php`) y navegación
+#### Task 7 — Página del panel (`panel/importar.php`) y navegación
 
 **Archivos:** Crea `panel/importar.php`. Modifica `panel/navbar.php`.
 
@@ -1801,7 +1801,7 @@ git commit -m "Añade la página del panel para importar datos oficiales"
 
 ---
 
-#### Tarea 8 — Prueba manual con el archivo real y verificación final
+#### Task 8 — Prueba manual con el archivo real y verificación final
 
 - [ ] **Paso 1:** Con sesión de `Claude` en el navegador, ir a
   `panel/importar.php`, subir el `datos_oficiales.json` real y una expansión
