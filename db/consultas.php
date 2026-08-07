@@ -3984,8 +3984,13 @@ class Tcg
 	// el match (el JSON oficial mezcla "Aire"/"aire", "Montaña"/"montaña"...).
 	public function normalizarTexto(string $s): string {
 		$s = trim(mb_strtolower($s, 'UTF-8'));
+		// Replace common Spanish characters manually to avoid iconv translit issues on some systems
+		$s = str_replace(['ñ', 'á', 'é', 'í', 'ó', 'ú', 'à', 'è', 'ì', 'ò', 'ù'],
+		                   ['n', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u'], $s);
 		$translit = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
 		if ($translit !== false) { $s = $translit; }
+		// Remove any remaining special characters that iconv might have left
+		$s = preg_replace('/[^a-z0-9\s]/i', '', $s);
 		return preg_replace('/\s+/', ' ', $s);
 	}
 
@@ -4103,6 +4108,7 @@ class Tcg
 			usort($lista, fn($a, $b) => $b['puntos'] <=> $a['puntos']);
 			foreach ($lista as $i => $item) {
 				if (!isset($ubicacionActual[$item['nombre']])) { continue; } // ya no juega
+				if ($item['puntos'] <= 0) { continue; } // sin puntos no se rankea
 				$idRareza = $i < 3 ? 4 : ($i < 10 ? 3 : null);
 				if ($idRareza === null) { continue; }
 				$clave = $ubicacionActual[$item['nombre']] . '|' . $item['nombre'];
