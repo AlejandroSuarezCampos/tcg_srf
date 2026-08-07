@@ -1011,7 +1011,11 @@ los nombres existentes en `equipos`:
 
 **Promoción** (después de la base; el valor más alto gana si un jugador cae en
 varias listas): tres rankings independientes, top 1-3 → Épico (`id_rareza=4`),
-top 4-10 → Raro (`id_rareza=3`):
+top 4-10 → Raro (`id_rareza=3`). En cada ranking solo entran jugadores con más
+de 0 puntos (goles, o goles+asistencias en el caso del "mejor jugador de cada
+equipo") — sin este filtro, una lista con pocos candidatos promocionaría por
+pura posición a alguien sin mérito real. (Ajuste hecho durante la Tarea 5, al
+escribir el self-check, sobre el diseño original de este apartado.)
 1. Goleadores de la temporada anterior cerrada (`historial_temporadas`, la
    entrada `"Temporada " . (temporada_actual - 1)`), solo si el jugador sigue
    en la plantilla actual de algún equipo.
