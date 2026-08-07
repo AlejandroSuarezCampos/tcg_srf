@@ -4209,7 +4209,12 @@ class Tcg
 			$match = $this->emparejarEquipo($equipo['nombre'], $equiposExistentes);
 			$idEquipo = null;
 			if ($match['estado'] === 'exacto') { $exactos++; $idEquipo = $match['id_equipo']; }
-			elseif ($match['estado'] === 'ambiguo') { $ambiguos[] = ['id' => $equipo['id']] + $match; }
+			elseif ($match['estado'] === 'ambiguo') {
+				$ambiguos[] = ['id' => $equipo['id']] + $match;
+				// El default de resolverEquipos() para un ambiguo sin decisión es "db"
+				// (usa candidato_db); aquí mismo, para que el conteo de omitidos coincida.
+				$idEquipo = $match['candidato_db']['id_equipo'];
+			}
 			else { $nuevos[] = $equipo['nombre']; }
 
 			foreach ($equipo['jugadores'] as $jugador) {
