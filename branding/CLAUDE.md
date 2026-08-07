@@ -2024,3 +2024,162 @@ no se muestra nada (igual que antes con el botón único).
 El manejador del `GET` (`isset($_GET['borrar_importadas'])`, al principio
 del fichero) lee también `$_GET['id_expansion']` y se lo pasa a
 `borrarCartasImportadas()`.
+
+---
+
+## 16. Rediseño del componente de tarjeta (diseño aprobado, sin construir)
+
+> Fase 3 / sistema de diseño. Afecta a `components/carta.php`, EL componente
+> de tarjeta único (§3) — se usa en álbum, colección, mazos, duelo, mercado,
+> sobres y el propio panel. Tocarlo aquí lo cambia en todas esas pantallas a
+> la vez; no hay forma de limitarlo a una sola sin duplicar marcado, que el
+> §3 prohíbe explícitamente. Brainstorm con maquetas visuales, aprobado por
+> Alejandro el 2026-08-07. Independiente del importador (§15): lo toca todo
+> el catálogo existente, no solo lo que se importe a partir de ahora.
+
+### 16.0 Objetivo
+
+Alejandro mandó varias cartas hechas en Photoshop como referencia (fondo a
+toda sangre, foto grande, nombre y posición legibles) y pidió acercar el
+componente real a ese lenguaje visual, pero usando solo datos que la web ya
+tiene (foto, nombre, posición, equipo, rareza, ataque/defensa/técnica) — sin
+inventar patrocinadores, escudos de sponsor ni arte ilustrado a medida, que
+no existen como dato.
+
+**Con una salvedad importante, descubierta durante el brainstorm:** parte
+del catálogo actual (15 cartas de jugador en las carpetas `ALL STARS` y
+`Apuesta Segura`, más las cartas de **presidente, entrenador, gerente y
+escudo que ya tienen imagen propia**) SON esas plantillas de Photoshop —
+la imagen ya es un diseño completo y cerrado (fondo, nombre y a veces
+patrocinador incluidos). Redibujar el marco nuevo encima de esas imágenes
+las estropearía. Esas cartas se quedan exactamente como se ven hoy.
+
+### 16.1 Tres modos por carta: `mostrar_stats`
+
+Nueva columna `cromos.mostrar_stats` — `ENUM('artwork','debajo','ninguna')
+NOT NULL DEFAULT 'artwork'`, migración `db/migraciones/015_mostrar_stats.sql`.
+Editable por carta desde `panel/cromos.php` (select nuevo en el modal de
+crear/editar), para poder cambiar de opinión sin tocar código.
+
+| Modo | Qué pasa |
+|---|---|
+| `artwork` | **Plantilla nueva** (§16.2): foto a sangre, marco rediseñado, estadísticas superpuestas sobre la imagen si las hay. Es el modo por defecto — el 99% del catálogo (fotos normales, incluidas todas las que cree el importador de §15). |
+| `debajo` | **Aspecto de HOY, sin tocar nada**: placa con `object-fit: contain` (nunca recorta), nombre/equipo/posición en texto plano debajo, marcas de rareza + etiqueta de texto como siempre, estadísticas en la fila `.carta-stats` de debajo si las hay. Para las cartas Photoshop. |
+| `ninguna` | Igual que `artwork`, pero sin la fila de estadísticas superpuesta (por si una carta no debe enseñar sus stats). |
+
+**Semilla de la migración** (verificada contra la BD real el 2026-08-07):
+
+```sql
+UPDATE cromos
+SET mostrar_stats = 'debajo'
+WHERE imagen != '' AND imagen IS NOT NULL
+  AND (
+    imagen LIKE '%ALL STARS%'
+    OR imagen LIKE '%Apuesta Segura%'
+    OR posicion IN ('ENT', 'GER', 'ESCUDO', 'PRESIDENTE')
+  );
+```
+
+Marca como `debajo` exactamente las cartas con arte Photoshop real (15 de
+`ALL STARS`/`Apuesta Segura`, más los entrenadores/gerentes/escudos/
+presidente que ya tienen imagen propia — verificado: 13 cartas con imagen de
+esos cuatro tipos hoy). El resto del catálogo (fotos normales, y los
+ENT/GER/ESCUDO sin imagen que crea el importador con `imagen=''`, para los
+que el modo da igual porque no hay foto que recortar) se queda en el
+`DEFAULT 'artwork'` de la columna, sin tocarlos uno a uno.
+
+### 16.2 La plantilla nueva (`artwork`/`ninguna`)
+
+Todo dentro de `.carta-placa`, sustituyendo el `object-fit: contain` actual
+para este modo:
+
+1. **Foto a sangre.** `object-fit: cover`, `object-position: center top`
+   (prioriza que la cara quede dentro del encuadre en vez de centrar el
+   cuerpo entero). **Decisión consciente que rompe la regla del §3** ("el
+   arte nunca se recorta") — solo para este modo; `debajo` sigue sin
+   recortar jamás, tal como pedía la regla original. Fondo detrás de la foto:
+   se mantiene el halo radial teñido por rareza que ya existe hoy
+   (`--rz-halo`), ahora más visible al no haber tanto espacio muerto
+   alrededor del retrato.
+2. **Degradado inferior** (`linear-gradient` de `--void` opaco a
+   transparente, ~55% de la altura de la placa) para que el texto de abajo
+   sea legible sobre la foto sin una placa sólida.
+3. **Marca de rareza**, esquina superior izquierda: reutiliza
+   `rareza_marcas()` (ya existe, sin tocar) — los chevrones/corona/destello,
+   **sin el texto visible** ("Común"/"Poco común"/...) que sí lleva el modo
+   `debajo`. El nombre de la rareza sigue disponible para lectores de
+   pantalla vía un `<span class="sr-only">`, nunca se pierde la
+   accesibilidad, solo el texto visible en pantalla.
+4. **Fila de estadísticas** (solo si `$opts['stats']` trae algo Y el modo es
+   `artwork`), superpuesta sobre la foto encima de la placa de nombre: hasta
+   3 píldoras circulares, mismos colores semánticos que ya tiene el sistema
+   (§4 del CLAUDE.md — no se inventa paleta):
+   - Ataque → `--success` (verde, `#3DDC9B`)
+   - Defensa → `--danger` (rojo, `#F0554A`)
+   - Técnica → `--info` (azul, `#5B96F2`)
+
+   Reutiliza el mismo array `$opts['stats']` que ya pasan `album.php`,
+   `coleccion.php` y `mazos.php` (claves `ATA`/`DEF`/`TÉC`) — no hace falta
+   tocar esos ficheros ni las consultas SQL que alimentan esas pantallas,
+   solo lo que ya envían. Las pantallas que hoy no pasan `stats` (`duelo.php`,
+   `mercado.php`, siempre en `tamano: 'sm'`) simplemente no muestran fila —
+   comportamiento igual al de hoy con las cartas pequeñas.
+5. **Insignia de posición + nombre**, en la placa de nombre (sobre el
+   degradado): un cuadrado de 26×26px con la posición (`POR`/`DF`/`MC`/`DC`,
+   tal cual vienen en la BD) coloreado — otra vez los semánticos existentes,
+   no paleta nueva:
+   - `POR` → `--amber` (naranja, `#E8752A`)
+   - `DF` → `--info` (azul, `#5B96F2`)
+   - `MC` → `--success` (verde, `#3DDC9B`)
+   - `DC` → `--danger` (rojo, `#F0554A`)
+
+   Solo se pinta si `posicion` es una de esas cuatro (`Tcg::POSICIONES_JUGABLES`,
+   ya existe); para `ENT`/`GER`/`ESCUDO`/`PRESIDENTE` no hay insignia (no son
+   posiciones de juego, no tienen color que representarlas).
+6. **Sin escudo de equipo.** Se consideró en el brainstorm y se descartó — la
+   tabla `equipos` no tiene ni un campo de escudo, y añadir una insignia de
+   equipo aquí sería una función nueva no pedida. El nombre del equipo sigue
+   como texto, igual que hoy (`carta-equipo`).
+
+### 16.3 Tamaños
+
+Los tres tamaños (`sm`/`md`/`lg`) existen para densidades distintas (mazos,
+selector, vista grande de colección). La fila de píldoras de stats **solo se
+pinta en `md` y `lg`** — a `sm` no cabe con legibilidad, igual que hoy
+`.carta-meta` ya se oculta en algunos contextos densos (ceremonia). El resto
+de la plantilla (foto a sangre, insignia de posición, marca de rareza) se
+aplica a los tres tamaños, escalando con las variables ya existentes.
+
+### 16.4 Qué NO cambia
+
+- El modo `debajo` es exactamente el `render_carta()` de hoy — cero riesgo
+  para las 13+15 cartas Photoshop existentes.
+- `render_rareza()` (la etiqueta suelta que se usa fuera de la carta, en
+  filtros y la sala de duelo) no se toca — sigue con texto visible, es un
+  contexto distinto a la carta.
+- Ningún fichero de consultas SQL nuevo ni tocado más allá de añadir
+  `mostrar_stats` al `SELECT` donde haga falta (auditoría de cada pantalla
+  durante la implementación: `listarColeccionUsuario`, las consultas de
+  álbum/mercado/mazos/duelo que arman el array `$cromo`/`$c`).
+- `$opts['stats']` sigue existiendo tal cual, con el mismo formato
+  ATA/DEF/TÉC — no se introduce una fuente de datos nueva.
+
+### 16.5 Verificación
+
+Además del checklist estándar de §13 (lint, sin scroll horizontal a 375px,
+foco visible, un solo `<h1>`, aviso legal):
+- Comparar visualmente antes/después en las 6 pantallas que usan
+  `render_carta()`: `album.php`, `coleccion.php`, `mazos.php`, `duelo.php`,
+  `mercado.php`, `sobres.php` (ceremonia, vía `carta_html()`).
+- Las 15 cartas de `ALL STARS`/`Apuesta Segura` y las de presidente/
+  entrenador/gerente/escudo con imagen propia deben verse **pixel a pixel
+  igual que antes de este cambio** (modo `debajo`).
+- Contraste del texto sobre el degradado (nombre, equipo, píldoras de stats)
+  ≥ 4.5:1 en el punto más claro de la foto — probar con una foto muy clara
+  de fondo, es el caso que puede fallar.
+- `prefers-reduced-motion` y el resto de reglas de accesibilidad del §7
+  siguen cumpliéndose (el recorte a sangre no añade animación, no debería
+  afectar, pero confirmarlo).
+- Reejecutar `derivarRasgosConfiguracion()` no aplica aquí (no toca rasgos),
+  pero sí comprobar que `panel/cromos.php` sigue creando/editando cromos sin
+  error con el select nuevo de `mostrar_stats`.
