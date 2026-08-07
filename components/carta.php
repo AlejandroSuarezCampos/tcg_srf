@@ -20,7 +20,11 @@
  * $cromo espera las claves que ya devuelven las consultas existentes:
  *   nombre, imagen, posicion, equipo, id_rareza, rareza, afinidad,
  *   afinidad_imagen, rasgo (el rasgo de CONFIGURACIÓN de la Capa 2 —
- *   Contraataque/Justicia/Vínculo/Brecha—, si la consulta lo trae).
+ *   Contraataque/Justicia/Vínculo/Brecha—, si la consulta lo trae),
+ *   mostrar_stats (columna de cromos: "debajo" = aspecto de siempre, arte
+ *   Photoshop sin recortar, stats bajo la placa; "artwork" o ausente = foto
+ *   a sangre con insignia de posición e imagen sobre placa, stats en
+ *   píldoras flotantes).
  *   Todo lo demás es opcional.
  *
  * Opciones ($opts):
@@ -115,16 +119,23 @@ function render_carta(array $c, array $opts = []): void
     $afinidad = (string) ($c['afinidad'] ?? '');
     $afinidadImg = (string) ($c['afinidad_imagen'] ?? '');
     $rasgo = (string) ($c['rasgo'] ?? '');
+    // §16: modo de la carta. "debajo" = aspecto de siempre (cartas
+    // Photoshop, nunca se recorta el arte). Cualquier otro valor (o su
+    // ausencia, para consultas que aún no seleccionen la columna) cae en
+    // "artwork", la plantilla nueva.
+    $modo = (string) ($c['mostrar_stats'] ?? 'artwork');
 
     // "No-afi" es el valor que usa la base de datos para las cartas sin
     // afinidad (escudos, presidentes): no se pinta el hexágono.
     $tieneAfinidad = $afinidad !== '' && strcasecmp($afinidad, 'No-afi') !== 0 && $afinidadImg !== '';
+    $esJugador = in_array($posicion, ['POR', 'DF', 'MC', 'DC'], true);
 
     $clases = ['carta'];
     if ($tamano !== 'md')  { $clases[] = 'carta--' . $tamano; }
     if ($href !== null)    { $clases[] = 'carta--accion'; }
     if (!$poseida)         { $clases[] = 'is-nopos'; }
     if ($seleccionada)     { $clases[] = 'is-seleccionada'; }
+    if ($modo !== 'debajo') { $clases[] = 'carta--artwork'; }
     if ($claseExtra !== '') { $clases[] = $claseExtra; }
 
     $attrs = '';
@@ -167,61 +178,128 @@ function render_carta(array $c, array $opts = []): void
 
       <div class="carta-marco">
 
-        <div class="carta-head">
-          <?= render_rareza($idRareza, $rareza) ?>
-          <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
-            <span class="carta-head-derecha">
-              <?php if ($cantidad !== null && $cantidad > 1): ?>
-                <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
-              <?php endif; ?>
-              <?php if ($tieneAfinidad): ?>
-                <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
-                  <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+        <?php if ($modo === 'debajo'): ?>
+          <!-- ===== Aspecto de siempre — cartas con arte Photoshop ya cerrado ===== -->
+          <div class="carta-head">
+            <?= render_rareza($idRareza, $rareza) ?>
+            <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
+              <span class="carta-head-derecha">
+                <?php if ($cantidad !== null && $cantidad > 1): ?>
+                  <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
+                <?php endif; ?>
+                <?php if ($tieneAfinidad): ?>
+                  <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
+                    <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+                  </span>
+                <?php endif; ?>
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <div class="carta-placa">
+            <?php if ($imagen !== ''): ?>
+              <img class="carta-arte"
+                   src="<?= htmlspecialchars($imagen) ?>"
+                   alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                   <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+            <?php else: ?>
+              <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+              <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php endif; ?>
+
+            <?php if ($posicion !== ''): ?>
+              <span class="carta-pos"><?= htmlspecialchars($posicion) ?></span>
+            <?php endif; ?>
+          </div>
+
+          <div class="carta-cuerpo">
+            <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+            <p class="carta-meta">
+              <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
+            </p>
+
+            <?php if ($rasgo !== ''): ?>
+              <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
+                <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
+              </p>
+            <?php endif; ?>
+
+            <?php if (!empty($stats)): ?>
+              <div class="carta-stats">
+                <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
+                  <div class="carta-stat">
+                    <b><?= htmlspecialchars((string) $valorStat) ?></b>
+                    <span><?= htmlspecialchars((string) $etiquetaStat) ?></span>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+
+        <?php else: ?>
+          <!-- ===== Plantilla nueva §16: foto a sangre (modo artwork/ninguna) ===== -->
+          <div class="carta-placa carta-placa--artwork">
+            <?php if ($imagen !== ''): ?>
+              <img class="carta-arte carta-arte--sangre"
+                   src="<?= htmlspecialchars($imagen) ?>"
+                   alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                   <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+            <?php else: ?>
+              <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+              <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php endif; ?>
+
+            <div class="carta-degradado" aria-hidden="true"></div>
+
+            <div class="carta-overlay-superior">
+              <span class="rz-flotante">
+                <?= rareza_marcas($idRareza) ?>
+                <span class="sr-only">Rareza: <?= htmlspecialchars($rareza) ?></span>
+              </span>
+              <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
+                <span class="carta-head-derecha">
+                  <?php if ($cantidad !== null && $cantidad > 1): ?>
+                    <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
+                  <?php endif; ?>
+                  <?php if ($tieneAfinidad): ?>
+                    <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
+                      <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+                    </span>
+                  <?php endif; ?>
                 </span>
               <?php endif; ?>
-            </span>
-          <?php endif; ?>
-        </div>
+            </div>
 
-        <div class="carta-placa">
-          <?php if ($imagen !== ''): ?>
-            <img class="carta-arte"
-                 src="<?= htmlspecialchars($imagen) ?>"
-                 alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
-                 <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
-          <?php else: ?>
-            <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
-            <span class="sr-only">Esta carta todavía no tiene ilustración</span>
-          <?php endif; ?>
+            <?php if ($modo === 'artwork' && !empty($stats)): ?>
+              <div class="carta-stats-flotantes">
+                <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
+                  <span class="carta-stat-pildora" data-stat="<?= htmlspecialchars((string) $etiquetaStat) ?>">
+                    <b><?= htmlspecialchars((string) $valorStat) ?></b>
+                    <span><?= htmlspecialchars((string) $etiquetaStat) ?></span>
+                  </span>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
 
-          <?php if ($posicion !== ''): ?>
-            <span class="carta-pos"><?= htmlspecialchars($posicion) ?></span>
-          <?php endif; ?>
-        </div>
-
-        <div class="carta-cuerpo">
-          <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
-          <p class="carta-meta">
-            <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
-          </p>
+            <div class="carta-placa-nombre">
+              <span class="carta-fila-nombre">
+                <?php if ($esJugador): ?>
+                  <span class="carta-pos-insignia" data-posicion="<?= htmlspecialchars($posicion) ?>"><?= htmlspecialchars($posicion) ?></span>
+                <?php endif; ?>
+                <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+              </span>
+              <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
+            </div>
+          </div>
 
           <?php if ($rasgo !== ''): ?>
-            <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
-              <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
-            </p>
-          <?php endif; ?>
-
-          <?php if (!empty($stats)): ?>
-            <div class="carta-stats">
-              <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
-                <div class="carta-stat">
-                  <b><?= htmlspecialchars((string) $valorStat) ?></b>
-                  <span><?= htmlspecialchars((string) $etiquetaStat) ?></span>
-                </div>
-              <?php endforeach; ?>
+            <div class="carta-cuerpo">
+              <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
+                <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
+              </p>
             </div>
           <?php endif; ?>
-        </div>
+        <?php endif; ?>
 
         <?php if ($pie !== ''): ?>
           <div class="carta-pie"><?= $pie ?></div>
