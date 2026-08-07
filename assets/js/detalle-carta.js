@@ -7,6 +7,8 @@
   'use strict';
 
   document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('form, button, a[href], .carta-accion-flotante, .carta-insignia')) return;
+
     var carta = e.target.closest && e.target.closest('.carta--detalle');
     if (!carta) return;
 
