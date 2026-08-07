@@ -338,6 +338,130 @@
   color: var(--frost-dim);
 }
 
+/* ==========================================================
+   PLANTILLA "ARTWORK" — foto a sangre, §16 del CLAUDE.md.
+   Se activa con la clase .carta--artwork (modo artwork/ninguna de
+   cromos.mostrar_stats). El modo "debajo" NO usa nada de este bloque —
+   sigue exactamente el marcado y CSS de siempre, es la red de seguridad
+   para las cartas con arte Photoshop ya cerrado.
+   ========================================================== */
+
+/* la foto ocupa todo el marco: cancela el padding de .carta-marco solo
+   para esta placa, y vuelve a redondear como si fuera el borde real de
+   la carta */
+.carta-placa--artwork {
+  margin: calc(var(--space-3) * -1);
+  border-radius: calc(var(--radius-xl) - 1px);
+}
+
+/* decisión consciente que rompe la regla de "el arte nunca se recorta"
+   (§3) — SOLO para este modo. object-position prioriza que la cara quede
+   dentro de encuadre en vez de centrar el cuerpo entero. */
+.carta-arte--sangre {
+  object-fit: cover;
+  object-position: center 15%;
+}
+
+.carta-degradado {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 58%;
+  background: linear-gradient(0deg, var(--void) 15%, rgba(11, 12, 16, .82) 55%, transparent 100%);
+  pointer-events: none;
+}
+
+/* sustituye a .carta-head para este modo: la rareza, la cantidad y la
+   afinidad flotan sobre la foto en vez de ocupar una fila propia encima,
+   porque ya no hay espacio "encima" — la foto llega hasta arriba. */
+.carta-overlay-superior {
+  position: absolute;
+  top: var(--space-2); left: var(--space-2); right: var(--space-2);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.rz-flotante {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: rgba(11, 12, 16, .55);
+  backdrop-filter: blur(4px);
+}
+
+/* estilo Adrenalyn: ataque verde, defensa rojo, técnica azul — los mismos
+   semánticos que ya tiene el sistema (§4), no se inventa paleta. Solo en
+   md/lg: a sm no cabe con legibilidad (igual que .carta-meta ya se oculta
+   en contextos densos como la ceremonia). */
+.carta-stats-flotantes {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 54px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.carta--sm .carta-stats-flotantes { display: none; }
+
+.carta-stat-pildora {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--void);
+  border: 2px solid rgba(11, 12, 16, .55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.carta-stat-pildora b { font-size: 12px; line-height: 1; font-weight: var(--fw-semibold); font-family: var(--font-mono); }
+.carta-stat-pildora span { font-size: 7px; letter-spacing: var(--tracking-caption); opacity: .8; }
+.carta-stat-pildora[data-stat="ATA"] { background: var(--success); }
+.carta-stat-pildora[data-stat="DEF"] { background: var(--danger); }
+.carta-stat-pildora[data-stat="TÉC"] { background: var(--info); }
+
+/* placa de nombre: sobre el degradado, sustituye a .carta-cuerpo (nombre +
+   equipo) para este modo — el rasgo de Compos, si lo hay, sigue debajo de
+   la placa como un .carta-cuerpo normal, eso no cambia. */
+.carta-placa-nombre {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+.carta-fila-nombre {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.carta-pos-insignia {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  color: var(--void);
+}
+/* colores semánticos existentes, no paleta nueva */
+.carta-pos-insignia[data-posicion="POR"] { background: var(--amber); }
+.carta-pos-insignia[data-posicion="DF"]  { background: var(--info); }
+.carta-pos-insignia[data-posicion="MC"]  { background: var(--success); }
+.carta-pos-insignia[data-posicion="DC"]  { background: var(--danger); }
+
+.carta-placa-nombre .carta-equipo {
+  display: block;
+  font-size: var(--fs-caption-sm);
+  color: var(--frost-dim);
+  margin-top: 2px;
+}
+
 /* pie de la carta: lo que cada pantalla añade debajo (vendedor, comprar…) */
 .carta-pie {
   display: flex;
