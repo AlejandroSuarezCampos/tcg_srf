@@ -34,6 +34,7 @@ function abrirModalCromo(cromo) {
     document.getElementById('f_posicion').value = cromo.posicion || '';
     document.getElementById('f_id_rareza').value = cromo.id_rareza || '';
     document.getElementById('f_id_afinidad').value = cromo.id_afinidad || '';
+    document.getElementById('f_mostrar_stats').value = cromo.mostrar_stats || 'artwork';
     document.getElementById('f_descripcion').value = cromo.descripcion || '';
   } else {
     titulo.textContent = 'Nuevo cromo';

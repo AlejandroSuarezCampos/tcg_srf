@@ -201,7 +201,7 @@ class Tcg
 		$sql = "
 			SELECT
 				c.id_cromo, c.nombre, c.posicion, c.descripcion, c.imagen,
-				c.id_expansion, c.id_equipo, c.id_rareza, c.id_afinidad,
+				c.id_expansion, c.id_equipo, c.id_rareza, c.id_afinidad, c.mostrar_stats,
 				e.nombre AS expansion,
 				eq.nombre AS equipo,
 				r.nombre AS rareza,
