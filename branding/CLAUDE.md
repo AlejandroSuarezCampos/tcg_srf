@@ -1900,7 +1900,8 @@ panel (`confirmarBorrado()` con `confirm()` nativo del navegador + enlace
 `SRF.confirmar` del sitio principal).
 
 **Marcado:** nueva columna `cromos.origen_importacion` (`TINYINT(1) NOT NULL
-DEFAULT 0`), migración `db/migraciones/013_importador_origen.sql`
+DEFAULT 0`), migración `db/migraciones/014_importador_origen.sql` (013 ya
+estaba ocupado por `013_plantillas_3d.sql`)
 (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, aditiva y re-ejecutable). `crearCromo()`
 gana un parámetro opcional más al final (`$origen_importacion = 0`,
 manteniendo compatibilidad con las llamadas existentes). `ejecutarImportacion()`
@@ -1923,3 +1924,65 @@ El botón muestra cuántas cartas importadas hay ahora mismo
 (`contarCartasImportadas()`), pide confirmación con el texto exacto de
 cuántas se van a borrar, y tras borrar reporta cuántas se borraron y cuántas
 se retuvieron por estar en uso (si las hay).
+
+## 15.11 Barra de progreso durante la importación
+
+`ejecutarImportacion()` puede tardar varios minutos con el archivo real
+(descarga de cientos de fotos). Alejandro pidió una barra que se vaya
+llenando para saber por dónde va, no un número exacto — aproximado es
+suficiente.
+
+**Por qué no basta con la petición POST normal:** el paso 2 hoy es un
+`<form method="POST">` que bloquea la navegación del navegador hasta que
+`panel/importar.php` termina de responder — durante ese bloqueo no corre
+ningún JS de la página, así que no se puede animar nada. Hace falta que el
+paso 2 se dispare por `fetch()` (JS), para poder sondear el progreso en
+paralelo mientras esa petición sigue en vuelo — mismo patrón de "sala en
+vivo sin websockets" que ya usa `duelo.js` (latido + sondeo, §9 del
+CLAUDE.md), aplicado aquí a un progreso en vez de a un estado de partida.
+
+**Dos endpoints nuevos en `assets/ajax/`** (nunca mezclado con el render,
+§2):
+- `importacion_ejecutar.php` — recibe el POST del paso 2 (las decisiones de
+  equipos ambiguos), llama a `ejecutarImportacion()` y devuelve el resultado
+  en JSON. Sustituye por completo la rama `isset($_POST['confirmar'])` que
+  hoy vive en `panel/importar.php` — se mueve entera aquí, no se duplica.
+- `importacion_progreso.php` — lee el fichero de progreso y devuelve
+  `{"actual": N, "total": M}` en JSON. Sondeado por JS cada ~800 ms mientras
+  dura la importación.
+
+**Guardar el progreso sin BD ni sesión compartida:** `ejecutarImportacion()`
+gana un parámetro opcional `?string $idSesionProgreso = null`. Si se pasa,
+calcula el total al principio (recorriendo `$equiposConJugadores` una vez:
+jugadores + campos de escudo/entrenador/gerente no vacíos) y va escribiendo
+`{"actual": N, "total": M}` en un fichero
+`sys_get_temp_dir() . '/tcg_importacion_progreso_' . $idSesionProgreso .
+'.json'` cada vez que procesa un jugador o una carta de equipo (se cree,
+se omita o falle da igual — lo que importa para la barra es "cuánto se ha
+recorrido", no "cuánto se ha creado"). Borra el fichero al terminar.
+
+**Trampa de PHP a evitar — el lock de sesión:** `session_start()` bloquea
+por fichero mientras la sesión esté abierta. Si `importacion_ejecutar.php`
+mantiene la sesión abierta durante los varios minutos que tarda la
+importación, **todas** las peticiones de `importacion_progreso.php` con la
+misma sesión (la del propio Alejandro, sondeando desde la misma pestaña) se
+quedarían colgadas esperando el lock — el sondeo dejaría de servir para
+nada. Por eso `importacion_ejecutar.php` lee lo que necesita de `$_SESSION`
+(los datos del JSON, la expansión) y llama a `session_write_close()` **antes**
+de invocar `ejecutarImportacion()`, para soltar el lock cuanto antes. El
+`session_id()` (que no cambia al cerrar la sesión) es lo que se le pasa como
+`$idSesionProgreso`, para que el fichero de progreso sea único por sesión de
+admin sin depender de la sesión seguir abierta.
+
+**Frontend** (`panel/assets/js/scriptImportar.js`, nuevo, sigue el patrón IIFE
++ `'use strict'` del resto de JS del proyecto): el botón "Crear cartas" pasa
+de `type="submit"` a `type="button"`; su `onclick` oculta el formulario,
+muestra una barra `<progress>` nativa de HTML (sin CSS nuevo, el navegador ya
+la estiliza) con un texto "X de Y", lanza el `fetch()` a
+`importacion_ejecutar.php` con los datos del formulario, y en paralelo un
+`setInterval` que sondea `importacion_progreso.php` y actualiza `value`/`max`
+de la barra y el texto. Al resolver el `fetch()`, para el `setInterval` y
+pinta el resumen final (creados/omitidos/equipos nuevos/fotos fallidas/
+posiciones desconocidas) con el mismo marcado que ya usa la vista de
+resultado. El botón "Cancelar" no cambia: sigue siendo un `<button
+type="submit">` normal, no necesita JS porque no tarda nada.
