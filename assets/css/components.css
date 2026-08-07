@@ -353,9 +353,8 @@
 .carta-placa--artwork {
   margin: calc(var(--pad-marco) * -1);
   border-radius: calc(var(--radius-xl) - 1px);
-  aspect-ratio: unset;   /* NUEVO: deja que el flex decida la altura */
-  flex: 1;                /* NUEVO: absorbe el espacio si el grid estira la carta */
-  min-height: 0;          /* NUEVO: evita que flex:1 desborde en algunos navegadores */
+  flex-grow: 1;            /* NUEVO: absorbe el espacio si el grid estira la carta, sin tocar aspect-ratio */
+  min-height: 0;           /* NUEVO: evita que flex-grow desborde en algunos navegadores */
   /* fondo más vivo que el halo sutil del modo debajo — usa el color de
      rareza a más intensidad (var(--rz), no var(--rz-halo)) para que las
      rarezas se noten de un vistazo, degradando a oscuro hacia los bordes. */
