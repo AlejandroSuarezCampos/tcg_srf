@@ -32,6 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_rareza    = (int) ($_POST['id_rareza'] ?? 0);
     $id_afinidad  = (int) ($_POST['id_afinidad'] ?? 0);
     $mostrar_stats = $_POST['mostrar_stats'] ?? 'artwork';
+    if (!in_array($mostrar_stats, ['artwork', 'debajo', 'ninguna'], true)) {
+        $mostrar_stats = 'artwork';
+    }
 
     if ($id_cromo !== '') {
         $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $mostrar_stats);

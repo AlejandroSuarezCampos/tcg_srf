@@ -2093,7 +2093,7 @@ que el modo da igual porque no hay foto que recortar) se queda en el
 Todo dentro de `.carta-placa`, sustituyendo el `object-fit: contain` actual
 para este modo:
 
-1. **Foto a sangre.** `object-fit: cover`, `object-position: center top`
+1. **Foto a sangre.** `object-fit: cover`, `object-position: center 15%`
    (prioriza que la cara quede dentro del encuadre en vez de centrar el
    cuerpo entero). **Decisión consciente que rompe la regla del §3** ("el
    arte nunca se recorta") — solo para este modo; `debajo` sigue sin
@@ -2102,7 +2102,7 @@ para este modo:
    (`--rz-halo`), ahora más visible al no haber tanto espacio muerto
    alrededor del retrato.
 2. **Degradado inferior** (`linear-gradient` de `--void` opaco a
-   transparente, ~55% de la altura de la placa) para que el texto de abajo
+   transparente, 58% de la altura de la placa) para que el texto de abajo
    sea legible sobre la foto sin una placa sólida.
 3. **Marca de rareza**, esquina superior izquierda: reutiliza
    `rareza_marcas()` (ya existe, sin tocar) — los chevrones/corona/destello,

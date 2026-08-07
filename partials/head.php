@@ -32,10 +32,10 @@ $bodyClass    = $bodyClass    ?? '';
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 
-<link rel="stylesheet" href="<?= $base ?>assets/css/tokens.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/base.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/components.css">
-<link rel="stylesheet" href="<?= $base ?>assets/css/layout.css">
+<link rel="stylesheet" href="<?= $base ?>assets/css/tokens.css?v=<?= filemtime(__DIR__ . '/../assets/css/tokens.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>assets/css/base.css?v=<?= filemtime(__DIR__ . '/../assets/css/base.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>assets/css/components.css?v=<?= filemtime(__DIR__ . '/../assets/css/components.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>assets/css/layout.css?v=<?= filemtime(__DIR__ . '/../assets/css/layout.css') ?>">
 <?php foreach ($cssExtra as $hoja): ?>
 <link rel="stylesheet" href="<?= $base . htmlspecialchars($hoja) ?>">
 <?php endforeach; ?>

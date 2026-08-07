@@ -7,8 +7,10 @@
  * añade una opción aquí; nunca se copia el marcado con variaciones.
  *
  * Reglas que este componente garantiza y que ninguna pantalla puede saltarse:
- *   1. El arte se muestra SIEMPRE completo (object-fit: contain), sobre una
- *      placa con halo de color según rareza. Nunca se recorta.
+ *   1. El arte se muestra completo en modo "debajo" (object-fit: contain,
+ *      nunca se recorta). En modo "artwork"/"ninguna" (el por defecto) el
+ *      arte va a sangre con la cara centrada arriba (object-fit: cover) —
+ *      decisión consciente de §16 del CLAUDE.md, documentada ahí.
  *   2. La rareza lleva señal no cromática además del color (chevrones para
  *      poco común/raro/épico, corona para legendario, destello para SRF).
  *   3. Todo arte de carta lleva texto alternativo.
@@ -284,12 +286,12 @@ function render_carta(array $c, array $opts = []): void
             <?php endif; ?>
 
             <div class="carta-placa-nombre">
-              <span class="carta-fila-nombre">
+              <div class="carta-fila-nombre">
                 <?php if ($esJugador): ?>
                   <span class="carta-pos-insignia" data-posicion="<?= htmlspecialchars($posicion) ?>"><?= htmlspecialchars($posicion) ?></span>
                 <?php endif; ?>
                 <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
-              </span>
+              </div>
               <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
             </div>
           </div>

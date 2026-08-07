@@ -296,6 +296,10 @@ include __DIR__ . '/partials/head.php';
         <?php render_carta($muestras[6], ['stats' => ['ATA' => 94, 'DEF' => 80, 'TÉC' => 97]]); ?>
       </div>
       <div class="sg-caso">
+        <span class="t-caption t-dim">Modo "debajo" (arte sin recortar)</span>
+        <?php render_carta(['mostrar_stats' => 'debajo'] + $muestras[3], ['stats' => ['ATA' => 88, 'DEF' => 72, 'TÉC' => 91]]); ?>
+      </div>
+      <div class="sg-caso">
         <span class="t-caption t-dim">Dorso (ceremonia de sobre)</span>
         <article class="carta" data-rareza="1">
           <div class="carta-dorso"><i class="ph ph-soccer-ball" aria-hidden="true"></i></div>
