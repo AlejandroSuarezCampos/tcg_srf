@@ -99,18 +99,19 @@ $expansiones = $db->listarExpansiones();
         </ul>
 
         <?php if (!empty($previsualizacion['equipos_ambiguos'])): ?>
-        <h3>Equipos que necesitan tu confirmación</h3>
+        <h3>Confirma el nombre correcto de estos equipos</h3>
+        <p>Los datos oficiales traen el nombre de este equipo escrito de forma distinta a como ya está en el catálogo — probablemente una errata en uno de los dos sitios. ¿Cuál es el nombre correcto?</p>
         <div class="admin-table-wrap">
           <table class="admin-table">
-            <thead><tr><th>Del JSON</th><th>¿Con cuál equipo es?</th></tr></thead>
+            <thead><tr><th>Equipo</th><th>¿Cuál es el nombre correcto?</th></tr></thead>
             <tbody>
             <?php foreach ($previsualizacion['equipos_ambiguos'] as $amb): ?>
             <tr>
-              <td><?= htmlspecialchars($amb['nombre_json']) ?> <small>(<?= $amb['porcentaje'] ?>% parecido)</small></td>
+              <td><?= htmlspecialchars($amb['nombre_json']) ?> <small>(<?= $amb['porcentaje'] ?>% parecido a "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>")</small></td>
               <td>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="db" checked> Es "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>" (ya existe)</label><br>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="json"> Es un equipo nuevo, llámalo "<?= htmlspecialchars($amb['nombre_json']) ?>"</label><br>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="otro"> Otro nombre:
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="db" checked> "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>" (como está en el catálogo)</label><br>
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="json"> "<?= htmlspecialchars($amb['nombre_json']) ?>" (como viene en los datos oficiales)</label><br>
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="otro"> Ninguno de los dos, es:
                   <input type="text" name="equipo_texto[<?= htmlspecialchars($amb['id']) ?>]" placeholder="Nombre correcto"></label>
               </td>
             </tr>

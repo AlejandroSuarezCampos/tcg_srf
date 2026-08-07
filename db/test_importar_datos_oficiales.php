@@ -32,6 +32,15 @@ afirmar($ambiguo['estado'] === 'ambiguo' && $ambiguo['candidato_db']['id_equipo'
 $nuevo = $db->emparejarEquipo('Equipo Totalmente Distinto FC', $existentes);
 afirmar($nuevo['estado'] === 'nuevo', 'nombre sin parecido se marca como nuevo');
 
+// Regresión real: "Instituto Occult" y "Instituto Otaku" son dos equipos
+// DISTINTOS del catálogo real, pero compartir el prefijo "Instituto " los
+// hacía dar 77,4% con similar_text — por encima del umbral antiguo (75%) y
+// se marcaban como el mismo equipo por error. Con el umbral a 90% deben
+// quedar como "nuevo" cada uno, nunca "ambiguo" entre sí.
+$existentesOtaku = [['id_equipo' => 21, 'nombre' => 'Instituto Otaku']];
+$occult = $db->emparejarEquipo('Instituto Occult', $existentesOtaku);
+afirmar($occult['estado'] === 'nuevo', 'Instituto Occult no se confunde con Instituto Otaku (falso positivo real)');
+
 $fixture = [
     'config' => ['temporada' => '3'],
     'equipos' => [

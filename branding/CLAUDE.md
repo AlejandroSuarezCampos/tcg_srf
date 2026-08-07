@@ -1001,9 +1001,13 @@ alfanumérico o espacio eliminado al final, trim) contra los nombres
 existentes en `equipos`:
 - **Coincidencia exacta tras normalizar** → usa ese `id_equipo`, sin
   preguntar.
-- **Similar pero no exacta** (`similar_text()` ≥ 75%) → se lista en el paso 1
-  como ambiguo, con tres opciones: nombre del JSON, nombre de la BD, o texto
-  libre.
+- **Similar pero no exacta** (`similar_text()` ≥ 90%) → se lista en el paso 1
+  para que confirmes cuál de los dos nombres es el correcto (o escribas uno
+  distinto). El umbral subió de 75% a 90% tras un falso positivo real:
+  "Instituto Occult" y "Instituto Otaku" —dos equipos DISTINTOS del
+  catálogo— daban 77,4% solo por compartir el prefijo "Instituto ", mientras
+  que los typos genuinos ("Instituto Kirkwood"/"Kikrwood", "Inazuma Kids
+  FC"/"CF") dan 93-94%. Caso cubierto en el self-check.
 - **Sin ningún parecido** → se crea automáticamente un `equipo` nuevo con el
   nombre del JSON, sin preguntar.
 
@@ -1225,7 +1229,10 @@ git commit -m "Añade helpers puros de mapeo para el importador de datos oficial
 			similar_text($normJson, $this->normalizarTexto($eq['nombre']), $pct);
 			if ($pct > $mejorPct) { $mejorPct = $pct; $mejor = $eq; }
 		}
-		if ($mejor !== null && $mejorPct >= 75.0) {
+		// Umbral revisado tras un caso real: "Instituto Occult" (nuevo) y
+		// "Instituto Otaku" (existente) son equipos distintos pero daban 77,4%
+		// solo por compartir "Instituto "; los typos genuinos dan 93-94%.
+		if ($mejor !== null && $mejorPct >= 90.0) {
 			return [
 				'estado' => 'ambiguo',
 				'nombre_json' => $nombreJson,

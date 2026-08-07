@@ -4021,7 +4021,12 @@ class Tcg
 			similar_text($normJson, $this->normalizarTexto($eq['nombre']), $pct);
 			if ($pct > $mejorPct) { $mejorPct = $pct; $mejor = $eq; }
 		}
-		if ($mejor !== null && $mejorPct >= 75.0) {
+		// Umbral verificado contra datos reales: los typos genuinos dan 93-94%
+		// ("Instituto Kirkwood"/"Instituto Kikrwood", "Inazuma Kids FC"/"CF"),
+		// mientras que equipos distintos con un prefijo común como "Instituto "
+		// pueden llegar a 75-77% sin ser el mismo equipo ("Instituto Occult"
+		// contra "Instituto Otaku" da 77,4%). 90% deja margen a ambos lados.
+		if ($mejor !== null && $mejorPct >= 90.0) {
 			return [
 				'estado' => 'ambiguo',
 				'nombre_json' => $nombreJson,
