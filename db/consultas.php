@@ -4167,6 +4167,130 @@ class Tcg
 			'tecnica' => max(1, min(99, (int) round($total * $split['tecnica']))),
 		];
 	}
+
+	public function guardarFotoImportada(string $url, string $equipoSlug, string $jugadorSlug): string {
+		$contenido = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 8]]));
+		if ($contenido === false) { return ''; }
+
+		$imagen = @imagecreatefromstring($contenido);
+		if ($imagen === false) { return ''; }
+
+		$carpeta = __DIR__ . "/../assets/img/Cromos/Importados/{$equipoSlug}";
+		if (!is_dir($carpeta) && !mkdir($carpeta, 0755, true) && !is_dir($carpeta)) {
+			imagedestroy($imagen);
+			return '';
+		}
+
+		$rutaDisco = "{$carpeta}/{$jugadorSlug}.webp";
+		$ok = imagewebp($imagen, $rutaDisco, 85);
+		imagedestroy($imagen);
+
+		return $ok ? "./assets/img/Cromos/Importados/{$equipoSlug}/{$jugadorSlug}.webp" : '';
+	}
+
+	public function existeCromoImportado(string $nombre, int $id_equipo, int $id_expansion): bool {
+		$stmt = $this->pdo->prepare("
+			SELECT 1 FROM cromos
+			WHERE nombre = :nombre AND id_equipo = :id_equipo AND id_expansion = :id_expansion
+			LIMIT 1
+		");
+		$stmt->execute([':nombre' => $nombre, ':id_equipo' => $id_equipo, ':id_expansion' => $id_expansion]);
+		return (bool) $stmt->fetchColumn();
+	}
+
+	public function previsualizarImportacion(array $datosJson, int $id_expansion): array {
+		$equiposExistentes = $this->listarEquipos();
+		$equiposConJugadores = array_values(array_filter($datosJson['equipos'] ?? [], fn($eq) => !empty($eq['jugadores'])));
+
+		$exactos = 0; $nuevos = []; $ambiguos = [];
+		$jugadoresACrear = 0; $jugadoresOmitidos = 0; $afinidadesDesconocidas = 0; $cartasEquipo = 0;
+
+		foreach ($equiposConJugadores as $equipo) {
+			$match = $this->emparejarEquipo($equipo['nombre'], $equiposExistentes);
+			$idEquipo = null;
+			if ($match['estado'] === 'exacto') { $exactos++; $idEquipo = $match['id_equipo']; }
+			elseif ($match['estado'] === 'ambiguo') { $ambiguos[] = ['id' => $equipo['id']] + $match; }
+			else { $nuevos[] = $equipo['nombre']; }
+
+			foreach ($equipo['jugadores'] as $jugador) {
+				if ($idEquipo !== null && $this->existeCromoImportado($jugador['nombre'], $idEquipo, $id_expansion)) {
+					$jugadoresOmitidos++;
+					continue;
+				}
+				$jugadoresACrear++;
+				if ($this->mapearAfinidadJugador($jugador['afinidad'] ?? null) === 5) { $afinidadesDesconocidas++; }
+			}
+
+			foreach (['escudo', 'entrenador', 'gerente'] as $campo) {
+				if (trim((string) ($equipo[$campo] ?? '')) !== '') { $cartasEquipo++; }
+			}
+		}
+
+		return [
+			'equipos_exactos' => $exactos,
+			'equipos_nuevos' => $nuevos,
+			'equipos_ambiguos' => $ambiguos,
+			'jugadores_a_crear' => $jugadoresACrear,
+			'jugadores_omitidos' => $jugadoresOmitidos,
+			'afinidades_desconocidas' => $afinidadesDesconocidas,
+			'cartas_equipo_a_crear' => $cartasEquipo,
+		];
+	}
+
+	public function ejecutarImportacion(array $datosJson, int $id_expansion, array $decisiones): array {
+		set_time_limit(0);
+
+		$equiposExistentes = $this->listarEquipos();
+		$idsEquiposPrevios = array_column($equiposExistentes, 'id_equipo');
+		$equiposConJugadores = array_values(array_filter($datosJson['equipos'] ?? [], fn($eq) => !empty($eq['jugadores'])));
+		$mapaEquipos = $this->resolverEquipos($equiposConJugadores, $equiposExistentes, $decisiones);
+		$rareza = $this->rankearRarezasImportacion($datosJson);
+
+		$creados = 0; $omitidos = 0; $fotosFallidas = []; $equiposCreados = 0;
+
+		foreach ($equiposConJugadores as $equipo) {
+			$idEquipo = $mapaEquipos[$equipo['id']];
+			if (!in_array($idEquipo, $idsEquiposPrevios, true)) { $equiposCreados++; }
+			$equipoSlug = $this->slugImportado($equipo['nombre']);
+
+			foreach ($equipo['jugadores'] as $jugador) {
+				if ($this->existeCromoImportado($jugador['nombre'], $idEquipo, $id_expansion)) { $omitidos++; continue; }
+
+				$posicion = $this->mapearPosicionJugador($jugador['posicion'] ?? '');
+				if ($posicion === null) { $omitidos++; continue; }
+
+				$idRareza = $rareza["{$equipo['id']}|{$jugador['nombre']}"] ?? (($jugador['titular'] ?? false) ? 2 : 1);
+				$idAfinidad = $this->mapearAfinidadJugador($jugador['afinidad'] ?? null);
+				$stats = $this->statsBaseImportacion($posicion, $idRareza);
+
+				$imagen = '';
+				if (!empty($jugador['foto'])) {
+					$imagen = $this->guardarFotoImportada($jugador['foto'], $equipoSlug, $this->slugImportado($jugador['nombre']));
+					if ($imagen === '') { $fotosFallidas[] = $jugador['nombre']; }
+				}
+
+				$this->crearCromo($jugador['nombre'], $posicion, '', $imagen, $id_expansion, $idEquipo, $idRareza, $idAfinidad, $stats['ataque'], $stats['defensa'], $stats['tecnica']);
+				$creados++;
+			}
+
+			if (trim((string) ($equipo['escudo'] ?? '')) !== '' && !$this->existeCromoImportado('Escudo ' . $equipo['nombre'], $idEquipo, $id_expansion)) {
+				$this->crearCromo('Escudo ' . $equipo['nombre'], 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+			if (trim((string) ($equipo['entrenador'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['entrenador'], $idEquipo, $id_expansion)) {
+				$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+			if (trim((string) ($equipo['gerente'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['gerente'], $idEquipo, $id_expansion)) {
+				$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+		}
+
+		$this->derivarRasgosConfiguracion();
+
+		return ['creados' => $creados, 'omitidos' => $omitidos, 'equipos_creados' => $equiposCreados, 'fotos_fallidas' => $fotosFallidas];
+	}
 }
 
 ?>
