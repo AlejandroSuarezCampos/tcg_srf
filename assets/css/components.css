@@ -234,6 +234,9 @@
   aspect-ratio: 233 / 361;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  flex-grow: 1;      /* NUEVO: absorbe cualquier espacio extra que el grid
+                         le imponga a la carta, en los dos modos por igual */
+  min-height: 0;      /* NUEVO */
   background:
     radial-gradient(ellipse 75% 55% at 50% 20%, var(--rz-halo), transparent 72%),
     linear-gradient(170deg, var(--void-2), #08090C);
@@ -353,8 +356,6 @@
 .carta-placa--artwork {
   margin: calc(var(--pad-marco) * -1);
   border-radius: calc(var(--radius-xl) - 1px);
-  flex-grow: 1;            /* NUEVO: absorbe el espacio si el grid estira la carta, sin tocar aspect-ratio */
-  min-height: 0;           /* NUEVO: evita que flex-grow desborde en algunos navegadores */
   /* fondo más vivo que el halo sutil del modo debajo — usa el color de
      rareza a más intensidad (var(--rz), no var(--rz-halo)) para que las
      rarezas se noten de un vistazo, degradando a oscuro hacia los bordes. */
@@ -373,14 +374,20 @@
   width: auto;
   height: auto;
   object-fit: contain;
-  object-position: center top;
+  object-position: center; /* antes: center top */
 }
 
 .carta-degradado {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 58%;
-  background: linear-gradient(0deg, var(--void) 15%, rgba(11, 12, 16, .82) 55%, transparent 100%);
+  height: 78%;
+  /* el tramo opaco (var(--void) sólido) tiene que llegar HASTA DONDE
+     ACABA LA FOTO (32% inferior de la placa) o más allá, para que el
+     corte de la imagen quede completamente tapado en vez de asomar
+     como una línea recta. 45% de esta franja (que mide 78% de la placa)
+     equivale a 0.45*78=35.1% de la placa, por encima del 32% donde
+     termina la foto — con margen de sobra. */
+  background: linear-gradient(0deg, var(--void) 45%, rgba(11, 12, 16, .88) 65%, transparent 100%);
   pointer-events: none;
 }
 
