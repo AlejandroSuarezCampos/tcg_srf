@@ -2183,3 +2183,705 @@ foco visible, un solo `<h1>`, aviso legal):
 - Reejecutar `derivarRasgosConfiguracion()` no aplica aquí (no toca rasgos),
   pero sí comprobar que `panel/cromos.php` sigue creando/editando cromos sin
   error con el select nuevo de `mostrar_stats`.
+
+### 16.6 Plan de implementación
+
+> REQUIRED SUB-SKILL para ejecutar: `superpowers:subagent-driven-development`
+> (recomendado) o `superpowers:executing-plans`. Pasos con checkbox `- [ ]`.
+
+**Restricciones globales:** un único componente de tarjeta (`components/carta.php`),
+nunca se copia su marcado en otra pantalla; nombres de clases CSS y de
+funciones en español; comentarios en español explicando el porqué; PDO
+preparado siempre; `htmlspecialchars()` en toda salida a HTML; sin
+dependencias nuevas de npm; el modo `debajo` debe quedar pixel a pixel
+igual que hoy, es la red de seguridad de todo este cambio.
+
+---
+
+#### Task 13 — Migración y semilla de `mostrar_stats`
+
+**Archivos:** Crea `db/migraciones/015_mostrar_stats.sql`.
+
+- [ ] **Paso 1:** Crear el fichero:
+
+```sql
+ALTER TABLE cromos ADD COLUMN IF NOT EXISTS mostrar_stats ENUM('artwork', 'debajo', 'ninguna') NOT NULL DEFAULT 'artwork' AFTER origen_importacion;
+
+UPDATE cromos
+SET mostrar_stats = 'debajo'
+WHERE imagen != '' AND imagen IS NOT NULL
+  AND (
+    imagen LIKE '%ALL STARS%'
+    OR imagen LIKE '%Apuesta Segura%'
+    OR posicion IN ('ENT', 'GER', 'ESCUDO', 'PRESIDENTE')
+  );
+```
+
+- [ ] **Paso 2:** Aplicarla contra la BD real de desarrollo:
+
+```bash
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/015_mostrar_stats.sql
+```
+
+- [ ] **Paso 3:** Verificar la semilla:
+
+```bash
+C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT mostrar_stats, COUNT(*) FROM cromos GROUP BY mostrar_stats;"
+```
+
+Esperado: una fila `debajo` con **28** cartas (15 de ALL STARS/Apuesta Segura
++ 13 de presidente/entrenador/gerente/escudo con imagen propia), el resto en
+`artwork`.
+
+- [ ] **Paso 4:** Commit.
+
+```bash
+git add db/migraciones/015_mostrar_stats.sql
+git commit -m "Añade cromos.mostrar_stats (artwork/debajo/ninguna) con semilla para las cartas Photoshop"
+```
+
+---
+
+#### Task 14 — `crearCromo()`/`actualizarCromo()` aceptan `mostrar_stats`
+
+**Archivos:** Modifica `db/consultas.php:220-268` (`crearCromo`, `actualizarCromo`).
+
+**Interfaces:**
+- Produce: `crearCromo(..., $ataque = 0, $defensa = 0, $tecnica = 0, $origen_importacion = 0, $mostrar_stats = 'artwork')` (13 parámetros, el nuevo al final). `actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $mostrar_stats = 'artwork')` (9 parámetros, el nuevo al final).
+
+- [ ] **Paso 1:** Editar `crearCromo()`:
+
+```php
+	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0, $origen_importacion = 0, $mostrar_stats = 'artwork') {
+		$sql = "
+			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica, origen_importacion, mostrar_stats)
+			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica, :origen_importacion, :mostrar_stats)
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([
+			":nombre" => $nombre,
+			":posicion" => $posicion,
+			":descripcion" => $descripcion,
+			":imagen" => $imagen,
+			":id_expansion" => $id_expansion,
+			":id_equipo" => $id_equipo,
+			":id_rareza" => $id_rareza,
+			":id_afinidad" => $id_afinidad,
+			":ataque" => $ataque,
+			":defensa" => $defensa,
+			":tecnica" => $tecnica,
+			":origen_importacion" => $origen_importacion,
+			":mostrar_stats" => $mostrar_stats,
+		]);
+		return $this->pdo->lastInsertId();
+	}
+```
+
+- [ ] **Paso 2:** Editar `actualizarCromo()`:
+
+```php
+	public function actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $mostrar_stats = 'artwork') {
+		$sql = "
+			UPDATE cromos SET
+				nombre = :nombre,
+				posicion = :posicion,
+				descripcion = :descripcion,
+				imagen = :imagen,
+				id_expansion = :id_expansion,
+				id_equipo = :id_equipo,
+				id_rareza = :id_rareza,
+				id_afinidad = :id_afinidad,
+				mostrar_stats = :mostrar_stats
+			WHERE id_cromo = :id_cromo
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([
+			":nombre" => $nombre,
+			":posicion" => $posicion,
+			":descripcion" => $descripcion,
+			":imagen" => $imagen,
+			":id_expansion" => $id_expansion,
+			":id_equipo" => $id_equipo,
+			":id_rareza" => $id_rareza,
+			":id_afinidad" => $id_afinidad,
+			":mostrar_stats" => $mostrar_stats,
+			":id_cromo" => $id_cromo,
+		]);
+	}
+```
+
+- [ ] **Paso 3:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 4:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "crearCromo()/actualizarCromo() aceptan mostrar_stats"
+```
+
+---
+
+#### Task 15 — Las consultas que alimentan `render_carta()` seleccionan `mostrar_stats`
+
+**Archivos:** Modifica `db/consultas.php` (varias funciones).
+
+**Contexto:** cada pantalla que llama a `render_carta()`/`carta_html()` saca
+sus datos de una función de `Tcg` distinta. El array `$cromo`/`$c` que le
+llega al componente necesita traer `mostrar_stats` (y `posicion`, donde no
+lo trajera ya) para que la plantilla nueva sepa qué modo pintar.
+
+- [ ] **Paso 1:** Añadir `c.mostrar_stats,` justo al lado de
+  `c.ataque, c.defensa, c.tecnica,` en las 7 funciones donde ya aparece esa
+  línea (confirmado con `grep -n "c\.ataque, c\.defensa, c\.tecnica" db/consultas.php`
+  el 2026-08-07, las líneas pueden haberse movido un poco si tocaste algo
+  antes — busca por nombre de función, no por número de línea):
+  - `listarColeccionCompleta()` (usada por `album.php`)
+  - `listarColeccionUsuario()` (usada por `coleccion.php`)
+  - `listarColeccionVendible()` (usada por `mercado.php`, poner cromo en venta)
+  - `listarCartasMazo()` (usada por `mazos.php`)
+  - `listarColeccionJugable()` (usada por `mazos.php`, selector de jugadores)
+  - `listarCopiasApostables()` (usada por `duelo.php`, apuesta de carta concreta)
+  - `listarCartasEstilo()` (rivales PvE, por completitud aunque hoy no se
+    confirmó que pase por `render_carta()` — igual de barato añadirlo)
+
+- [ ] **Paso 2:** `listarMercadoActivo()` (la que alimenta el listado
+  principal de `mercado.php`, línea ~245) hoy NO selecciona ni `posicion` ni
+  `mostrar_stats`. Añade ambas columnas a su `SELECT`:
+
+```php
+	public function listarMercadoActivo($filtros = []) {
+		$sql = "
+			SELECT
+				m.id_anuncio, m.precio, m.fecha_publicacion,
+				col.id_coleccion, col.id_usuario AS id_vendedor,
+				c.id_cromo, c.nombre AS carta, c.imagen, c.posicion, c.mostrar_stats,
+				eq.nombre AS equipo,
+				r.id_rareza, r.nombre AS rareza,
+				u.nombre AS vendedor
+			FROM mercado m
+```
+
+  (resto de la función sin cambios; solo la línea del `SELECT` con `c.id_cromo`
+  gana `c.posicion, c.mostrar_stats`).
+
+- [ ] **Paso 3:** Localiza la consulta que alimenta la alineación de
+  `duelo.php` (las llamadas a `render_carta($c, ['tamano' => 'sm', 'pie' => ...])`
+  en las líneas ~460 y ~478 de `duelo.php`) y la que alimenta las cartas
+  reveladas al abrir un sobre en `abrirSobre()` (la que devuelve el array
+  que `sobres.php` recorre para construir `'cartas'` con `carta_html()`).
+  Búscalas con:
+
+```bash
+grep -n "function.*[Aa]lineacion\|function abrirSobre" db/consultas.php
+```
+
+  Añade `c.mostrar_stats` (y `c.posicion` si no estuviera ya) a sus
+  `SELECT` con el mismo criterio que los pasos 1-2, siguiendo el alias de
+  tabla que use cada consulta (`c`, `cr`, etc. — revisa el `FROM`/`JOIN` de
+  cada una).
+
+- [ ] **Paso 4:** Verificación final de cobertura — ningún sitio que llame a
+  `render_carta()`/`carta_html()` debe quedarse sin `mostrar_stats` en los
+  datos que le pasa:
+
+```bash
+grep -rn "render_carta(\|carta_html(" --include="*.php" .
+```
+
+  Para cada resultado, confirma (leyendo el fichero) que el array `$c`/`$cromo`
+  usado en esa llamada viene de una consulta ya tocada en los pasos 1-3. Si
+  encuentras una que se te haya escapado, aplícale el mismo cambio.
+
+- [ ] **Paso 5:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 6:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Las consultas que alimentan render_carta() seleccionan mostrar_stats"
+```
+
+---
+
+#### Task 16 — CSS de la plantilla nueva (`carta--artwork`)
+
+**Archivos:** Modifica `assets/css/components.css` (añade reglas nuevas cerca
+de las de `.carta-*` existentes, cerca de la línea 342 donde termina
+`.carta-stats`, antes de `.carta-pie`).
+
+- [ ] **Paso 1:** Añadir las reglas:
+
+```css
+/* ==========================================================
+   PLANTILLA "ARTWORK" — foto a sangre, §16 del CLAUDE.md.
+   Se activa con la clase .carta--artwork (modo artwork/ninguna de
+   cromos.mostrar_stats). El modo "debajo" NO usa nada de este bloque —
+   sigue exactamente el marcado y CSS de siempre, es la red de seguridad
+   para las cartas con arte Photoshop ya cerrado.
+   ========================================================== */
+
+/* la foto ocupa todo el marco: cancela el padding de .carta-marco solo
+   para esta placa, y vuelve a redondear como si fuera el borde real de
+   la carta */
+.carta-placa--artwork {
+  margin: calc(var(--space-3) * -1);
+  border-radius: calc(var(--radius-xl) - 1px);
+}
+
+/* decisión consciente que rompe la regla de "el arte nunca se recorta"
+   (§3) — SOLO para este modo. object-position prioriza que la cara quede
+   dentro de encuadre en vez de centrar el cuerpo entero. */
+.carta-arte--sangre {
+  object-fit: cover;
+  object-position: center 15%;
+}
+
+.carta-degradado {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 58%;
+  background: linear-gradient(0deg, var(--void) 15%, rgba(11, 12, 16, .82) 55%, transparent 100%);
+  pointer-events: none;
+}
+
+/* sustituye a .carta-head para este modo: la rareza, la cantidad y la
+   afinidad flotan sobre la foto en vez de ocupar una fila propia encima,
+   porque ya no hay espacio "encima" — la foto llega hasta arriba. */
+.carta-overlay-superior {
+  position: absolute;
+  top: var(--space-2); left: var(--space-2); right: var(--space-2);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.rz-flotante {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: rgba(11, 12, 16, .55);
+  backdrop-filter: blur(4px);
+}
+
+/* estilo Adrenalyn: ataque verde, defensa rojo, técnica azul — los mismos
+   semánticos que ya tiene el sistema (§4), no se inventa paleta. Solo en
+   md/lg: a sm no cabe con legibilidad (igual que .carta-meta ya se oculta
+   en contextos densos como la ceremonia). */
+.carta-stats-flotantes {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 54px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.carta--sm .carta-stats-flotantes { display: none; }
+
+.carta-stat-pildora {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--void);
+  border: 2px solid rgba(11, 12, 16, .55);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.carta-stat-pildora b { font-size: 12px; line-height: 1; font-weight: var(--fw-semibold); font-family: var(--font-mono); }
+.carta-stat-pildora span { font-size: 7px; letter-spacing: var(--tracking-caption); opacity: .8; }
+.carta-stat-pildora[data-stat="ATA"] { background: var(--success); }
+.carta-stat-pildora[data-stat="DEF"] { background: var(--danger); }
+.carta-stat-pildora[data-stat="TÉC"] { background: var(--info); }
+
+/* placa de nombre: sobre el degradado, sustituye a .carta-cuerpo (nombre +
+   equipo) para este modo — el rasgo de Compos, si lo hay, sigue debajo de
+   la placa como un .carta-cuerpo normal, eso no cambia. */
+.carta-placa-nombre {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+.carta-fila-nombre {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.carta-pos-insignia {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  color: var(--void);
+}
+/* colores semánticos existentes, no paleta nueva */
+.carta-pos-insignia[data-posicion="POR"] { background: var(--amber); }
+.carta-pos-insignia[data-posicion="DF"]  { background: var(--info); }
+.carta-pos-insignia[data-posicion="MC"]  { background: var(--success); }
+.carta-pos-insignia[data-posicion="DC"]  { background: var(--danger); }
+
+.carta-placa-nombre .carta-equipo {
+  display: block;
+  font-size: var(--fs-caption-sm);
+  color: var(--frost-dim);
+  margin-top: 2px;
+}
+```
+
+- [ ] **Paso 2:** No hace falta tocar nada más en el CSS — `.carta-placa`,
+  `.carta-marco`, `.carta-nombre`, `.carta-rz-marcas`, etc. ya existen y se
+  heredan tal cual (el HTML de la Task 5 añade la clase `carta-placa--artwork`
+  ADEMÁS de `carta-placa`, y usa `.carta-nombre` sin modificar para el texto).
+
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add assets/css/components.css
+git commit -m "Añade el CSS de la plantilla artwork del componente de tarjeta"
+```
+
+---
+
+#### Task 17 — Reescribe `components/carta.php` con los dos modos
+
+**Archivos:** Modifica `components/carta.php` (función `render_carta()`
+completa).
+
+**Interfaces:**
+- Consume: `rareza_marcas()` (ya existe, sin tocar), las clases CSS de la
+  Task 4, la columna `mostrar_stats` de la Task 3.
+- Produce: `render_carta()` sigue con la misma firma pública (`$c`, `$opts`)
+  — ningún caller existente necesita cambiar sus llamadas.
+
+- [ ] **Paso 1:** Sustituir el cuerpo de `render_carta()` (desde
+  `function render_carta(array $c, array $opts = []): void {` hasta su `}`
+  de cierre) por:
+
+```php
+function render_carta(array $c, array $opts = []): void
+{
+    $tamano       = $opts['tamano']       ?? 'md';
+    $href         = $opts['href']         ?? null;
+    $poseida      = $opts['poseida']      ?? true;
+    $protegida    = $opts['protegida']    ?? false;
+    $precio       = $opts['precio']       ?? null;
+    $seleccionada = $opts['seleccionada'] ?? false;
+    $cantidad     = $opts['cantidad']     ?? null;
+    $stats        = $opts['stats']        ?? null;
+    $claseExtra   = $opts['clase']        ?? '';
+    $datos        = $opts['datos']        ?? [];
+    $lazy         = $opts['lazy']         ?? true;
+    $acciones     = $opts['acciones']     ?? '';
+    $pie          = $opts['pie']          ?? '';
+
+    $idRareza = (int) ($c['id_rareza'] ?? 1);
+    $nombre   = (string) ($c['nombre'] ?? 'Carta sin nombre');
+    $rareza   = (string) ($c['rareza'] ?? 'Común');
+    $imagen   = (string) ($c['imagen'] ?? '');
+    $equipo   = (string) ($c['equipo'] ?? '');
+    $posicion = (string) ($c['posicion'] ?? '');
+    $afinidad = (string) ($c['afinidad'] ?? '');
+    $afinidadImg = (string) ($c['afinidad_imagen'] ?? '');
+    $rasgo = (string) ($c['rasgo'] ?? '');
+    // §16: modo de la carta. "debajo" = aspecto de siempre (cartas
+    // Photoshop, nunca se recorta el arte). Cualquier otro valor (o su
+    // ausencia, para consultas que aún no seleccionen la columna) cae en
+    // "artwork", la plantilla nueva.
+    $modo = (string) ($c['mostrar_stats'] ?? 'artwork');
+
+    // "No-afi" es el valor que usa la base de datos para las cartas sin
+    // afinidad (escudos, presidentes): no se pinta el hexágono.
+    $tieneAfinidad = $afinidad !== '' && strcasecmp($afinidad, 'No-afi') !== 0 && $afinidadImg !== '';
+    $esJugador = in_array($posicion, ['POR', 'DF', 'MC', 'DC'], true);
+
+    $clases = ['carta'];
+    if ($tamano !== 'md')  { $clases[] = 'carta--' . $tamano; }
+    if ($href !== null)    { $clases[] = 'carta--accion'; }
+    if (!$poseida)         { $clases[] = 'is-nopos'; }
+    if ($seleccionada)     { $clases[] = 'is-seleccionada'; }
+    if ($modo !== 'debajo') { $clases[] = 'carta--artwork'; }
+    if ($claseExtra !== '') { $clases[] = $claseExtra; }
+
+    $attrs = '';
+    foreach ($datos as $clave => $valor) {
+        $attrs .= ' data-' . htmlspecialchars($clave) . '="' . htmlspecialchars((string) $valor) . '"';
+    }
+
+    $etiqueta = $href !== null ? 'a' : 'article';
+    $apertura = '<' . $etiqueta
+        . ' class="' . implode(' ', $clases) . '"'
+        . ' data-rareza="' . $idRareza . '"'
+        . ($href !== null ? ' href="' . htmlspecialchars($href) . '"' : '')
+        . $attrs . '>';
+    ?>
+    <?= $apertura ?>
+
+      <?php if ($protegida): ?>
+        <span class="carta-insignia carta-insignia--protegida" title="Protegida: no se puede vender">
+          <i class="ph ph-lock-simple" aria-hidden="true"></i>
+          <span class="sr-only">Carta protegida, no se puede vender</span>
+        </span>
+      <?php endif; ?>
+
+      <?php if ($precio !== null): ?>
+        <span class="carta-insignia carta-insignia--precio">
+          <i class="ph ph-coins" aria-hidden="true"></i>
+          <?= number_format((int) $precio, 0, ',', '.') ?>
+          <span class="sr-only">monedas</span>
+        </span>
+      <?php endif; ?>
+
+      <?= $acciones ?>
+
+      <?php if (!$poseida): ?>
+        <span class="carta-candado">
+          <i class="ph ph-lock-simple" aria-hidden="true"></i>
+          Sin conseguir
+        </span>
+      <?php endif; ?>
+
+      <div class="carta-marco">
+
+        <?php if ($modo === 'debajo'): ?>
+          <!-- ===== Aspecto de siempre — cartas con arte Photoshop ya cerrado ===== -->
+          <div class="carta-head">
+            <?= render_rareza($idRareza, $rareza) ?>
+            <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
+              <span class="carta-head-derecha">
+                <?php if ($cantidad !== null && $cantidad > 1): ?>
+                  <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
+                <?php endif; ?>
+                <?php if ($tieneAfinidad): ?>
+                  <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
+                    <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+                  </span>
+                <?php endif; ?>
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <div class="carta-placa">
+            <?php if ($imagen !== ''): ?>
+              <img class="carta-arte"
+                   src="<?= htmlspecialchars($imagen) ?>"
+                   alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                   <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+            <?php else: ?>
+              <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+              <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php endif; ?>
+
+            <?php if ($posicion !== ''): ?>
+              <span class="carta-pos"><?= htmlspecialchars($posicion) ?></span>
+            <?php endif; ?>
+          </div>
+
+          <div class="carta-cuerpo">
+            <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+            <p class="carta-meta">
+              <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
+            </p>
+
+            <?php if ($rasgo !== ''): ?>
+              <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
+                <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
+              </p>
+            <?php endif; ?>
+
+            <?php if (!empty($stats)): ?>
+              <div class="carta-stats">
+                <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
+                  <div class="carta-stat">
+                    <b><?= htmlspecialchars((string) $valorStat) ?></b>
+                    <span><?= htmlspecialchars((string) $etiquetaStat) ?></span>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+
+        <?php else: ?>
+          <!-- ===== Plantilla nueva §16: foto a sangre (modo artwork/ninguna) ===== -->
+          <div class="carta-placa carta-placa--artwork">
+            <?php if ($imagen !== ''): ?>
+              <img class="carta-arte carta-arte--sangre"
+                   src="<?= htmlspecialchars($imagen) ?>"
+                   alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                   <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+            <?php else: ?>
+              <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+              <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php endif; ?>
+
+            <div class="carta-degradado" aria-hidden="true"></div>
+
+            <div class="carta-overlay-superior">
+              <span class="rz-flotante">
+                <?= rareza_marcas($idRareza) ?>
+                <span class="sr-only">Rareza: <?= htmlspecialchars($rareza) ?></span>
+              </span>
+              <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
+                <span class="carta-head-derecha">
+                  <?php if ($cantidad !== null && $cantidad > 1): ?>
+                    <span class="carta-cantidad" title="Tienes <?= (int) $cantidad ?> copias">×<?= (int) $cantidad ?></span>
+                  <?php endif; ?>
+                  <?php if ($tieneAfinidad): ?>
+                    <span class="carta-afinidad" title="Afinidad: <?= htmlspecialchars($afinidad) ?>">
+                      <img src="<?= htmlspecialchars($afinidadImg) ?>" alt="Afinidad <?= htmlspecialchars($afinidad) ?>">
+                    </span>
+                  <?php endif; ?>
+                </span>
+              <?php endif; ?>
+            </div>
+
+            <?php if ($modo === 'artwork' && !empty($stats)): ?>
+              <div class="carta-stats-flotantes">
+                <?php foreach (array_slice($stats, 0, 3, true) as $etiquetaStat => $valorStat): ?>
+                  <span class="carta-stat-pildora" data-stat="<?= htmlspecialchars((string) $etiquetaStat) ?>">
+                    <b><?= htmlspecialchars((string) $valorStat) ?></b>
+                    <span><?= htmlspecialchars((string) $etiquetaStat) ?></span>
+                  </span>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+
+            <div class="carta-placa-nombre">
+              <span class="carta-fila-nombre">
+                <?php if ($esJugador): ?>
+                  <span class="carta-pos-insignia" data-posicion="<?= htmlspecialchars($posicion) ?>"><?= htmlspecialchars($posicion) ?></span>
+                <?php endif; ?>
+                <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+              </span>
+              <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
+            </div>
+          </div>
+
+          <?php if ($rasgo !== ''): ?>
+            <div class="carta-cuerpo">
+              <p class="carta-rasgo" title="Compo de configuración: <?= htmlspecialchars($rasgo) ?>">
+                <i class="ph ph-hexagon" aria-hidden="true"></i> <?= htmlspecialchars($rasgo) ?>
+              </p>
+            </div>
+          <?php endif; ?>
+        <?php endif; ?>
+
+        <?php if ($pie !== ''): ?>
+          <div class="carta-pie"><?= $pie ?></div>
+        <?php endif; ?>
+
+      </div>
+    </<?= $etiqueta ?>>
+    <?php
+}
+```
+
+- [ ] **Paso 2:** Actualizar el bloque de comentario de cabecera del fichero
+  (líneas 1-44) para documentar `mostrar_stats` en la lista de claves que
+  espera `$cromo` (junto a `nombre, imagen, posicion, ...`), y añadir una
+  línea explicando los tres modos, igual que ya documenta `rasgo`. No hace
+  falta reescribir todo el comentario, solo añadir esa entrada.
+
+- [ ] **Paso 3:** `C:/xampp/php/php.exe -l components/carta.php`.
+- [ ] **Paso 4:** Commit.
+
+```bash
+git add components/carta.php
+git commit -m "render_carta() soporta los dos modos de §16 (artwork/debajo)"
+```
+
+---
+
+#### Task 18 — Selector de `mostrar_stats` en el panel de cromos
+
+**Archivos:** Modifica `panel/cromos.php`.
+
+**Interfaces:**
+- Consume: `actualizarCromo()`/`crearCromo()` con el nuevo parámetro
+  `$mostrar_stats` (Task 2).
+
+- [ ] **Paso 1:** En el manejador POST (cerca de la línea 24, donde ya se
+  leen `$id_rareza`/`$id_afinidad` de `$_POST`), añade:
+
+```php
+    $mostrar_stats = $_POST['mostrar_stats'] ?? 'artwork';
+```
+
+  y pásalo como último argumento en las dos llamadas (`actualizarCromo(...)`
+  y `crearCromo(...)`) que ya existen justo debajo.
+
+- [ ] **Paso 2:** En el formulario del modal (cerca de donde está el campo
+  "Rareza", dentro de `.form-grid`), añade un campo nuevo:
+
+```html
+          <div class="field">
+            <label>Estadísticas</label>
+            <select name="mostrar_stats" id="f_mostrar_stats">
+              <option value="artwork">En el artwork (plantilla nueva)</option>
+              <option value="debajo">Debajo de la carta (cartas Photoshop)</option>
+              <option value="ninguna">No mostrar</option>
+            </select>
+          </div>
+```
+
+- [ ] **Paso 3:** En `panel/assets/js/scriptCromos.js`, dentro de la función
+  que rellena el modal al editar (`abrirModalCromo(cromo)`, donde ya se
+  hace `document.getElementById('f_id_rareza').value = cromo.id_rareza`),
+  añade la línea equivalente para el campo nuevo:
+
+```js
+    document.getElementById('f_mostrar_stats').value = cromo.mostrar_stats || 'artwork';
+```
+
+  Y en la rama de "Nuevo cromo" (donde se resetea el formulario), asegúrate
+  de que el `<select>` quede en `artwork` (el valor por defecto del HTML ya
+  lo cubre con el `<option>` en ese orden, pero confírmalo probándolo).
+
+- [ ] **Paso 4:** Para que el listado del panel (la tabla de `cromos.php`)
+  también pueda pasarle `cromo.mostrar_stats` al JS de edición, confirma que
+  `listarCromosAdmin()` (la consulta que alimenta esa tabla) ya selecciona
+  `c.mostrar_stats` — si no, añádelo a su `SELECT` igual que en la Task 3.
+
+- [ ] **Paso 5:** `C:/xampp/php/php.exe -l panel/cromos.php`.
+- [ ] **Paso 6:** Prueba manual en el navegador (`http://localhost/tcg_srf_importador/panel/cromos.php`, sesión `Claude`): editar un cromo existente, cambiar `mostrar_stats`, guardar, reabrir el modal y comprobar que el valor persiste.
+- [ ] **Paso 7:** Commit.
+
+```bash
+git add panel/cromos.php panel/assets/js/scriptCromos.js db/consultas.php
+git commit -m "Añade el selector de mostrar_stats al panel de cromos"
+```
+
+---
+
+#### Task 19 — Verificación visual en las 6 pantallas y checklist de accesibilidad
+
+- [ ] **Paso 1:** Con sesión de `Claude` en el navegador
+  (`http://localhost/tcg_srf_importador/`), revisar `album.php`,
+  `coleccion.php`, `mazos.php`, `mercado.php` — confirmar que las cartas en
+  modo `artwork` (la mayoría del catálogo, incluidas las 810+ que ya existen)
+  muestran foto a sangre, insignia de posición coloreada, y las 3 píldoras de
+  stats cuando el tamaño no es `sm`.
+- [ ] **Paso 2:** Abrir un sobre (`sobres.php`) y jugar un duelo completo
+  (`duelos.php` → `duelo.php`) para cubrir las cartas en `tamano: 'sm'` — sin
+  píldoras de stats (ocultas a ese tamaño), pero con insignia de posición y
+  recorte a sangre.
+- [ ] **Paso 3:** Buscar específicamente una de las 28 cartas sembradas en
+  `debajo` (ej. "Gentian" o "Escudo Instituto Zeus") en `album.php` o
+  `coleccion.php` y confirmar que se ve **exactamente igual que antes de
+  este cambio** — sin recorte, sin insignia de posición coloreada, con las
+  estadísticas debajo si las tenía.
+- [ ] **Paso 4:** A 375×812 (móvil): sin scroll horizontal de página
+  (`document.documentElement.scrollWidth`), objetivos táctiles ≥24×24px.
+- [ ] **Paso 5:** Contraste del nombre/equipo/píldoras sobre el degradado:
+  probar con una carta de foto muy clara de fondo (si hay alguna en el
+  catálogo) y comprobar que el texto se sigue leyendo.
+- [ ] **Paso 6:** Con "reducir movimiento" activado en el sistema, confirmar
+  que nada de esto añadió una animación nueva que debiera respetar esa
+  preferencia (no debería, es todo estático).
+- [ ] **Paso 7:** `for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done` sin errores (§13).
