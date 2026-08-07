@@ -317,9 +317,20 @@ class Tcg
 		]);
 	}
 
+	// Devuelve false sin borrar si la expansión todavía tiene cartas (la FK
+	// cromos.id_expansion -> expansiones.id_expansion no tiene cascada, y
+	// borrar cartas en uso a ciegas se lo cargaría de golpe con un error
+	// fatal). El admin tiene que vaciarla o mover las cartas antes.
 	public function eliminarExpansion($id_expansion) {
+		$stmt = $this->pdo->prepare("SELECT COUNT(*) FROM cromos WHERE id_expansion = :id");
+		$stmt->execute([":id" => $id_expansion]);
+		if ((int) $stmt->fetchColumn() > 0) {
+			return false;
+		}
+
 		$stmt = $this->pdo->prepare("DELETE FROM expansiones WHERE id_expansion = :id");
 		$stmt->execute([":id" => $id_expansion]);
+		return true;
 	}
 
 	// ==========================================================

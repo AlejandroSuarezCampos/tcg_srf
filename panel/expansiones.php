@@ -14,8 +14,8 @@ if(isset($_SESSION['dictador'])){
 
 // ----- Borrado (?eliminar=ID) -----
 if (isset($_GET['eliminar'])) {
-    $db->eliminarExpansion((int) $_GET['eliminar']);
-    header('Location: expansiones.php');
+    $borrada = $db->eliminarExpansion((int) $_GET['eliminar']);
+    header('Location: expansiones.php' . ($borrada ? '' : '?error=cartas_en_uso'));
     exit;
 }
 
@@ -69,6 +69,10 @@ if ($filtroTexto !== '') {
       </div>
       <button class="btn btn-primary" onclick="abrirModalExpansion()">+ Nueva expansión</button>
     </div>
+
+    <?php if (($_GET['error'] ?? '') === 'cartas_en_uso'): ?>
+    <div class="alert alert-danger">No se puede eliminar esta expansión: todavía tiene cartas asociadas. Bórralas (o muévelas a otra expansión) primero.</div>
+    <?php endif; ?>
 
     <form method="GET" class="admin-toolbar">
       <div class="admin-search">
