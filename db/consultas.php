@@ -4294,7 +4294,7 @@ class Tcg
 		];
 	}
 
-	public function ejecutarImportacion(array $datosJson, int $id_expansion, array $decisiones): array {
+	public function ejecutarImportacion(array $datosJson, int $id_expansion, array $decisiones, ?string $idSesionProgreso = null): array {
 		set_time_limit(0);
 
 		$equiposExistentes = $this->listarEquipos();
@@ -4307,6 +4307,29 @@ class Tcg
 		$creados = 0; $omitidos = 0; $fotosFallidas = []; $equiposCreados = 0;
 		$posicionesDesconocidas = [];
 
+		// Progreso opcional, sondeado por assets/ajax/importacion_progreso.php mientras
+		// esta función (que puede tardar varios minutos) sigue ejecutándose. Se guarda en
+		// un fichero temporal, no en BD ni sesión — ver §15.11 del CLAUDE.md de branding.
+		$ficheroProgreso = null;
+		$actualProgreso = 0;
+		$totalProgreso = 0;
+		if ($idSesionProgreso !== null) {
+			$ficheroProgreso = sys_get_temp_dir() . '/tcg_importacion_progreso_' . $idSesionProgreso . '.json';
+			foreach ($equiposConJugadores as $equipo) {
+				$totalProgreso += count($equipo['jugadores']);
+				if (trim((string) ($equipo['escudo'] ?? '')) !== '') { $totalProgreso++; }
+				if (trim((string) ($equipo['entrenador'] ?? '')) !== '') { $totalProgreso++; }
+				if (trim((string) ($equipo['gerente'] ?? '')) !== '') { $totalProgreso++; }
+			}
+			file_put_contents($ficheroProgreso, json_encode(['actual' => $actualProgreso, 'total' => $totalProgreso]));
+		}
+
+		$avanzarProgreso = function () use (&$actualProgreso, $totalProgreso, $ficheroProgreso) {
+			if ($ficheroProgreso === null) { return; }
+			$actualProgreso++;
+			file_put_contents($ficheroProgreso, json_encode(['actual' => $actualProgreso, 'total' => $totalProgreso]));
+		};
+
 		foreach ($equiposConJugadores as $equipo) {
 			$idEquipo = $mapaEquipos[$equipo['id']];
 			$nombreEquipoFinal = $nombresEquipos[$idEquipo] ?? $equipo['nombre'];
@@ -4314,6 +4337,7 @@ class Tcg
 			$equipoSlug = $this->slugImportado($equipo['nombre']);
 
 			foreach ($equipo['jugadores'] as $jugador) {
+				$avanzarProgreso();
 				if ($this->existeCromoImportado($jugador['nombre'], $idEquipo, $id_expansion)) { $omitidos++; continue; }
 
 				$posicion = $this->mapearPosicionJugador($jugador['posicion'] ?? '');
@@ -4333,21 +4357,34 @@ class Tcg
 				$creados++;
 			}
 
-			if (trim((string) ($equipo['escudo'] ?? '')) !== '' && !$this->existeCromoImportado('Escudo ' . $nombreEquipoFinal, $idEquipo, $id_expansion)) {
-				$this->crearCromo('Escudo ' . $nombreEquipoFinal, 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
-				$creados++;
+			if (trim((string) ($equipo['escudo'] ?? '')) !== '') {
+				$avanzarProgreso();
+				if (!$this->existeCromoImportado('Escudo ' . $nombreEquipoFinal, $idEquipo, $id_expansion)) {
+					$this->crearCromo('Escudo ' . $nombreEquipoFinal, 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
+					$creados++;
+				}
 			}
-			if (trim((string) ($equipo['entrenador'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['entrenador'], $idEquipo, $id_expansion)) {
-				$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
-				$creados++;
+			if (trim((string) ($equipo['entrenador'] ?? '')) !== '') {
+				$avanzarProgreso();
+				if (!$this->existeCromoImportado($equipo['entrenador'], $idEquipo, $id_expansion)) {
+					$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
+					$creados++;
+				}
 			}
-			if (trim((string) ($equipo['gerente'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['gerente'], $idEquipo, $id_expansion)) {
-				$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
-				$creados++;
+			if (trim((string) ($equipo['gerente'] ?? '')) !== '') {
+				$avanzarProgreso();
+				if (!$this->existeCromoImportado($equipo['gerente'], $idEquipo, $id_expansion)) {
+					$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
+					$creados++;
+				}
 			}
 		}
 
 		$this->derivarRasgosConfiguracion();
+
+		if ($ficheroProgreso !== null && file_exists($ficheroProgreso)) {
+			unlink($ficheroProgreso);
+		}
 
 		return ['creados' => $creados, 'omitidos' => $omitidos, 'equipos_creados' => $equiposCreados, 'fotos_fallidas' => $fotosFallidas, 'posiciones_desconocidas' => $posicionesDesconocidas];
 	}

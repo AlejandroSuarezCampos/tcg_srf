@@ -16,16 +16,8 @@ if (isset($_GET['borrar_importadas'])) {
 }
 
 $error = '';
-$resultado = null;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmar']) && isset($_SESSION['import_datos'])) {
-    $decisiones = [];
-    foreach ($_POST['equipo_eleccion'] ?? [] as $idEquipoJson => $eleccion) {
-        $decisiones[$idEquipoJson] = ['eleccion' => $eleccion, 'texto' => $_POST['equipo_texto'][$idEquipoJson] ?? ''];
-    }
-    $resultado = $db->ejecutarImportacion($_SESSION['import_datos'], (int) $_SESSION['import_id_expansion'], $decisiones);
-    unset($_SESSION['import_datos'], $_SESSION['import_id_expansion']);
-} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancelar'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancelar'])) {
     unset($_SESSION['import_datos'], $_SESSION['import_id_expansion']);
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['json_datos'])) {
     $contenido = file_get_contents($_FILES['json_datos']['tmp_name']);
@@ -86,23 +78,8 @@ $totalImportadas = $db->contarCartasImportadas();
       </div>
     <?php endif; ?>
 
-    <?php if ($resultado): ?>
-      <div class="field-full">
-        <h2><?= $resultado['creados'] ?> cartas creadas</h2>
-        <ul>
-          <li><?= $resultado['omitidos'] ?> omitidas (ya existían)</li>
-          <li><?= $resultado['equipos_creados'] ?> equipos nuevos creados</li>
-        </ul>
-        <?php if (!empty($resultado['fotos_fallidas'])): ?>
-        <div class="alert alert-warning">No se pudo descargar la foto de: <?= htmlspecialchars(implode(', ', $resultado['fotos_fallidas'])) ?>. Esas cartas se crearon sin imagen.</div>
-        <?php endif; ?>
-        <?php if (!empty($resultado['posiciones_desconocidas'])): ?>
-        <div class="alert alert-warning">No se crearon por posición no reconocida: <?= htmlspecialchars(implode(', ', $resultado['posiciones_desconocidas'])) ?>.</div>
-        <?php endif; ?>
-      </div>
-
-    <?php elseif ($previsualizacion): ?>
-      <form method="POST">
+    <?php if ($previsualizacion): ?>
+      <form method="POST" id="formPrevisualizacion">
         <h2>Previsualización</h2>
         <ul>
           <li><?= $previsualizacion['jugadores_a_crear'] ?> jugadores a crear</li>
@@ -141,9 +118,16 @@ $totalImportadas = $db->contarCartasImportadas();
 
         <div class="modal-footer">
           <button type="submit" name="cancelar" value="1" class="btn btn-ghost">Cancelar</button>
-          <button type="submit" name="confirmar" value="1" class="btn btn-primary">Crear cartas</button>
+          <button type="button" id="btnConfirmarImportacion" class="btn btn-primary">Crear cartas</button>
         </div>
       </form>
+
+      <div id="importacionProgreso" class="field-full" style="display:none">
+        <p><progress id="importacionProgresoBarra" value="0" max="1" style="width:100%"></progress></p>
+        <p id="importacionProgresoTexto">Importando…</p>
+      </div>
+
+      <div id="importacionResultado" class="field-full" style="display:none"></div>
 
     <?php else: ?>
       <form method="POST" enctype="multipart/form-data">
@@ -174,5 +158,6 @@ $totalImportadas = $db->contarCartasImportadas();
   </main>
 </div>
 
+<script src="./assets/js/scriptImportar.js"></script>
 </body>
 </html>
