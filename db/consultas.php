@@ -217,10 +217,10 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad) {
+	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0) {
 		$sql = "
-			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad)
-			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad)
+			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica)
+			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica)
 		";
 		$stmt = $this->pdo->prepare($sql);
 		$stmt->execute([
@@ -232,6 +232,9 @@ class Tcg
 			":id_equipo" => $id_equipo,
 			":id_rareza" => $id_rareza,
 			":id_afinidad" => $id_afinidad,
+			":ataque" => $ataque,
+			":defensa" => $defensa,
+			":tecnica" => $tecnica,
 		]);
 		return $this->pdo->lastInsertId();
 	}
