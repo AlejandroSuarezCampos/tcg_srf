@@ -30,6 +30,9 @@ $activeAdmin = $activeAdmin ?? '';
     <a href="cromos.php" class="<?= $activeAdmin === 'cromos' ? 'active' : '' ?>">
       <span class="nav-ico"><i class="bi bi-collection"></i></span> Cromos
     </a>
+    <a href="importar.php" class="<?= $activeAdmin === 'importar' ? 'active' : '' ?>">
+      <span class="nav-ico"><i class="bi bi-cloud-upload"></i></span> Importar datos
+    </a>
     <a href="sobres.php" class="<?= $activeAdmin === 'sobres' ? 'active' : '' ?>">
       <span class="nav-ico"><i class="bi bi-box-seam"></i></span> Sobres
     </a>
