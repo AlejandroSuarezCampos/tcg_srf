@@ -217,10 +217,10 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0) {
+	public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0, $origen_importacion = 0) {
 		$sql = "
-			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica)
-			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica)
+			INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica, origen_importacion)
+			VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica, :origen_importacion)
 		";
 		$stmt = $this->pdo->prepare($sql);
 		$stmt->execute([
@@ -235,6 +235,7 @@ class Tcg
 			":ataque" => $ataque,
 			":defensa" => $defensa,
 			":tecnica" => $tecnica,
+			":origen_importacion" => $origen_importacion,
 		]);
 		return $this->pdo->lastInsertId();
 	}
@@ -4328,20 +4329,20 @@ class Tcg
 					if ($imagen === '') { $fotosFallidas[] = $jugador['nombre']; }
 				}
 
-				$this->crearCromo($jugador['nombre'], $posicion, '', $imagen, $id_expansion, $idEquipo, $idRareza, $idAfinidad, $stats['ataque'], $stats['defensa'], $stats['tecnica']);
+				$this->crearCromo($jugador['nombre'], $posicion, '', $imagen, $id_expansion, $idEquipo, $idRareza, $idAfinidad, $stats['ataque'], $stats['defensa'], $stats['tecnica'], 1);
 				$creados++;
 			}
 
 			if (trim((string) ($equipo['escudo'] ?? '')) !== '' && !$this->existeCromoImportado('Escudo ' . $nombreEquipoFinal, $idEquipo, $id_expansion)) {
-				$this->crearCromo('Escudo ' . $nombreEquipoFinal, 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$this->crearCromo('Escudo ' . $nombreEquipoFinal, 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
 				$creados++;
 			}
 			if (trim((string) ($equipo['entrenador'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['entrenador'], $idEquipo, $id_expansion)) {
-				$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
 				$creados++;
 			}
 			if (trim((string) ($equipo['gerente'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['gerente'], $idEquipo, $id_expansion)) {
-				$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0, 1);
 				$creados++;
 			}
 		}
@@ -4349,6 +4350,42 @@ class Tcg
 		$this->derivarRasgosConfiguracion();
 
 		return ['creados' => $creados, 'omitidos' => $omitidos, 'equipos_creados' => $equiposCreados, 'fotos_fallidas' => $fotosFallidas, 'posiciones_desconocidas' => $posicionesDesconocidas];
+	}
+
+	public function contarCartasImportadas(): int {
+		$stmt = $this->pdo->query("SELECT COUNT(*) FROM cromos WHERE origen_importacion = 1");
+		return (int) $stmt->fetchColumn();
+	}
+
+	public function borrarCartasImportadas(): array {
+		$stmt = $this->pdo->query("SELECT id_cromo FROM cromos WHERE origen_importacion = 1");
+		$ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+		if (empty($ids)) {
+			return ['borrados' => 0, 'en_uso' => 0];
+		}
+
+		$placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+		$stmtC = $this->pdo->prepare("SELECT DISTINCT id_cromo FROM coleccion WHERE id_cromo IN ($placeholders)");
+		$stmtC->execute($ids);
+		$enColeccion = array_map('intval', $stmtC->fetchAll(PDO::FETCH_COLUMN));
+
+		$stmtA = $this->pdo->prepare("SELECT DISTINCT id_cromo FROM duelo_alineaciones WHERE id_cromo IN ($placeholders)");
+		$stmtA->execute($ids);
+		$enAlineacion = array_map('intval', $stmtA->fetchAll(PDO::FETCH_COLUMN));
+
+		$enUso = array_unique(array_merge($enColeccion, $enAlineacion));
+		$aBorrar = array_values(array_diff($ids, $enUso));
+
+		$borrados = 0;
+		if (!empty($aBorrar)) {
+			$placeholdersBorrar = implode(',', array_fill(0, count($aBorrar), '?'));
+			$stmtDel = $this->pdo->prepare("DELETE FROM cromos WHERE id_cromo IN ($placeholdersBorrar)");
+			$stmtDel->execute($aBorrar);
+			$borrados = $stmtDel->rowCount();
+		}
+
+		return ['borrados' => $borrados, 'en_uso' => count($enUso)];
 	}
 }
 

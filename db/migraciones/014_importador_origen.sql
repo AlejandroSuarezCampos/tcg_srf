@@ -1,0 +1,1 @@
+ALTER TABLE cromos ADD COLUMN IF NOT EXISTS origen_importacion TINYINT(1) NOT NULL DEFAULT 0 AFTER cupo_numerado;

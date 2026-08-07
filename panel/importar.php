@@ -8,6 +8,13 @@ if (isset($_SESSION['dictador'])) {
     header("Location: ../landing.php"); exit;
 }
 
+// ----- Borrado de cartas importadas (?borrar_importadas=1) -----
+if (isset($_GET['borrar_importadas'])) {
+    $borradoResultado = $db->borrarCartasImportadas();
+    header('Location: importar.php?importados_borrados=1&n=' . $borradoResultado['borrados'] . '&retenidas=' . $borradoResultado['en_uso']);
+    exit;
+}
+
 $error = '';
 $resultado = null;
 
@@ -37,6 +44,7 @@ $previsualizacion = isset($_SESSION['import_datos'])
     : null;
 
 $expansiones = $db->listarExpansiones();
+$totalImportadas = $db->contarCartasImportadas();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -66,6 +74,16 @@ $expansiones = $db->listarExpansiones();
 
     <?php if ($error): ?>
       <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <?php if (isset($_GET['importados_borrados'])): ?>
+      <?php $nBorradas = (int) ($_GET['n'] ?? 0); $nRetenidas = (int) ($_GET['retenidas'] ?? 0); ?>
+      <div class="alert <?= $nRetenidas > 0 ? 'alert-warning' : 'alert-success' ?>">
+        <?= $nBorradas ?> cartas importadas borradas.
+        <?php if ($nRetenidas > 0): ?>
+          <?= $nRetenidas ?> se conservaron por estar en uso (en una colección o en un duelo).
+        <?php endif; ?>
+      </div>
     <?php endif; ?>
 
     <?php if ($resultado): ?>
@@ -145,6 +163,13 @@ $expansiones = $db->listarExpansiones();
           <button type="submit" class="btn btn-primary">Previsualizar</button>
         </div>
       </form>
+
+      <?php if ($totalImportadas > 0): ?>
+      <div class="field-full">
+        <p><?= $totalImportadas ?> cartas importadas actualmente.</p>
+        <button type="button" class="btn btn-ghost" onclick="if(confirm('¿Borrar las <?= htmlspecialchars((string) $totalImportadas) ?> cartas importadas? Esta acción no se puede deshacer.')) window.location.href='importar.php?borrar_importadas=1'">Borrar cartas importadas</button>
+      </div>
+      <?php endif; ?>
     <?php endif; ?>
   </main>
 </div>
