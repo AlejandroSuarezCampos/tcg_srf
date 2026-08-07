@@ -4087,13 +4087,44 @@ class Tcg
 		return $mapa;
 	}
 
-	private const IMPORT_BASE_TOTAL = ['comun' => 165, 'poco_comun' => 190, 'raro' => 215, 'epico' => 240];
-	private const IMPORT_RAREZA_CLAVE = [1 => 'comun', 2 => 'poco_comun', 3 => 'raro', 4 => 'epico'];
-	private const IMPORT_SPLIT_POSICION = [
-		'POR' => ['ataque' => 0.20, 'defensa' => 0.45, 'tecnica' => 0.35],
-		'DF'  => ['ataque' => 0.25, 'defensa' => 0.45, 'tecnica' => 0.30],
-		'MC'  => ['ataque' => 0.33, 'defensa' => 0.30, 'tecnica' => 0.37],
-		'DC'  => ['ataque' => 0.45, 'defensa' => 0.25, 'tecnica' => 0.30],
+	// Tabla real de Rangos_estadisticas_SRF.csv (24 filas: rarezas 1-6 x POR/DF/MC/DC). Ver §15.10.
+	private const IMPORT_RANGOS_STATS = [
+		1 => [
+			'POR' => ['ataque' => [23, 37], 'defensa' => [62, 76], 'tecnica' => [52, 66]],
+			'DF'  => ['ataque' => [37, 51], 'defensa' => [57, 71], 'tecnica' => [47, 61]],
+			'MC'  => ['ataque' => [48, 62], 'defensa' => [49, 63], 'tecnica' => [56, 70]],
+			'DC'  => ['ataque' => [63, 77], 'defensa' => [37, 51], 'tecnica' => [50, 64]],
+		],
+		2 => [
+			'POR' => ['ataque' => [31, 45], 'defensa' => [68, 82], 'tecnica' => [59, 73]],
+			'DF'  => ['ataque' => [43, 57], 'defensa' => [65, 79], 'tecnica' => [53, 67]],
+			'MC'  => ['ataque' => [56, 70], 'defensa' => [57, 71], 'tecnica' => [65, 79]],
+			'DC'  => ['ataque' => [69, 83], 'defensa' => [45, 59], 'tecnica' => [58, 72]],
+		],
+		3 => [
+			'POR' => ['ataque' => [39, 53], 'defensa' => [74, 88], 'tecnica' => [65, 79]],
+			'DF'  => ['ataque' => [50, 64], 'defensa' => [72, 86], 'tecnica' => [60, 74]],
+			'MC'  => ['ataque' => [64, 78], 'defensa' => [65, 79], 'tecnica' => [73, 87]],
+			'DC'  => ['ataque' => [76, 90], 'defensa' => [53, 67], 'tecnica' => [66, 80]],
+		],
+		4 => [
+			'POR' => ['ataque' => [47, 61], 'defensa' => [80, 94], 'tecnica' => [72, 86]],
+			'DF'  => ['ataque' => [56, 70], 'defensa' => [79, 93], 'tecnica' => [66, 80]],
+			'MC'  => ['ataque' => [72, 86], 'defensa' => [73, 87], 'tecnica' => [81, 95]],
+			'DC'  => ['ataque' => [82, 96], 'defensa' => [60, 74], 'tecnica' => [74, 88]],
+		],
+		5 => [
+			'POR' => ['ataque' => [55, 69], 'defensa' => [86, 99], 'tecnica' => [79, 93]],
+			'DF'  => ['ataque' => [63, 77], 'defensa' => [86, 99], 'tecnica' => [73, 87]],
+			'MC'  => ['ataque' => [80, 94], 'defensa' => [81, 95], 'tecnica' => [90, 99]],
+			'DC'  => ['ataque' => [89, 99], 'defensa' => [68, 82], 'tecnica' => [83, 97]],
+		],
+		6 => [
+			'POR' => ['ataque' => [63, 77], 'defensa' => [92, 99], 'tecnica' => [86, 99]],
+			'DF'  => ['ataque' => [69, 83], 'defensa' => [92, 99], 'tecnica' => [79, 93]],
+			'MC'  => ['ataque' => [88, 99], 'defensa' => [89, 99], 'tecnica' => [92, 99]],
+			'DC'  => ['ataque' => [92, 99], 'defensa' => [76, 90], 'tecnica' => [91, 99]],
+		],
 	];
 
 	// Tres rankings independientes (goleadores temporada anterior, goleadores
@@ -4160,16 +4191,14 @@ class Tcg
 	}
 
 	public function statsBaseImportacion(string $posicion, int $idRareza): array {
-		if (!isset(self::IMPORT_SPLIT_POSICION[$posicion])) {
-			return ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0]; // ENT/GER/ESCUDO
+		$rango = self::IMPORT_RANGOS_STATS[$idRareza][$posicion] ?? null;
+		if ($rango === null) {
+			return ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0]; // ENT/GER/ESCUDO, o rareza sin tabla
 		}
-		$clave = self::IMPORT_RAREZA_CLAVE[$idRareza] ?? 'comun';
-		$total = self::IMPORT_BASE_TOTAL[$clave] * (mt_rand(92, 108) / 100);
-		$split = self::IMPORT_SPLIT_POSICION[$posicion];
 		return [
-			'ataque'  => max(1, min(99, (int) round($total * $split['ataque']))),
-			'defensa' => max(1, min(99, (int) round($total * $split['defensa']))),
-			'tecnica' => max(1, min(99, (int) round($total * $split['tecnica']))),
+			'ataque'  => mt_rand($rango['ataque'][0], $rango['ataque'][1]),
+			'defensa' => mt_rand($rango['defensa'][0], $rango['defensa'][1]),
+			'tecnica' => mt_rand($rango['tecnica'][0], $rango['tecnica'][1]),
 		];
 	}
 

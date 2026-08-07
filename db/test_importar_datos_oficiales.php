@@ -61,6 +61,8 @@ afirmar(!isset($rareza['eqA|Suplente']), 'jugador sin goles no se promociona');
 $statsEnt = $db->statsBaseImportacion('ENT', 5);
 afirmar($statsEnt === ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0], 'entrenador siempre 0/0/0');
 $statsDC = $db->statsBaseImportacion('DC', 4);
-afirmar($statsDC['ataque'] >= 50 && $statsDC['ataque'] <= 99, 'delantero épico tiene ataque alto');
+afirmar($statsDC['ataque'] >= 82 && $statsDC['ataque'] <= 96, 'delantero épico tiene ataque en rango real 82-96');
+$statsPor = $db->statsBaseImportacion('POR', 1);
+afirmar($statsPor['ataque'] >= 23 && $statsPor['ataque'] <= 37, 'portero común tiene ataque en rango real 23-37');
 
 echo "\nTodas las comprobaciones pasaron.\n";
