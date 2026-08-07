@@ -3971,6 +3971,39 @@ class Tcg
 			return ["ok" => false, "error" => "Error al reclamar la misión."];
 		}
 	}
+
+	// ==========================================================
+	// IMPORTACIÓN DATOS OFICIALES
+	// ==========================================================
+
+	private const IMPORT_POSICIONES = ['POR' => 'POR', 'DEF' => 'DF', 'MED' => 'MC', 'DEL' => 'DC'];
+	private const IMPORT_AFINIDADES = ['fuego' => 2, 'bosque' => 4, 'aire' => 3, 'viento' => 3, 'montana' => 1];
+
+	// Minúsculas, sin tildes, sin espacios repetidos — para comparar nombres
+	// de equipo y claves de afinidad sin que un acento o una mayúscula rompa
+	// el match (el JSON oficial mezcla "Aire"/"aire", "Montaña"/"montaña"...).
+	public function normalizarTexto(string $s): string {
+		$s = trim(mb_strtolower($s, 'UTF-8'));
+		$translit = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+		if ($translit !== false) { $s = $translit; }
+		return preg_replace('/\s+/', ' ', $s);
+	}
+
+	public function mapearPosicionJugador(string $pos): ?string {
+		$pos = strtoupper(trim($pos));
+		return self::IMPORT_POSICIONES[$pos] ?? null;
+	}
+
+	public function mapearAfinidadJugador(?string $nombre): int {
+		if ($nombre === null || trim($nombre) === '') { return 5; } // no-afi
+		return self::IMPORT_AFINIDADES[$this->normalizarTexto($nombre)] ?? 5;
+	}
+
+	public function slugImportado(string $texto): string {
+		$slug = preg_replace('/[^a-z0-9]+/', '-', $this->normalizarTexto($texto));
+		$slug = trim($slug, '-');
+		return $slug !== '' ? $slug : 'x';
+	}
 }
 
 ?>
