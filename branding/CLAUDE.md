@@ -1986,3 +1986,41 @@ pinta el resumen final (creados/omitidos/equipos nuevos/fotos fallidas/
 posiciones desconocidas) con el mismo marcado que ya usa la vista de
 resultado. El botón "Cancelar" no cambia: sigue siendo un `<button
 type="submit">` normal, no necesita JS porque no tarda nada.
+
+## 15.12 Borrado de cartas importadas por expansión
+
+El botón de §15.10 borraba TODAS las cartas importadas de golpe, sin
+importar la expansión. Alejandro pidió poder borrar solo las de una
+expansión concreta (para poder probar una importación en una expansión de
+pruebas y limpiarla sin arriesgar cartas importadas de otra expansión que sí
+esté en uso).
+
+**`Tcg`, cambios:**
+- `borrarCartasImportadas(?int $id_expansion = null)`: gana un parámetro
+  opcional. Si se pasa, el `SELECT id_cromo FROM cromos WHERE
+  origen_importacion = 1` añade `AND id_expansion = :id_expansion`. El resto
+  de la lógica (excluir las que están en `coleccion`/`duelo_alineaciones`)
+  no cambia. `null` mantiene el comportamiento global de antes, por si algo
+  más lo llama así en el futuro.
+- `contarCartasImportadas()` deja de ser lo que decide si se muestra el
+  botón — pasa a usarse `listarExpansionesConCartasImportadas(): array`,
+  nueva, que devuelve una fila por cada expansión con al menos una carta
+  importada: `[['id_expansion'=>int, 'nombre'=>string, 'total'=>int], ...]`
+  (`SELECT c.id_expansion, e.nombre, COUNT(*) AS total FROM cromos c JOIN
+  expansiones e ON e.id_expansion = c.id_expansion WHERE
+  c.origen_importacion = 1 GROUP BY c.id_expansion, e.nombre ORDER BY
+  e.nombre`).
+
+**`panel/importar.php`:** el bloque único "N cartas importadas actualmente
+[Borrar cartas importadas]" de la pantalla del paso 1 se sustituye por una
+tabla (mismo patrón `admin-table`/`admin-table-wrap` que usa el resto del
+panel, sin CSS nuevo) con una fila por expansión que tiene cartas
+importadas: nombre de la expansión, cuántas, y un botón "Borrar" por fila
+que apunta a `importar.php?borrar_importadas=1&id_expansion=ID`, con el
+mismo `confirm()` nativo de antes pero mencionando la expansión y la cifra
+concretas en el mensaje. Si no hay ninguna expansión con cartas importadas,
+no se muestra nada (igual que antes con el botón único).
+
+El manejador del `GET` (`isset($_GET['borrar_importadas'])`, al principio
+del fichero) lee también `$_GET['id_expansion']` y se lo pasa a
+`borrarCartasImportadas()`.
