@@ -78,6 +78,9 @@ $expansiones = $db->listarExpansiones();
         <?php if (!empty($resultado['fotos_fallidas'])): ?>
         <div class="alert alert-warning">No se pudo descargar la foto de: <?= htmlspecialchars(implode(', ', $resultado['fotos_fallidas'])) ?>. Esas cartas se crearon sin imagen.</div>
         <?php endif; ?>
+        <?php if (!empty($resultado['posiciones_desconocidas'])): ?>
+        <div class="alert alert-warning">No se crearon por posición no reconocida: <?= htmlspecialchars(implode(', ', $resultado['posiciones_desconocidas'])) ?>.</div>
+        <?php endif; ?>
       </div>
 
     <?php elseif ($previsualizacion): ?>
@@ -90,6 +93,9 @@ $expansiones = $db->listarExpansiones();
           <li><?= count($previsualizacion['equipos_nuevos']) ?> equipos nuevos: <?= htmlspecialchars(implode(', ', $previsualizacion['equipos_nuevos'])) ?></li>
           <li><?= $previsualizacion['afinidades_desconocidas'] ?> jugadores con afinidad no reconocida (irán como "no-afi")</li>
           <li><?= $previsualizacion['cartas_equipo_a_crear'] ?> cartas de escudo/entrenador/gerente a crear</li>
+          <?php if (!empty($previsualizacion['posiciones_desconocidas'])): ?>
+          <li><?= count($previsualizacion['posiciones_desconocidas']) ?> jugadores con posición no reconocida (no se crearán): <?= htmlspecialchars(implode(', ', $previsualizacion['posiciones_desconocidas'])) ?></li>
+          <?php endif; ?>
         </ul>
 
         <?php if (!empty($previsualizacion['equipos_ambiguos'])): ?>
