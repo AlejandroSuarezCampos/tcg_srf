@@ -19,6 +19,7 @@ class Tcg
 				c.descripcion,
 				c.imagen,
 				c.posicion,
+				c.mostrar_stats,
 				e.nombre AS expansion,
 				eq.nombre AS equipo,
 				r.id_rareza,
@@ -143,7 +144,7 @@ class Tcg
 				c.descripcion,
 				c.imagen,
 				c.posicion,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				c.id_expansion,
 				e.nombre AS expansion,
 				e.fecha_salida,
@@ -396,7 +397,7 @@ class Tcg
 			SELECT
 				col.id_coleccion, col.obtenida, col.bloqueada,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.id_equipo, eq.nombre AS equipo,
 				e.id_expansion, e.nombre AS expansion,
 				r.id_rareza, r.nombre AS rareza,
@@ -542,7 +543,7 @@ class Tcg
 		$sql = "
 			SELECT
 				col.id_coleccion, col.obtenida,
-				c.nombre, c.imagen, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
+				c.nombre, c.imagen, c.posicion, c.mostrar_stats, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -561,7 +562,7 @@ class Tcg
 		$sql = "
 			SELECT
 				col.id_coleccion,
-				c.nombre, c.imagen, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
+				c.nombre, c.imagen, c.posicion, c.mostrar_stats, eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza
 			FROM coleccion col
 			INNER JOIN cromos c ON col.id_cromo = c.id_cromo
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -608,7 +609,7 @@ class Tcg
 			SELECT
 				m.id_anuncio, m.precio, m.fecha_publicacion,
 				col.id_coleccion, col.id_usuario AS id_vendedor,
-				c.id_cromo, c.nombre AS carta, c.imagen,
+				c.id_cromo, c.nombre AS carta, c.imagen, c.posicion, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				u.nombre AS vendedor
@@ -649,7 +650,7 @@ class Tcg
 	public function listarColeccionVendible($id_usuario) {
 		$sql = "
 			SELECT col.id_coleccion, c.id_cromo, c.nombre, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.nombre AS equipo, r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
 				(SELECT rg.nombre FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
@@ -874,7 +875,7 @@ class Tcg
 			// Cartas disponibles en esa expansión, con su rareza y probabilidad real
 			$stmtCartas = $this->pdo->prepare("
 				SELECT
-					c.id_cromo, c.nombre, c.imagen,
+					c.id_cromo, c.nombre, c.imagen, c.posicion, c.mostrar_stats,
 					eq.nombre AS equipo,
 					c.id_rareza, r.nombre AS rareza, r.probabilidad
 				FROM cromos c
@@ -1540,7 +1541,7 @@ class Tcg
 			SELECT
 				mc.id_mazo_carta, mc.hueco, col.id_coleccion, col.bloqueada,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
@@ -1568,7 +1569,7 @@ class Tcg
 			SELECT
 				col.id_coleccion, col.bloqueada,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
@@ -1802,7 +1803,7 @@ class Tcg
 			SELECT
 				col.id_coleccion,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
@@ -1866,7 +1867,7 @@ class Tcg
 		$stmt = $this->pdo->prepare("
 			SELECT
 				da.hueco, da.ataque, da.defensa, da.tecnica,
-				c.id_cromo, c.nombre, c.posicion, c.imagen,
+				c.id_cromo, c.nombre, c.posicion, c.imagen, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
@@ -3167,7 +3168,7 @@ class Tcg
 			SELECT
 				rc.hueco,
 				c.id_cromo, c.nombre, c.posicion, c.imagen,
-				c.ataque, c.defensa, c.tecnica,
+				c.ataque, c.defensa, c.tecnica, c.mostrar_stats,
 				eq.nombre AS equipo,
 				r.id_rareza, r.nombre AS rareza,
 				af.nombre AS afinidad, af.imagen AS afinidad_imagen,
