@@ -4004,6 +4004,78 @@ class Tcg
 		$slug = trim($slug, '-');
 		return $slug !== '' ? $slug : 'x';
 	}
+
+	public function emparejarEquipo(string $nombreJson, array $equiposExistentes): array {
+		$normJson = $this->normalizarTexto($nombreJson);
+		$mejor = null;
+		$mejorPct = 0.0;
+		foreach ($equiposExistentes as $eq) {
+			if ($this->normalizarTexto($eq['nombre']) === $normJson) {
+				return ['estado' => 'exacto', 'id_equipo' => (int) $eq['id_equipo'], 'nombre' => $eq['nombre']];
+			}
+			similar_text($normJson, $this->normalizarTexto($eq['nombre']), $pct);
+			if ($pct > $mejorPct) { $mejorPct = $pct; $mejor = $eq; }
+		}
+		if ($mejor !== null && $mejorPct >= 75.0) {
+			return [
+				'estado' => 'ambiguo',
+				'nombre_json' => $nombreJson,
+				'candidato_db' => ['id_equipo' => (int) $mejor['id_equipo'], 'nombre' => $mejor['nombre']],
+				'porcentaje' => round($mejorPct, 1),
+			];
+		}
+		return ['estado' => 'nuevo', 'nombre' => $nombreJson];
+	}
+
+	// $decisiones: [id_json_equipo => ['eleccion' => 'json'|'db'|'otro', 'texto' => string|null]],
+	// solo hace falta para los equipos que salieron 'ambiguo' en emparejarEquipo().
+	public function resolverEquipos(array $equiposJson, array $equiposExistentes, array $decisiones): array {
+		$mapa = [];
+		$cacheNombreAId = [];
+		foreach ($equiposExistentes as $eq) {
+			$cacheNombreAId[$this->normalizarTexto($eq['nombre'])] = (int) $eq['id_equipo'];
+		}
+
+		foreach ($equiposJson as $equipo) {
+			$match = $this->emparejarEquipo($equipo['nombre'], $equiposExistentes);
+			$idExistente = null;
+			$nombreFinal = null;
+
+			if ($match['estado'] === 'exacto') {
+				$idExistente = $match['id_equipo'];
+			} elseif ($match['estado'] === 'ambiguo') {
+				$decision = $decisiones[$equipo['id']] ?? ['eleccion' => 'db', 'texto' => null];
+				if ($decision['eleccion'] === 'db') {
+					$idExistente = $match['candidato_db']['id_equipo'];
+				} elseif ($decision['eleccion'] === 'json') {
+					$nombreFinal = $match['nombre_json'];
+				} else {
+					$nombreFinal = trim((string) $decision['texto']) !== '' ? $decision['texto'] : $match['nombre_json'];
+				}
+			} else {
+				$nombreFinal = $match['nombre'];
+			}
+
+			if ($idExistente !== null) {
+				$mapa[$equipo['id']] = $idExistente;
+				continue;
+			}
+
+			$clave = $this->normalizarTexto($nombreFinal);
+			if (isset($cacheNombreAId[$clave])) {
+				$mapa[$equipo['id']] = $cacheNombreAId[$clave];
+				continue;
+			}
+
+			$stmt = $this->pdo->prepare("INSERT INTO equipos (nombre) VALUES (:nombre)");
+			$stmt->execute([':nombre' => $nombreFinal]);
+			$nuevoId = (int) $this->pdo->lastInsertId();
+			$cacheNombreAId[$clave] = $nuevoId;
+			$mapa[$equipo['id']] = $nuevoId;
+		}
+
+		return $mapa;
+	}
 }
 
 ?>
