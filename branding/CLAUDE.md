@@ -2885,3 +2885,74 @@ git commit -m "Añade el selector de mostrar_stats al panel de cromos"
   que nada de esto añadió una animación nueva que debiera respetar esa
   preferencia (no debería, es todo estático).
 - [ ] **Paso 7:** `for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done` sin errores (§13).
+
+## 16.14 Segundo pivote: estadísticas a un modal, selector de mazos rehecho
+
+Tras ver el resultado real (§16.6-§16.13 ya construidas y con dos rondas de
+ajuste de UX encima), Alejandro pidió un cambio de interacción, no de
+retoque visual: **quitar las estadísticas de la propia carta** en las
+pantallas de catálogo (evita del todo el problema de alturas distintas
+entre modo `artwork` y `debajo`, ya no hace falta que ninguna foto se
+estire) y verlas en un **modal** al hacer clic. Además, el selector de
+jugador de `mazos.php` deja de usar la tarjeta completa y pasa a una lista
+de filas horizontales.
+
+**Superado por esta sección:** la garantía de §16.6 de que el modo `debajo`
+queda "pixel a pixel igual que antes" ya no aplica a su bloque de
+estadísticas — Alejandro decidió explícitamente que también deje de
+mostrarlas ahí. El resto de esa garantía (imagen sin recortar, marcado
+clásico de nombre/posición) sigue en pie.
+
+### 16.14.1 Modal de detalle de carta
+
+Nueva opción en `render_carta()`: `$opts['detalle'] = true` (por defecto
+`false` — no toca ningún caller existente que no la pase explícitamente).
+Cuando es `true` y la carta es de un puesto jugable
+(`Tcg::POSICIONES_JUGABLES`) con `$opts['stats']` no vacío:
+
+- La carta deja de pintar la fila de píldoras (`artwork`) o el bloque
+  `.carta-stats` (`debajo`) — en su lugar, un aviso pequeño y siempre
+  visible: **"Haz clic aquí para ver las estadísticas"**.
+- La carta entera (el `<article>`/`<a>`) se vuelve clicable (`cursor:
+  pointer`, cambia a la clase `carta--detalle`) y lleva atributos `data-*`
+  con todo lo que necesita el modal: foto, nombre, equipo, posición,
+  ataque, defensa, técnica — todos con `htmlspecialchars()`.
+- Un solo modal compartido por página (mismo patrón que
+  `partials/confirmar.php` / `SRF.abrirModal`/`cerrarModal` de `ui.js`, sin
+  inventar un sistema de modales nuevo), con: foto grande (`object-fit:
+  contain`, nunca recortada — aquí sí importa verla completa), nombre,
+  equipo, posición, y las tres estadísticas con los mismos colores
+  semánticos ya establecidos (ataque verde/defensa rojo/técnica azul).
+- Un único `<script>` con un listener delegado (`click` en `.carta--detalle`,
+  ignora clics dentro de `.carta-acciones-flotante`/botones propios de la
+  carta si los hubiera) que lee los `data-*` del elemento clicado, rellena
+  el modal, y llama a `SRF.abrirModal('modalDetalleCarta')`.
+
+**Dónde se activa:** `album.php`, `coleccion.php`, `mercado.php` (las dos
+llamadas a `render_carta()` de esa pantalla) añaden `'detalle' => true`
+junto a su `'stats' => ...` ya existente. `duelo.php`, `sobres.php`,
+`perfil.php`, `landing.php` no se tocan — sin la opción, siguen exactamente
+igual que hoy (`duelo.php` no pasaba `stats` de todas formas).
+
+### 16.14.2 Selector de mazos: lista de barras horizontales
+
+`mazos.php` (la única llamada a `render_carta()` de ese fichero, el
+`selector-item` donde se elige jugador para un hueco) deja de usar
+`render_carta()` — es un contexto de selección rápida, no un catálogo, así
+que una lista compacta sirve mejor que tarjetas completas. Nuevo marcado
+propio (no reutiliza el componente de tarjeta, a propósito: es una lista,
+no una carta) por jugador:
+
+```
+[miniatura] Nombre — Equipo · POS · ATA 82 DEF 66 TEC 84
+```
+
+Una fila con: miniatura pequeña de la foto (`object-fit: contain`, con el
+mismo placeholder de "sin ilustración" si no hay imagen), nombre, equipo,
+insignia de posición (mismos colores que ya existen:
+naranja/azul/verde/rojo), y las tres estadísticas en línea — todo con la
+misma altura de fila para cualquier jugador, sin depender de si la carta
+original era `artwork` o `debajo` (esta lista no usa `mostrar_stats` en
+absoluto, es un modo de presentación distinto). Mismo comportamiento de
+selección que hoy (clic → asigna al hueco elegido), solo cambia el marcado
+visual de cada fila del selector.
