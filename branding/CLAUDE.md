@@ -52,9 +52,10 @@ distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
 **Si Alejandro no dice por dónde seguir**, pregunta entre: la **ceremonia 3D de
 sobres** (§14, autorizada y sin empezar), la **Fase 3** (panel de administración
-al sistema nuevo, §12), o los **mecanismos de sesión que quedan del documento de
-balance** (anti-tilt, pity del Aumento, matchmaking anti-repetición, validador
-de balance — §10.7). Son trabajos independientes entre sí.
+al sistema nuevo, §12), el **importador de datos oficiales** (§15, diseño
+aprobado, sin construir), o los **mecanismos de sesión que quedan del documento
+de balance** (anti-tilt, pity del Aumento, matchmaking anti-repetición,
+validador de balance — §10.7). Son trabajos independientes entre sí.
 
 ---
 
@@ -759,20 +760,22 @@ ventaja de poder.
 2. **Fase 3** — panel de administración al sistema nuevo (hoy sigue con
    Bootstrap Icons y su propio `admin.css`), motion unificado de las
    ceremonias, y documentar cómo añadir una expansión de temporada.
-3. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
+3. **§15, importador de datos oficiales** — diseño aprobado con plan de
+   implementación completo, sin construir. Va con la Fase 3.
+4. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
    y la derivación nunca lo pisa; falta solo la UI. Va con la Fase 3.
-4. **Lo que queda del documento de balance** (§10.7): anti-tilt de sesión,
+5. **Lo que queda del documento de balance** (§10.7): anti-tilt de sesión,
    pity del Aumento, matchmaking anti-repetición PvP, validador de balance.
-5. **Más contenido de Cadenas**: hoy hay 2 cadenas y 18 nodos. El motor
+6. **Más contenido de Cadenas**: hoy hay 2 cadenas y 18 nodos. El motor
    aguanta más sin tocar código; es trabajo de datos.
-6. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
-7. **Resolver los hallazgos abiertos de §10.6.**
-8. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
-9. **Algoritmo definitivo del marcador de goles PvP**, hoy placeholder
-   funcional (`marcadorDuelo()`): nunca contradice al ganador ya sorteado,
-   pero no se considera el diseño final. El PvE ya usa su propia fórmula
-   (`pve_goles_*`).
-10. **`_legacy/` se puede borrar** cuando Alejandro confirme.
+7. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
+8. **Resolver los hallazgos abiertos de §10.6.**
+9. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
+10. **Algoritmo definitivo del marcador de goles PvP**, hoy placeholder
+    funcional (`marcadorDuelo()`): nunca contradice al ganador ya sorteado,
+    pero no se considera el diseño final. El PvE ya usa su propia fórmula
+    (`pve_goles_*`).
+11. **`_legacy/` se puede borrar** cuando Alejandro confirme.
 
 ---
 
@@ -903,3 +906,914 @@ Además de §13, verifica:
   salta al estado final y la secuencia FUT se sustituye por el aura estática.
 - Los botones de skip dejan el DOM en el mismo estado final que la animación
   completa, sin timelines colgadas ni listeners duplicados tras varios usos.
+
+---
+
+## 15. Importador de datos oficiales (diseño aprobado, sin construir)
+
+> Fase 3, trabajo independiente y en paralelo a lo que se construye en otras
+> sesiones — no lo toca. Diseño y plan aprobados por Alejandro el 2026-08-07.
+
+### 15.0 Objetivo
+
+Alejandro sube manualmente el `datos_oficiales.json` que exporta la web de la
+Superliga Frontier desde el panel de administración. El importador crea, en
+una expansión que él elige, las cartas de **todos los jugadores actualmente
+en plantilla de algún equipo**, más las cartas de escudo/entrenador/gerente de
+esos equipos. Nunca se ejecuta solo: siempre es una acción manual, con
+previsualización antes de escribir nada en la base de datos.
+
+**Fuera de alcance:** agentes libres del JSON (`agentes_libres`), `PRESIDENTE`
+(el JSON no trae ese dato), edición masiva de cartas ya creadas, y cualquier
+otro trabajo en curso en paralelo.
+
+### 15.1 Dónde vive
+
+- **Página nueva:** `panel/importar.php`, mismo patrón que `panel/cromos.php` /
+  `panel/expansiones.php` (guard de `$_SESSION['dictador']`, `admin.css`,
+  Bootstrap Icons, reutiliza `.field`, `.admin-table`/`.admin-table-wrap`,
+  `.alert-*`, `.modal-footer` ya existentes — sin CSS nuevo). Entrada nueva en
+  `panel/navbar.php`.
+- **Lógica de datos:** todo en `Tcg` (`db/consultas.php`), sección nueva
+  `IMPORTACIÓN DATOS OFICIALES`. No se crean clases nuevas.
+- **Self-check aislado:** `db/test_importar_datos_oficiales.php`, un script de
+  CLI con `assert`-a-mano sobre las funciones puras (mapeo de posición y
+  afinidad, emparejamiento de equipos, ranking de rareza, stats), sin arrancar
+  el panel ni depender de datos concretos en la BD.
+
+### 15.2 Flujo (wizard de dos pasos, con `$_SESSION`)
+
+**Paso 1 — Subir y previsualizar** (sin escribir en BD): formulario con
+`<input type="file">` + selector de expansión destino
+(`listarExpansiones()`; si la expansión que quiere no existe, la crea antes
+desde `expansiones.php`, este importador no crea expansiones). Al subir se
+decodifica el JSON, se guarda en `$_SESSION['import_datos']` /
+`$_SESSION['import_id_expansion']` para el paso 2, y se muestra sin tocar la
+BD:
+- Nº de jugadores a crear / omitidos (ya existentes en esa expansión).
+- Equipos: cuántos matchean exacto, cuántos no tienen ningún parecido (se
+  crearán automáticamente), y una tabla de **equipos ambiguos** —similitud de
+  texto alta pero no exacta, ej. "Instituto Kirkwood" del JSON vs "Instituto
+  Kikrwood" de la BD— con un selector por fila: usar nombre del JSON / usar
+  nombre de la BD / escribir uno distinto.
+- Jugadores con afinidad no reconocida (nulos, texto suelto, URLs por error
+  de datos en el JSON) → cuenta, irán como "no-afi".
+- Nº de cartas de escudo/entrenador/gerente a crear.
+
+**Paso 2 — Confirmar y crear**: resuelve los equipos ambiguos con lo elegido
+en el paso 1, crea los equipos nuevos que hagan falta, crea las cartas de
+jugador (con foto descargada y optimizada) y las de escudo/entrenador/gerente,
+llama a `derivarRasgosConfiguracion()` una sola vez al final (no por carta,
+igual que hace `panel/cromos.php`), limpia la sesión y muestra el resumen
+(creadas / omitidas / equipos nuevos / fotos que fallaron al descargar). Si
+falla la descarga de una foto puntual, la carta se crea igual con `imagen`
+vacío y se lista como aviso — no bloquea el resto del lote.
+
+### 15.3 Mapeo de datos
+
+| JSON | Columna en `cromos` | Regla |
+|---|---|---|
+| `nombre` (jugador) | `nombre` | tal cual |
+| `posicion` | `posicion` | `POR→POR`, `DEF→DF`, `MED→MC`, `DEL→DC` |
+| `afinidad` | `id_afinidad` | `Fuego→2`, `Bosque→4`, `Montaña`/`montaña`→1, **`Aire→3` (Viento)**; cualquier otro valor (nulo, texto no reconocido, URL filtrada por error del JSON) → `5` (no-afi) |
+| equipo del jugador | `id_equipo` | exacto (normalizado) → usa el existente; similar → lo elegido en el paso 1; sin parecido → crea fila nueva en `equipos` |
+| `foto` (URL cloudfront) | `imagen` | se descarga con GD, se convierte a WebP, se guarda en `assets/img/Cromos/Importados/<slug-equipo>/<slug-jugador>.webp`; si falla, `imagen = ''` |
+| — | `descripcion` | `''` |
+| — | `id_expansion` | la elegida en el paso 1 |
+| — | `cupo_numerado` | `NULL` |
+
+Cartas de equipo (una por campo no vacío, por cada equipo con jugadores
+importados):
+
+| Tipo | `posicion` | `nombre` | `imagen` | `id_rareza` | `id_afinidad` |
+|---|---|---|---|---|---|
+| Escudo | `ESCUDO` | `"Escudo {equipo}"` | `''` | 5 (Legendario) | 5 (no-afi) |
+| Entrenador | `ENT` | valor de `entrenador` | `''` | 5 (Legendario) | 5 (no-afi) |
+| Gerente | `GER` | valor de `gerente` | `''` | 5 (Legendario) | 5 (no-afi) |
+
+### 15.4 Equipos: coincidencia difusa
+
+Para cada equipo del JSON con jugadores a importar, comparar su nombre
+(normalizado: minúsculas, sin tildes vía `iconv(...TRANSLIT...)`, trim) contra
+los nombres existentes en `equipos`:
+- **Coincidencia exacta tras normalizar** → usa ese `id_equipo`, sin
+  preguntar.
+- **Similar pero no exacta** (`similar_text()` ≥ 75%) → se lista en el paso 1
+  como ambiguo, con tres opciones: nombre del JSON, nombre de la BD, o texto
+  libre.
+- **Sin ningún parecido** → se crea automáticamente un `equipo` nuevo con el
+  nombre del JSON, sin preguntar.
+
+### 15.5 Rareza
+
+**Base:** `titular === true` → Poco común (`id_rareza=2`); resto → Común
+(`id_rareza=1`).
+
+**Promoción** (después de la base; el valor más alto gana si un jugador cae en
+varias listas): tres rankings independientes, top 1-3 → Épico (`id_rareza=4`),
+top 4-10 → Raro (`id_rareza=3`):
+1. Goleadores de la temporada anterior cerrada (`historial_temporadas`, la
+   entrada `"Temporada " . (temporada_actual - 1)`), solo si el jugador sigue
+   en la plantilla actual de algún equipo.
+2. Goleadores actuales (`goles` de la temporada en curso).
+3. Mejor jugador de cada equipo actual (mayor `goles + asistencias` de su
+   plantilla), todos los "mejores" rankeados juntos.
+
+### 15.6 Stats de combate
+
+Hoy el panel deja `ataque`/`defensa`/`tecnica` a 0 (el formulario de
+`cromos.php` no las expone). Para que las cartas importadas pesen en combate:
+
+```
+BASE_TOTAL = ['comun' => 165, 'poco_comun' => 190, 'raro' => 215, 'epico' => 240]
+// (la promoción de jugador nunca pasa de Épico; Legendario es solo para
+// escudo/entrenador/gerente, que van con 0/0/0 y no entran aquí)
+// jitter aleatorio ±8% sobre el total antes de repartir
+
+SPLIT_POR_POSICION = [ // fracciones de BASE_TOTAL, suman 1.0
+  'POR' => ['ataque' => 0.20, 'defensa' => 0.45, 'tecnica' => 0.35],
+  'DF'  => ['ataque' => 0.25, 'defensa' => 0.45, 'tecnica' => 0.30],
+  'MC'  => ['ataque' => 0.33, 'defensa' => 0.30, 'tecnica' => 0.37],
+  'DC'  => ['ataque' => 0.45, 'defensa' => 0.25, 'tecnica' => 0.30],
+]
+
+stat = round(BASE_TOTAL[rareza] * SPLIT_POR_POSICION[posicion][stat] * jitter)
+clamp cada stat entre 1 y 99
+```
+
+`BASE_TOTAL` sale de promediar las stats reales ya existentes en `cromos` por
+rareza (común ~165-170, poco común ~190, raro ~210-215, épico ~235-245 de
+suma; consulta hecha sobre la BD real el 2026-08-07). El reparto por posición
+sigue el mismo sesgo que ya muestran los datos reales (portero fuerte en
+defensa, delantero fuerte en ataque).
+
+`ponytail:` heurística sin playtesting dedicado, aproximando lo que ya hay en
+el catálogo — no es un sistema derivado del documento de balance. Retocar
+`BASE_TOTAL`/`SPLIT_POR_POSICION` si el balance no cuadra al jugar.
+
+### 15.7 Reimportar / idempotencia
+
+Antes de crear una carta (de jugador o de equipo) se comprueba si ya existe
+una fila en `cromos` con el mismo `nombre` + `id_equipo` + `id_expansion`
+elegida (`existeCromoImportado()`). Si existe, se omite. Así se puede volver a
+subir el archivo (tras una jornada nueva, por ejemplo) sin duplicar todo el
+catálogo, mientras se elija la misma expansión.
+
+### 15.8 Errores y casos límite
+
+- **Fotos que no se pueden descargar**: no bloquean el lote; la carta se crea
+  con `imagen=''` y se lista como aviso en el resumen final.
+- **JSON mal formado o sin la clave `equipos`**: el paso 1 falla con un
+  mensaje claro, no se guarda nada en sesión.
+- **`entrenador`/`gerente` vacío**: no se crea esa carta para ese equipo.
+- **Equipo con 0 jugadores en el JSON** (hoy: Raimon, Oscuridad Ancestral,
+  Ragnah): no se crea ni el equipo ni sus cartas de
+  escudo/entrenador/gerente.
+- **Tamaño de subida**: el JSON pesa ~1.1 MB; si `upload_max_filesize` /
+  `post_max_size` de XAMPP lo bloquean, hay que subirlos a mano en `php.ini`
+  (no se toca automáticamente).
+- **Descarga de 500+ fotos**: puede tardar; el paso 2 corre con
+  `set_time_limit(0)`.
+
+### 15.9 Plan de implementación
+
+> REQUIRED SUB-SKILL para ejecutar: `superpowers:subagent-driven-development`
+> (recomendado) o `superpowers:executing-plans`. Pasos con checkbox `- [ ]`
+> para seguimiento.
+
+**Restricciones globales:** sin dependencias nuevas de npm (no aplica, es
+PHP puro); sin clases nuevas, todo en `Tcg`; sin CSS nuevo en `admin.css`,
+reutilizar lo existente; nombres de funciones y comentarios en español; PDO
+preparado siempre; `htmlspecialchars()` en toda salida a HTML.
+
+---
+
+#### Tarea 1 — Extender `crearCromo()` con stats de combate
+
+**Archivos:** Modifica `db/consultas.php:220-237` (`crearCromo`).
+
+**Interfaces:**
+- Produce: `crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0)` — compatible con la llamada actual de `panel/cromos.php` (no le pasa esos tres últimos, quedan a 0).
+
+- [ ] **Paso 1:** Editar la firma y el `INSERT` para incluir `ataque`, `defensa`, `tecnica` con default `0`:
+
+```php
+public function crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0) {
+    $sql = "
+        INSERT INTO cromos (nombre, posicion, descripcion, imagen, id_expansion, id_equipo, id_rareza, id_afinidad, ataque, defensa, tecnica)
+        VALUES (:nombre, :posicion, :descripcion, :imagen, :id_expansion, :id_equipo, :id_rareza, :id_afinidad, :ataque, :defensa, :tecnica)
+    ";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([
+        ":nombre" => $nombre,
+        ":posicion" => $posicion,
+        ":descripcion" => $descripcion,
+        ":imagen" => $imagen,
+        ":id_expansion" => $id_expansion,
+        ":id_equipo" => $id_equipo,
+        ":id_rareza" => $id_rareza,
+        ":id_afinidad" => $id_afinidad,
+        ":ataque" => $ataque,
+        ":defensa" => $defensa,
+        ":tecnica" => $tecnica,
+    ]);
+    return $this->pdo->lastInsertId();
+}
+```
+
+- [ ] **Paso 2:** Verificar que `panel/cromos.php` sigue creando cromos sin
+  error (`C:/xampp/php/php.exe -l db/consultas.php panel/cromos.php`, y crear
+  un cromo de prueba desde el panel con la cuenta `Claude`).
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Añade stats de combate opcionales a crearCromo()"
+```
+
+---
+
+#### Tarea 2 — Helpers puros de mapeo (posición, afinidad, texto)
+
+**Archivos:** Modifica `db/consultas.php`, nueva sección al final de la
+clase (antes del `}` que cierra `Tcg`, hoy línea 3971).
+
+**Interfaces:**
+- Produce: `normalizarTexto(string $s): string`, `mapearPosicionJugador(string $pos): ?string`, `mapearAfinidadJugador(?string $nombre): int`, `slugImportado(string $texto): string`.
+
+- [ ] **Paso 1:** Añadir la sección con las constantes y las cuatro funciones:
+
+```php
+	// ==========================================================
+	// IMPORTACIÓN DATOS OFICIALES
+	// ==========================================================
+
+	private const IMPORT_POSICIONES = ['POR' => 'POR', 'DEF' => 'DF', 'MED' => 'MC', 'DEL' => 'DC'];
+	private const IMPORT_AFINIDADES = ['fuego' => 2, 'bosque' => 4, 'aire' => 3, 'viento' => 3, 'montana' => 1];
+
+	// Minúsculas, sin tildes, sin espacios repetidos — para comparar nombres
+	// de equipo y claves de afinidad sin que un acento o una mayúscula rompa
+	// el match (el JSON oficial mezcla "Aire"/"aire", "Montaña"/"montaña"...).
+	public function normalizarTexto(string $s): string {
+		$s = trim(mb_strtolower($s, 'UTF-8'));
+		$translit = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
+		if ($translit !== false) { $s = $translit; }
+		return preg_replace('/\s+/', ' ', $s);
+	}
+
+	public function mapearPosicionJugador(string $pos): ?string {
+		$pos = strtoupper(trim($pos));
+		return self::IMPORT_POSICIONES[$pos] ?? null;
+	}
+
+	public function mapearAfinidadJugador(?string $nombre): int {
+		if ($nombre === null || trim($nombre) === '') { return 5; } // no-afi
+		return self::IMPORT_AFINIDADES[$this->normalizarTexto($nombre)] ?? 5;
+	}
+
+	public function slugImportado(string $texto): string {
+		$slug = preg_replace('/[^a-z0-9]+/', '-', $this->normalizarTexto($texto));
+		$slug = trim($slug, '-');
+		return $slug !== '' ? $slug : 'x';
+	}
+```
+
+- [ ] **Paso 2:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Añade helpers puros de mapeo para el importador de datos oficiales"
+```
+
+---
+
+#### Tarea 3 — Emparejamiento y resolución de equipos
+
+**Archivos:** Modifica `db/consultas.php`, dentro de la sección de la Tarea 2.
+
+**Interfaces:**
+- Consume: `normalizarTexto()` (Tarea 2).
+- Produce: `emparejarEquipo(string $nombreJson, array $equiposExistentes): array` (`$equiposExistentes` = salida de `listarEquipos()`), `resolverEquipos(array $equiposJson, array $equiposExistentes, array $decisiones): array` (devuelve `[id_json_equipo => id_equipo]`).
+
+- [ ] **Paso 1:** Añadir ambas funciones:
+
+```php
+	public function emparejarEquipo(string $nombreJson, array $equiposExistentes): array {
+		$normJson = $this->normalizarTexto($nombreJson);
+		$mejor = null;
+		$mejorPct = 0.0;
+		foreach ($equiposExistentes as $eq) {
+			if ($this->normalizarTexto($eq['nombre']) === $normJson) {
+				return ['estado' => 'exacto', 'id_equipo' => (int) $eq['id_equipo'], 'nombre' => $eq['nombre']];
+			}
+			similar_text($normJson, $this->normalizarTexto($eq['nombre']), $pct);
+			if ($pct > $mejorPct) { $mejorPct = $pct; $mejor = $eq; }
+		}
+		if ($mejor !== null && $mejorPct >= 75.0) {
+			return [
+				'estado' => 'ambiguo',
+				'nombre_json' => $nombreJson,
+				'candidato_db' => ['id_equipo' => (int) $mejor['id_equipo'], 'nombre' => $mejor['nombre']],
+				'porcentaje' => round($mejorPct, 1),
+			];
+		}
+		return ['estado' => 'nuevo', 'nombre' => $nombreJson];
+	}
+
+	// $decisiones: [id_json_equipo => ['eleccion' => 'json'|'db'|'otro', 'texto' => string|null]],
+	// solo hace falta para los equipos que salieron 'ambiguo' en emparejarEquipo().
+	public function resolverEquipos(array $equiposJson, array $equiposExistentes, array $decisiones): array {
+		$mapa = [];
+		$cacheNombreAId = [];
+		foreach ($equiposExistentes as $eq) {
+			$cacheNombreAId[$this->normalizarTexto($eq['nombre'])] = (int) $eq['id_equipo'];
+		}
+
+		foreach ($equiposJson as $equipo) {
+			$match = $this->emparejarEquipo($equipo['nombre'], $equiposExistentes);
+			$idExistente = null;
+			$nombreFinal = null;
+
+			if ($match['estado'] === 'exacto') {
+				$idExistente = $match['id_equipo'];
+			} elseif ($match['estado'] === 'ambiguo') {
+				$decision = $decisiones[$equipo['id']] ?? ['eleccion' => 'db', 'texto' => null];
+				if ($decision['eleccion'] === 'db') {
+					$idExistente = $match['candidato_db']['id_equipo'];
+				} elseif ($decision['eleccion'] === 'json') {
+					$nombreFinal = $match['nombre_json'];
+				} else {
+					$nombreFinal = trim((string) $decision['texto']) !== '' ? $decision['texto'] : $match['nombre_json'];
+				}
+			} else {
+				$nombreFinal = $match['nombre'];
+			}
+
+			if ($idExistente !== null) {
+				$mapa[$equipo['id']] = $idExistente;
+				continue;
+			}
+
+			$clave = $this->normalizarTexto($nombreFinal);
+			if (isset($cacheNombreAId[$clave])) {
+				$mapa[$equipo['id']] = $cacheNombreAId[$clave];
+				continue;
+			}
+
+			$stmt = $this->pdo->prepare("INSERT INTO equipos (nombre) VALUES (:nombre)");
+			$stmt->execute([':nombre' => $nombreFinal]);
+			$nuevoId = (int) $this->pdo->lastInsertId();
+			$cacheNombreAId[$clave] = $nuevoId;
+			$mapa[$equipo['id']] = $nuevoId;
+		}
+
+		return $mapa;
+	}
+```
+
+- [ ] **Paso 2:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Añade emparejamiento y resolución de equipos al importador"
+```
+
+---
+
+#### Tarea 4 — Ranking de rarezas y fórmula de stats
+
+**Archivos:** Modifica `db/consultas.php`, misma sección.
+
+**Interfaces:**
+- Produce: `rankearRarezasImportacion(array $datosJson): array` (devuelve `['id_json_equipo|nombre_jugador' => id_rareza]`, solo para promocionados), `statsBaseImportacion(string $posicion, int $idRareza): array` (devuelve `['ataque'=>int,'defensa'=>int,'tecnica'=>int]`).
+
+- [ ] **Paso 1:** Añadir ambas funciones:
+
+```php
+	private const IMPORT_BASE_TOTAL = ['comun' => 165, 'poco_comun' => 190, 'raro' => 215, 'epico' => 240];
+	private const IMPORT_RAREZA_CLAVE = [1 => 'comun', 2 => 'poco_comun', 3 => 'raro', 4 => 'epico'];
+	private const IMPORT_SPLIT_POSICION = [
+		'POR' => ['ataque' => 0.20, 'defensa' => 0.45, 'tecnica' => 0.35],
+		'DF'  => ['ataque' => 0.25, 'defensa' => 0.45, 'tecnica' => 0.30],
+		'MC'  => ['ataque' => 0.33, 'defensa' => 0.30, 'tecnica' => 0.37],
+		'DC'  => ['ataque' => 0.45, 'defensa' => 0.25, 'tecnica' => 0.30],
+	];
+
+	// Tres rankings independientes (goleadores temporada anterior, goleadores
+	// actuales, mejor jugador por equipo); top 1-3 -> Épico, top 4-10 -> Raro.
+	// Si un jugador cae en varias listas, se queda con la rareza más alta.
+	public function rankearRarezasImportacion(array $datosJson): array {
+		$resultado = [];
+
+		$ubicacionActual = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$ubicacionActual[$jugador['nombre']] = $equipo['id'];
+			}
+		}
+
+		$aplicarRanking = function (array $lista) use (&$resultado, $ubicacionActual) {
+			usort($lista, fn($a, $b) => $b['puntos'] <=> $a['puntos']);
+			foreach ($lista as $i => $item) {
+				if (!isset($ubicacionActual[$item['nombre']])) { continue; } // ya no juega
+				$idRareza = $i < 3 ? 4 : ($i < 10 ? 3 : null);
+				if ($idRareza === null) { continue; }
+				$clave = $ubicacionActual[$item['nombre']] . '|' . $item['nombre'];
+				if ($idRareza > ($resultado[$clave] ?? 0)) { $resultado[$clave] = $idRareza; }
+			}
+		};
+
+		$actuales = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$actuales[] = ['nombre' => $jugador['nombre'], 'puntos' => (int) ($jugador['goles'] ?? 0)];
+			}
+		}
+		$aplicarRanking($actuales);
+
+		$numeroActual = (int) ($datosJson['config']['temporada'] ?? 0);
+		$etiquetaAnterior = 'Temporada ' . ($numeroActual - 1);
+		foreach ($datosJson['historial_temporadas'] ?? [] as $temporada) {
+			if (($temporada['nombre'] ?? '') !== $etiquetaAnterior) { continue; }
+			$anteriores = [];
+			foreach ($temporada['equipos'] ?? [] as $equipo) {
+				foreach ($equipo['jugadores'] ?? [] as $jugador) {
+					$anteriores[] = ['nombre' => $jugador['nombre'], 'puntos' => (int) ($jugador['goles'] ?? 0)];
+				}
+			}
+			$aplicarRanking($anteriores);
+			break;
+		}
+
+		$mejoresPorEquipo = [];
+		foreach ($datosJson['equipos'] as $equipo) {
+			$mejor = null;
+			foreach ($equipo['jugadores'] ?? [] as $jugador) {
+				$puntos = (int) ($jugador['goles'] ?? 0) + (int) ($jugador['asistencias'] ?? 0);
+				if ($mejor === null || $puntos > $mejor['puntos']) {
+					$mejor = ['nombre' => $jugador['nombre'], 'puntos' => $puntos];
+				}
+			}
+			if ($mejor !== null) { $mejoresPorEquipo[] = $mejor; }
+		}
+		$aplicarRanking($mejoresPorEquipo);
+
+		return $resultado;
+	}
+
+	public function statsBaseImportacion(string $posicion, int $idRareza): array {
+		if (!isset(self::IMPORT_SPLIT_POSICION[$posicion])) {
+			return ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0]; // ENT/GER/ESCUDO
+		}
+		$clave = self::IMPORT_RAREZA_CLAVE[$idRareza] ?? 'comun';
+		$total = self::IMPORT_BASE_TOTAL[$clave] * (mt_rand(92, 108) / 100);
+		$split = self::IMPORT_SPLIT_POSICION[$posicion];
+		return [
+			'ataque'  => max(1, min(99, (int) round($total * $split['ataque']))),
+			'defensa' => max(1, min(99, (int) round($total * $split['defensa']))),
+			'tecnica' => max(1, min(99, (int) round($total * $split['tecnica']))),
+		];
+	}
+```
+
+- [ ] **Paso 2:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Añade ranking de rarezas y fórmula de stats al importador"
+```
+
+---
+
+#### Tarea 5 — Self-check de las funciones puras
+
+**Archivos:** Crea `db/test_importar_datos_oficiales.php`.
+
+**Interfaces:**
+- Consume: todas las funciones de las Tareas 2-4 (`mapearPosicionJugador`, `mapearAfinidadJugador`, `emparejarEquipo`, `rankearRarezasImportacion`, `statsBaseImportacion`).
+
+- [ ] **Paso 1:** Crear el script:
+
+```php
+<?php
+require_once __DIR__ . '/conexion.php';
+
+function afirmar($cond, $mensaje) {
+    if (!$cond) { fwrite(STDERR, "FALLO: {$mensaje}\n"); exit(1); }
+    echo "OK: {$mensaje}\n";
+}
+
+afirmar($db->mapearPosicionJugador('DEL') === 'DC', 'DEL mapea a DC');
+afirmar($db->mapearPosicionJugador('DEF') === 'DF', 'DEF mapea a DF');
+afirmar($db->mapearPosicionJugador('MED') === 'MC', 'MED mapea a MC');
+afirmar($db->mapearPosicionJugador('POR') === 'POR', 'POR mapea a POR');
+afirmar($db->mapearPosicionJugador('inventado') === null, 'posición desconocida devuelve null');
+
+afirmar($db->mapearAfinidadJugador('Fuego') === 2, 'Fuego -> 2');
+afirmar($db->mapearAfinidadJugador('Aire') === 3, 'Aire -> Viento (3)');
+afirmar($db->mapearAfinidadJugador('Montaña') === 1, 'Montaña -> 1');
+afirmar($db->mapearAfinidadJugador('Bosque') === 4, 'Bosque -> 4');
+afirmar($db->mapearAfinidadJugador(null) === 5, 'nulo -> no-afi (5)');
+afirmar($db->mapearAfinidadJugador('Forest') === 5, 'valor no reconocido -> no-afi (5)');
+
+$existentes = [
+    ['id_equipo' => 13, 'nombre' => 'Instituto Zeus'],
+    ['id_equipo' => 99, 'nombre' => 'Instituto Kikrwood'],
+];
+$exacto = $db->emparejarEquipo('Instituto Zeus', $existentes);
+afirmar($exacto['estado'] === 'exacto' && $exacto['id_equipo'] === 13, 'match exacto encuentra Instituto Zeus');
+
+$ambiguo = $db->emparejarEquipo('Instituto Kirkwood', $existentes);
+afirmar($ambiguo['estado'] === 'ambiguo' && $ambiguo['candidato_db']['id_equipo'] === 99, 'Kirkwood/Kikrwood se detecta como ambiguo');
+
+$nuevo = $db->emparejarEquipo('Equipo Totalmente Distinto FC', $existentes);
+afirmar($nuevo['estado'] === 'nuevo', 'nombre sin parecido se marca como nuevo');
+
+$fixture = [
+    'config' => ['temporada' => '3'],
+    'equipos' => [
+        ['id' => 'eqA', 'nombre' => 'Equipo A', 'jugadores' => [
+            ['nombre' => 'Goleador Top', 'goles' => 20, 'asistencias' => 1],
+            ['nombre' => 'Suplente', 'goles' => 0, 'asistencias' => 0],
+        ]],
+        ['id' => 'eqB', 'nombre' => 'Equipo B', 'jugadores' => [
+            ['nombre' => 'Jugador Medio', 'goles' => 5, 'asistencias' => 5],
+        ]],
+    ],
+    'historial_temporadas' => [],
+];
+$rareza = $db->rankearRarezasImportacion($fixture);
+afirmar(($rareza['eqA|Goleador Top'] ?? null) === 4, 'máximo goleador actual sube a épico');
+afirmar(!isset($rareza['eqA|Suplente']), 'jugador sin goles no se promociona');
+
+$statsEnt = $db->statsBaseImportacion('ENT', 5);
+afirmar($statsEnt === ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0], 'entrenador siempre 0/0/0');
+$statsDC = $db->statsBaseImportacion('DC', 4);
+afirmar($statsDC['ataque'] >= 50 && $statsDC['ataque'] <= 99, 'delantero épico tiene ataque alto');
+
+echo "\nTodas las comprobaciones pasaron.\n";
+```
+
+- [ ] **Paso 2:** Ejecutar y comprobar que todo pasa.
+
+```bash
+C:/xampp/php/php.exe db/test_importar_datos_oficiales.php
+```
+
+Esperado: una línea `OK:` por cada `afirmar()` y el mensaje final, sin
+`FALLO:`.
+
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/test_importar_datos_oficiales.php
+git commit -m "Añade self-check de las funciones puras del importador"
+```
+
+---
+
+#### Tarea 6 — Descarga de fotos, dedupe y orquestadores
+
+**Archivos:** Modifica `db/consultas.php`, misma sección.
+
+**Interfaces:**
+- Consume: `slugImportado()` (Tarea 2), `emparejarEquipo()`/`resolverEquipos()` (Tarea 3), `rankearRarezasImportacion()`/`statsBaseImportacion()` (Tarea 4), `crearCromo()` (Tarea 1), `listarEquipos()`/`derivarRasgosConfiguracion()` (ya existentes).
+- Produce: `guardarFotoImportada(string $url, string $equipoSlug, string $jugadorSlug): string`, `existeCromoImportado(string $nombre, int $id_equipo, int $id_expansion): bool`, `previsualizarImportacion(array $datosJson, int $id_expansion): array`, `ejecutarImportacion(array $datosJson, int $id_expansion, array $decisiones): array`.
+
+- [ ] **Paso 1:** Añadir las cuatro funciones:
+
+```php
+	public function guardarFotoImportada(string $url, string $equipoSlug, string $jugadorSlug): string {
+		$contenido = @file_get_contents($url, false, stream_context_create(['http' => ['timeout' => 8]]));
+		if ($contenido === false) { return ''; }
+
+		$imagen = @imagecreatefromstring($contenido);
+		if ($imagen === false) { return ''; }
+
+		$carpeta = __DIR__ . "/../assets/img/Cromos/Importados/{$equipoSlug}";
+		if (!is_dir($carpeta) && !mkdir($carpeta, 0755, true) && !is_dir($carpeta)) {
+			imagedestroy($imagen);
+			return '';
+		}
+
+		$rutaDisco = "{$carpeta}/{$jugadorSlug}.webp";
+		$ok = imagewebp($imagen, $rutaDisco, 85);
+		imagedestroy($imagen);
+
+		return $ok ? "./assets/img/Cromos/Importados/{$equipoSlug}/{$jugadorSlug}.webp" : '';
+	}
+
+	public function existeCromoImportado(string $nombre, int $id_equipo, int $id_expansion): bool {
+		$stmt = $this->pdo->prepare("
+			SELECT 1 FROM cromos
+			WHERE nombre = :nombre AND id_equipo = :id_equipo AND id_expansion = :id_expansion
+			LIMIT 1
+		");
+		$stmt->execute([':nombre' => $nombre, ':id_equipo' => $id_equipo, ':id_expansion' => $id_expansion]);
+		return (bool) $stmt->fetchColumn();
+	}
+
+	public function previsualizarImportacion(array $datosJson, int $id_expansion): array {
+		$equiposExistentes = $this->listarEquipos();
+		$equiposConJugadores = array_values(array_filter($datosJson['equipos'] ?? [], fn($eq) => !empty($eq['jugadores'])));
+
+		$exactos = 0; $nuevos = []; $ambiguos = [];
+		$jugadoresACrear = 0; $jugadoresOmitidos = 0; $afinidadesDesconocidas = 0; $cartasEquipo = 0;
+
+		foreach ($equiposConJugadores as $equipo) {
+			$match = $this->emparejarEquipo($equipo['nombre'], $equiposExistentes);
+			$idEquipo = null;
+			if ($match['estado'] === 'exacto') { $exactos++; $idEquipo = $match['id_equipo']; }
+			elseif ($match['estado'] === 'ambiguo') { $ambiguos[] = ['id' => $equipo['id']] + $match; }
+			else { $nuevos[] = $equipo['nombre']; }
+
+			foreach ($equipo['jugadores'] as $jugador) {
+				if ($idEquipo !== null && $this->existeCromoImportado($jugador['nombre'], $idEquipo, $id_expansion)) {
+					$jugadoresOmitidos++;
+					continue;
+				}
+				$jugadoresACrear++;
+				if ($this->mapearAfinidadJugador($jugador['afinidad'] ?? null) === 5) { $afinidadesDesconocidas++; }
+			}
+
+			foreach (['escudo', 'entrenador', 'gerente'] as $campo) {
+				if (trim((string) ($equipo[$campo] ?? '')) !== '') { $cartasEquipo++; }
+			}
+		}
+
+		return [
+			'equipos_exactos' => $exactos,
+			'equipos_nuevos' => $nuevos,
+			'equipos_ambiguos' => $ambiguos,
+			'jugadores_a_crear' => $jugadoresACrear,
+			'jugadores_omitidos' => $jugadoresOmitidos,
+			'afinidades_desconocidas' => $afinidadesDesconocidas,
+			'cartas_equipo_a_crear' => $cartasEquipo,
+		];
+	}
+
+	public function ejecutarImportacion(array $datosJson, int $id_expansion, array $decisiones): array {
+		set_time_limit(0);
+
+		$equiposExistentes = $this->listarEquipos();
+		$idsEquiposPrevios = array_column($equiposExistentes, 'id_equipo');
+		$equiposConJugadores = array_values(array_filter($datosJson['equipos'] ?? [], fn($eq) => !empty($eq['jugadores'])));
+		$mapaEquipos = $this->resolverEquipos($equiposConJugadores, $equiposExistentes, $decisiones);
+		$rareza = $this->rankearRarezasImportacion($datosJson);
+
+		$creados = 0; $omitidos = 0; $fotosFallidas = []; $equiposCreados = 0;
+
+		foreach ($equiposConJugadores as $equipo) {
+			$idEquipo = $mapaEquipos[$equipo['id']];
+			if (!in_array($idEquipo, $idsEquiposPrevios, true)) { $equiposCreados++; }
+			$equipoSlug = $this->slugImportado($equipo['nombre']);
+
+			foreach ($equipo['jugadores'] as $jugador) {
+				if ($this->existeCromoImportado($jugador['nombre'], $idEquipo, $id_expansion)) { $omitidos++; continue; }
+
+				$posicion = $this->mapearPosicionJugador($jugador['posicion'] ?? '');
+				if ($posicion === null) { $omitidos++; continue; }
+
+				$idRareza = $rareza["{$equipo['id']}|{$jugador['nombre']}"] ?? (($jugador['titular'] ?? false) ? 2 : 1);
+				$idAfinidad = $this->mapearAfinidadJugador($jugador['afinidad'] ?? null);
+				$stats = $this->statsBaseImportacion($posicion, $idRareza);
+
+				$imagen = '';
+				if (!empty($jugador['foto'])) {
+					$imagen = $this->guardarFotoImportada($jugador['foto'], $equipoSlug, $this->slugImportado($jugador['nombre']));
+					if ($imagen === '') { $fotosFallidas[] = $jugador['nombre']; }
+				}
+
+				$this->crearCromo($jugador['nombre'], $posicion, '', $imagen, $id_expansion, $idEquipo, $idRareza, $idAfinidad, $stats['ataque'], $stats['defensa'], $stats['tecnica']);
+				$creados++;
+			}
+
+			if (trim((string) ($equipo['escudo'] ?? '')) !== '' && !$this->existeCromoImportado('Escudo ' . $equipo['nombre'], $idEquipo, $id_expansion)) {
+				$this->crearCromo('Escudo ' . $equipo['nombre'], 'ESCUDO', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+			if (trim((string) ($equipo['entrenador'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['entrenador'], $idEquipo, $id_expansion)) {
+				$this->crearCromo($equipo['entrenador'], 'ENT', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+			if (trim((string) ($equipo['gerente'] ?? '')) !== '' && !$this->existeCromoImportado($equipo['gerente'], $idEquipo, $id_expansion)) {
+				$this->crearCromo($equipo['gerente'], 'GER', '', '', $id_expansion, $idEquipo, 5, 5, 0, 0, 0);
+				$creados++;
+			}
+		}
+
+		$this->derivarRasgosConfiguracion();
+
+		return ['creados' => $creados, 'omitidos' => $omitidos, 'equipos_creados' => $equiposCreados, 'fotos_fallidas' => $fotosFallidas];
+	}
+```
+
+- [ ] **Paso 2:** `C:/xampp/php/php.exe -l db/consultas.php`.
+- [ ] **Paso 3:** Commit.
+
+```bash
+git add db/consultas.php
+git commit -m "Añade orquestadores de previsualización y ejecución del importador"
+```
+
+---
+
+#### Tarea 7 — Página del panel (`panel/importar.php`) y navegación
+
+**Archivos:** Crea `panel/importar.php`. Modifica `panel/navbar.php`.
+
+**Interfaces:**
+- Consume: `listarExpansiones()`, `previsualizarImportacion()`, `ejecutarImportacion()` (Tarea 6).
+
+- [ ] **Paso 1:** Añadir la entrada de navegación en `panel/navbar.php`, justo
+  después del enlace a "Cromos":
+
+```php
+    <a href="importar.php" class="<?= $activeAdmin === 'importar' ? 'active' : '' ?>">
+      <span class="nav-ico"><i class="bi bi-cloud-upload"></i></span> Importar datos
+    </a>
+```
+
+- [ ] **Paso 2:** Crear `panel/importar.php`:
+
+```php
+<?php
+session_start();
+require_once __DIR__ . '/../db/conexion.php';
+
+if (isset($_SESSION['dictador'])) {
+    if ($_SESSION['dictador'] != 1) { header("Location: ../landing.php"); exit; }
+} else {
+    header("Location: ../landing.php"); exit;
+}
+
+$error = '';
+$resultado = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirmar']) && isset($_SESSION['import_datos'])) {
+    $decisiones = [];
+    foreach ($_POST['equipo_eleccion'] ?? [] as $idEquipoJson => $eleccion) {
+        $decisiones[$idEquipoJson] = ['eleccion' => $eleccion, 'texto' => $_POST['equipo_texto'][$idEquipoJson] ?? ''];
+    }
+    $resultado = $db->ejecutarImportacion($_SESSION['import_datos'], (int) $_SESSION['import_id_expansion'], $decisiones);
+    unset($_SESSION['import_datos'], $_SESSION['import_id_expansion']);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancelar'])) {
+    unset($_SESSION['import_datos'], $_SESSION['import_id_expansion']);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['json_datos'])) {
+    $contenido = file_get_contents($_FILES['json_datos']['tmp_name']);
+    $datos = json_decode($contenido, true);
+
+    if (!is_array($datos) || !isset($datos['equipos']) || !is_array($datos['equipos'])) {
+        $error = 'El archivo no parece un datos_oficiales.json válido: falta la clave "equipos".';
+    } else {
+        $_SESSION['import_datos'] = $datos;
+        $_SESSION['import_id_expansion'] = (int) ($_POST['id_expansion'] ?? 0);
+    }
+}
+
+$previsualizacion = isset($_SESSION['import_datos'])
+    ? $db->previsualizarImportacion($_SESSION['import_datos'], (int) $_SESSION['import_id_expansion'])
+    : null;
+
+$expansiones = $db->listarExpansiones();
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Importar datos oficiales — Panel de control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="./assets/css/admin.css">
+<link rel="icon" type="image/png" href="../assets/img/iconos/favicon.ico">
+</head>
+<body>
+
+<div class="admin-shell">
+  <?php $activeAdmin = 'importar'; include __DIR__ . '/navbar.php'; ?>
+
+  <main class="admin-main">
+    <div class="admin-head">
+      <div>
+        <h1>Importar datos oficiales</h1>
+        <p>Crea cartas de jugadores, escudos, entrenadores y gerentes a partir del datos_oficiales.json de la Superliga Frontier.</p>
+      </div>
+    </div>
+
+    <?php if ($error): ?>
+      <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+
+    <?php if ($resultado): ?>
+      <div class="field-full">
+        <h2><?= $resultado['creados'] ?> cartas creadas</h2>
+        <ul>
+          <li><?= $resultado['omitidos'] ?> omitidas (ya existían)</li>
+          <li><?= $resultado['equipos_creados'] ?> equipos nuevos creados</li>
+        </ul>
+        <?php if (!empty($resultado['fotos_fallidas'])): ?>
+        <div class="alert alert-warning">No se pudo descargar la foto de: <?= htmlspecialchars(implode(', ', $resultado['fotos_fallidas'])) ?>. Esas cartas se crearon sin imagen.</div>
+        <?php endif; ?>
+      </div>
+
+    <?php elseif ($previsualizacion): ?>
+      <form method="POST">
+        <h2>Previsualización</h2>
+        <ul>
+          <li><?= $previsualizacion['jugadores_a_crear'] ?> jugadores a crear</li>
+          <li><?= $previsualizacion['jugadores_omitidos'] ?> jugadores omitidos (ya existen en esta expansión)</li>
+          <li><?= $previsualizacion['equipos_exactos'] ?> equipos ya reconocidos</li>
+          <li><?= count($previsualizacion['equipos_nuevos']) ?> equipos nuevos: <?= htmlspecialchars(implode(', ', $previsualizacion['equipos_nuevos'])) ?></li>
+          <li><?= $previsualizacion['afinidades_desconocidas'] ?> jugadores con afinidad no reconocida (irán como "no-afi")</li>
+          <li><?= $previsualizacion['cartas_equipo_a_crear'] ?> cartas de escudo/entrenador/gerente a crear</li>
+        </ul>
+
+        <?php if (!empty($previsualizacion['equipos_ambiguos'])): ?>
+        <h3>Equipos que necesitan tu confirmación</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Del JSON</th><th>¿Con cuál equipo es?</th></tr></thead>
+            <tbody>
+            <?php foreach ($previsualizacion['equipos_ambiguos'] as $amb): ?>
+            <tr>
+              <td><?= htmlspecialchars($amb['nombre_json']) ?> <small>(<?= $amb['porcentaje'] ?>% parecido)</small></td>
+              <td>
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="db" checked> Es "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>" (ya existe)</label><br>
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="json"> Es un equipo nuevo, llámalo "<?= htmlspecialchars($amb['nombre_json']) ?>"</label><br>
+                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="otro"> Otro nombre:
+                  <input type="text" name="equipo_texto[<?= htmlspecialchars($amb['id']) ?>]" placeholder="Nombre correcto"></label>
+              </td>
+            </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <?php endif; ?>
+
+        <div class="modal-footer">
+          <button type="submit" name="cancelar" value="1" class="btn btn-ghost">Cancelar</button>
+          <button type="submit" name="confirmar" value="1" class="btn btn-primary">Crear cartas</button>
+        </div>
+      </form>
+
+    <?php else: ?>
+      <form method="POST" enctype="multipart/form-data">
+        <div class="field field-full">
+          <label>Archivo datos_oficiales.json</label>
+          <input type="file" name="json_datos" accept=".json,application/json" required>
+        </div>
+        <div class="field field-full">
+          <label>Expansión destino</label>
+          <select name="id_expansion" required>
+            <?php foreach ($expansiones as $ex): ?>
+            <option value="<?= $ex['id_expansion'] ?>"><?= htmlspecialchars($ex['nombre']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Previsualizar</button>
+        </div>
+      </form>
+    <?php endif; ?>
+  </main>
+</div>
+
+</body>
+</html>
+```
+
+- [ ] **Paso 3:** `C:/xampp/php/php.exe -l panel/importar.php panel/navbar.php`.
+- [ ] **Paso 4:** Verificar en navegador con la cuenta `Claude` (`dictador=1`)
+  que `panel/importar.php` carga, el formulario del paso 1 aparece, y que
+  redirige a `landing.php` si no hay sesión de dictador.
+- [ ] **Paso 5:** Commit.
+
+```bash
+git add panel/importar.php panel/navbar.php
+git commit -m "Añade la página del panel para importar datos oficiales"
+```
+
+---
+
+#### Tarea 8 — Prueba manual con el archivo real y verificación final
+
+- [ ] **Paso 1:** Con sesión de `Claude` en el navegador, ir a
+  `panel/importar.php`, subir el `datos_oficiales.json` real y una expansión
+  de prueba, y comprobar que el resumen del paso 1 cuadra con lo esperado
+  (43 equipos en el JSON, 21 ya en BD, ~22 nuevos, ~133 agentes libres
+  excluidos del conteo).
+- [ ] **Paso 2:** Resolver los equipos ambiguos (ej. "Instituto Kirkwood" vs
+  "Instituto Kikrwood") y confirmar. Comprobar en `panel/cromos.php` que las
+  cartas aparecen con equipo/posición/afinidad/foto correctos.
+- [ ] **Paso 3:** Comprobar que `derivarRasgosConfiguracion()` no rompió el
+  reparto existente (`12/10/8/8`, según §13 del CLAUDE.md).
+- [ ] **Paso 4:** Volver a subir el mismo archivo con la misma expansión y
+  comprobar que el resumen da 0 jugadores a crear (todos omitidos).
+- [ ] **Paso 5:** `for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done` sin
+  errores (§13).
