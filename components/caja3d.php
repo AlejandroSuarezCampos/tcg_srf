@@ -1,53 +1,38 @@
 <?php
 /**
- * COMPONENTE DE CAJA/SOBRE 3D — prompt-claude-code-sobres-3d.md.
+ * COMPONENTE — Caja/sobre en pseudo-3D. Volumen 100% CSS: perspective +
+ * preserve-3d + translateZ/rotateX/rotateY. Nunca WebGL ni modelos reales.
  *
- * Todo el volumen es CSS falso (perspective + preserve-3d + rotate/translateZ
- * sobre capas planas), nunca WebGL ni modelos reales. Las texturas de cada
- * cara vienen de Tcg::rutasPlantilla(), y si el admin no ha subido ninguna,
- * las claves faltan en $rutas y el CSS (assets/css/components.css) cae solo
- * al degradado por defecto — el render nunca se rompe por falta de assets.
+ * Referencia visual: una caja de cromos tipo Panini/blaster — se ven tres
+ * caras (frente, tapa superior, lateral), con grosor real, y al abrirla los
+ * sobres están DE PIE dentro, apretados de delante hacia atrás, sobresaliendo
+ * un poco por encima del borde.
  *
- * Reutilizado en tres sitios con el MISMO marcado, a propósito:
- *   · sobres.php       — el juego real (Fases 1-4 del prompt).
- *   · panel/plantillas.php (vista previa) — mismo componente que producción,
- *     para que el admin valide el resultado con el motor real, no una maqueta.
+ * GEOMETRÍA (importante, no la "simplifiques" a transform-origin + pliegue):
+ * cada cara se centra primero en el volumen con translate(-50%,-50%) y luego
+ * se empuja a su sitio con translateX/Y/Z + rotate. Es la única forma fiable
+ * de armar un prisma no cúbico. Plegar las caras desde su arista con
+ * transform-origin (lo que hacía la versión anterior) las dejaba casi de
+ * canto: la caja se veía como un rectángulo plano, sin volumen.
  *
- * Uso:
- *   require_once __DIR__ . '/components/caja3d.php';
- *   caja3d_html($db->rutasPlantilla('caja_expansion', $idExpansion), [...]);
+ *   .pack3d                     host: define --pack3d-w/h/d y la perspectiva
+ *     .pack3d-sombra            sombra de contacto en el suelo
+ *     .pack3d-volumen           preserve-3d; idle CSS en reposo
+ *       .pack3d-tilt            preserve-3d; SOLO el tilt al cursor (GSAP)
+ *         .pack3d-cara--front|--top|--side
+ *         .pack3d-bisagra       línea de charnela en la arista trasera-superior
+ *           .pack3d-tapa        gira 90°→205° para abrirse hacia arriba y atrás
+ *         .pack3d-interior      suelo de la caja (se ve al abrir)
+ *         .pack3d-interior-sobres
+ *           .pack3d-sobre × N   de pie, escalonados en Z por --i
+ *
+ * Sin plantilla subida (Fase 5) faltan las claves de $rutas y el CSS cae al
+ * degradado por defecto: el render nunca se rompe por falta de assets.
  */
-
-/**
- * Caja con front/top/side + tapa con bisagra propia + interior (el fondo que
- * se ve al levantar la tapa). Sirve tanto para la caja grande de una
- * expansión como para la caja pequeña de un tipo de sobre: la única
- * diferencia es la clase de escala.
- *
- * La tapa (.caja3d-tapa) reposa plegada sobre el propio "front" (misma
- * técnica que .sobre-3d-mitad en la ceremonia: transform-origin en su borde
- * superior, pegada sin necesidad de traslación). sobres.js la abre girándola
- * más allá de 90° (rotateX hasta ~-170) y desvaneciéndola a la vez, así que
- * "desaparece de la vista" en vez de perseguir un punto de bisagra físico
- * exacto en la cara "top" — es una ilusión 3D, no una junta real.
- *
- * $opts['interiorHtml']: HTML ya renderizado (normalmente N × sobre3d_mini_html())
- * que se inserta DENTRO de .caja3d-interior-scroll — a propósito en el mismo
- * árbol preserve-3d que la caja, nunca en un contenedor hermano, para que
- * "levantar" un sobre se perciba dentro del hueco de la caja (requisito
- * técnico del prompt de sobres 3D). .caja3d-interior-scroll es el único punto
- * con overflow-y:auto de toda la caja: es la única forma de tener scroll
- * interno Y transforms 3D a la vez sin que el navegador aplane el resto de
- * caras (overflow != visible fuerza un contexto de recorte que rompe
- * preserve-3d en los DESCENDIENTES de ESE elemento, no en sus hermanos).
- *
- * $rutas viene de Tcg::rutasPlantilla('caja_expansion'|'caja_sobre', $id).
- * Opciones: escala ('grande'|'pequena'), clase, id, datos (data-*), interiorHtml.
- */
-function caja3d_html(array $rutas, array $opts = []): string
+function pack3d_caja_html(array $rutas, array $opts = []): string
 {
     $escala = $opts['escala'] ?? 'grande';
-    $clase  = trim('caja3d caja3d--' . $escala . ' ' . ($opts['clase'] ?? ''));
+    $clase  = trim('pack3d pack3d--' . $escala . ' ' . ($opts['clase'] ?? ''));
     $idAttr = isset($opts['id']) ? ' id="' . htmlspecialchars($opts['id']) . '"' : '';
     $interiorHtml = $opts['interiorHtml'] ?? '';
 
@@ -65,14 +50,16 @@ function caja3d_html(array $rutas, array $opts = []): string
     ob_start();
     ?>
 <div class="<?= $clase ?>"<?= $idAttr . $datosAttr ?>>
-  <div class="caja3d-caras">
-    <div class="caja3d-tilt">
-      <div class="caja3d-cara caja3d-front"<?= $fondo('front') ?>></div>
-      <div class="caja3d-cara caja3d-side"<?= $fondo('side') ?>></div>
-      <div class="caja3d-cara caja3d-top"<?= $fondo('top') ?>></div>
-      <div class="caja3d-tapa"<?= $fondo('lid') ?>></div>
-      <div class="caja3d-interior"<?= $fondo('interior') ?>>
-        <div class="caja3d-interior-scroll"><?= $interiorHtml ?></div>
+  <div class="pack3d-sombra" aria-hidden="true"></div>
+  <div class="pack3d-volumen">
+    <div class="pack3d-tilt">
+      <div class="pack3d-cara pack3d-cara--front"<?= $fondo('front') ?>></div>
+      <div class="pack3d-cara pack3d-cara--side"<?= $fondo('side') ?>></div>
+      <div class="pack3d-cara pack3d-cara--top"<?= $fondo('top') ?>></div>
+      <div class="pack3d-interior"<?= $fondo('interior') ?>></div>
+      <div class="pack3d-interior-sobres"><?= $interiorHtml ?></div>
+      <div class="pack3d-bisagra">
+        <div class="pack3d-tapa"<?= $fondo('lid') ?>></div>
       </div>
     </div>
   </div>
@@ -82,15 +69,21 @@ function caja3d_html(array $rutas, array $opts = []): string
 }
 
 /**
- * Sobre individual con frente y reverso (relieve simulado con gradientes,
- * no geometría real: un sobre es plano). $rutas viene de
- * Tcg::rutasPlantilla('sobre', $idSobre). Opciones: clase, datos (data-*).
+ * Sobre individual, de pie dentro de la caja. $opts['indice'] es su posición
+ * en la fila (0..N-1) y $opts['total'] cuántos hay: el CSS los reparte en
+ * profundidad con esos dos números, sin generar una regla por sobre.
  */
-function sobre3d_mini_html(array $rutas, array $opts = []): string
+function pack3d_sobre_html(array $rutas, array $opts = []): string
 {
-    $clase  = trim('sobre3d-mini ' . ($opts['clase'] ?? ''));
+    $clase  = trim('pack3d-sobre ' . ($opts['clase'] ?? ''));
     $idAttr = isset($opts['id']) ? ' id="' . htmlspecialchars($opts['id']) . '"' : '';
     $deshabilitado = !empty($opts['disabled']);
+
+    $indice = (int) ($opts['indice'] ?? 0);
+    $total  = max(1, (int) ($opts['total'] ?? 1));
+    // --i y --n los consume .pack3d-sobre para su translateZ. El "-1" reparte
+    // los N sobres simétricos respecto al centro de la caja.
+    $estilo = ' style="--i:' . $indice . ';--n:' . $total . '"';
 
     $datosAttr = '';
     foreach ($opts['datos'] ?? [] as $clave => $valor) {
@@ -99,16 +92,16 @@ function sobre3d_mini_html(array $rutas, array $opts = []): string
 
     $fondo = function (string $zona) use ($rutas): string {
         return isset($rutas[$zona])
-            ? ' style="background-image:url(\'' . htmlspecialchars($rutas[$zona]) . '\')"'
+            ? 'background-image:url(\'' . htmlspecialchars($rutas[$zona]) . '\');'
             : '';
     };
 
     ob_start();
     ?>
-<button type="button" class="<?= $clase ?>"<?= $idAttr . $datosAttr ?>
+<button type="button" class="<?= $clase ?>"<?= $idAttr . $datosAttr . $estilo ?>
         <?= $deshabilitado ? 'disabled title="No tienes monedas suficientes"' : '' ?>>
-  <div class="sobre3d-mini-frente"<?= $fondo('frente') ?>></div>
-  <div class="sobre3d-mini-reverso"<?= $fondo('reverso') ?>></div>
+  <span class="pack3d-sobre-frente" style="<?= $fondo('frente') ?>"></span>
+  <span class="pack3d-sobre-canto" aria-hidden="true"></span>
 </button>
     <?php
     return trim(ob_get_clean());

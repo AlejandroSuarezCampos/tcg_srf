@@ -12,11 +12,14 @@
  *   $cssExtra      -> array de hojas adicionales, relativas a $base
  *   $bodyClass     -> clases del <body>
  */
+require_once __DIR__ . '/assets.php';   // assetUrl() / assetScript()
+
 $base         = $base         ?? '';
 $paginaTitulo = $paginaTitulo ?? 'Superliga Frontier TCG';
 $paginaDesc   = $paginaDesc   ?? 'El registro coleccionable de la Superliga Frontier.';
 $cssExtra     = $cssExtra     ?? [];
 $bodyClass    = $bodyClass    ?? '';
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -28,16 +31,59 @@ $bodyClass    = $bodyClass    ?? '';
 <meta name="color-scheme" content="dark">
 <link rel="icon" type="image/png" href="<?= $base ?>assets/img/iconos/favicon.ico">
 
+<!-- PREFERENCIA DE MOVIMIENTO — va INLINE y lo primero de todo, a propósito.
+     · Inline: un fichero .js aparte podría servirse cacheado y dejar la
+       página con el modo equivocado (ya pasó con ui.js).
+     · Lo primero: fija data-motion en <html> ANTES del primer pintado, así no
+       se ve un fotograma con las animaciones del modo que no toca.
+     Todo el CSS del sitio cuelga de :root[data-motion="reduce"] en vez de
+     @media (prefers-reduced-motion), porque una media query la decide el
+     sistema y NO se puede sobrescribir desde JavaScript: con ella, activar las
+     animaciones en la web dejaba las ceremonias en display:none y la pantalla
+     muerta. La preferencia propia manda sobre la del sistema. -->
+<script>
+(function () {
+  var SRF = (window.SRF = window.SRF || {});
+  var CLAVE = 'srf-animaciones';   // 'si' | 'no' | ausente = automático
+
+  SRF.preferenciaMovimiento = function () {
+    try { return localStorage.getItem(CLAVE); } catch (e) { return null; }
+  };
+  SRF.movimientoReducido = function () {
+    var p = SRF.preferenciaMovimiento();
+    if (p === 'si') return false;
+    if (p === 'no') return true;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  };
+  SRF.aplicarMovimiento = function () {
+    document.documentElement.dataset.motion = SRF.movimientoReducido() ? 'reduce' : 'full';
+  };
+  SRF.fijarPreferenciaMovimiento = function (valor) {
+    try {
+      if (valor === null) localStorage.removeItem(CLAVE);
+      else localStorage.setItem(CLAVE, valor);
+    } catch (e) { /* modo privado: se queda en automático */ }
+    SRF.aplicarMovimiento();
+  };
+
+  SRF.aplicarMovimiento();
+  // si el jugador cambia la preferencia del SISTEMA con la página abierta y
+  // aquí está en automático, el modo se actualiza solo
+  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (mq.addEventListener) mq.addEventListener('change', SRF.aplicarMovimiento);
+})();
+</script>
+
 <!-- Geist autoalojada: sin dependencia de terceros para la tipografía -->
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 
-<link rel="stylesheet" href="<?= $base ?>assets/css/tokens.css?v=<?= filemtime(__DIR__ . '/../assets/css/tokens.css') ?>">
-<link rel="stylesheet" href="<?= $base ?>assets/css/base.css?v=<?= filemtime(__DIR__ . '/../assets/css/base.css') ?>">
-<link rel="stylesheet" href="<?= $base ?>assets/css/components.css?v=<?= filemtime(__DIR__ . '/../assets/css/components.css') ?>">
-<link rel="stylesheet" href="<?= $base ?>assets/css/layout.css?v=<?= filemtime(__DIR__ . '/../assets/css/layout.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/tokens.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/base.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/components.css') ?>">
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/layout.css') ?>">
 <?php foreach ($cssExtra as $hoja): ?>
-<link rel="stylesheet" href="<?= $base . htmlspecialchars($hoja) ?>">
+<link rel="stylesheet" href="<?= htmlspecialchars(assetUrl($base, $hoja)) ?>">
 <?php endforeach; ?>
 
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">

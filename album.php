@@ -144,7 +144,6 @@ include __DIR__ . '/navbar.php';
                   'stats'   => $esJugador
                       ? ['ATA' => $cromo['ataque'], 'DEF' => $cromo['defensa'], 'TÉC' => $cromo['tecnica']]
                       : null,
-                  'detalle' => true,
                   'datos'   => [
                       'nombre'   => $cromo['nombre'],
                       'equipo'   => $cromo['equipo'],
@@ -169,10 +168,8 @@ include __DIR__ . '/navbar.php';
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
-<?php include __DIR__ . '/partials/carta_detalle.php'; ?>
 
-<script src="assets/js/album.js"></script>
-<script src="assets/js/detalle-carta.js"></script>
+<?= assetScript($base ?? '', 'assets/js/album.js') ?>
 
 </body>
 </html>

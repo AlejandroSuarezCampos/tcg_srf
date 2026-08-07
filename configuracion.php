@@ -272,13 +272,36 @@ include __DIR__ . '/navbar.php';
          style="margin-top:var(--space-3);"></p>
     </section>
 
+    <!-- Movimiento y animaciones -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-titulo">Animaciones</h2>
+          <p class="t-body-sm t-dim" style="margin-top:var(--space-2);">
+            La apertura de sobres, el walkout de las cartas raras y las cajas 3D.
+            Por defecto se respeta la preferencia de tu sistema operativo.
+          </p>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label for="selectAnimaciones">Ceremonias y efectos</label>
+        <select id="selectAnimaciones">
+          <option value="auto">Automático — seguir a mi sistema</option>
+          <option value="si">Activadas siempre</option>
+          <option value="no">Desactivadas siempre</option>
+        </select>
+        <p class="campo-hint" id="animacionesEstado" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
   </div>
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/perfil.js"></script>
-<script src="assets/js/configuracion.js"></script>
+<?= assetScript($base ?? '', 'assets/js/perfil.js') ?>
+<?= assetScript($base ?? '', 'assets/js/configuracion.js') ?>
 
 </body>
 </html>

@@ -198,7 +198,7 @@ include __DIR__ . '/navbar.php';
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/perfil.js"></script>
+<?= assetScript($base ?? '', 'assets/js/perfil.js') ?>
 
 </body>
 </html>

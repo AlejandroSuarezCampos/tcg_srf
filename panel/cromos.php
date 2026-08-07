@@ -31,15 +31,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_equipo    = (int) ($_POST['id_equipo'] ?? 0);
     $id_rareza    = (int) ($_POST['id_rareza'] ?? 0);
     $id_afinidad  = (int) ($_POST['id_afinidad'] ?? 0);
-    $mostrar_stats = $_POST['mostrar_stats'] ?? 'artwork';
-    if (!in_array($mostrar_stats, ['artwork', 'debajo', 'ninguna'], true)) {
-        $mostrar_stats = 'artwork';
-    }
 
     if ($id_cromo !== '') {
-        $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $mostrar_stats);
+        $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
     } else {
-        $db->crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, mostrar_stats: $mostrar_stats);
+        $db->crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
     }
 
     // Capa 2: el rasgo de configuración sale del cruce puesto × afinidad, así
@@ -234,15 +230,6 @@ if ($filtroExpansion !== '') {
             </select>
           </div>
 
-          <div class="field">
-            <label>Estadísticas</label>
-            <select name="mostrar_stats" id="f_mostrar_stats">
-              <option value="artwork">En el artwork (plantilla nueva)</option>
-              <option value="debajo">Debajo de la carta (cartas Photoshop)</option>
-              <option value="ninguna">No mostrar</option>
-            </select>
-          </div>
-
           <div class="field field-full">
             <label>Afinidad</label>
             <select name="id_afinidad" id="f_id_afinidad">
@@ -267,7 +254,7 @@ if ($filtroExpansion !== '') {
   </div>
 </div>
 
-<script src="./assets/js/scriptCromos.js"></script>
+<script src="./assets/js/scriptCromos.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptCromos.js') ?>"></script>
 
 </body>
 </html>

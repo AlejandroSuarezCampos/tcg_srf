@@ -202,12 +202,11 @@
 }
 
 .carta-marco {
-  --pad-marco: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   height: 100%;
-  padding: var(--pad-marco);
+  padding: var(--space-3);
   /* red de seguridad: nada de lo que haya dentro del marco debe poder
      asomar fuera de él. Sin esto, una etiqueta de rareza larga ("Poco
      común") empujaba la insignia de cantidad literalmente fuera de la
@@ -234,9 +233,6 @@
   aspect-ratio: 233 / 361;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  flex-grow: 1;      /* NUEVO: absorbe cualquier espacio extra que el grid
-                         le imponga a la carta, en los dos modos por igual */
-  min-height: 0;      /* NUEVO */
   background:
     radial-gradient(ellipse 75% 55% at 50% 20%, var(--rz-halo), transparent 72%),
     linear-gradient(170deg, var(--void-2), #08090C);
@@ -340,174 +336,6 @@
   letter-spacing: var(--tracking-caption);
   text-transform: uppercase;
   color: var(--frost-dim);
-}
-
-/* ==========================================================
-   PLANTILLA "ARTWORK" — foto a sangre, §16 del CLAUDE.md.
-   Se activa con la clase .carta--artwork (modo artwork/ninguna de
-   cromos.mostrar_stats). El modo "debajo" NO usa nada de este bloque —
-   sigue exactamente el marcado y CSS de siempre, es la red de seguridad
-   para las cartas con arte Photoshop ya cerrado.
-   ========================================================== */
-
-/* la foto ocupa todo el marco: cancela el padding de .carta-marco solo
-   para esta placa, y vuelve a redondear como si fuera el borde real de
-   la carta */
-.carta-placa--artwork {
-  margin: calc(var(--pad-marco) * -1);
-  border-radius: calc(var(--radius-xl) - 1px);
-  /* fondo más vivo que el halo sutil del modo debajo — usa el color de
-     rareza a más intensidad (var(--rz), no var(--rz-halo)) para que las
-     rarezas se noten de un vistazo, degradando a oscuro hacia los bordes. */
-  background:
-    radial-gradient(ellipse 95% 75% at 50% 12%, var(--rz), transparent 62%),
-    linear-gradient(170deg, var(--void-2), #08090C);
-}
-
-/* deja de ser "cover a sangre total": ahora es "contain dentro de un marco
-   más pequeño, anclado arriba". Nunca recorta la cara (aunque la foto
-   tenga mucho margen vacío alrededor, como pasa con parte del catálogo
-   importado), y al no llegar a los bordes/esquinas, el hueco sobrante se
-   camufla con el fondo oscuro degradado que ya tiene .carta-placa. */
-.carta-arte--sangre {
-  inset: 8% 12% 32% 12%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  object-position: center; /* antes: center top */
-}
-
-.carta-degradado {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 78%;
-  /* el tramo opaco (var(--void) sólido) tiene que llegar HASTA DONDE
-     ACABA LA FOTO (32% inferior de la placa) o más allá, para que el
-     corte de la imagen quede completamente tapado en vez de asomar
-     como una línea recta. 45% de esta franja (que mide 78% de la placa)
-     equivale a 0.45*78=35.1% de la placa, por encima del 32% donde
-     termina la foto — con margen de sobra. */
-  background: linear-gradient(0deg, var(--void) 45%, rgba(11, 12, 16, .88) 65%, transparent 100%);
-  pointer-events: none;
-}
-
-/* sustituye a .carta-head para este modo: la rareza, la cantidad y la
-   afinidad flotan sobre la foto en vez de ocupar una fila propia encima,
-   porque ya no hay espacio "encima" — la foto llega hasta arriba. */
-.carta-overlay-superior {
-  position: absolute;
-  top: var(--space-2); left: var(--space-2); right: var(--space-2);
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-/* sin .rz-flotante (cartas Común), .carta-head-derecha queda como único
-   hijo y space-between lo manda a la izquierda; fuérzalo a la derecha */
-.carta-overlay-superior .carta-head-derecha { margin-left: auto; }
-.rz-flotante {
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  background: rgba(11, 12, 16, .55);
-  backdrop-filter: blur(4px);
-}
-
-/* estilo Adrenalyn: ataque verde, defensa rojo, técnica azul — los mismos
-   semánticos que ya tiene el sistema (§4), no se inventa paleta. Solo en
-   md/lg: a sm no cabe con legibilidad (igual que .carta-meta ya se oculta
-   en contextos densos como la ceremonia). */
-.carta-stats-flotantes {
-  position: absolute;
-  left: 0; right: 0;
-  /* ponytail: número fijo que asume una altura de .carta-placa-nombre de
-     una línea; con nombre de 2 líneas (permitido, line-clamp: 2) puede
-     solapar. Subido para dar más margen sin reestructurar el HTML;
-     arreglo real: anclar al flujo en vez de dos position:absolute. */
-  bottom: 78px;
-  z-index: 3;
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2);
-}
-.carta--sm .carta-stats-flotantes { display: none; }
-.carta--lg .carta-stats-flotantes { bottom: 92px; }
-
-.carta-stat-pildora {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  color: var(--void);
-  border: 2px solid rgba(11, 12, 16, .55);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
-}
-.carta-stat-pildora b { font-size: 12px; line-height: 1; font-weight: var(--fw-semibold); font-family: var(--font-mono); }
-.carta-stat-pildora span { font-size: 7px; letter-spacing: var(--tracking-caption); opacity: .8; }
-.carta-stat-pildora[data-stat="ATA"] { background: var(--success); }
-.carta-stat-pildora[data-stat="DEF"] { background: var(--danger); }
-.carta-stat-pildora[data-stat="TÉC"] { background: var(--info); }
-
-/* §16.14.1: aviso de "ver estadísticas en el modal" — sustituye a las
-   píldoras/bloque de stats cuando la carta abre el modal de detalle. */
-.carta--detalle { cursor: pointer; }
-.carta-ver-stats {
-  display: block;
-  font-size: var(--fs-caption);
-  color: var(--frost-dim);
-  text-align: center;
-}
-.carta-ver-stats--flotante {
-  position: absolute;
-  left: var(--space-2); right: var(--space-2);
-  bottom: 78px;
-  z-index: 3;
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .8);
-}
-.carta--lg .carta-ver-stats--flotante { bottom: 92px; }
-
-/* placa de nombre: sobre el degradado, sustituye a .carta-cuerpo (nombre +
-   equipo) para este modo — el rasgo de Compos, si lo hay, sigue debajo de
-   la placa como un .carta-cuerpo normal, eso no cambia. */
-.carta-placa-nombre {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  z-index: 3;
-  padding: var(--space-2) var(--space-3) var(--space-3);
-}
-.carta-fila-nombre {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.carta-pos-insignia {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: var(--fw-semibold);
-  color: var(--void);
-}
-/* colores semánticos existentes, no paleta nueva */
-.carta-pos-insignia[data-posicion="POR"] { background: var(--amber); }
-.carta-pos-insignia[data-posicion="DF"]  { background: var(--info); }
-.carta-pos-insignia[data-posicion="MC"]  { background: var(--success); }
-.carta-pos-insignia[data-posicion="DC"]  { background: var(--danger); }
-
-.carta-placa-nombre .carta-equipo {
-  display: block;
-  font-size: var(--fs-caption-sm);
-  color: var(--frost-dim);
-  margin-top: 2px;
 }
 
 /* pie de la carta: lo que cada pantalla añade debajo (vendedor, comprar…) */
@@ -746,23 +574,21 @@
 /* Movimiento reducido: se apagan los barridos y el aura queda fija en su
    estado medio. La carta sigue siendo inconfundiblemente SRF —borde
    arcoíris, aura y tinte— pero sin nada en movimiento. */
-@media (prefers-reduced-motion: reduce) {
-  .carta[data-rareza="6"] .carta-placa::before,
-  .rz[data-rareza="6"]::after { display: none; }
-  .carta[data-rareza="6"]::before { opacity: .5; }
-}
+:root[data-motion="reduce"] .carta[data-rareza="6"] .carta-placa::before,
+:root[data-motion="reduce"] .rz[data-rareza="6"]::after { display: none; }
+:root[data-motion="reduce"] .carta[data-rareza="6"]::before { opacity: .5; }
 
 /* ==========================================================================
    3c. TAMAÑOS Y ESTADOS DE LA CARTA
    ========================================================================== */
 .carta--sm { border-radius: var(--radius-lg); }
-.carta--sm .carta-marco { --pad-marco: var(--space-2); gap: var(--space-2); border-radius: calc(var(--radius-lg) - 1px); }
+.carta--sm .carta-marco { padding: var(--space-2); gap: var(--space-2); border-radius: calc(var(--radius-lg) - 1px); }
 .carta--sm .carta-nombre { font-size: var(--fs-caption); }
 .carta--sm .carta-meta { font-size: 11px; }
 .carta--sm .carta-afinidad { width: 22px; height: 22px; }
 .carta--sm .rz { font-size: 9px; padding: 3px 6px; }
 
-.carta--lg .carta-marco { --pad-marco: var(--space-4); gap: var(--space-4); }
+.carta--lg .carta-marco { padding: var(--space-4); gap: var(--space-4); }
 .carta--lg .carta-nombre { font-size: var(--fs-h3); }
 .carta--lg .carta-meta { font-size: var(--fs-body-sm); }
 
@@ -847,44 +673,41 @@
 .carta-grid--densa { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-3); }
 
 /* ==========================================================================
-   4. CAJAS Y SOBRES 3D (prompt-claude-code-sobres-3d.md)
+   4. CAJAS Y SOBRES 3D — pack3d (components/caja3d.php)
    Todo el volumen es CSS falso: perspective + transform-style:preserve-3d +
-   rotateX/Y + translateZ sobre capas PLANAS (las texturas son PNG recortados
-   de la plantilla del admin, componente components/caja3d.php). Nunca WebGL,
-   nunca Three.js, nunca un modelo real — así lo pide el prompt.
-   El comportamiento (tilt al cursor, apertura en fases) vive en sobres.js,
-   con GSAP (vendorizado) como orquestador de timing/easing.
+   translateZ/rotateX/rotateY sobre capas PLANAS. Nunca WebGL, nunca Three.js,
+   nunca un modelo real. GSAP solo orquesta timing/easing, en sobres.js.
 
-   Geometría de una caja (front/top/side, más tapa e interior superpuestos):
-   con transform-style:preserve-3d en .caja3d-caras, cada cara de esquina
-   solo necesita plegarse desde la arista que comparte con "front" — sin
-   trasladar nada, el pliegue por sí solo la deja pegada en la costura (mismo
-   principio que .sobre-3d-mitad en la ceremonia):
-     · top:      transform-origin en su borde superior + rotateX(90deg).
-     · side:     transform-origin en su borde derecho  + rotateY(-90deg).
-     · interior: transform-origin en su borde inferior + rotateX(-90deg)
-                 (mismo truco que "top", en espejo: es el suelo de la caja).
-   La tapa y el interior NO seden geometría real de bisagra: la tapa reposa
-   plana sobre "front" (como .sobre-3d-mitad) y solo gira más allá de 90° al
-   abrirse, desvaneciéndose a la vez — es una ilusión de apertura, no una
-   junta física. Los 50 sobres viven DENTRO de .caja3d-interior-scroll, en el
-   mismo árbol preserve-3d que la caja (requisito técnico del prompt): el
-   único punto de toda la caja con overflow-y:auto es ese, porque es la única
-   forma de tener scroll interno y transforms 3D sin que el navegador aplane
-   el resto de caras (overflow≠visible crea un contexto de recorte que solo
-   afecta a los DESCENDIENTES de ese elemento, nunca a sus hermanos).
+   REFERENCIA VISUAL: caja de cromos tipo Panini/blaster. Cerrada se ven tres
+   caras con grosor real (frente + tapa + lateral); abierta, la tapa se
+   levanta por su charnela trasera y los sobres están DE PIE dentro, apretados
+   de delante hacia atrás y sobresaliendo por encima del borde.
 
-   "Portal" (.caja3d-portal): el mismo elemento de caja que vive en la
-   vitrina o el submenú pasa a position:fixed a pantalla completa al abrirse
-   (Fase 3), sin moverlo de sitio en el DOM ni duplicarlo — ninguno de sus
-   ancestros (.submenu-tipo, .vitrina-item) usa transform, así que
-   position:fixed sigue ancorado de verdad al viewport.
+   GEOMETRÍA — cada cara se CENTRA primero en el volumen con
+   translate(-50%,-50%) y luego se empuja a su sitio con translateX/Y/Z +
+   rotate:
+     · front: translateZ(+d/2)
+     · top:   translateY(-h/2) rotateX(90deg)      (tamaño w × d)
+     · side:  translateX(+w/2) rotateY(90deg)      (tamaño d × h)
+     · suelo: translateY(+h/2) rotateX(90deg)      (tamaño w × d)
+   NO plegar las caras desde su arista con transform-origin: es lo que hacía
+   la versión anterior y las dejaba casi de canto — la caja se veía como un
+   rectángulo plano, sin ningún volumen.
+
+   El volumen se orienta con rotateX(-18deg) rotateY(-32deg): con esos signos
+   quedan visibles a la vez frente, tapa y lateral DERECHO (las normales de
+   ambas caras acaban con z positiva, o sea mirando a cámara).
+
+   Los sobres van en .pack3d-interior-sobres, en el MISMO árbol preserve-3d
+   que la caja. Ese contenedor NO puede llevar overflow ni scroll: cualquier
+   overflow≠visible crea un contexto de recorte que APLANA a todos sus
+   descendientes y destruye el 3D (además de pintar barras de scroll sueltas
+   flotando en la escena).
    ========================================================================== */
 
-/* arte común a caja y sobre: si no hay plantilla subida (background-image no
-   se resuelve), este degradado de fondo es lo único que se ve — el render
-   nunca se rompe por falta de assets (Fase 5 del prompt) */
-.caja3d-cara, .caja3d-tapa, .caja3d-interior, .sobre3d-mini-frente, .sobre3d-mini-reverso {
+/* arte común: sin plantilla subida (Fase 5) este degradado es el único fondo,
+   así el render nunca se rompe por falta de assets */
+.pack3d-cara, .pack3d-tapa, .pack3d-interior, .pack3d-sobre-frente {
   background-color: var(--panel);
   background-image:
     radial-gradient(ellipse 75% 55% at 50% 20%, var(--amber-soft), transparent 72%),
@@ -903,7 +726,7 @@
 }
 .vitrina-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-8);
   padding-block: var(--space-6);
 }
@@ -911,213 +734,340 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
+  gap: var(--space-2);
 }
-.js-caja-expansion { cursor: pointer; }
-.js-caja-expansion:focus-visible .caja3d-caras { outline: 2px solid var(--amber); outline-offset: 6px; }
-.vitrina-item-nombre { font-weight: var(--fw-semibold); }
+.js-caja-expansion { cursor: pointer; display: block; }
+.js-caja-expansion:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
+.vitrina-item-nombre { font-weight: var(--fw-semibold); text-align: center; }
 
-/* el portal: en reposo no pinta caja propia (display:contents — el hijo
-   .caja3d se comporta como si el portal no existiera), y solo al abrirse
-   pasa a overlay fijo. Así, abrir/cerrar es un simple toggle de clase, sin
-   mover el nodo en el DOM ni clonar nada. */
-.caja3d-portal { display: contents; }
-.caja3d-portal.esta-abierta {
+/* el portal: en reposo no pinta caja propia (display:contents), y solo al
+   abrirse pasa a overlay fijo. Abrir/cerrar es un toggle de clase, sin mover
+   el nodo en el DOM ni clonar nada. */
+.pack3d-portal { display: contents; }
+.pack3d-portal.esta-abierta {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-5);
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
   padding: var(--space-6);
-  background: rgba(4, 5, 7, .93);
-  overflow-y: auto;
+  background: radial-gradient(ellipse at 50% 45%, rgba(24,14,6,.96), rgba(4,5,7,.985) 70%);
 }
-/* display:none por defecto: con el portal en display:contents (caja acoplada
-   en la vitrina/submenú), position:absolute no tendría contexto de quién
-   fiarse y el botón podría aparecer flotando en cualquier parte de la
-   página. Solo cobra sentido — y solo se muestra — con la caja abierta. */
-.caja3d-portal-cerrar { display: none; position: absolute; top: var(--space-5); right: var(--space-5); }
-.caja3d-portal.esta-abierta .caja3d-portal-cerrar { display: inline-flex; }
+.pack3d-portal-cerrar { display: none; position: absolute; top: var(--space-5); right: var(--space-5); z-index: 2; }
+.pack3d-portal.esta-abierta .pack3d-portal-cerrar { display: inline-flex; }
 
-/* caja base: tamaño en variables para poder reescalar sin tocar la geometría.
-   --interior-h es la profundidad (falsa) del hueco interior, independiente
-   de --caja-d: los sobres necesitan una "bahía" mucho más generosa que el
-   grosor real de la caja para no quedar minúsculos. */
-.caja3d {
-  --caja-w: 210px;
-  --caja-h: 260px;
-  --caja-d: 58px;
-  --interior-h: 60%;
+/* ---- el volumen ---- */
+.pack3d {
+  --pack3d-w: 200px;
+  --pack3d-h: 250px;
+  --pack3d-d: 130px;
+  --pack3d-sobre-w: 165px;
+  --pack3d-sobre-h: 235px;
+  --pack3d-giro-x: -18deg;
+  --pack3d-giro-y: -32deg;
   position: relative;
-  width: var(--caja-w);
-  height: var(--caja-h);
-  perspective: 1100px;
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  perspective: 1500px;
+  perspective-origin: 50% 42%;
+  /* La caja gira y su tapa/lateral asoman FUERA de su caja de layout, y la
+     sombra de contacto cae otro medio "fondo" por debajo. Sin reservar ese
+     hueco arriba y abajo, la tapa se comía lo que hubiera encima y la sombra
+     oscurecía el nombre/precio de debajo. */
+  margin: calc(var(--pack3d-d) * .55) auto calc(var(--pack3d-d) * .5 + var(--space-4));
 }
-.caja3d--pequena { --caja-w: 130px; --caja-h: 160px; --caja-d: 36px; }
-/* tamaño "abierta" (Fase 3): la asigna sobres.js al abrir el portal — mismo
-   componente, solo cambian las variables de tamaño, nunca la estructura */
-.caja3d--abierta { --caja-w: 280px; --caja-h: 320px; --caja-d: 64px; --interior-h: 320px; }
+.pack3d--pequena {
+  --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px;
+  --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px;
+}
 
-.caja3d-caras {
+/* sombra de contacto: elipse aplanada bajo la caja, fuera del preserve-3d
+   para que no herede la rotación del volumen */
+.pack3d-sombra {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + var(--pack3d-d) * .1);
+  width: calc(var(--pack3d-w) * 1.25);
+  height: calc(var(--pack3d-d) * .5);
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.72), transparent 70%);
+  filter: blur(7px);
+  pointer-events: none;
+}
+
+/* idle (Fase 1: animación visible sin interacción). El tilt al cursor vive en
+   .pack3d-tilt, una capa aparte: GSAP escribe "transform" en línea, y sobre
+   esta misma capa competiría con la animación CSS por la misma propiedad. */
+.pack3d-volumen {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform: rotateX(-8deg) rotateY(-24deg);
-  will-change: transform;
-  animation: caja3dFlota 4.6s ease-in-out infinite;
+  animation: pack3dFlota 5.2s ease-in-out infinite;
 }
-@keyframes caja3dFlota {
-  0%, 100% { transform: rotateX(-8deg) rotateY(-24deg) translateY(0); }
-  50%      { transform: rotateX(-6deg) rotateY(-24deg) translateY(-7px); }
+@keyframes pack3dFlota {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
 }
-/* mientras la caja está abierta, sobres.js gira .caja3d-caras a mano con
-   GSAP (ángulo "mirando hacia dentro"): esta clase para la animación CSS de
-   flotación para que no compita por la misma propiedad de la misma capa */
-.caja3d-caras.en-portal { animation: none; }
-/* capa del tilt al cursor: la anima GSAP (sobres.js), nunca CSS — así no
-   compite con la animación de flotación de .caja3d-caras (una animación CSS
-   y un estilo en línea sobre la MISMA propiedad de la MISMA capa se pisarían
-   entre sí, de ahí que el tilt viva en su propia capa anidada) */
-.caja3d-tilt { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; }
+.pack3d-volumen.en-portal { animation: none; }
 
-.caja3d-cara {
+.pack3d-tilt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--pack3d-giro-x)) rotateY(var(--pack3d-giro-y));
+}
+
+.pack3d-cara, .pack3d-interior, .pack3d-tapa {
   position: absolute;
-  border: 1px solid var(--line);
-  backface-visibility: hidden;
+  left: 50%;
+  top: 50%;
+  background-size: cover;
+  background-position: center;
 }
-.caja3d-front { inset: 0; }
-.caja3d-top {
-  left: 0; top: 0; width: 100%; height: var(--caja-d);
-  transform-origin: top; transform: rotateX(90deg);
+
+/* frente */
+.pack3d-cara--front {
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%) translateZ(calc(var(--pack3d-d) / 2));
+  box-shadow: inset 0 0 0 1px var(--line), inset 0 -60px 90px rgba(0,0,0,.45);
 }
-.caja3d-side {
-  right: 0; top: 0; width: var(--caja-d); height: 100%;
-  transform-origin: right; transform: rotateY(-90deg);
+/* tapa superior (la cara fija; la que se abre es .pack3d-tapa) */
+.pack3d-cara--top {
+  width: var(--pack3d-w);
+  height: var(--pack3d-d);
+  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / -2)) rotateX(90deg);
+  filter: brightness(1.22);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-/* tapa: en reposo, tira decorativa sobre el propio front (misma técnica que
-   .sobre-3d-mitad). sobres.js la abre girándola más allá de 90° y
-   desvaneciéndola — "desaparece de la vista" en vez de perseguir una
-   bisagra física exacta */
-.caja3d-tapa {
+/* lateral derecho */
+.pack3d-cara--side {
+  width: var(--pack3d-d);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%) translateX(calc(var(--pack3d-w) / 2)) rotateY(90deg);
+  filter: brightness(.62);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* suelo interior: solo se ve con la caja abierta */
+.pack3d-interior {
+  width: var(--pack3d-w);
+  height: var(--pack3d-d);
+  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / 2)) rotateX(90deg);
+  filter: brightness(.4);
+}
+
+/* charnela: div de altura 0 colocado en la arista TRASERA-SUPERIOR. La tapa
+   cuelga de ella con transform-origin en su propio borde superior, así que
+   rotarla es literalmente abrir una bisagra:
+     · rotateX(90deg)  → tumbada hacia delante, tapando la boca (cerrada)
+     · rotateX(205deg) → de pie e inclinada hacia atrás (abierta) */
+.pack3d-bisagra {
   position: absolute;
-  left: 0; top: 0; width: 100%; height: 38%;
-  transform-origin: top;
-  border: 1px solid var(--amber-line);
-  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-w);
+  height: 0;
+  transform: translateX(-50%)
+             translateY(calc(var(--pack3d-h) / -2))
+             translateZ(calc(var(--pack3d-d) / -2));
+  transform-style: preserve-3d;
 }
-/* interior/suelo: plegado en espejo al de "top" (ver comentario de arriba de
-   sección). z-index negativo: en reposo, con la tapa cerrada delante, no
-   debe robarle el clic ni el foco a nada de la cara frontal */
-.caja3d-interior {
+.pack3d-tapa {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: var(--pack3d-d);
+  transform-origin: 50% 0;
+  transform: rotateX(90deg);
+  /* al abrirse pasa de 180°, así que se ve su reverso: sin esto desaparecería */
+  backface-visibility: visible;
+  filter: brightness(1.3);
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+
+/* ---- Fase 3/4: los sobres, DE PIE dentro de la caja ----
+   Sin overflow de ningún tipo (aplanaría el 3D). Cada sobre se coloca en
+   profundidad con --i (su índice) y --n (cuántos hay): se reparten simétricos
+   respecto al centro, ocupando ~el 88% del fondo de la caja. */
+.pack3d-interior-sobres {
   position: absolute;
-  left: 0; bottom: 0; width: 100%; height: var(--interior-h);
-  transform-origin: bottom; transform: rotateX(-90deg);
-  overflow: hidden;
-  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-w);
+  height: var(--pack3d-h);
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+  pointer-events: none;   /* solo los sobres reciben clic, no el hueco */
 }
-.caja3d-interior-scroll {
+.pack3d-sobre {
+  --paso: calc(var(--pack3d-d) * .88 / var(--n));
+  --z: calc((var(--i) - (var(--n) - 1) / 2) * var(--paso));
+  /* apoyado en el suelo: su base coincide con el fondo de la caja, así que
+     asoma por arriba tanto como su alto exceda al de la caja */
+  --y: calc((var(--pack3d-h) - var(--pack3d-sobre-h)) / 2);
+  --alza: 0px;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--pack3d-sobre-w);
+  height: var(--pack3d-sobre-h);
+  transform: translate(-50%, -50%)
+             translateY(calc(var(--y) + var(--alza)))
+             translateZ(var(--z));
+  transform-style: preserve-3d;
+  transition: transform 200ms var(--ease), filter 200ms var(--ease);
+  border: 0;
+  padding: 0;
+  font: inherit;
+  background: none;
+  cursor: pointer;
+  opacity: 0;               /* invisibles hasta que la caja se abre */
+  pointer-events: none;
+}
+.pack3d--abierta .pack3d-sobre { opacity: 1; pointer-events: auto; }
+
+.pack3d-sobre-frente {
   position: absolute;
   inset: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
 }
-/* al elegir un sobre, los demás se difuminan para que el elegido destaque, y
-   toda la caja se atenúa para no competir con el modal de confirmación */
-.caja3d-interior-scroll.con-seleccion .sobre3d-mini:not(.es-seleccionado) { opacity: 0; pointer-events: none; }
-.caja3d-portal.con-seleccion .caja3d-cara,
-.caja3d-portal.con-seleccion .caja3d-tapa { opacity: .2; }
+/* canto brillante en el borde superior: es lo que de verdad da la lectura de
+   "muchos sobres apretados" al mirarlos desde arriba */
+.pack3d-sobre-canto {
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 4px;
+  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.06));
+  border-radius: 3px 3px 0 0;
+}
+
+/* Fase 4: levantar SOLO el sobre bajo el cursor (o con foco de teclado) */
+@media (hover: hover) {
+  .pack3d--abierta .pack3d-sobre:hover { --alza: -46px; filter: brightness(1.35); }
+}
+.pack3d--abierta .pack3d-sobre:focus-visible {
+  --alza: -46px;
+  filter: brightness(1.35);
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+}
+/* mismo efecto forzado por JS (SRF.pack3d.liftEnvelopeOnHover), para la vista
+   previa del panel y para poder demostrarlo sin ratón */
+.pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -46px; filter: brightness(1.35); }
+.pack3d-sobre:disabled { cursor: not-allowed; filter: grayscale(.7) brightness(.55); }
+
+/* seleccionado: sale del todo de la caja, hacia cámara */
+.pack3d-sobre.es-seleccionado {
+  --alza: -150px;
+  transform: translate(-50%, -50%)
+             translateY(calc(var(--y) + var(--alza)))
+             translateZ(calc(var(--pack3d-d) / 2 + 140px))
+             rotateY(8deg);
+  filter: brightness(1.5) drop-shadow(0 26px 40px rgba(0,0,0,.7));
+  transition: transform 420ms var(--ease), filter 420ms var(--ease);
+}
+/* al elegir uno, el resto y la propia caja se apartan visualmente */
+.pack3d-interior-sobres.con-seleccion .pack3d-sobre:not(.es-seleccionado) { opacity: 0; pointer-events: none; }
+.pack3d-portal.con-seleccion .pack3d-cara,
+.pack3d-portal.con-seleccion .pack3d-interior,
+.pack3d-portal.con-seleccion .pack3d-tapa { opacity: .18; }
+
+/* ---- Fase 3: tamaño de la caja abierta ---- */
+/* DOS escalas independientes, cada una uniforme dentro de sí misma — nunca
+   valores sueltos por eje, o el arte se recorta (ver más abajo):
+     · caja  ×1.2 de la base 200:250:130   → 240×300×156
+     · sobre ×1.4 de la base 165:235       → 231×329
+   front/top/side/interior pintan un recorte FIJO de Tcg::ZONAS_CAJA
+   (proporción 4:5, 1.538:1 y 1:1.923 — ver §14.1 de branding/CLAUDE.md) y el
+   sobre otro de Tcg::ZONAS_SOBRE (1:1.427): cualquier forma que no respete
+   esas proporciones hace que `background-size: cover` recorte trozos reales
+   del arte — el bug de "la plantilla se ve cortada".
+   Las DOS escalas tienen que ser distintas a propósito: el sobre (329 alto)
+   es más alto que la caja (300 alto) para que asome por encima del borde
+   como una caja de cromos real abierta («sobresaliendo un poco por encima»,
+   ver cabecera de components/caja3d.php) — iguales, la caja tapa los sobres
+   enteros y no se ve ninguno (lo que pasó al probar con una sola escala
+   1.6× para las dos). Al mismo tiempo el sobre se queda MÁS ESTRECHO que la
+   caja (231 < 240): si fuera más ancho asomaría también por los LADOS, el
+   mismo defecto de "atraviesa el contenedor" que ya se corrigió para la
+   carta de la ceremonia en escenaCarta() (ceremonia.js). */
+.pack3d--abierta {
+  --pack3d-w: 240px;
+  --pack3d-h: 300px;
+  --pack3d-d: 156px;
+  --pack3d-sobre-w: 231px;
+  --pack3d-sobre-h: 329px;
+  margin: 0;
+}
 
 /* ---- Fase 2: submenú de tipos de sobre de una expansión ---- */
-.submenu-tipos {
+/* [hidden] tiene la MISMA especificidad que .submenu-tipos (0-1-0): sin el
+   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
+   "display:none" del navegador y el submenú se queda visible siempre,
+   superpuesto a la vitrina, aunque sobres.js ponga/quite el atributo bien. */
+.submenu-tipos:not([hidden]) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: var(--space-8);
-  padding-block: var(--space-8);
+  padding-block: var(--space-6);
 }
-.submenu-tipos-volver { flex-basis: 100%; }
+.submenu-tipos-cabecera {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.submenu-tipos-cabecera h2 { margin: 0; }
+.submenu-tipos-cabecera p { margin: 0; }
 .submenu-tipo {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
 }
-.js-tipo-sobre { cursor: pointer; }
-.js-tipo-sobre:focus-visible .caja3d-caras { outline: 2px solid var(--amber); outline-offset: 6px; }
-.submenu-tipo-nombre { font-weight: var(--fw-semibold); }
+.js-tipo-sobre { cursor: pointer; display: block; }
+.js-tipo-sobre:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
+.submenu-tipo-nombre { font-weight: var(--fw-semibold); text-align: center; }
 .submenu-tipo-precio {
   display: flex; align-items: center; gap: var(--space-1);
   font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--amber-light);
 }
 
-/* ---- Fase 4: sobre individual dentro del hueco ---- */
-.sobre3d-mini {
-  position: relative;
-  width: 76px;
-  aspect-ratio: 4 / 5;
-  transform-style: preserve-3d;
-  will-change: transform;
-  transition: transform 200ms var(--ease);
-  cursor: pointer;
-  border: 0;
-  padding: 0;
-  font: inherit;
+/* rótulo de la caja abierta, dentro del portal */
+.pack3d-portal-titulo {
+  display: none;
+  text-align: center;
+  margin-top: var(--space-6);
 }
-/* "levantarse" al pasar el cursor o llegar el foco por teclado (§Fase 4):
-   CSS puro, no JS — más fiable que rastrear 50 mousemove */
-@media (hover: hover) {
-  .sobre3d-mini:hover { transform: translateY(-10px) scale(1.08); z-index: 2; }
-}
-/* mismo efecto que :hover, forzado por JS (SRF.sobres3d.liftEnvelopeOnHover) —
-   lo usa el modo "Vista previa" del panel para demostrar el efecto sin ratón */
-.sobre3d-mini.es-hover-forzado { transform: translateY(-10px) scale(1.08); z-index: 2; }
-.sobre3d-mini:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; transform: translateY(-10px) scale(1.08); z-index: 2; }
-.sobre3d-mini:disabled { opacity: .45; cursor: not-allowed; }
-.sobre3d-mini.es-seleccionado { transform: scale(1.15); z-index: 3; }
-.sobre3d-mini-frente, .sobre3d-mini-reverso {
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  backface-visibility: hidden;
-}
-.sobre3d-mini-reverso { transform: rotateY(180deg); }
+.pack3d-portal.esta-abierta .pack3d-portal-titulo { display: block; }
 
-/* sin movimiento: nada de flotación, tilt, lift al hover ni apertura animada
-   — cada fase deja el estado final fijado por CSS/JS sin transición */
-@media (prefers-reduced-motion: reduce) {
-  .caja3d-caras { animation: none; }
-  .caja3d-caras, .caja3d-tapa, .sobre3d-mini { transition: none; }
-  .sobre3d-mini:hover, .sobre3d-mini:focus-visible { transform: none; }
-}
-@media (max-width: 640px) {
-  .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-6); }
-  .caja3d--abierta { --caja-w: 220px; --caja-h: 260px; --caja-d: 50px; --interior-h: 240px; }
-  .sobre3d-mini { width: 64px; }
+/* sin movimiento: ni flotación, ni tilt, ni levantado al hover — cada fase
+   deja su estado final sin transición */
+:root[data-motion="reduce"] .pack3d-volumen { animation: none; }
+:root[data-motion="reduce"] .pack3d-sobre { transition: none; }
+:root[data-motion="reduce"] .pack3d-sobre:hover,
+:root[data-motion="reduce"] .pack3d-sobre:focus-visible,
+:root[data-motion="reduce"] .pack3d-sobre.es-hover-forzado { --alza: -46px; }
+
+@media (max-width: 760px) {
+  .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-6); }
+  .pack3d { --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px; --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px; }
+  /* mismas DOS escalas que la variante de escritorio (caja ×1.2, sobre ×1.4
+     de sus respectivas bases), ver nota ahí: no valores sueltos, o el arte
+     vuelve a recortarse y los sobres dejan de asomar por encima. */
+  .pack3d--abierta {
+    --pack3d-w: 180px; --pack3d-h: 222px; --pack3d-d: 114px;
+    --pack3d-sobre-w: 171px; --pack3d-sobre-h: 241px;
+  }
+  .pack3d--abierta .pack3d-sobre:hover, .pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -34px; }
 }
 
 /* ==========================================================================
@@ -1128,7 +1078,10 @@
 /* La mesa tiene que caber en pantalla: el sobre se mira, no se navega.
    El número de columnas y el tamaño de la carta se calculan para que el modal
    entre completo en el viewport sin scroll. */
-.ceremonia-mesa {
+/* :not([hidden]) por la misma razón que .cer-escena/.cer-walkout/
+   .cer-aviso-motion: ceremonia.js hace mesa.hidden = true/false y sin el
+   guard esta regla de autor le ganaría siempre al [hidden] de user-agent. */
+.ceremonia-mesa:not([hidden]) {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -1151,46 +1104,346 @@
    tamaño que sea, es alcanzable. */
 .ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
-/* §14.4: el sobre se abre en 3D antes de repartir — dos mitades que se
-   separan a lo largo de la costura central, con destello detrás. */
-.ceremonia-apertura {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-height: 280px;
-  perspective: 1400px;
+/* ==========================================================================
+   ESCENA DE APERTURA — inmersiva y a pantalla completa.
+
+   Mientras dura la apertura, el modal deja de parecer un modal: se le quita
+   caja, borde, cabecera y pie, y queda solo el fondo negro con el sobre. Es
+   deliberado: los botones y el marco competían con lo único que importa mirar.
+   El único control es .cer-saltar, discreto, arriba a la derecha. Al llegar al
+   resumen se quita .es-inmersiva y vuelve el modal normal (título, Continuar).
+
+   EL SOBRE está construido como uno real:
+     · proporción 1 : 1.9, como un sobre de Adrenalyn / Pokémon
+     · dos bandas TERMOSELLADAS (arriba y abajo) con su estriado vertical fino
+     · borde dentado en el filo de cada banda (el corte "pinking")
+     · reflejo de film que barre al aparecer
+   La banda de arriba (.cer-sobre-tira) es la que se rasga y sale volando.
+   ========================================================================== */
+
+/* ---- el escenario ---- */
+.ceremonia.es-inmersiva { background: radial-gradient(ellipse at 50% 45%, #0d0a08, #000 72%); }
+.ceremonia.es-inmersiva .modal-caja {
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
 }
-.sobre-3d {
+.ceremonia.es-inmersiva .modal-head,
+.ceremonia.es-inmersiva .modal-pie,
+.ceremonia.es-inmersiva .ceremonia-mesa,
+.ceremonia.es-inmersiva .cer-aviso-motion { display: none; }
+
+/* [hidden] tiene la MISMA especificidad que .cer-escena (0-1-0): sin el
+   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
+   "display:none" del navegador (mismo problema que ya se documentó para
+   .submenu-tipos, ver más abajo). Sin este guard, escena.hidden = true
+   (terminar(), en ceremonia.js) NO ocultaba nada: la escena de apertura se
+   quedaba pintada por encima del resumen, mezclando el sobre/carta a medio
+   animar con la mesa de cartas reveladas — el "se queda ahí bugueado" que
+   se veía tras usar "Saltar". */
+.cer-escena:not([hidden]) {
+  --cer-crimp: 7%;          /* alto de cada banda termosellada */
+  --cer-diente: 9px;        /* paso del dentado del filo */
   position: relative;
-  width: 190px;
-  aspect-ratio: 4 / 5;
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+
+/* control único, discreto */
+.cer-saltar {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 16px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  color: var(--frost-dim);
+  font: inherit;
+  font-size: var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.cer-saltar:hover { color: var(--frost); border-color: var(--line-strong); }
+.cer-saltar:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+/* ---- el sobre ---- */
+/* Sin `transform` de centrado en CSS: lo escribe GSAP entero (xPercent /
+   yPercent), igual que en .cer-carta. Si se dejara aquí un
+   translate(-50%,-50%), el primer tween lo machacaría y el sobre se iría a
+   la esquina. */
+.cer-sobre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(150px, 21vh, 215px);
+  aspect-ratio: 1 / 1.9;
   transform-style: preserve-3d;
+  z-index: 3;
+  filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .8));
 }
-.sobre-3d-mitad {
+
+/* plástico: la textura de la plantilla, con un sombreado lateral que le da
+   el abombamiento del sobre lleno */
+.cer-sobre-cuerpo {
+  position: absolute;
+  inset: 0;
+  background-color: var(--panel);
+  background-image:
+    radial-gradient(ellipse 82% 58% at 50% 22%, var(--amber-soft), transparent 70%),
+    linear-gradient(168deg, var(--void-2), #08090C);
+  background-size: cover;
+  background-position: center;
+  z-index: 3;
+}
+/* abombamiento + brillo de film, encima de la textura */
+.cer-sobre-cuerpo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.42) 0 4%, transparent 16% 84%, rgba(0,0,0,.42) 96% 100%),
+    linear-gradient(90deg, transparent 30%, rgba(255,255,255,.09) 42% 50%, transparent 62%);
+  pointer-events: none;
+}
+
+/* bandas termoselladas: estriado vertical fino, el detalle que hace que se
+   lea como un sobre y no como una tarjeta */
+.cer-sobre-sellado,
+.cer-sobre-tira {
   position: absolute;
   left: 0;
   right: 0;
-  height: 50%;
-  overflow: hidden;
-  backface-visibility: hidden;
-  box-shadow: var(--shadow-lg);
-  background:
-    radial-gradient(ellipse 75% 90% at 50% 0%, var(--amber-soft), transparent 72%),
-    linear-gradient(170deg, var(--void-2), #08090C);
+  height: var(--cer-crimp);
+  background-color: color-mix(in srgb, var(--panel) 70%, #fff 30%);
+  background-image:
+    repeating-linear-gradient(90deg,
+      rgba(0,0,0,.34) 0 1px,
+      rgba(255,255,255,.16) 1px 3px);
+  z-index: 4;
 }
-.sobre-3d-arriba { top: 0; transform-origin: bottom center; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
-.sobre-3d-abajo  { bottom: 0; transform-origin: top center; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
-.sobre-3d-img { position: absolute; left: 0; width: 100%; height: 200%; object-fit: cover; }
-.sobre-3d-arriba .sobre-3d-img { top: 0; }
-.sobre-3d-abajo .sobre-3d-img { top: -100%; }
-.sobre-3d-destello {
+.cer-sobre-sellado { bottom: 0; }
+.cer-sobre-tira    { top: 0; transform-origin: bottom center; }
+
+/* filo dentado: triángulos del color del escenario recortando el borde.
+   Se pintan encima en vez de usar mask, para que no dependa del soporte de
+   mask-image en el navegador. */
+.cer-sobre-sellado::after,
+.cer-sobre-tira::after {
+  content: '';
   position: absolute;
-  inset: -45%;
+  left: -1px;
+  right: -1px;
+  height: 6px;
+  background:
+    repeating-linear-gradient(90deg,
+      #000 0 calc(var(--cer-diente) * .22),
+      transparent calc(var(--cer-diente) * .22) calc(var(--cer-diente) * .5),
+      #000 calc(var(--cer-diente) * .5) var(--cer-diente));
+}
+.cer-sobre-sellado::after { bottom: -1px; }
+.cer-sobre-tira::after    { top: -1px; }
+
+/* boca: el hueco oscuro que aparece al arrancar la tira */
+.cer-sobre-boca {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 0;
+  height: calc(var(--cer-crimp) + 6%);
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #000 40%, rgba(0,0,0,.3));
+  box-shadow: inset 0 8px 16px rgba(0,0,0,.95);
+  z-index: 2;
+  opacity: 0;
+}
+
+/* reflejo que barre el film al aparecer el sobre */
+.cer-sobre-brillo {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: linear-gradient(102deg,
+    transparent 36%, rgba(255,255,255,.3) 47%, rgba(255,255,255,.06) 53%, transparent 60%);
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ---- la carta que sale ---- */
+/* Sin `transform` en CSS a propósito: lo escribe GSAP entero. El giro va con
+   rotationY desde JS, nunca con una clase — un transform en línea de GSAP le
+   gana siempre a una regla de clase y la carta se quedaría sin girar. */
+.cer-carta {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(170px, 30vh, 260px);
+  aspect-ratio: 5 / 7;
+  transform-style: preserve-3d;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 2;              /* DETRÁS del sobre hasta que asoma por la boca */
+  opacity: 0;
+}
+.cer-carta:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-lg); }
+.cer-carta-cara {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  display: block;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,.6);
+}
+.cer-carta-dorso .carta-dorso {
+  display: grid;
+  place-items: center;
+  width: 100%; height: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 9px, transparent 9px 18px),
+    linear-gradient(180deg, var(--panel), var(--void));
+  color: rgba(255,255,255,.2);
+  font-size: 54px;
+}
+.cer-carta-frente { transform: rotateY(180deg); }
+.cer-carta-frente .carta { width: 100%; height: 100%; }
+.cer-carta-aura {
+  position: absolute;
+  inset: -22%;
   border-radius: 50%;
-  background: radial-gradient(circle, #fff, transparent 65%);
+  background: radial-gradient(circle, var(--rz-aura, var(--amber)), transparent 62%);
   opacity: 0;
   pointer-events: none;
+  z-index: -1;
+  filter: blur(18px);
 }
+
+.cer-pista, .cer-contador {
+  position: absolute;
+  left: 0; right: 0;
+  margin: 0;
+  text-align: center;
+  color: var(--frost-dim);
+  font-size: var(--fs-caption);
+  z-index: 7;
+}
+.cer-pista {
+  bottom: var(--space-6);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.cer-contador { top: var(--space-6); }
+
+/* ---- walkout: solo legendaria (5) y SRF (6) ---- */
+/* z-index 9: por ENCIMA de .cer-carta (máx. 6) y de .cer-pista/.cer-contador
+   (7) a propósito — el walkout tiene que tapar sobre y carta mientras dura
+   la tensión, y solo al desvanecerse (pedirVolteo, tramo final) deja ver la
+   carta ya volteada debajo. Antes iba en z-index 5, POR DEBAJO de la carta,
+   así que se veía la carta encima y la animación enterrada al fondo.
+   :not([hidden]) por el mismo motivo que .cer-escena y .cer-aviso-motion:
+   sin él, este display:grid (regla de autor) le gana siempre al display:none
+   de [hidden] (regla de user-agent), así que walkout.hidden = true (fuera de
+   una revelación legendaria/SRF) no ocultaba nada de verdad — el fondo
+   oscurecido del walkout se veía DETRÁS de cada carta común también,
+   mientras .cer-escena estuviera visible, no solo en las exclusivas. */
+.cer-walkout:not([hidden]) {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 9;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.93) 66%);
+}
+.cer-walkout-rayos {
+  position: absolute;
+  width: 150vmax;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 8deg, var(--rz-aura, var(--amber)) 9deg 11deg, transparent 12deg 26deg,
+    transparent 26deg 34deg, var(--rz-aura, var(--amber)) 35deg 37deg, transparent 38deg 52deg);
+  opacity: .45;
+  mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
+  -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
+}
+.cer-walkout-texto { position: relative; text-align: center; }
+.cer-walkout-rareza {
+  display: block;
+  font-size: clamp(34px, 9vw, 84px);
+  font-weight: var(--fw-bold);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 30px var(--rz-aura, var(--amber)), 0 0 84px var(--rz-aura, var(--amber));
+}
+.cer-walkout-nombre {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: clamp(15px, 2.6vw, 22px);
+  letter-spacing: .04em;
+  color: var(--frost);
+  text-shadow: 0 0 20px rgba(0, 0, 0, .8);
+}
+
+@media (max-width: 600px) {
+  .cer-sobre { width: clamp(130px, 19vh, 170px); }
+  .cer-carta { width: clamp(150px, 27vh, 200px); }
+  .cer-saltar { top: var(--space-3); right: var(--space-3); }
+}
+
+/* Con movimiento reducido la escena no se usa: ceremonia.js va directo al
+   resumen. Se apaga también por CSS por si el modo cambia a media sesión. */
+:root[data-motion="reduce"] .cer-escena { display: none; }
+
+/* aviso de "puedes activar las animaciones solo en esta web": aparece en el
+   resumen cuando la ceremonia se saltó por la preferencia del SISTEMA.
+   :not([hidden]) por el mismo motivo que .cer-escena más arriba: sin él,
+   este display:flex (regla de autor) le gana al display:none de [hidden]
+   (regla de user-agent) pase lo que pase — así que ofrecerAnimaciones()
+   podía marcar avisoMotion.hidden = true y el aviso seguía viéndose en
+   cuanto .es-inmersiva dejaba de taparlo con su propio display:none. Es la
+   causa de "el aviso sigue saliendo aunque ya haya activado animaciones". */
+.cer-aviso-motion:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-md);
+  background: var(--amber-soft);
+}
+.cer-aviso-motion p {
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+  font-size: var(--fs-body-sm);
+  color: var(--frost);
+}
+.cer-aviso-motion p .ph { color: var(--amber-light); margin-right: var(--space-1); }
+.cer-aviso-motion-botones { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* dentro de la ceremonia la carta va al grano: rareza, arte y nombre */
 .ceremonia .carta-meta { display: none; }
@@ -1338,13 +1591,16 @@
 
 /* Movimiento reducido: sin volteo, sin fanfarria, sin destello. Las cartas
    ya salen reveladas desde JavaScript, así que aquí solo se anula el 3D. */
-@media (prefers-reduced-motion: reduce) {
-  .ranura, .ranura.esta-volteada { transform: none; transition: none; }
-  .ranura-frente { transform: none; }
-  .ranura-dorso, .ranura.con-fanfarria::after, .ceremonia-destello { display: none; }
-  .ceremonia .modal-caja.es-srf { animation: none; }
-  .ranura-aura, .ceremonia-fut { display: none; }
-}
+:root[data-motion="reduce"] .ranura,
+:root[data-motion="reduce"] .ranura.esta-volteada { transform: none; transition: none; }
+:root[data-motion="reduce"] .ranura-frente { transform: none; }
+:root[data-motion="reduce"] .ranura-dorso,
+:root[data-motion="reduce"] .ranura.con-fanfarria::after,
+:root[data-motion="reduce"] .ceremonia-destello { display: none; }
+:root[data-motion="reduce"] .ceremonia .modal-caja.es-srf { animation: none; }
+:root[data-motion="reduce"] .ranura-aura,
+:root[data-motion="reduce"] .ceremonia-fut { display: none; }
+/* la escena de apertura ya se apaga en su propio bloque (.cer-escena) */
 
 /* ==========================================================================
    5. PANEL / TARJETA GENÉRICA
@@ -1746,77 +2002,6 @@
   border-right: 2px solid var(--amber-ink);
   border-bottom: 2px solid var(--amber-ink);
   transform: rotate(45deg);
-}
-
-/* Selector de mazos: filas horizontales en vez de tarjetas — contexto de
-   selección rápida, no un catálogo (§16.14.2). Misma altura de fila para
-   cualquier jugador, sin depender de mostrar_stats del cromo. */
-.selector-cartas--filas {
-  display: flex;
-  flex-direction: column;
-  grid-template-columns: none;
-  gap: var(--space-1);
-}
-.selector-cartas--filas .selector-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--panel-2);
-  border: 1px solid transparent;
-  text-align: left;
-}
-.selector-fila-foto {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  overflow: hidden;
-}
-.selector-fila-foto img { width: 100%; height: 100%; object-fit: contain; object-position: center; }
-.selector-fila-foto .carta-placa-vacia { font-size: 20px; }
-.selector-fila-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.selector-fila-nombre {
-  font-size: var(--fs-body-sm);
-  font-weight: var(--fw-semibold);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.selector-fila-equipo {
-  font-size: var(--fs-caption-sm);
-  color: var(--frost-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.selector-fila-stats {
-  flex-shrink: 0;
-  display: flex;
-  gap: var(--space-2);
-}
-.selector-cartas--filas .carta-stat-pildora {
-  position: static;
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 3px;
-  width: auto;
-  height: auto;
-  border-radius: var(--radius-sm);
-  padding: 3px 6px;
 }
 
 .selector-vacio {

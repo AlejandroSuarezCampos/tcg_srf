@@ -242,14 +242,9 @@ include __DIR__ . '/navbar.php';
             . '<input type="hidden" name="id_anuncio" value="' . (int) $a['id_anuncio'] . '">'
             . $boton . '</form>';
 
-        $esJugador = in_array($a['posicion'], Tcg::POSICIONES_JUGABLES, true);
         render_carta($datosCarta, [
             'precio' => (int) $a['precio'],
             'pie'    => $pie,
-            'stats'  => $esJugador
-                ? ['ATA' => $a['ataque'], 'DEF' => $a['defensa'], 'TÉC' => $a['tecnica']]
-                : null,
-            'detalle' => true,
             'datos'  => ['anuncio' => (int) $a['id_anuncio']],
         ]);
         ?>
@@ -303,7 +298,7 @@ include __DIR__ . '/navbar.php';
                    data-rareza-nombre="<?= htmlspecialchars($c['rareza']) ?>">
               <input type="radio" name="seleccion_carta" class="sr-only"
                      value="<?= $c['id_coleccion'] ?>">
-              <?php render_carta($c, ['tamano' => 'sm', 'cantidad' => $grupo['cantidad'], 'detalle' => true]); ?>
+              <?php render_carta($c, ['tamano' => 'sm', 'cantidad' => $grupo['cantidad']]); ?>
             </label>
           <?php endforeach; ?>
 
@@ -333,12 +328,10 @@ include __DIR__ . '/navbar.php';
 
 <!-- Confirmación de acciones con consecuencia económica -->
 <?php include __DIR__ . '/partials/confirmar.php'; ?>
-<?php include __DIR__ . '/partials/carta_detalle.php'; ?>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/mercado.js"></script>
-<script src="assets/js/detalle-carta.js"></script>
+<?= assetScript($base ?? '', 'assets/js/mercado.js') ?>
 
 </body>
 </html>

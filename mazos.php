@@ -426,7 +426,7 @@ include __DIR__ . '/navbar.php';
               <a class="btn btn-primary" href="sobres.php">Ir a sobres</a>
             </div>
           <?php else: ?>
-            <div class="selector-cartas selector-cartas--filas" id="m-lista" role="group" aria-label="Jugadores disponibles">
+            <div class="selector-cartas selector-cartas--grande" id="m-lista" role="group" aria-label="Jugadores disponibles">
               <?php foreach ($porCromo as $idCromo => $grupo): ?>
                 <?php
                 $c = $grupo['fila'];
@@ -449,23 +449,10 @@ include __DIR__ . '/navbar.php';
                         data-defensa="<?= (int) $c['defensa'] ?>"
                         data-tecnica="<?= (int) $c['tecnica'] ?>"
                         <?= $bloqueada ? 'disabled' : '' ?>>
-                  <span class="selector-fila-foto">
-                    <?php if ($c['imagen'] !== ''): ?>
-                      <img src="<?= htmlspecialchars($c['imagen']) ?>" alt="" loading="lazy" decoding="async">
-                    <?php else: ?>
-                      <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
-                    <?php endif; ?>
-                  </span>
-                  <span class="selector-fila-info">
-                    <span class="selector-fila-nombre"><?= htmlspecialchars($c['nombre']) ?></span>
-                    <span class="selector-fila-equipo"><?= htmlspecialchars($c['equipo']) ?></span>
-                  </span>
-                  <span class="carta-pos-insignia" data-posicion="<?= htmlspecialchars($c['posicion']) ?>"><?= htmlspecialchars($c['posicion']) ?></span>
-                  <span class="selector-fila-stats">
-                    <span class="carta-stat-pildora" data-stat="ATA"><b><?= (int) $c['ataque'] ?></b><span>ATA</span></span>
-                    <span class="carta-stat-pildora" data-stat="DEF"><b><?= (int) $c['defensa'] ?></b><span>DEF</span></span>
-                    <span class="carta-stat-pildora" data-stat="TÉC"><b><?= (int) $c['tecnica'] ?></b><span>TÉC</span></span>
-                  </span>
+                  <?php render_carta($c, [
+                      'stats'    => ['ATA' => $c['ataque'], 'DEF' => $c['defensa'], 'TÉC' => $c['tecnica']],
+                      'cantidad' => $cantidad,
+                  ]); ?>
                 </button>
               <?php endforeach; ?>
 
@@ -500,7 +487,7 @@ include __DIR__ . '/navbar.php';
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
 
-<script src="assets/js/mazos.js"></script>
+<?= assetScript($base ?? '', 'assets/js/mazos.js') ?>
 
 </body>
 </html>

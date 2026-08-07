@@ -154,11 +154,17 @@
    de enseñarlo. Con "reducir movimiento" activo no hay simulación ni cuenta
    atrás: se pinta el marcador directamente, como antes.
 
-   Con movimiento normal, antes de dejar ver el resultado se muestra un modal
-   de "partido en juego": un reloj avanzando y los goles apareciendo uno a uno
-   hasta llegar al marcador real, que ya está renderizado (oculto) debajo. Es
-   ceremonia, no cálculo: los números finales sales de los que el servidor ya
-   escribió en el marcador oculto, esto solo dramatiza el camino hasta ellos.
+   DOS MODOS, los elige duelo.php con data-modo (ver el comentario de allí):
+
+     · 'narrado'  DUELOS PvP. El servidor manda el partido entero minuto a
+       minuto (assets/ajax/duelo_narracion.php) y aquí solo se reproduce.
+
+     · 'clasico'  CADENAS PvE. El comportamiento de siempre: reloj y goles
+       apareciendo hasta llegar al marcador real, que ya está renderizado
+       (oculto) debajo. Los números salen de ese marcador, nunca se calculan
+       aquí. Se mantiene tal cual mientras las cadenas no se trabajen aparte.
+
+   Los dos acaban igual: cerrar el modal revela el resultado.
    -------------------------------------------------------------------------- */
 (function () {
   'use strict';
@@ -172,7 +178,20 @@
 
   var veredicto = partido.querySelector('.partido-veredicto');
 
+  /* Si un minijuego llegó a parar un gol, el servidor ya actualizó el marcador
+     guardado, pero la pantalla de resultado que hay DEBAJO del modal se
+     renderizó antes con el viejo. Hay que corregirla antes de destaparla o el
+     jugador vería un paradón y justo después el gol que acaba de parar. */
+  var marcadorFinal = null;
+
   function revelarResultado() {
+    if (marcadorFinal) {
+      var casillas = partido.querySelectorAll('.partido-goles');
+      if (casillas.length === 2) {
+        casillas[0].textContent = marcadorFinal[0];
+        casillas[1].textContent = marcadorFinal[1];
+      }
+    }
     partido.classList.add('es-revelando');
     window.setTimeout(function () {
       partido.classList.remove('es-revelando');
@@ -182,113 +201,378 @@
     if (veredicto) veredicto.focus({ preventScroll: false });
   }
 
-  var reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var reducido = SRF.movimientoReducido();   // preferencia de la web por encima de la del sistema
   var simulacion = document.getElementById('simulacionPartido');
 
-  if (reducido || !simulacion) {
+  if (!simulacion) {
+    revelarResultado();
+    return;
+  }
+
+  var esNarrado = simulacion.dataset.modo !== 'clasico';
+
+  /* MOVIMIENTO REDUCIDO — reduce el MOVIMIENTO, nunca el juego.
+     Hasta ahora esta preferencia se saltaba el partido entero, y desde que el
+     partido tiene minijuegos eso dejó de ser una decisión estética: quien la
+     tenía puesta no veía el encuentro, no jugaba ninguna de sus decisiones, no
+     podía parar un gol ni marcar uno, y encima su rival se comía la espera de
+     alguien que nunca iba a aparecer. Una desventaja competitiva atada a un
+     ajuste de accesibilidad, que además crecía con cada minijuego nuevo.
+
+     · CLÁSICO (cadenas) — sigue saltándose. Ahí el partido es pura decoración:
+       el marcador ya está decidido y no hay ninguna decisión que tomar, así que
+       saltarlo no quita nada.
+     · NARRADO (duelos PvP) — no se salta NUNCA. Se ve entero y se juega entero;
+       lo que se apaga son las animaciones, que ya tienen sus reglas escritas en
+       layout.css colgando de :root[data-motion="reduce"]. */
+  if (reducido && !esNarrado) {
     revelarResultado();
     return;
   }
 
   /* --------------------------------------------------------------------
-     Números finales: se leen del marcador YA renderizado (oculto detrás
-     del modal), nunca se recalculan aquí. El orden en el DOM es siempre
-     mío primero, del rival después (ver duelo.php).
+     Común a los dos modos.
      -------------------------------------------------------------------- */
-  var goles = partido.querySelectorAll('.partido-goles');
-  var misGolesFinal = parseInt(goles[0].textContent, 10) || 0;
-  var susGolesFinal = parseInt(goles[1].textContent, 10) || 0;
+  var reloj       = document.getElementById('simReloj');
+  var barra       = document.getElementById('simBarra');
+  var golesYoEl   = document.getElementById('simGolesYo');
+  var golesOtroEl = document.getElementById('simGolesOtro');
+  var relato      = document.getElementById('simRelato');
+  var aguja       = document.getElementById('simMomentumAguja');
+  var zonaEventos = document.getElementById('simEventos');   // solo modo clásico
 
   var nombreYo   = partido.querySelector('.partido-lado .partido-nombre').textContent.trim();
   var nombreOtro = partido.querySelectorAll('.partido-lado .partido-nombre')[1].textContent.trim();
 
-  var DURACION_MS = 7000;   // dentro del rango de 5–10 s pedido
-  var MINUTO_MAX  = 93;     // 90' + un pellizco de descuento
-
-  /* Reparte los goles en franjas del partido para que no se agrupen todos
-     al principio o al final; el minuto exacto dentro de cada franja es al
-     azar, así que dos recargas de la misma simulación no se ven idénticas.
-     Es puramente decorativo: no cambia el resultado, solo cuándo se ve. */
-  function programarEventos() {
-    var eventos = [];
-    var i;
-    for (i = 0; i < misGolesFinal; i++) eventos.push({ mio: true });
-    for (i = 0; i < susGolesFinal; i++) eventos.push({ mio: false });
-
-    var n = eventos.length;
-    // orden al azar de qué equipo marca en qué franja
-    for (i = eventos.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var tmp = eventos[i]; eventos[i] = eventos[j]; eventos[j] = tmp;
-    }
-    for (i = 0; i < n; i++) {
-      var inicio = Math.floor((i / n) * 88) + 1;
-      var fin    = Math.floor(((i + 1) / n) * 88) + 1;
-      eventos[i].minuto = inicio + Math.floor(Math.random() * Math.max(1, fin - inicio));
-    }
-    eventos.sort(function (a, b) { return a.minuto - b.minuto; });
-
-    var acumMio = 0, acumSuyo = 0;
-    eventos.forEach(function (e) {
-      if (e.mio) acumMio++; else acumSuyo++;
-      e.marcadorMio = acumMio;
-      e.marcadorSuyo = acumSuyo;
-    });
-    return eventos;
-  }
-
-  var eventos = programarEventos();
-
-  var reloj      = document.getElementById('simReloj');
-  var barra      = document.getElementById('simBarra');
-  var golesYoEl  = document.getElementById('simGolesYo');
-  var golesOtroEl = document.getElementById('simGolesOtro');
-  var zonaEventos = document.getElementById('simEventos');
-
-  function mostrarEvento(e) {
-    if (e.mio) { golesYoEl.textContent = e.marcadorMio; }
-    else { golesOtroEl.textContent = e.marcadorSuyo; }
-
-    var pill = document.createElement('span');
-    pill.className = 'simulacion-evento';
-    pill.textContent = 'Gol de ' + (e.mio ? nombreYo : nombreOtro);
-    zonaEventos.innerHTML = '';
-    zonaEventos.appendChild(pill);
-    pill.addEventListener('animationend', function () {
-      if (pill.parentNode) pill.remove();
-    });
-  }
-
+  // El partido narrado pide más aire que la insignia de gol suelta del clásico.
+  var DURACION_MS = esNarrado ? 16000 : 7000;
+  var minutoMax   = esNarrado ? 94 : 93;
+  var eventos     = [];
   var raf = null;
   var terminado = false;
 
+  /* Las estadísticas en vivo ya no se pintan durante el partido (decisión de
+     Alejandro: distraen del relato y del momentum, que es lo que se mira).
+     El sondeo las sigue trayendo en d.stats y el motor las sigue calculando,
+     así que volver a enseñarlas es añadir el marcado, no rehacer nada. */
+
+  /* El relato crece hacia abajo y solo se conservan las últimas líneas: un
+     partido son ~20 eventos y dejarlos todos obligaría a hacer scroll dentro
+     de un modal que no debe desplazarse. */
+  var MAX_LINEAS = 4;
+
+  function mostrarEvento(e) {
+    golesYoEl.textContent   = e.marcador[0];
+    golesOtroEl.textContent = e.marcador[1];
+
+    if (!esNarrado) {
+      // CLÁSICO (cadenas): una insignia de gol que aparece y se va sola.
+      var pill = document.createElement('span');
+      pill.className = 'simulacion-evento';
+      pill.textContent = 'Gol de ' + (e.mio ? nombreYo : nombreOtro);
+      zonaEventos.innerHTML = '';
+      zonaEventos.appendChild(pill);
+      pill.addEventListener('animationend', function () {
+        if (pill.parentNode) pill.remove();
+      });
+      return;
+    }
+
+    if (aguja) {
+      // momentum llega en -100..100 ya desde MI punto de vista
+      aguja.style.left = ((e.momentum + 100) / 2) + '%';
+      aguja.classList.toggle('es-mio', e.momentum > 0);
+    }
+
+    var linea = document.createElement('p');
+    linea.className = 'sim-linea';
+    if (e.tipo === 'gol') linea.classList.add(e.mio ? 'es-gol-mio' : 'es-gol-suyo');
+    if (e.tipo === 'inicio' || e.tipo === 'final' || e.tipo === 'descanso' ||
+        e.tipo === 'reanuda' || e.tipo === 'descuento') {
+      linea.classList.add('es-hito');
+    }
+
+    var min = document.createElement('b');
+    min.className = 'sim-linea-min mono';
+    min.textContent = e.minuto + "'";
+    linea.appendChild(min);
+    linea.appendChild(document.createTextNode(e.texto));
+
+    relato.appendChild(linea);
+    while (relato.children.length > MAX_LINEAS) relato.removeChild(relato.firstChild);
+  }
+
+  /* Reloj local — SOLO modo clásico (cadenas). En el modo narrado el minuto lo
+     manda el servidor y esta función no se usa: ver sondear(), más abajo. */
   function paso(marcaTiempo) {
     if (!paso.inicio) paso.inicio = marcaTiempo;
+
     var t = Math.min(1, (marcaTiempo - paso.inicio) / DURACION_MS);
-    var minutoActual = t * MINUTO_MAX;
+    var minutoActual = t * minutoMax;
 
     reloj.textContent = Math.floor(minutoActual) + "'";
     barra.style.width = (t * 100) + '%';
 
-    eventos.forEach(function (e) {
-      if (!e.mostrado && minutoActual >= e.minuto) {
-        e.mostrado = true;
-        mostrarEvento(e);
+    for (var i = 0; i < eventos.length; i++) {
+      if (!eventos[i].mostrado && minutoActual >= eventos[i].minuto) {
+        eventos[i].mostrado = true;
+        mostrarEvento(eventos[i]);
       }
-    });
+    }
 
     if (t < 1) {
       raf = window.requestAnimationFrame(paso);
     } else {
       reloj.textContent = 'Final';
-      window.setTimeout(terminar, 700);
+      window.setTimeout(terminar, 900);
     }
+  }
+
+  /* ======================================================================
+     MINIJUEGO — el servidor manda
+     El reloj está parado en el SERVIDOR desde que la jugada toca (ver
+     Tcg::estadoPartido), así que los dos jugadores están detenidos aquí, no
+     solo el que decide. La cuenta atrás que se ve abajo es puramente visual:
+     si se agota no la resuelve este temporizador sino el propio servidor en el
+     siguiente sondeo, aplicando la opción segura (§1.5 regla 4). Dejárselo al
+     navegador significaría que cerrar la pestaña congela el partido del rival
+     para siempre.
+     ====================================================================== */
+  var panel       = document.getElementById('simMinijuego');
+  var mjTitulo    = document.getElementById('simMjTitulo');
+  var mjTexto     = document.getElementById('simMjEnunciado');
+  var mjBarra     = document.getElementById('simMjBarra');
+  var mjSegundos  = document.getElementById('simMjSegundos');
+  var mjOpciones  = document.getElementById('simMjOpciones');
+  var mjResultado = document.getElementById('simMjResultado');
+
+  var panelPuesto = null;   // qué hay pintado ahora: id de evento, 'rival' o null
+  var enviando = false;
+
+  function pintarMinijuego(mj) {
+    if (panelPuesto === mj.id_evento) return;   // ya está puesto, no repintar
+    panelPuesto = mj.id_evento;
+    enviando = false;
+
+    mjTitulo.textContent = mj.titulo;
+    // La pista va junto al enunciado: es lo único que separa leer al rival de
+    // adivinar, así que tiene que verse sin buscarla.
+    mjTexto.textContent = mj.enunciado + (mj.pista ? '  ' + mj.pista : '');
+    mjResultado.hidden = true;
+    mjResultado.className = 'sim-mj-resultado';
+    mjOpciones.innerHTML = '';
+    panel.hidden = false;
+
+    mj.opciones.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sim-mj-opcion';
+      b.innerHTML = '<b></b><span></span>';
+      b.querySelector('b').textContent = o.nombre;
+      b.querySelector('span').textContent = o.pista;
+      b.addEventListener('click', function () { decidir(mj.id_evento, o.clave); });
+      mjOpciones.appendChild(b);
+    });
+
+    arrancarCuenta(mj.plazo);
+  }
+
+  /* La cuenta atrás. El número va SIEMPRE; la barra solo se anima si el
+     jugador no ha pedido reducir el movimiento. Poner la transición en línea
+     sin comprobarlo pisaba la regla `transition: none` de layout.css, que es
+     justo la que respeta la preferencia. */
+  var cuenta = null;
+
+  function arrancarCuenta(plazo) {
+    pararCuenta();
+
+    mjBarra.style.transition = 'none';
+    mjBarra.style.transform = 'scaleX(1)';
+    if (!reducido) {
+      window.requestAnimationFrame(function () {
+        mjBarra.style.transition = 'transform ' + plazo + 's linear';
+        mjBarra.style.transform = 'scaleX(0)';
+      });
+    }
+
+    var quedan = plazo;
+    mjSegundos.textContent = quedan + 's';
+    cuenta = window.setInterval(function () {
+      quedan--;
+      mjSegundos.textContent = (quedan > 0 ? quedan : 0) + 's';
+      if (quedan <= 0) pararCuenta();
+    }, 1000);
+  }
+
+  function pararCuenta() {
+    if (cuenta) { window.clearInterval(cuenta); cuenta = null; }
+  }
+
+  function decidir(idEvento, clave) {
+    if (enviando) return;
+    enviando = true;
+    pararCuenta();
+    mjSegundos.textContent = '';
+    Array.prototype.forEach.call(mjOpciones.querySelectorAll('button'),
+      function (b) { b.disabled = true; });
+
+    fetch('assets/ajax/duelo_minijuego.php', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: new URLSearchParams({
+        id_duelo: simulacion.dataset.idDuelo,
+        id_evento: idEvento,
+        opcion: clave
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) { ocultarPanel(); return; }
+
+        /* El dato oculto solo se conoce DESPUÉS de decidir: antes no viaja.
+           Hay dos vocabularios porque hay dos cosas que adivinar — el remate
+           que te llega si defiendes, y cómo sale el portero si atacas. */
+        var mote = {
+          potente: 'un cañonazo', colocado: 'un tiro colocado', raso: 'un tiro raso',
+          achica: 'a comerte el ángulo', tierra: 'al suelo', espera: 'plantado'
+        }[d.remate] || d.remate;
+        var defendia = ['potente', 'colocado', 'raso'].indexOf(d.remate) !== -1;
+
+        var dice;
+        if (d.resultado === 'acierto') {
+          dice = defendia ? 'Leíste ' + mote + '.' : 'Salió ' + mote + ' y se la adivinaste.';
+        } else {
+          dice = defendia ? 'Llegó ' + mote + '. No te dio tiempo.'
+                          : 'Salió ' + mote + '. Se te fue fuera.';
+        }
+        if (d.parado) {
+          dice += defendia
+            ? ' ¡Paradón! El gol no sube al marcador.'
+            : ' ¡Dentro! Ese sí cuenta.';
+          marcadorFinal = d.marcador;
+          golesYoEl.textContent   = d.marcador[0];
+          golesOtroEl.textContent = d.marcador[1];
+        }
+        mjResultado.textContent = dice;
+        mjResultado.classList.add('es-' + d.resultado);
+        mjResultado.hidden = false;
+        /* El panel se queda un momento para poder leer el desenlace; el partido
+           ya se ha reanudado en el servidor. Es corto a propósito: se paga en
+           CADA decisión y con varias por partido la suma se nota. */
+        window.setTimeout(ocultarPanel, 1200);
+      })
+      .catch(ocultarPanel);
+  }
+
+  function ocultarPanel() {
+    pararCuenta();
+    mjSegundos.textContent = '';
+    panel.hidden = true;
+    panelPuesto = null;
+  }
+
+  /* ======================================================================
+     SONDEO DEL PARTIDO (modo narrado)
+     El navegador no lleva el partido: pregunta en qué minuto va. Mismo patrón
+     sin websockets que ya usa la sala de espera.
+     ====================================================================== */
+  var vistos = {};
+  var sondeo = null;
+
+  /* Aviso sin decisión (esperando al rival, esperando a empezar, actuación
+     final). No hay plazo que contar, así que la cuenta se detiene y el reloj
+     se deja lleno en vez de a medias. */
+  function avisoEnPanel(titulo, texto) {
+    pararCuenta();
+    mjSegundos.textContent = '';
+    mjTitulo.textContent = titulo;
+    mjTexto.textContent = texto;
+    mjOpciones.innerHTML = '';
+    mjResultado.hidden = true;
+    mjBarra.style.transition = 'none';
+    mjBarra.style.transform = 'scaleX(1)';
+    panel.hidden = false;
+  }
+
+  function pintarEstado(d) {
+    if (d.fase === 'esperando') {
+      reloj.textContent = '—';
+      if (panelPuesto !== 'espera') {
+        panelPuesto = 'espera';
+        avisoEnPanel('Antes de empezar',
+          'Esperando a que aparezca ' + ((d.nombres && d.nombres.suyo) || 'el rival') + '…');
+      }
+      return;
+    }
+    if (panelPuesto === 'espera') ocultarPanel();
+
+    /* Al acabar se enseña la puntuación de actuación (§4.6): es lo que hace
+       que las decisiones importen aunque el marcador no se haya podido mover,
+       y lo único que le queda por optimizar a quien pierde. */
+    if (d.fase === 'final' && d.actuacion && d.actuacion.jugados) {
+      if (panelPuesto !== 'actuacion') {
+        panelPuesto = 'actuacion';
+        avisoEnPanel('Tu actuación',
+          'Acertaste ' + d.actuacion.aciertos + ' de ' + d.actuacion.jugados + ' decisiones.');
+      }
+    }
+
+    reloj.textContent = d.fase === 'final' ? 'Final' : d.minuto + "'";
+    barra.style.width = ((d.avance || 0) * 100) + '%';
+
+    (d.eventos || []).forEach(function (e) {
+      if (vistos[e.id]) return;
+      vistos[e.id] = true;
+      mostrarEvento(e);
+    });
+
+    /* El marcador que se destapará al final sale SIEMPRE de aquí, del último
+       sondeo, nunca del que el servidor pintó en la página al cargarla.
+       Antes solo se actualizaba cuando el gol lo parabas TÚ, así que si lo
+       paraba el rival tu pantalla no se enteraba y acababa enseñando un
+       marcador distinto al suyo: una cuenta veía 4-2 y la otra 4-3. */
+    if (d.marcador) {
+      golesYoEl.textContent   = d.marcador[0];
+      golesOtroEl.textContent = d.marcador[1];
+      marcadorFinal = d.marcador;
+    }
+
+    if (d.minijuego) {
+      pintarMinijuego(d.minijuego);
+    } else if (d.esperando_rival) {
+      // El partido está parado por una decisión del OTRO. Se dice, en vez de
+      // dejar el reloj congelado sin ninguna explicación.
+      if (panelPuesto !== 'rival') {
+        panelPuesto = 'rival';
+        avisoEnPanel('Ocasión',
+          ((d.nombres && d.nombres.suyo) || 'El rival') + ' está decidiendo…');
+      }
+    } else if (panelPuesto === 'rival') {
+      ocultarPanel();
+    }
+  }
+
+  function sondear() {
+    if (terminado) return;
+    fetch('assets/ajax/duelo_narracion.php?id_duelo=' + encodeURIComponent(simulacion.dataset.idDuelo), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.ok) { terminar(); return; }
+        pintarEstado(d);
+        if (d.fase === 'final') { window.setTimeout(terminar, 1500); return; }
+        sondeo = window.setTimeout(sondear, 1000);
+      })
+      // Un fallo de red no debe matar el partido: se reintenta más despacio.
+      .catch(function () { sondeo = window.setTimeout(sondear, 2000); });
   }
 
   function terminar() {
     if (terminado) return;
     terminado = true;
     if (raf) window.cancelAnimationFrame(raf);
+    if (sondeo) window.clearTimeout(sondeo);
     SRF.cerrarModal('simulacionPartido');
   }
 
@@ -309,6 +593,42 @@
     function (btn) { btn.addEventListener('click', terminar); }
   );
 
+  /* ---- CLÁSICO (cadenas): conserva su reloj local, intacto --------------
+     Los goles se leen del marcador YA renderizado (oculto detrás del modal),
+     nunca se recalculan aquí. Se reparten en franjas para que no se agrupen
+     todos al principio o al final. */
+  if (!esNarrado) {
+    var goles = partido.querySelectorAll('.partido-goles');
+    var misGolesFinal = parseInt(goles[0].textContent, 10) || 0;
+    var susGolesFinal = parseInt(goles[1].textContent, 10) || 0;
+
+    var brutos = [], i, j, tmp;
+    for (i = 0; i < misGolesFinal; i++) brutos.push({ mio: true });
+    for (i = 0; i < susGolesFinal; i++) brutos.push({ mio: false });
+
+    for (i = brutos.length - 1; i > 0; i--) {
+      j = Math.floor(Math.random() * (i + 1));
+      tmp = brutos[i]; brutos[i] = brutos[j]; brutos[j] = tmp;
+    }
+    for (i = 0; i < brutos.length; i++) {
+      var ini = Math.floor((i / brutos.length) * 88) + 1;
+      var fin = Math.floor(((i + 1) / brutos.length) * 88) + 1;
+      brutos[i].minuto = ini + Math.floor(Math.random() * Math.max(1, fin - ini));
+    }
+    brutos.sort(function (a, b) { return a.minuto - b.minuto; });
+
+    var accMio = 0, accSuyo = 0;
+    eventos = brutos.map(function (e) {
+      if (e.mio) accMio++; else accSuyo++;
+      return { minuto: e.minuto, mio: e.mio, tipo: 'gol', marcador: [accMio, accSuyo] };
+    });
+
+    SRF.abrirModal('simulacionPartido');
+    raf = window.requestAnimationFrame(paso);
+    return;
+  }
+
+  /* ---- NARRADO (duelos PvP): lo lleva el servidor ---------------------- */
   SRF.abrirModal('simulacionPartido');
-  raf = window.requestAnimationFrame(paso);
+  sondear();
 })();

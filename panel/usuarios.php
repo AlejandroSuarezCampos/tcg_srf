@@ -231,7 +231,7 @@ if ($filtroTexto !== '') {
   </div>
 </div>
 
-<script src="./assets/js/scriptUsuarios.js"></script>
+<script src="./assets/js/scriptUsuarios.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptUsuarios.js') ?>"></script>
 
 </body>
 </html>

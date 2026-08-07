@@ -226,7 +226,6 @@ include __DIR__ . '/navbar.php';
                 'stats'    => $esJugador
                     ? ['ATA' => $c['ataque'], 'DEF' => $c['defensa'], 'TÉC' => $c['tecnica']]
                     : null,
-                'detalle'  => true,
             ]);
             ?>
           <?php endforeach; ?>
@@ -238,10 +237,8 @@ include __DIR__ . '/navbar.php';
 </main>
 
 <?php include __DIR__ . '/partials/footer.php'; ?>
-<?php include __DIR__ . '/partials/carta_detalle.php'; ?>
 
-<script src="assets/js/coleccion.js"></script>
-<script src="assets/js/detalle-carta.js"></script>
+<?= assetScript($base ?? '', 'assets/js/coleccion.js') ?>
 
 </body>
 </html>

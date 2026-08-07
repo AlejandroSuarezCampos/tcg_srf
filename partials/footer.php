@@ -9,6 +9,8 @@
  *   $base        -> prefijo relativo a la raíz ('' o '../')
  *   $pieCompleto -> true en la portada (columnas y redes), false en el resto
  */
+require_once __DIR__ . '/assets.php';   // assetScript()
+
 $base        = $base        ?? '';
 $pieCompleto = $pieCompleto ?? false;
 ?>
@@ -67,4 +69,4 @@ $pieCompleto = $pieCompleto ?? false;
   </div>
 </footer>
 
-<script src="<?= $base ?>assets/js/ui.js"></script>
+<?= assetScript($base, 'assets/js/ui.js') ?>
