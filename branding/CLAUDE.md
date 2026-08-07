@@ -35,6 +35,42 @@
 > sencillamente no está al día: lo más probable es que ninguna migración falle
 > en silencio, sino que faltaba aplicarla. El `gd` de PHP, que el §8 daba por
 > problemático, **ya está activo** en CLI y en Apache.
+>
+> **Sesión de arranque 2026-08-07 (misma tarde que la v7):** dos cosas
+> encontradas y ya resueltas, ninguna toca código:
+> 1. **MariaDB no arrancaba.** `mysql_error.log` daba `Aria engine: log data
+>    error` / `log initialization failed` al iniciar — el log de recuperación
+>    de Aria quedó corrupto, probablemente por un apagado no limpio de una
+>    sesión anterior de XAMPP. Se arregló **moviendo** (no borrando)
+>    `mysql\data\aria_log.00000001` y `aria_log_control` a
+>    `mysql\data\_aria_backup_corrupt\`: MariaDB los regenera solo al arrancar.
+>    Es la reparación estándar para este error y no toca `ibdata1` ni las
+>    tablas InnoDB reales (que son casi todas en este proyecto). Nueva entrada
+>    de trampa en §8.
+> 2. **Esta copia tampoco tenía la `014` aplicada** (faltaban `duelo_minijuegos`
+>    y las 4 filas `partido_*` de `configuracion`) — mismo patrón que la `013`
+>    en la v6. Aplicada con el flag `--default-character-set=utf8mb4` de
+>    siempre. Confirma otra vez la regla: **comprueba migraciones cada sesión,
+>    no asumas que la copia local está al día por tener `.git` o por haber
+>    funcionado antes.**
+>
+> Tras ambos arreglos: Apache y MariaDB arriba, las 5 comprobaciones del paso 5
+> dan los valores esperados, `styleguide.php` responde 200, los 42 ficheros
+> `.php` pasan `php -l` sin error, y la codificación de `rasgos.montana` sigue
+> en `c3b1`. El proyecto queda listo para seguir sin arrastrar nada pendiente
+> de entorno.
+>
+> **v7.1 — el catálogo de minijuegos pasa de 2 a 12 (§15.4).** Lo importante no
+> son las diez entradas nuevas sino los **dos límites que había debajo**:
+> `minijuegoDeEvento()` cogía la primera entrada que casaba, así que solo cabía
+> **una por (familia, lado)** y cualquier segunda era código muerto; y las
+> familias que la v7 daba por "libres y baratas" no lo eran —`defensa` es
+> **inalcanzable** y la que de verdad estaba sin estrenar era `balon_parado`
+> atacando, la segunda más frecuente—. Con la elección determinista entre
+> candidatas, la clave `tipos` y un tercer dato oculto (`colocacion_defensa`,
+> leído del defensa porque **en una falta no hay portero**), las tres
+> combinaciones que existen quedan cubiertas con cuatro entradas cada una.
+> Hay verificador: `db/verificar_minijuegos.php` (§15.9).
 
 ---
 
@@ -175,7 +211,7 @@ buscan por nombre.
 | **§15 — Motor de eventos narrado** | El partido se cuenta minuto a minuto (Biblia §1) | ✅ **Construido** |
 | **§15 — Marcador PvP desde la simulación** | Jubila la fórmula provisional `marcadorDuelo()` (Biblia §1.3) | ✅ **Construido** |
 | **§15 — Partido en vivo (PvP)** | Reloj en servidor, los dos jugadores a la vez, migración `014` | ✅ **Construido** |
-| **§15 — Minijuegos** | Catálogo + 2 entradas jugables de ~90 (Biblia §2) | 🟡 **Empezado** |
+| **§15 — Minijuegos** | Catálogo + **12** entradas jugables de ~90 (Biblia §2). Las 3 combinaciones (familia, lado) alcanzables están cubiertas | 🟡 **En marcha** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
 | **§15 — Partido narrado en cadenas** | Las cadenas siguen con el modo clásico | ⬜ **Sin empezar, a propósito** |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
@@ -271,6 +307,9 @@ tcg_srf/
 │   ├── minijuegos.php    ← catálogo de minijuegos (§15.4). Cada entrada declara
 │   │                        su familia, su impacto y sus opciones. Añadir uno
 │   │                        es añadir un array, no tocar el motor.
+│   ├── verificar_minijuegos.php  ← comprueba las invariantes del catálogo
+│   │                        (ciclo cerrado, sin opción dominante, determinismo,
+│   │                        valor de la pista). Solo CLI. Pásalo al añadir uno.
 │   ├── migraciones/
 │   │   ├── 002_duelos_misiones_mazos.sql   Fase 2
 │   │   ├── 003_capa2_compos.sql            Capa 2
@@ -604,6 +643,13 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
   no puede reiniciarlo (`Restart-Service` da "Acceso denegado").
 - Apache y MariaDB a veces están parados. Si XAMPP los deja a medias, mata los
   procesos `httpd`/`mysqld` y relanza desde `C:\xampp\`.
+- **Si MariaDB no arranca y `mysql\data\mysql_error.log` dice `Aria engine: log
+  data error` / `log initialization failed`**, el log de recuperación de Aria
+  quedó corrupto (típico de un apagado no limpio de XAMPP, ya pasó el
+  2026-08-07). Se arregla **moviendo** (no borrando)
+  `mysql\data\aria_log.00000001` y `mysql\data\aria_log_control` fuera de
+  `mysql\data\` — MariaDB los regenera solos al siguiente arranque. No toca
+  `ibdata1` ni las tablas InnoDB, que son la mayoría de este proyecto.
 
 - **El panel del navegador de pruebas no tiene el FOCO** (`document.hasFocus()`
   es `false`), además de no componer fotogramas. Eso rompe cosas que en un
@@ -958,15 +1004,18 @@ elegir formación es una decisión táctica sobre a qué compos apostar, nunca u
 ventaja de poder.
 ## 12. Pendientes, en orden aproximado
 
-1. **Subir arte real de cajas/sobres** en `panel/plantillas.php` (§14) — el
-   motor está construido y probado. Ya hay un primer intento en marcha:
-   `caja_expansion_3`, `caja_sobre_2` y `sobre_2` tienen los recortes
-   correctos en `assets/img/plantillas/`, pero sin fila en `plantillas_3d`
-   (la migración `013` faltaba en esta copia, ver nota de v6 y §5.2) siguen
-   mostrando el degradado por defecto. **Hay que volver a subirlas desde el
-   panel** para que el `INSERT` se ejecute contra la tabla ya creada — no
-   basta con que los ficheros existan. El resto es trabajo de contenido, no
-   de código.
+1. ~~Subir arte real de cajas/sobres del Base Set~~ — **hecho el 2026-08-07**:
+   `caja_expansion_3`, `caja_sobre_2` y `sobre_2` (expansión id 3 "Base Set -
+   T2", sobre id 2 "Sobre Básico") ya tienen fila en `plantillas_3d` — se
+   llamó a `Tcg::subirPlantilla()` por CLI reutilizando el `original.png` que
+   ya estaba en `assets/img/plantillas/{tipo}_{id}/` (el mismo flujo que hace
+   `panel/plantillas.php`, sin pasar por el navegador). `sobres.php` ya sirve
+   las texturas reales (`front.png`, `side.png`, `top.png`, `lid.png`,
+   `interior.png`, `frente.png`, `reverso.png`, todo 200) en vez del
+   degradado por defecto. **Sigue pendiente el resto del catálogo**: los
+   otros dos sobres del Base Set (`id_sobre` 1 "Sobre Doble" y 3 "sobre
+   prueba") y cualquier expansión futura no tienen plantilla — mismo proceso,
+   arte nuevo primero.
 2. **Fase 3** — panel de administración al sistema nuevo (hoy sigue con
    Bootstrap Icons y su propio `admin.css`, salvo `plantillas.php` que ya usa
    el sistema nuevo), motion unificado de las ceremonias, y documentar cómo
@@ -981,9 +1030,14 @@ ventaja de poder.
 
 **Pendientes que nacieron con el §15:**
 
-7. **Más minijuegos.** El contrato está hecho y probado; faltan 88 del catálogo
-   de la Biblia. Las familias `balon_parado` y `defensa` ya las emite el motor y
-   no las usa nadie (§15.4). Empezar por ahí es barato.
+7. **Más minijuegos.** Van 12 del catálogo de la Biblia y el motor ya admite
+   varias entradas por combinación, así que crecer es solo escribir arrays y
+   pasar `db/verificar_minijuegos.php`. **Ojo con lo que decía la v7:** las
+   familias `balon_parado` y `defensa` NO estaban ambas libres —`defensa` es
+   inalcanzable y `balon_parado` ya está cubierta (§15.4, con la tabla de
+   huecos medidos)—. Hoy lo que queda es **añadir variantes a las tres
+   combinaciones que llegan**; abrir una cuarta exige tocar el filtro
+   `$tieneSentido` de `narracionDuelo()`, que es decisión de diseño.
 8. **El desequilibrio de compos** que §15.8 deja medido: hoy mezclar afinidades
    rinde más que enfocarlas, así que construir bien un equipo casi no importa.
    Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
@@ -1420,16 +1474,65 @@ victorias (nunca goles), y el `rango` se calcula únicamente en PvE. **En un due
 PvP el marcador no lo lee nadie más que la pantalla que lo pinta.** Si algún día
 pasa a valer para algo, hay que releer esto.
 
-Construidos 2 de ~90:
+Construidos **12** de ~90:
 
-| Clave | Familia | Lado | Qué adivinas |
+| Clave | Familia · lado | Dato oculto | La pregunta |
 |---|---|---|---|
-| `muralla_humana` | `porteria` | defiendes | qué remate llega |
-| `elige_tu_veneno` | `disparo` | atacas | cómo sale el portero |
+| `muralla_humana` | `porteria` · defiendes | remate | cómo sales |
+| `mano_cambiada` | `porteria` · defiendes | remate | con qué mano respondes |
+| `lectura_de_cadera` | `porteria` · defiendes | remate | **cuándo** te comprometes |
+| `el_ultimo_palmo` | `porteria` · defiendes | remate | qué palmo cubres |
+| `elige_tu_veneno` | `disparo` · atacas | estilo_portero | dónde la pones |
+| `el_regate_previo` | `disparo` · atacas | estilo_portero | tiras o le regateas |
+| `desde_la_frontal` | `disparo` · atacas | estilo_portero | cómo la golpeas de lejos |
+| `primer_toque` | `disparo` · atacas | estilo_portero | sin tiempo de controlar |
+| `la_barrera` | `balon_parado` · atacas (falta) | colocacion_defensa | por dónde pasas la barrera |
+| `la_pizarra` | `balon_parado` · atacas (falta) | colocacion_defensa | qué jugada ensayas |
+| `el_corner` | `balon_parado` · atacas (córner) | colocacion_defensa | dónde pones el saque |
+| `segunda_jugada` | `balon_parado` · atacas (córner) | colocacion_defensa | qué haces con el rechace |
 
-Son **espejo** el uno del otro: sus tres opciones encajan una a una, así que lo
-que aprendes parando te sirve para rematar. Familias que el motor ya emite y
-**nadie usa todavía**: `balon_parado` (59 eventos medidos) y `defensa` (47).
+Los de `porteria` y los de `disparo` son **espejo** unos de otros: sus opciones
+encajan una a una, así que lo que aprendes parando te sirve para rematar.
+
+**Dos cosas del motor cambiaron para que esto quepa** (v7.1, 2026-08-07):
+
+1. **`minijuegoDeEvento()` ya no devuelve la primera entrada que case.** Junta
+   todas las candidatas y elige de forma **determinista** con la semilla del
+   duelo. Antes había un techo real de **una entrada por (familia, lado)**: la
+   segunda que escribieras era código muerto, y ese —no el motor de eventos—
+   era el límite para crecer. De regalo sirve a §1.5 regla 6: repetir un nodo
+   ya no solo se lee distinto, se **juega** distinto.
+2. **Clave `tipos` opcional** en una entrada, para acotarla a ciertos tipos de
+   evento. Hace falta porque `balon_parado` mezcla córners y faltas, y
+   *"¿dónde pones el córner?"* sobre una falta se lee como un fallo.
+
+**Tercer dato oculto: `colocacion_defensa`** (`{salta, aguanta, sale}`), que se
+lee del **defensa** rival y no del portero. No es una preferencia estética: en
+una **falta** el motor no reparte portero —sus protagonistas son solo `jugador`
+y `defensa`—, así que un minijuego de balón parado que leyera al portero
+devolvería siempre su valor por defecto y dejaría **una opción ganando el 100 %
+de las faltas**. El defensa sí está en las dos jugadas de la familia.
+
+> ⚠️ **Corrección a lo que decía la v7 sobre familias libres.** Decía que
+> `balon_parado` y `defensa` estaban sin usar y eran "baratas para empezar".
+> Medido sobre 400 partidos simulados, las combinaciones **(familia, lado) que
+> de verdad llegan** son solo tres, porque `narracionDuelo()` exige
+> `tipo === "gol"` para defender y `tipo !== "gol"` para atacar:
+>
+> | combinación | huecos medidos | estado |
+> |---|---|---|
+> | `disparo` · ataco | 2453 | 4 entradas |
+> | `balon_parado` · ataco | 1101 | 4 entradas ← **era la que estaba libre** |
+> | `porteria` · defiendo | 1039 | 4 entradas |
+> | `defensa` · defiendo | **0** | **inalcanzable**: defender exige un gol, y un gol siempre es `familia_def` `porteria` |
+> | `balon_parado` · defiendo | **0** | mismo motivo |
+> | `arbitro` · ataco | 202 | alcanzable pero **inservible**: el evento de tarjeta no lleva `protagonistas`, así que el dato oculto caería siempre en su valor por defecto |
+>
+> **Antes de escribir una entrada para una familia nueva, comprueba que llega.**
+> Hoy las tres combinaciones útiles están cubiertas: seguir creciendo por aquí
+> es añadir variantes a las tres, no descubrir familias nuevas. Para abrir una
+> cuarta habría que tocar el filtro `$tieneSentido` de `narracionDuelo()`, y eso
+> es una decisión de diseño, no una ampliación de catálogo.
 
 **Tres reglas que costaron sangre:**
 
@@ -1554,10 +1657,21 @@ Además de §13:
   resueltos, no en una muestra. La invariante dura de §1.3 es que el ganador del
   sorteo siempre acaba con más goles: se midió sobre 4.000 partidos sintéticos y
   debe dar **0 violaciones**.
+- **Pasa el verificador**, que cubre esto y seis cosas más de una vez:
+  ```
+  C:\xampp\php\php.exe db/verificar_minijuegos.php
+  ```
+  No toca la base de datos y sale con código 1 si algo falla. **Ejecútalo
+  siempre que añadas una entrada a `db/minijuegos.php`.** Comprueba el ciclo
+  cerrado, la opción segura única, que la clave de una opción no delate su
+  valor, los plazos, el reparto del dato oculto, que ninguna entrada sea código
+  muerto, el determinismo y cuánto vale leer la pista.
 - Ninguna opción de un minijuego puede tener ventaja eligiéndola siempre a ciegas
-  (las tres a ~33 %), y leer la pista debe quedar por encima.
-- El dato oculto (`remate`, `estilo_portero`) **no puede aparecer** en el JSON que
-  se manda al cliente antes de decidir.
+  (las tres a ~33 %), y leer la pista debe quedar por encima **sin resolverlo
+  sola**. Medido hoy: a ciegas 33,2-33,9 %; leyendo, 37,2 % (`estilo_portero`),
+  44,2 % (`remate`) y 46,9 % (`colocacion_defensa`).
+- El dato oculto (`remate`, `estilo_portero`, `colocacion_defensa`) **no puede
+  aparecer** en el JSON que se manda al cliente antes de decidir.
 - Resolver dos veces la misma jugada debe devolver *"Esa jugada ya estaba
   resuelta"* y no volver a mover el marcador.
 - Con movimiento reducido, un duelo PvP debe **abrir el modal y ofrecer sus

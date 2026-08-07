@@ -3244,7 +3244,7 @@ class Tcg
 	 * ofrece decisión. Solo las ocasiones marcadas como interactivas por el
 	 * motor son candidatas (§1.5 regla 3: nunca todas).
 	 */
-	public static function minijuegoDeEvento(array $evento, $defiendo = false) {
+	public static function minijuegoDeEvento(array $evento, $defiendo = false, $semilla = 0.0) {
 		if (empty($evento["interactivo"])) return null;
 		/* La familia depende del LADO desde el que se mire la misma jugada: un
 		   remate del rival es "disparo" para quien lo tira y "porteria" para
@@ -3255,15 +3255,37 @@ class Tcg
 		if (!$familia) return null;
 
 		$quiero = $defiendo ? "defiendo" : "ataco";
+
+		/* TODOS los candidatos, no el primero que case. Con "return" al primer
+		   match el catálogo tenía un techo de UNA entrada por (familia, lado):
+		   daba igual cuántas escribieras, el resto eran código muerto. Ese era
+		   el límite real para crecer, no el motor de eventos. */
+		$candidatos = [];
 		foreach (self::catalogoMinijuegos() as $clave => $mj) {
 			// El lado también tiene que casar: "disparo" existe en las dos
 			// lecturas de la misma jugada, y sin esta comprobación una ocasión
 			// del rival ofrecería el minijuego de rematar.
-			if ($mj["familia"] === $familia && ($mj["lado"] ?? "defiendo") === $quiero) {
-				return ["clave" => $clave] + $mj;
-			}
+			if ($mj["familia"] !== $familia) continue;
+			if (($mj["lado"] ?? "defiendo") !== $quiero) continue;
+			/* "tipos" acota una entrada a ciertos tipos de evento. Existe porque
+			   una misma familia mezcla jugadas que no se narran igual: en
+			   balon_parado caen córners Y faltas, y "¿dónde pones el córner?"
+			   sobre una falta se lee como un fallo. Sin la lista, la entrada
+			   vale para todos los tipos de su familia. */
+			if (!empty($mj["tipos"]) && !in_array($evento["tipo"] ?? "", $mj["tipos"], true)) continue;
+			$candidatos[] = ["clave" => $clave] + $mj;
 		}
-		return null;
+		if (!$candidatos) return null;
+		if (count($candidatos) === 1) return $candidatos[0];
+
+		/* Elección DETERMINISTA, nunca mt_rand(): el navegador manda solo qué
+		   opción eligió, y resolverMinijuegoDuelo() vuelve a preguntar por este
+		   camino qué minijuego era. Si aquí hubiera azar real, el servidor
+		   podría recalcular una entrada distinta a la que se jugó.
+		   Multiplicador propio (3313) para no correlacionar QUÉ minijuego sale
+		   con el dato oculto que se sortea después con 7919 / 4409 / 6271. */
+		$azar = self::azarSembrado(fmod($semilla * 3313 + ($evento["id"] ?? 0) * 0.029, 1));
+		return $candidatos[(int) floor($azar() * count($candidatos)) % count($candidatos)];
 	}
 
 	/**
@@ -3304,11 +3326,101 @@ class Tcg
 		return "espera";
 	}
 
+	/**
+	 * Cómo se planta la defensa rival en un balón parado. Tercer dato oculto,
+	 * y el que abre la familia `balon_parado` entera (§2 de la Biblia).
+	 *
+	 * Se deduce del DEFENSOR (`protagonistas.defensa`) y no del portero a
+	 * propósito: en una FALTA el motor no reparte portero — sus protagonistas
+	 * son solo jugador y defensa—, así que un minijuego de balón parado que
+	 * leyera al portero devolvería siempre el valor por defecto y dejaría una
+	 * opción ganando el 100 % de las faltas. Justo la opción dominante que
+	 * prohíbe §1.5 regla 2. El defensor sí está en las dos jugadas de la
+	 * familia (córner y falta), así que es el único dato honesto disponible.
+	 */
+	public static function estiloDefensaDeJugada(array $evento, array $cartasDefensor, $semilla) {
+		$nombre = $evento["protagonistas"]["defensa"] ?? null;
+		$carta = null;
+		foreach ($cartasDefensor as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "salta";
+
+		// Un defensa de mucha Defensa aguanta la posición; uno de mucho Ataque
+		// rompe hacia el balón. Mismo esquema relativo que las otras dos.
+		$perfil = fn($c) => ((float) ($c["defensa"] ?? 0) + (float) ($c["ataque"] ?? 0)) > 0
+			? ((float) $c["defensa"] - (float) $c["ataque"]) / ((float) $c["defensa"] + (float) $c["ataque"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasDefensor);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		$k = 3.0;
+		$pesos = [
+			"aguanta" => max(0.05, 1 + $k * $desvio),
+			"sale"    => max(0.05, 1 - $k * $desvio),
+			"salta"   => 1.0,
+		];
+
+		$azar = self::azarSembrado(fmod($semilla * 6271 + $evento["id"] * 0.017, 1));
+		$corte = $azar() * array_sum($pesos);
+		foreach ($pesos as $tipo => $peso) {
+			$corte -= $peso;
+			if ($corte <= 0) return $tipo;
+		}
+		return "salta";
+	}
+
+	/** Pista sobre la defensa rival: espejo de pistaRemate(). */
+	public static function pistaDefensa(array $evento, array $cartasDefensor) {
+		$nombre = $evento["protagonistas"]["defensa"] ?? null;
+		$carta = null;
+		foreach ($cartasDefensor as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "No sabes cómo van a defenderla.";
+
+		$perfil = fn($c) => ((float) ($c["defensa"] ?? 0) + (float) ($c["ataque"] ?? 0)) > 0
+			? ((float) $c["defensa"] - (float) $c["ataque"]) / ((float) $c["defensa"] + (float) $c["ataque"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasDefensor);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		if ($desvio > 0.02)  return $carta["nombre"] . " aguanta la posición mejor que sus compañeros.";
+		if ($desvio < -0.02) return $carta["nombre"] . " es de los que rompen hacia el balón.";
+		return $carta["nombre"] . " no se casa con ninguna marca.";
+	}
+
+	/**
+	 * ¿El dato oculto lo pone el equipo que DEFIENDE la jugada?
+	 *
+	 * Fuente única de verdad para saber de qué alineación hay que sacar las
+	 * cartas. La usan resolverMinijuegoDuelo() (para calcular el dato) y
+	 * narracionDuelo() (para calcular la pista), y tienen que coincidir: si una
+	 * mirase la alineación equivocada, la pista hablaría de una carta y el
+	 * sorteo saldría de otra.
+	 */
+	public static function datoOcultoLoPoneElDefensor(array $minijuego) {
+		return in_array($minijuego["oculto"] ?? "remate", ["estilo_portero", "colocacion_defensa"], true);
+	}
+
 	/** El dato oculto que hay que adivinar, según lo que declare el catálogo. */
 	public static function ocultoDeJugada(array $minijuego, array $evento, array $cartas, $semilla) {
-		return ($minijuego["oculto"] ?? "remate") === "estilo_portero"
-			? self::estiloPorteroDeJugada($evento, $cartas, $semilla)
-			: self::remateDeJugada($evento, $cartas, $semilla);
+		switch ($minijuego["oculto"] ?? "remate") {
+			case "estilo_portero":     return self::estiloPorteroDeJugada($evento, $cartas, $semilla);
+			case "colocacion_defensa": return self::estiloDefensaDeJugada($evento, $cartas, $semilla);
+			default:                   return self::remateDeJugada($evento, $cartas, $semilla);
+		}
+	}
+
+	/** La pista que acompaña a ese dato oculto. Espejo de ocultoDeJugada(). */
+	public static function pistaDeJugada(array $minijuego, array $evento, array $cartas) {
+		switch ($minijuego["oculto"] ?? "remate") {
+			case "estilo_portero":     return self::pistaPortero($evento, $cartas);
+			case "colocacion_defensa": return self::pistaDefensa($evento, $cartas);
+			default:                   return self::pistaRemate($evento, $cartas);
+		}
 	}
 
 	/** Pista sobre el portero rival: espejo de pistaRemate(). */
@@ -3845,12 +3957,13 @@ class Tcg
 		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
 
 		/* De qué alineación sale el dato oculto depende de qué se adivina: el
-		   REMATE lo elige quien ataca, el ESTILO DEL PORTERO quien defiende. */
+		   REMATE lo elige quien ataca; el ESTILO DEL PORTERO y la COLOCACIÓN DE
+		   LA DEFENSA, quien defiende. */
 		$idAtacante = $evento["lado"] === "local" ? (int) $duelo["id_creador"] : (int) $duelo["id_rival"];
 		$idDefensor = $evento["lado"] === "local" ? (int) $duelo["id_rival"]   : (int) $duelo["id_creador"];
 		$cartas = $this->listarAlineacionDuelo(
 			$id_duelo,
-			($minijuego["oculto"] ?? "remate") === "estilo_portero" ? $idDefensor : $idAtacante
+			self::datoOcultoLoPoneElDefensor($minijuego) ? $idDefensor : $idAtacante
 		);
 
 		$remate    = self::ocultoDeJugada($minijuego, $evento, $cartas, (float) $duelo["valor_sorteo"]);
@@ -4141,7 +4254,7 @@ class Tcg
 			// exige que el evento ya sea interactivo, y quien decide eso aquí es
 			// el criterio de arriba, no el dado del ritmo que trae el motor.
 			$e["interactivo"] = true;
-			$mj = self::minijuegoDeEvento($e, $defiendo);
+			$mj = self::minijuegoDeEvento($e, $defiendo, (float) $duelo["valor_sorteo"]);
 			if (!$mj) { $e["interactivo"] = false; continue; }
 
 			$ofrecidos++;
@@ -4156,15 +4269,22 @@ class Tcg
 				"enunciado" => strtr($mj["enunciado"], [
 					"{jugador}" => $e["protagonistas"]["jugador"] ?? "El rival",
 					"{portero}" => $e["protagonistas"]["portero"] ?? "tu portero",
+					"{defensa}" => $e["protagonistas"]["defensa"] ?? "la defensa",
 				]),
 				"plazo"     => $plazo,
 				/* La pista habla de la TENDENCIA de la carta rival implicada,
 				   nunca del dato concreto: ese no viaja al cliente ni aquí ni en
 				   ningún sitio, o bastaría con mirar la respuesta de red.
-				   Defendiendo se lee al REMATADOR; atacando, al PORTERO. */
-				"pista"     => $defiendo
-					? self::pistaRemate($e, $e["lado"] === "local" ? $cartasC : $cartasR)
-					: self::pistaPortero($e, $e["lado"] === "local" ? $cartasR : $cartasC),
+
+				   De qué alineación se lee lo decide el DATO OCULTO, no el lado
+				   desde el que juegas: antes era un ternario sobre $defiendo, y
+				   con un tercer dato oculto (la defensa en los balones parados,
+				   que se lee del rival aunque estés atacando) ese atajo pasaba a
+				   ser falso y la pista habría hablado de la carta equivocada. */
+				"pista"     => self::pistaDeJugada($mj, $e,
+					self::datoOcultoLoPoneElDefensor($mj)
+						? ($e["lado"] === "local" ? $cartasR : $cartasC)
+						: ($e["lado"] === "local" ? $cartasC : $cartasR)),
 				"opciones"  => array_map(fn($o) => [
 					"clave" => $o["clave"], "nombre" => $o["nombre"], "pista" => $o["pista"],
 				], $mj["opciones"]),
