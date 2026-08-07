@@ -1839,3 +1839,87 @@ git commit -m "Añade la página del panel para importar datos oficiales"
   comprobar que el resumen da 0 jugadores a crear (todos omitidos).
 - [ ] **Paso 5:** `for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done` sin
   errores (§13).
+
+## 15.10 Refinamiento tras la implementación: stats reales y borrado de importados
+
+Dos cambios pedidos por Alejandro después de probar el importador con el
+archivo real, sobre la base ya construida en §15.1-§15.9.
+
+### Stats de combate: tabla real en vez de la heurística
+
+Alejandro entregó `Rangos_estadisticas_SRF.csv` (mín/máx de ataque, defensa y
+técnica por rareza × posición, 24 filas: rarezas 1-6 × POR/DF/MC/DC). Sustituye
+por completo la fórmula heurística de §15.6 (`IMPORT_BASE_TOTAL` /
+`IMPORT_SPLIT_POSICION`, con su jitter ±8%): `statsBaseImportacion()` pasa a
+buscar el rango exacto `[min, max]` de cada estadística en una tabla fija
+(`IMPORT_RANGOS_STATS[$idRareza][$posicion]`) y sortear con `mt_rand(min,
+max)` de forma independiente para ataque/defensa/técnica. Sin tope 1-99
+manual: los rangos del CSV ya respetan ese límite. Para posiciones sin
+entrada (`ENT`/`GER`/`ESCUDO`) sigue devolviendo `0/0/0`, igual que antes.
+
+La tabla completa (transcrita del CSV):
+
+| Rareza | Posición | Ataque | Defensa | Técnica |
+|---|---|---|---|---|
+| 1 Común | POR | 23-37 | 62-76 | 52-66 |
+| 1 Común | DF | 37-51 | 57-71 | 47-61 |
+| 1 Común | MC | 48-62 | 49-63 | 56-70 |
+| 1 Común | DC | 63-77 | 37-51 | 50-64 |
+| 2 Poco común | POR | 31-45 | 68-82 | 59-73 |
+| 2 Poco común | DF | 43-57 | 65-79 | 53-67 |
+| 2 Poco común | MC | 56-70 | 57-71 | 65-79 |
+| 2 Poco común | DC | 69-83 | 45-59 | 58-72 |
+| 3 Raro | POR | 39-53 | 74-88 | 65-79 |
+| 3 Raro | DF | 50-64 | 72-86 | 60-74 |
+| 3 Raro | MC | 64-78 | 65-79 | 73-87 |
+| 3 Raro | DC | 76-90 | 53-67 | 66-80 |
+| 4 Épico | POR | 47-61 | 80-94 | 72-86 |
+| 4 Épico | DF | 56-70 | 79-93 | 66-80 |
+| 4 Épico | MC | 72-86 | 73-87 | 81-95 |
+| 4 Épico | DC | 82-96 | 60-74 | 74-88 |
+| 5 Legendario | POR | 55-69 | 86-99 | 79-93 |
+| 5 Legendario | DF | 63-77 | 86-99 | 73-87 |
+| 5 Legendario | MC | 80-94 | 81-95 | 90-99 |
+| 5 Legendario | DC | 89-99 | 68-82 | 83-97 |
+| 6 SRF | POR | 63-77 | 92-99 | 86-99 |
+| 6 SRF | DF | 69-83 | 92-99 | 79-93 |
+| 6 SRF | MC | 88-99 | 89-99 | 92-99 |
+| 6 SRF | DC | 92-99 | 76-90 | 91-99 |
+
+Las filas 5 (Legendario) y 6 (SRF) no las usa hoy el importador de jugadores
+(la promoción de rareza nunca pasa de Épico, §15.5), pero se incluyen
+completas por si `statsBaseImportacion()` se reutiliza en otro contexto
+(cartas Legendario/SRF de escudo/entrenador/gerente siguen yendo a `0/0/0`
+porque su posición no tiene entrada en la tabla, no por la rareza).
+
+### Botón para borrar las cartas importadas
+
+Nuevo botón en `panel/importar.php`, siguiendo el patrón ya existente en el
+panel (`confirmarBorrado()` con `confirm()` nativo del navegador + enlace
+`?accion=valor` — el panel es "el sistema viejo", §12, no usa el modal
+`SRF.confirmar` del sitio principal).
+
+**Marcado:** nueva columna `cromos.origen_importacion` (`TINYINT(1) NOT NULL
+DEFAULT 0`), migración `db/migraciones/013_importador_origen.sql`
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, aditiva y re-ejecutable). `crearCromo()`
+gana un parámetro opcional más al final (`$origen_importacion = 0`,
+manteniendo compatibilidad con las llamadas existentes). `ejecutarImportacion()`
+lo pasa a `1` en **todas** sus llamadas a `crearCromo()` (jugadores y cartas
+de equipo) — así "cartas importadas" significa exactamente "creadas por este
+importador", sin importar en qué expansión ni cuándo.
+
+**Borrado seguro — nunca borra cartas ya en manos de un jugador:**
+`borrarCartasImportadas()` primero reúne los `id_cromo` con
+`origen_importacion = 1`, luego comprueba cuáles aparecen en `coleccion`
+(alguien la tiene) o en `duelo_alineaciones` (se usó en un duelo, aunque sea
+histórico) — esas se **excluyen** del borrado y se cuentan aparte como
+"retenidas". Solo se borran las que no están en uso. `cromo_rasgos` se
+limpia solo (`FOREIGN KEY ... ON DELETE CASCADE`, ya existe en el esquema);
+`coleccion` y `duelo_alineaciones` NO tienen cascada (son `RESTRICT` por
+defecto), así que intentar borrar una carta en uso fallaría de golpe si no
+se filtrara antes — de ahí el filtro previo en vez de un `DELETE` directo.
+
+El botón muestra cuántas cartas importadas hay ahora mismo
+(`contarCartasImportadas()`), pide confirmación con el texto exacto de
+cuántas se van a borrar, y tras borrar reporta cuántas se borraron y cuántas
+se retuvieron por estar en uso (si las hay).
