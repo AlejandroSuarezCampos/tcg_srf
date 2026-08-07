@@ -353,14 +353,28 @@
 .carta-placa--artwork {
   margin: calc(var(--pad-marco) * -1);
   border-radius: calc(var(--radius-xl) - 1px);
+  aspect-ratio: unset;   /* NUEVO: deja que el flex decida la altura */
+  flex: 1;                /* NUEVO: absorbe el espacio si el grid estira la carta */
+  min-height: 0;          /* NUEVO: evita que flex:1 desborde en algunos navegadores */
+  /* fondo más vivo que el halo sutil del modo debajo — usa el color de
+     rareza a más intensidad (var(--rz), no var(--rz-halo)) para que las
+     rarezas se noten de un vistazo, degradando a oscuro hacia los bordes. */
+  background:
+    radial-gradient(ellipse 95% 75% at 50% 12%, var(--rz), transparent 62%),
+    linear-gradient(170deg, var(--void-2), #08090C);
 }
 
-/* decisión consciente que rompe la regla de "el arte nunca se recorta"
-   (§3) — SOLO para este modo. object-position prioriza que la cara quede
-   dentro de encuadre en vez de centrar el cuerpo entero. */
+/* deja de ser "cover a sangre total": ahora es "contain dentro de un marco
+   más pequeño, anclado arriba". Nunca recorta la cara (aunque la foto
+   tenga mucho margen vacío alrededor, como pasa con parte del catálogo
+   importado), y al no llegar a los bordes/esquinas, el hueco sobrante se
+   camufla con el fondo oscuro degradado que ya tiene .carta-placa. */
 .carta-arte--sangre {
-  object-fit: cover;
-  object-position: center 15%;
+  inset: 8% 12% 32% 12%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  object-position: center top;
 }
 
 .carta-degradado {
@@ -406,14 +420,14 @@
      una línea; con nombre de 2 líneas (permitido, line-clamp: 2) puede
      solapar. Subido para dar más margen sin reestructurar el HTML;
      arreglo real: anclar al flujo en vez de dos position:absolute. */
-  bottom: 64px;
+  bottom: 78px;
   z-index: 3;
   display: flex;
   justify-content: center;
   gap: var(--space-2);
 }
 .carta--sm .carta-stats-flotantes { display: none; }
-.carta--lg .carta-stats-flotantes { bottom: 76px; }
+.carta--lg .carta-stats-flotantes { bottom: 92px; }
 
 .carta-stat-pildora {
   display: flex;
