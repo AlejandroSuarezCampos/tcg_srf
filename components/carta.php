@@ -252,10 +252,12 @@ function render_carta(array $c, array $opts = []): void
             <div class="carta-degradado" aria-hidden="true"></div>
 
             <div class="carta-overlay-superior">
-              <span class="rz-flotante">
-                <?= rareza_marcas($idRareza) ?>
-                <span class="sr-only">Rareza: <?= htmlspecialchars($rareza) ?></span>
-              </span>
+              <?php if ($idRareza > 1): ?>
+                <span class="rz-flotante">
+                  <?= rareza_marcas($idRareza) ?>
+                  <span class="sr-only">Rareza: <?= htmlspecialchars($rareza) ?></span>
+                </span>
+              <?php endif; ?>
               <?php if (($cantidad !== null && $cantidad > 1) || $tieneAfinidad): ?>
                 <span class="carta-head-derecha">
                   <?php if ($cantidad !== null && $cantidad > 1): ?>
