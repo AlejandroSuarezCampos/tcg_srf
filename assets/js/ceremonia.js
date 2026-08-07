@@ -37,6 +37,7 @@
   var cerFrente  = document.getElementById('cerCartaFrente');
   var walkout    = document.getElementById('cerWalkout');
   var walkoutRz  = document.getElementById('cerWalkoutRareza');
+  var walkoutNom = document.getElementById('cerWalkoutNombre');
   var pista      = document.getElementById('ceremoniaPista');
   var contador   = document.getElementById('ceremoniaContador');
   var btnSaltarCarta = document.getElementById('ceremoniaSaltarCarta');
@@ -70,6 +71,16 @@
   var avanzar = null;        // resolve() de la carta actual
   var sobreActual = null;    // para poder repetir la apertura con animación
   var enReparto = false;     // false mientras se abre el sobre, true al repartir
+
+  // Cierra el modal (X, Escape, "Continuar") a media ceremonia: detener() no
+  // puede cancelar de verdad la promesa pendiente de escenaCarta() (avanzar),
+  // así que repartir() la resuelve y sigue corriendo en segundo plano hasta
+  // llamar a terminar() igualmente. Si para entonces ya se ha abierto un
+  // sobre NUEVO, ese terminar() tardío pisaba su estado (ocultaba su escena,
+  // repintaba la mesa con las cartas viejas, podía reabrir el aviso de
+  // movimiento). Cada llamada a ceremonia() saca un número de sesión nuevo;
+  // repartir() comprueba que sigue siendo la vigente antes de cerrar nada.
+  var sesion = 0;
 
   /* ---------------------------------------------------------------------
      Utilidades
@@ -199,7 +210,14 @@
       });
       tlActual = tl;
 
-      tl.to(cerCarta, { y: 34, scale: .74, duration: .34, ease: 'power2.out' })
+      // El tope de escala .60 aquí NO es arbitrario: .cer-carta (hasta 260px)
+      // es más ancha que .cer-sobre (hasta 215px), así que si se deja crecer
+      // hasta .74 antes del cambio de z-index, sus bordes ya asoman por los
+      // LADOS del sobre mientras se supone que sigue oculta detrás — se lee
+      // como si la carta atravesara el sobre. Con .60 el ancho efectivo se
+      // queda por debajo del ancho del sobre en todo el clamp, así que el
+      // salto de z-index pasa con la carta todavía completamente tapada.
+      tl.to(cerCarta, { y: 34, scale: .60, duration: .34, ease: 'power2.out' })
         // ya asoma por la boca: pasa a estar DELANTE del sobre
         .set(cerCarta, { zIndex: 6 })
         .to(cerCarta, { y: -34, scale: 1, duration: .62, ease: 'power3.out' })
@@ -218,6 +236,13 @@
   function voltearAhora(carta) {
     cartaRevelada = true;
     pista.textContent = 'Toca otra vez para continuar';
+    // pedirVolteo() esconde la pista al empezar el giro (estorba durante la
+    // animación y durante el walkout). Hay que volver a mostrarla AQUÍ: sin
+    // esto se cambiaba el texto de un elemento que seguía con [hidden], así
+    // que la carta se quedaba destapada y sin ninguna indicación de que hay
+    // que tocarla otra vez para sacar la siguiente — la ceremonia parecía
+    // colgada justo en el momento que el jugador tiene que actuar.
+    pista.hidden = false;
     if (carta.id_rareza >= 5 && typeof SRF.onExclusiveReveal === 'function') {
       SRF.onExclusiveReveal(carta);
     }
@@ -250,6 +275,7 @@
     // ---- WALKOUT (rareza 5 y 6) ----
     walkout.hidden = false;
     walkoutRz.textContent = carta.rareza;
+    if (walkoutNom) walkoutNom.textContent = carta.nombre || '';
     walkout.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
     caja.classList.add('en-walkout');
 
@@ -399,16 +425,19 @@
   /* ---------------------------------------------------------------------
      Orquestación
      --------------------------------------------------------------------- */
-  async function repartir() {
+  async function repartir(miSesion) {
     for (indice = 0; indice < cartas.length; indice++) {
       if (saltandoTodo) break;
       await escenaCarta(cartas[indice]);
     }
+    if (miSesion !== sesion) return;  // el modal se cerró y ya hay otra ceremonia en curso
     terminar();
   }
 
   function ceremonia(listaCartas, sobre) {
     if (!listaCartas || !listaCartas.length) return;
+
+    var miSesion = ++sesion;
 
     cartas = listaCartas;
     sobreActual = sobre || null;
@@ -445,8 +474,9 @@
     escena.hidden = false;
     inmersivo(true);
     abrirSobre(sobre).then(function () {
+      if (miSesion !== sesion) return;
       enReparto = true;
-      repartir();
+      repartir(miSesion);
     });
   }
 

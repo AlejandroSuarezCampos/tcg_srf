@@ -978,14 +978,30 @@
 .pack3d-portal.con-seleccion .pack3d-tapa { opacity: .18; }
 
 /* ---- Fase 3: tamaño de la caja abierta ---- */
-/* Mucho más honda que cerrada: los sobres se reparten en ESE fondo, así que
-   la profundidad es lo que decide si se ven apretados o sueltos. */
+/* DOS escalas independientes, cada una uniforme dentro de sí misma — nunca
+   valores sueltos por eje, o el arte se recorta (ver más abajo):
+     · caja  ×1.2 de la base 200:250:130   → 240×300×156
+     · sobre ×1.4 de la base 165:235       → 231×329
+   front/top/side/interior pintan un recorte FIJO de Tcg::ZONAS_CAJA
+   (proporción 4:5, 1.538:1 y 1:1.923 — ver §14.1 de branding/CLAUDE.md) y el
+   sobre otro de Tcg::ZONAS_SOBRE (1:1.427): cualquier forma que no respete
+   esas proporciones hace que `background-size: cover` recorte trozos reales
+   del arte — el bug de "la plantilla se ve cortada".
+   Las DOS escalas tienen que ser distintas a propósito: el sobre (329 alto)
+   es más alto que la caja (300 alto) para que asome por encima del borde
+   como una caja de cromos real abierta («sobresaliendo un poco por encima»,
+   ver cabecera de components/caja3d.php) — iguales, la caja tapa los sobres
+   enteros y no se ve ninguno (lo que pasó al probar con una sola escala
+   1.6× para las dos). Al mismo tiempo el sobre se queda MÁS ESTRECHO que la
+   caja (231 < 240): si fuera más ancho asomaría también por los LADOS, el
+   mismo defecto de "atraviesa el contenedor" que ya se corrigió para la
+   carta de la ceremonia en escenaCarta() (ceremonia.js). */
 .pack3d--abierta {
-  --pack3d-w: 300px;
-  --pack3d-h: 235px;
-  --pack3d-d: 400px;
-  --pack3d-sobre-w: 250px;
-  --pack3d-sobre-h: 300px;
+  --pack3d-w: 240px;
+  --pack3d-h: 300px;
+  --pack3d-d: 156px;
+  --pack3d-sobre-w: 231px;
+  --pack3d-sobre-h: 329px;
   margin: 0;
 }
 
@@ -1044,9 +1060,12 @@
 @media (max-width: 760px) {
   .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-6); }
   .pack3d { --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px; --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px; }
+  /* mismas DOS escalas que la variante de escritorio (caja ×1.2, sobre ×1.4
+     de sus respectivas bases), ver nota ahí: no valores sueltos, o el arte
+     vuelve a recortarse y los sobres dejan de asomar por encima. */
   .pack3d--abierta {
-    --pack3d-w: 215px; --pack3d-h: 170px; --pack3d-d: 280px;
-    --pack3d-sobre-w: 180px; --pack3d-sobre-h: 215px;
+    --pack3d-w: 180px; --pack3d-h: 222px; --pack3d-d: 114px;
+    --pack3d-sobre-w: 171px; --pack3d-sobre-h: 241px;
   }
   .pack3d--abierta .pack3d-sobre:hover, .pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -34px; }
 }
@@ -1059,7 +1078,10 @@
 /* La mesa tiene que caber en pantalla: el sobre se mira, no se navega.
    El número de columnas y el tamaño de la carta se calculan para que el modal
    entre completo en el viewport sin scroll. */
-.ceremonia-mesa {
+/* :not([hidden]) por la misma razón que .cer-escena/.cer-walkout/
+   .cer-aviso-motion: ceremonia.js hace mesa.hidden = true/false y sin el
+   guard esta regla de autor le ganaría siempre al [hidden] de user-agent. */
+.ceremonia-mesa:not([hidden]) {
   position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -1116,7 +1138,15 @@
 .ceremonia.es-inmersiva .ceremonia-mesa,
 .ceremonia.es-inmersiva .cer-aviso-motion { display: none; }
 
-.cer-escena {
+/* [hidden] tiene la MISMA especificidad que .cer-escena (0-1-0): sin el
+   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
+   "display:none" del navegador (mismo problema que ya se documentó para
+   .submenu-tipos, ver más abajo). Sin este guard, escena.hidden = true
+   (terminar(), en ceremonia.js) NO ocultaba nada: la escena de apertura se
+   quedaba pintada por encima del resumen, mezclando el sobre/carta a medio
+   animar con la mesa de cartas reveladas — el "se queda ahí bugueado" que
+   se veía tras usar "Saltar". */
+.cer-escena:not([hidden]) {
   --cer-crimp: 7%;          /* alto de cada banda termosellada */
   --cer-diente: 9px;        /* paso del dentado del filo */
   position: relative;
@@ -1322,13 +1352,24 @@
 .cer-contador { top: var(--space-6); }
 
 /* ---- walkout: solo legendaria (5) y SRF (6) ---- */
-.cer-walkout {
+/* z-index 9: por ENCIMA de .cer-carta (máx. 6) y de .cer-pista/.cer-contador
+   (7) a propósito — el walkout tiene que tapar sobre y carta mientras dura
+   la tensión, y solo al desvanecerse (pedirVolteo, tramo final) deja ver la
+   carta ya volteada debajo. Antes iba en z-index 5, POR DEBAJO de la carta,
+   así que se veía la carta encima y la animación enterrada al fondo.
+   :not([hidden]) por el mismo motivo que .cer-escena y .cer-aviso-motion:
+   sin él, este display:grid (regla de autor) le gana siempre al display:none
+   de [hidden] (regla de user-agent), así que walkout.hidden = true (fuera de
+   una revelación legendaria/SRF) no ocultaba nada de verdad — el fondo
+   oscurecido del walkout se veía DETRÁS de cada carta común también,
+   mientras .cer-escena estuviera visible, no solo en las exclusivas. */
+.cer-walkout:not([hidden]) {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
-  z-index: 5;
+  z-index: 9;
   background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.93) 66%);
 }
 .cer-walkout-rayos {
@@ -1354,6 +1395,15 @@
   color: #fff;
   text-shadow: 0 0 30px var(--rz-aura, var(--amber)), 0 0 84px var(--rz-aura, var(--amber));
 }
+.cer-walkout-nombre {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: clamp(15px, 2.6vw, 22px);
+  letter-spacing: .04em;
+  color: var(--frost);
+  text-shadow: 0 0 20px rgba(0, 0, 0, .8);
+}
 
 @media (max-width: 600px) {
   .cer-sobre { width: clamp(130px, 19vh, 170px); }
@@ -1366,8 +1416,14 @@
 :root[data-motion="reduce"] .cer-escena { display: none; }
 
 /* aviso de "puedes activar las animaciones solo en esta web": aparece en el
-   resumen cuando la ceremonia se saltó por la preferencia del SISTEMA */
-.cer-aviso-motion {
+   resumen cuando la ceremonia se saltó por la preferencia del SISTEMA.
+   :not([hidden]) por el mismo motivo que .cer-escena más arriba: sin él,
+   este display:flex (regla de autor) le gana al display:none de [hidden]
+   (regla de user-agent) pase lo que pase — así que ofrecerAnimaciones()
+   podía marcar avisoMotion.hidden = true y el aviso seguía viéndose en
+   cuanto .es-inmersiva dejaba de taparlo con su propio display:none. Es la
+   causa de "el aviso sigue saliendo aunque ya haya activado animaciones". */
+.cer-aviso-motion:not([hidden]) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;

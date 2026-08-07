@@ -2691,29 +2691,1510 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
+	/* ======================================================================
+	   MOTOR DE EVENTOS NARRADO  (Biblia §1)
+	   ----------------------------------------------------------------------
+	   Capa que va ENCIMA del resultado, nunca dentro (§1.1): quién gana, con
+	   qué probabilidad y con qué TOTAL lo siguen decidiendo las tres capas ya
+	   cerradas y la curva Elo. Este motor solo cuenta lo que pasó.
+
+	   NO GUARDA NADA. La lista de eventos se regenera cuando hace falta a
+	   partir de datos que el duelo ya tiene almacenados (fuerzas por línea
+	   recalculadas desde la alineación CONGELADA, marcador y valor_sorteo).
+	   Es determinista: el mismo duelo se narra igual cada vez que se abre —
+	   necesario para que el veredicto compartible (§6.1) siga cuadrando— y
+	   dos intentos distintos del mismo nodo se narran distinto solos, porque
+	   cada duelo tiene su propio valor_sorteo. Eso es exactamente la regla 6
+	   de §1.5 sin pagar una columna JSON por duelo.
+
+	   El azar va con un generador propio sembrado, NUNCA con mt_rand(): esta
+	   función se llama al pintar una pantalla, y tocar el estado global del
+	   generador desde ahí contaminaría el sorteo de cualquier duelo o sobre
+	   que se resolviera después en la misma petición.
+	   ====================================================================== */
+
+	/** Minutos reglamentarios. El descuento se añade aparte, al final. */
+	const PARTIDO_MINUTOS = 90;
+
 	/**
-	 * Marcador de goles. PROVISIONAL: la especificación (§9.3) lo deja para un
-	 * documento propio. Cumple el contrato que sí fija:
-	 *   · nunca contradice al ganador ya sorteado,
-	 *   · se deriva del mismo valor de sorteo, no de otra tirada aparte,
-	 *   · tiene en cuenta las categorías, no solo quién ganó.
+	 * Generador determinista [0,1). LCG clásico: da igual que sea de calidad
+	 * estadística mediocre, aquí solo reparte narración, no decide resultados.
 	 */
-	private function marcadorDuelo($fuerzaGanador, $fuerzaPerdedor, $sorteo) {
-		// Cuánto pesó el ataque del ganador frente a lo que tenía enfrente.
-		$muro = max(1, $fuerzaPerdedor["DF"] + $fuerzaPerdedor["POR"]);
-		$dominio = $fuerzaGanador["DC"] / $muro;
-
-		// Dos derivados deterministas del mismo sorteo, para no tirar otra vez.
-		$r1 = fmod($sorteo * 1000, 1);
-		$r2 = fmod($sorteo * 7919, 1);
-
-		$golesGanador  = (int) max(1, min(6, round(1 + $dominio * 3 + $r1 * 1.5)));
-		$muroGanador   = max(1, $fuerzaGanador["DF"] + $fuerzaGanador["POR"]);
-		$dominioRival  = $fuerzaPerdedor["DC"] / $muroGanador;
-		$golesPerdedor = (int) max(0, min($golesGanador - 1, round($dominioRival * 3 + $r2)));
-
-		return [$golesGanador, $golesPerdedor];
+	private static function azarSembrado($semilla) {
+		$estado = (int) (fmod(abs((float) $semilla), 1.0) * 2147483647);
+		if ($estado <= 0) $estado = 123456789;
+		return function () use (&$estado) {
+			$estado = ($estado * 1103515245 + 12345) & 0x7FFFFFFF;
+			return $estado / 0x7FFFFFFF;
+		};
 	}
+
+	/**
+	 * Selector de frases SIN REEMPLAZO dentro de un mismo partido (§1.5 regla
+	 * 6). Devuelve un callable ($tipo, $vars) => string. Mientras queden
+	 * variantes sin usar de ese tipo no repite ninguna; al agotarlas vuelve a
+	 * barajar. Sin esto, elegir al azar repetiría frases dentro del MISMO
+	 * partido, que es donde más canta.
+	 */
+	private static function narrador(array $plantillas, callable $azar) {
+		$bolsas = [];
+		return function ($tipo, array $vars = []) use ($plantillas, $azar, &$bolsas) {
+			$variantes = $plantillas[$tipo] ?? [];
+			if (!$variantes) return "";
+
+			if (empty($bolsas[$tipo])) {
+				$bolsas[$tipo] = range(0, count($variantes) - 1);
+				// Fisher-Yates con el azar sembrado: reproducible.
+				for ($i = count($bolsas[$tipo]) - 1; $i > 0; $i--) {
+					$j = (int) ($azar() * ($i + 1));
+					[$bolsas[$tipo][$i], $bolsas[$tipo][$j]] = [$bolsas[$tipo][$j], $bolsas[$tipo][$i]];
+				}
+			}
+			$texto = $variantes[array_pop($bolsas[$tipo])];
+
+			foreach ($vars as $clave => $valor) {
+				$texto = str_replace("{" . $clave . "}", $valor, $texto);
+			}
+			return $texto;
+		};
+	}
+
+	/** Cartas de un bando agrupadas por línea, para elegir protagonista. */
+	private static function plantillaPorLinea(array $cartas, $formacion) {
+		$huecos = self::huecosDe($formacion);
+		$porLinea = ["POR" => [], "DF" => [], "MC" => [], "DC" => []];
+		foreach ($cartas as $carta) {
+			$linea = $huecos[(int) ($carta["hueco"] ?? 0)] ?? "MC";
+			$porLinea[$linea][] = $carta;
+		}
+		return $porLinea;
+	}
+
+	/**
+	 * Elige una carta de las líneas pedidas, ponderando por lo que aporta:
+	 * el protagonista de una jugada NO puede ser siempre el de más Ataque
+	 * (§1.5 regla 6 lo prohíbe explícitamente), pero tampoco puede ser
+	 * uniforme o el partido lo protagonizaría el peor de la plantilla tanto
+	 * como la estrella. Se pondera, y así varía sin dejar de tener sentido.
+	 */
+	private static function protagonista(array $porLinea, array $lineas, callable $azar, $porDefecto = "El equipo", array $evitar = []) {
+		$candidatas = [];
+		foreach ($lineas as $linea) {
+			foreach ($porLinea[$linea] ?? [] as $carta) {
+				// En PvE el rival puede llevar LAS MISMAS cartas que el jugador,
+				// así que atacante y defensor pueden salir con el mismo nombre y
+				// la frase queda en "Entrada tardía de X sobre X". Se descartan
+				// aquí los nombres ya usados en esta misma jugada.
+				if (in_array($carta["nombre"], $evitar, true)) continue;
+				$candidatas[] = [$carta, max(1.0, self::aportarCarta($carta, $linea))];
+			}
+		}
+		if (!$candidatas) return $porDefecto;
+
+		$suma = array_sum(array_column($candidatas, 1));
+		$corte = $azar() * $suma;
+		foreach ($candidatas as [$carta, $peso]) {
+			$corte -= $peso;
+			if ($corte <= 0) return $carta["nombre"];
+		}
+		return $candidatas[0][0]["nombre"];
+	}
+
+	/**
+	 * Genera la lista completa y ordenada de eventos de un partido ya resuelto.
+	 *
+	 * $bando = [
+	 *   "nombre"     => string,
+	 *   "fuerza"     => ["POR"=>f,"DF"=>f,"MC"=>f,"DC"=>f],
+	 *   "cartas"     => alineación congelada,
+	 *   "formacion"  => clave de formación,
+	 *   "goles"      => int  (ya decidido; el motor lo REPARTE, no lo inventa)
+	 * ]
+	 *
+	 * $opciones acepta:
+	 *   "dificultad" => clave de self::DIFICULTADES (null en PvP). Es la que
+	 *                   gobierna cuántas ocasiones se ofrecen como minijuego,
+	 *                   igual que ya gobierna Elo/Compos/Aumento del rival.
+	 *
+	 * Devuelve ["eventos" => [...], "stats" => [...]].
+	 *
+	 * CONTRATO DE UN EVENTO — es la superficie a la que se van a enganchar
+	 * las ~90 entradas del catálogo (§2) y las 5 palancas de dificultad (§3),
+	 * así que se rompe caro. Cada evento lleva SIEMPRE:
+	 *   id          identificador estable dentro del partido; es la referencia
+	 *               con la que un minijuego dirá luego "resolví ESTA jugada".
+	 *   minuto,     tipo, lado, texto, marcador
+	 *   momentum    -100..100, positivo = a favor del local (§1.4)
+	 *   familia     solo en ocasiones: a qué familia del catálogo pertenecería
+	 *               el minijuego que puede colgar de esta jugada (§2.3)
+	 *   interactivo solo en ocasiones: si esta jugada es una de las elegidas
+	 *               para ofrecer decisión al jugador (§1.5 regla 3: NUNCA todas)
+	 *   protagonistas  cartas ya resueltas de la jugada, para que el minijuego
+	 *               no tenga que volver a elegirlas y contradecir al texto.
+	 *
+	 * §1.3: el marcador no se recalcula aquí. Los goles ya vienen dados y el
+	 * motor decide EN QUÉ MINUTO y CÓMO caen, eligiendo para ello las
+	 * ocasiones más peligrosas que él mismo generó. Así el marcador nace de la
+	 * simulación sin poder contradecir nunca al ganador ya sorteado, que es la
+	 * única restricción dura que §1.3 mantiene del sistema anterior.
+	 */
+	public static function generarEventosPartido(array $local, array $visitante, $semilla, array $opciones = []) {
+		$azar       = self::azarSembrado($semilla);
+		$plantillas = require __DIR__ . "/plantillas_narracion.php";
+		$frase      = self::narrador($plantillas, $azar);
+
+		/* Cuántas de las ocasiones generadas se ofrecen como minijuego. NO es
+		   "todas" a propósito (§1.5 regla 3: si aparecieran en cada ocasión se
+		   convertirían en el nuevo botón repetitivo que este motor viene a
+		   evitar). Sube con la dificultad porque un Extremo debe exigir estar
+		   encima del partido; en Fácil se ofrece poco para no abrumar. */
+		$ritmoPorDificultad = [
+			"facil" => 0.30, "medio" => 0.40, "dificil" => 0.50,
+			"muy_dificil" => 0.60, "extremo" => 0.70,
+		];
+		$ritmoInteractivo = $ritmoPorDificultad[$opciones["dificultad"] ?? ""] ?? 0.45;
+
+		$bandos = ["local" => $local, "visitante" => $visitante];
+		$porLinea = [];
+		foreach ($bandos as $lado => $b) {
+			$porLinea[$lado] = self::plantillaPorLinea($b["cartas"] ?? [], $b["formacion"] ?? self::FORMACION_BASE);
+		}
+
+		$mcL = max(1.0, (float) $local["fuerza"]["MC"]);
+		$mcV = max(1.0, (float) $visitante["fuerza"]["MC"]);
+		$pLocal = $mcL / ($mcL + $mcV);   // §1.2: la posesión la decide el MEDIO, no el total
+
+		$descuento = 1 + (int) ($azar() * 4);
+		$minutoFinal = self::PARTIDO_MINUTOS + $descuento;
+
+		/* --- Fase 1: repartir posesión y marcar qué tramos son ocasión -----
+		   Se recorre el partido en tramos cortos. Cada tramo lo domina un
+		   bando y puede acabar en ocasión, ponderado por su Ataque contra el
+		   muro rival (Defensa + Portería), igual que §1.2.
+
+		   Las ocasiones viven SIEMPRE sobre un tramo real, nunca en un minuto
+		   suelto inventado: la fase 3 recorre los tramos, así que una ocasión
+		   colocada en un minuto que no es de ningún tramo no se narraría nunca
+		   y el marcador se quedaría corto (pasó: un 7-6 se contaba como 7-4). */
+		$tramos = [];
+		$minuto = 1;
+		while ($minuto <= $minutoFinal) {
+			$lado    = $azar() < $pLocal ? "local" : "visitante";
+			$contra  = $lado === "local" ? "visitante" : "local";
+
+			$ataque = max(1.0, (float) $bandos[$lado]["fuerza"]["DC"]);
+			$muro   = max(1.0, (float) $bandos[$contra]["fuerza"]["DF"] + (float) $bandos[$contra]["fuerza"]["POR"]);
+			$ratio  = $ataque / ($ataque + $muro);
+
+			// Probabilidad de que el tramo acabe en ocasión. Acotada por arriba
+			// y por abajo: ni el mazo más flojo se queda sin pisar el área, ni
+			// el más fuerte convierte cada tramo en una ocasión.
+			$pOcasion = max(0.14, min(0.52, 0.10 + $ratio * 0.62));
+
+			$tramos[] = [
+				"minuto"  => $minuto,
+				"lado"    => $lado,
+				"ratio"   => $ratio,
+				"ocasion" => $azar() < $pOcasion,
+				// El peligro decide qué ocasiones acaban en gol. Mezcla la
+				// calidad real del ataque con azar para que no sean siempre
+				// las mismas jugadas las que entran.
+				"peligro" => $ratio * (0.55 + $azar() * 0.9),
+				"gol"     => false,
+			];
+			$minuto += 2 + (int) ($azar() * 3);   // tramos de 2 a 4 minutos
+		}
+
+		/* --- Fase 2: decidir qué ocasiones son gol -------------------------
+		   DOS MODOS:
+
+		   · NATURAL (goles = null) — §1.3 en su forma literal: cada ocasión se
+		     resuelve por su cuenta y el marcador ES el número de ocasiones que
+		     acabaron dentro. Lo usa resolverDuelo() en PvP para DECIDIR el
+		     resultado, sustituyendo a la fórmula provisional marcadorDuelo().
+
+		   · REPARTO (goles dados) — el marcador ya está decidido y aquí solo se
+		     coloca: se marcan como gol las ocasiones más peligrosas de cada
+		     bando. Lo usan las cadenas y, sobre todo, la narración de un duelo
+		     ya guardado: así lo que se cuenta NUNCA puede contradecir al
+		     marcador que está en la base de datos, aunque algún día se retoquen
+		     las probabilidades del modo natural. */
+		$modoNatural = !isset($local["goles"]) || !isset($visitante["goles"]);
+
+		if ($modoNatural) {
+			foreach ($tramos as $i => $t) {
+				if (!$t["ocasion"]) continue;
+				// Conversión acotada: ni una ocasión clarísima es gol seguro, ni
+				// una mala es imposible. Calibrado para dar marcadores con forma
+				// de fútbol (la mayoría 0-3) en vez de los 7-6 de la fórmula
+				// provisional.
+				$pGol = max(0.05, min(0.45, 0.06 + $t["peligro"] * 0.30));
+				$tramos[$i]["gol"] = $azar() < $pGol;
+			}
+
+			$cuenta = function ($lado) use (&$tramos) {
+				return count(array_filter($tramos, fn($t) => $t["lado"] === $lado && $t["gol"]));
+			};
+
+			/* Única restricción dura que §1.3 conserva del sistema anterior: la
+			   simulación no puede contradecir al ganador ya sorteado. Se corrige
+			   con el mínimo destrozo posible —ascender la mejor ocasión fallada
+			   del ganador, y solo si no queda ninguna, anular el peor gol del
+			   perdedor— en vez de rehacer el marcador entero. */
+			$gana = ($opciones["gana"] ?? null) === "visitante" ? "visitante" : "local";
+			$pierde = $gana === "local" ? "visitante" : "local";
+
+			$vueltas = 0;
+			while ($cuenta($gana) <= $cuenta($pierde) && $vueltas++ < 60) {
+				// 1º ascender la mejor ocasión que el ganador ya falló
+				$candidatos = array_keys(array_filter(
+					$tramos, fn($t) => $t["lado"] === $gana && $t["ocasion"] && !$t["gol"]
+				));
+				if ($candidatos) {
+					usort($candidatos, fn($a, $b) => $tramos[$b]["peligro"] <=> $tramos[$a]["peligro"]);
+					$tramos[$candidatos[0]]["gol"] = true;
+					continue;
+				}
+				// 2º anular el gol más flojo del perdedor
+				$suyos = array_keys(array_filter($tramos, fn($t) => $t["lado"] === $pierde && $t["gol"]));
+				if ($suyos) {
+					usort($suyos, fn($a, $b) => $tramos[$a]["peligro"] <=> $tramos[$b]["peligro"]);
+					$tramos[$suyos[0]]["gol"] = false;
+					continue;
+				}
+				/* 3º crear una ocasión al ganador. Hace falta de verdad: si el
+				   ganador no generó NINGUNA ocasión y el perdedor tampoco marcó,
+				   el partido se queda 0-0 y sin este paso se guardaba un empate
+				   con un ganador ya sorteado, que es justo lo que §1.3 prohíbe
+				   (pasaba en el 1% de los partidos). */
+				$libres = array_keys(array_filter($tramos, fn($t) => $t["lado"] === $gana && !$t["ocasion"]));
+				if (!$libres) break;
+				usort($libres, fn($a, $b) => $tramos[$b]["ratio"] <=> $tramos[$a]["ratio"]);
+				$tramos[$libres[0]]["ocasion"] = true;
+				$tramos[$libres[0]]["gol"] = true;
+			}
+
+			$golesDe = ["local" => $cuenta("local"), "visitante" => $cuenta("visitante")];
+		} else {
+
+		$golesDe = ["local" => (int) $local["goles"], "visitante" => (int) $visitante["goles"]];
+
+		foreach (["local", "visitante"] as $lado) {
+			$suyos = array_keys(array_filter($tramos, fn($t) => $t["lado"] === $lado));
+
+			$conOcasion = array_values(array_filter($suyos, fn($i) => $tramos[$i]["ocasion"]));
+			$faltan = $golesDe[$lado] - count($conOcasion);
+			if ($faltan > 0) {
+				$libres = array_values(array_filter($suyos, fn($i) => !$tramos[$i]["ocasion"]));
+				usort($libres, fn($a, $b) => $tramos[$b]["ratio"] <=> $tramos[$a]["ratio"]);
+				foreach (array_slice($libres, 0, $faltan) as $i) {
+					$tramos[$i]["ocasion"] = true;
+					$conOcasion[] = $i;
+				}
+			}
+
+			usort($conOcasion, fn($a, $b) => $tramos[$b]["peligro"] <=> $tramos[$a]["peligro"]);
+			foreach (array_slice($conOcasion, 0, $golesDe[$lado]) as $i) {
+				$tramos[$i]["gol"] = true;
+			}
+		}
+
+		}   // fin del modo REPARTO
+
+		/* TEXTURA MÍNIMA DE PARTIDO. Con marcadores altos —el marcador
+		   provisional llega a dar 4-8 o 9-5— puede pasar que TODAS las
+		   ocasiones generadas acaben siendo gol, y entonces el partido se narra
+		   como doce goles seguidos sin una sola parada, sin un tiro fuera y sin
+		   un córner. Eso no se lee como un partido, se lee como un fallo.
+		   Se garantizan ocasiones falladas suficientes ascendiendo más tramos,
+		   que al no entrar en el reparto de goles se resuelven como parada,
+		   despeje, tiro fuera o córner. No toca el marcador: solo lo rodea de
+		   lo que cualquier partido real tiene alrededor de sus goles. */
+		$golesTotales = $golesDe["local"] + $golesDe["visitante"];
+		$noGol = count(array_filter($tramos, fn($t) => $t["ocasion"] && !$t["gol"]));
+		$minimoNoGol = max(4, (int) ceil($golesTotales * 0.6));
+		if ($noGol < $minimoNoGol) {
+			$libres = array_keys(array_filter($tramos, fn($t) => !$t["ocasion"]));
+			usort($libres, fn($a, $b) => $tramos[$b]["ratio"] <=> $tramos[$a]["ratio"]);
+			foreach (array_slice($libres, 0, $minimoNoGol - $noGol) as $i) {
+				$tramos[$i]["ocasion"] = true;   // ocasión que NO es gol: gol sigue en false
+			}
+		}
+
+		/* --- Fase 3: convertir todo en eventos narrados -------------------- */
+		$eventos = [];
+		$stats = [
+			"local"     => ["posesion" => 0, "tiros" => 0, "a_puerta" => 0, "paradas" => 0, "corners" => 0, "faltas" => 0, "tarjetas" => 0],
+			"visitante" => ["posesion" => 0, "tiros" => 0, "a_puerta" => 0, "paradas" => 0, "corners" => 0, "faltas" => 0, "tarjetas" => 0],
+		];
+		$marcador = ["local" => 0, "visitante" => 0];
+
+		/* MOMENTUM (§1.4): media móvil de quién ha generado las ocasiones más
+		   recientes. Positivo = a favor del local. No toca ninguna fuerza ni
+		   ninguna probabilidad —el cálculo sigue cerrado (§1.1)—, es un
+		   indicador de lectura... y el único efecto que varios minijuegos del
+		   catálogo declaran tener (El Grito de Guerra, La Mirada Desafiante,
+		   El Baile Provocador mueven Momentum y nada más), así que tiene que
+		   existir en el motor antes que ellos. El 0.78 es el factor de olvido:
+		   una ocasión pesa, pero cuatro ocasiones seguidas del rival le dan la
+		   vuelta al indicador en unos pocos minutos. */
+		$momentum = 0.0;
+		$empujarMomentum = function ($lado, $fuerza = 26.0) use (&$momentum) {
+			$momentum = $momentum * 0.78 + ($lado === "local" ? $fuerza : -$fuerza);
+			$momentum = max(-100.0, min(100.0, $momentum));
+		};
+
+		$siguienteId = 0;
+		$añadir = function ($minuto, $tipo, $texto, $lado = null, $extra = []) use (&$eventos, &$marcador, &$momentum, &$siguienteId) {
+			if ($texto === "") return;
+			$eventos[] = array_merge([
+				"id"       => ++$siguienteId,
+				"minuto"   => (int) $minuto,
+				"tipo"     => $tipo,
+				"lado"     => $lado,
+				"texto"    => $texto,
+				"marcador" => [$marcador["local"], $marcador["visitante"]],
+				"momentum" => (int) round($momentum),
+			], $extra);
+		};
+
+		$añadir(0, "inicio", $frase("inicio"));
+
+		$ultimoNotable = 0;
+		$mediaMarcada = false;
+
+		foreach ($tramos as $tramo) {
+			$m = $tramo["minuto"];
+
+			// Hitos de cronómetro.
+			if (!$mediaMarcada && $m > 45) {
+				$añadir(45, "descanso", $frase("descanso"));
+				$añadir(46, "reanuda", $frase("reanuda"));
+				$mediaMarcada = true;
+				$ultimoNotable = 46;
+			}
+
+			$stats[$tramo["lado"]]["posesion"]++;
+
+			$lado   = $tramo["lado"];
+			$contra = $lado === "local" ? "visitante" : "local";
+			$nombreAtaca  = $bandos[$lado]["nombre"];
+			$nombreDefien = $bandos[$contra]["nombre"];
+
+			if ($tramo["ocasion"]) {
+				$ladoOc = $lado;
+				$contOc = $contra;
+				$atacante = $nombreAtaca;
+				$defensor = $nombreDefien;
+
+				// Cada nombre ya elegido se pasa como "evitar" al siguiente: los
+				// cuatro papeles de una misma jugada tienen que ser cuatro
+				// personas distintas, aunque ambos equipos compartan cartas.
+				$jugador = self::protagonista($porLinea[$ladoOc], ["DC", "MC"], $azar, $atacante);
+				$portero = self::protagonista($porLinea[$contOc], ["POR"], $azar, "el portero", [$jugador]);
+				$defensa = self::protagonista($porLinea[$contOc], ["DF"], $azar, "la defensa", [$jugador, $portero]);
+				$asiste  = self::protagonista($porLinea[$ladoOc], ["MC", "DF"], $azar, $atacante, [$jugador, $portero, $defensa]);
+
+				$vars = compact("jugador", "portero", "defensa", "asiste")
+					+ ["equipo" => $atacante, "rival" => $defensor];
+
+				$stats[$ladoOc]["tiros"]++;
+				$empujarMomentum($ladoOc);
+
+				// Contexto que hereda el minijuego que cuelgue de esta jugada.
+				// Se resuelve UNA vez y viaja con el evento: si el minijuego
+				// volviera a elegir protagonista por su cuenta, acabaría
+				// contradiciendo al texto que el jugador acaba de leer.
+				$gancho = [
+					"protagonistas" => [
+						"jugador" => $jugador, "portero" => $portero,
+						"defensa" => $defensa, "asiste"  => $asiste,
+					],
+					"interactivo" => $azar() < $ritmoInteractivo,
+				];
+
+				if ($tramo["gol"]) {
+					$marcador[$ladoOc]++;
+					$stats[$ladoOc]["a_puerta"]++;
+					// Con asistencia solo si hay alguien distinto a quien marca:
+					// "X asiste a X" se lee como un fallo, no como una jugada.
+					$tipo = ($asiste !== $jugador && $azar() < 0.55) ? "gol_asistido" : "gol";
+					$empujarMomentum($ladoOc, 40.0);   // un gol pesa más que una ocasión
+					$añadir($m, "gol", $frase($tipo, $vars), $ladoOc,
+						$gancho + ["destacado" => true,
+						           "familia" => "disparo", "familia_def" => "porteria"]);
+				} else {
+					$dado = $azar();
+					if ($dado < 0.34) {
+						$stats[$ladoOc]["a_puerta"]++;
+						$stats[$contOc]["paradas"]++;
+						$añadir($m, "parada", $frase("parada", $vars), $ladoOc,
+							$gancho + ["familia" => "disparo", "familia_def" => "porteria"]);
+					} elseif ($dado < 0.62) {
+						$añadir($m, "tiro_fuera", $frase("tiro_fuera", $vars), $ladoOc,
+							$gancho + ["familia" => "disparo", "familia_def" => null]);
+					} elseif ($dado < 0.84) {
+						$añadir($m, "despeje", $frase("despeje", $vars), $ladoOc,
+							$gancho + ["familia" => "disparo", "familia_def" => "defensa"]);
+					} else {
+						$stats[$ladoOc]["corners"]++;
+						$añadir($m, "corner", $frase("corner", $vars), $ladoOc,
+							$gancho + ["familia" => "balon_parado", "familia_def" => "balon_parado"]);
+					}
+				}
+				$ultimoNotable = $m;
+			}
+
+			// Faltas y tarjetas: puro color, sin efecto mecánico (§1.4).
+			if (!$tramo["ocasion"] && $azar() < 0.10) {
+				$jugador = self::protagonista($porLinea[$lado], ["DC", "MC"], $azar, $nombreAtaca);
+				$defensa = self::protagonista($porLinea[$contra], ["DF", "MC"], $azar, $nombreDefien, [$jugador]);
+				$vars = compact("jugador", "defensa") + ["equipo" => $nombreAtaca, "rival" => $nombreDefien];
+
+				$stats[$contra]["faltas"]++;
+				if ($azar() < 0.22) {
+					$stats[$contra]["tarjetas"]++;
+					// La tarjeta es del que la ve, pero la falta la sufre el que
+					// atacaba: el balón parado resultante es SUYO.
+					$añadir($m, "tarjeta", $frase("tarjeta", $vars), $contra,
+						["familia" => "arbitro", "interactivo" => false]);
+				} else {
+					$añadir($m, "falta", $frase("falta", $vars), $lado,
+						["familia" => "balon_parado", "interactivo" => $azar() < $ritmoInteractivo,
+						 "protagonistas" => ["jugador" => $jugador, "defensa" => $defensa]]);
+				}
+				$ultimoNotable = $m;
+			}
+
+			/* §1.5 regla 8 — mínimo garantizado de interacción. Si el azar deja
+			   un hueco largo sin nada que leer, se fuerza un evento de contexto.
+			   Sin esto, un partido puede tener tramos enteros en blanco y se
+			   siente como "botón, esperar, continuar", que es justo lo que todo
+			   este motor viene a corregir. */
+			if ($m - $ultimoNotable >= 12) {
+				$jugador = self::protagonista($porLinea[$lado], ["MC", "DF"], $azar, $nombreAtaca);
+				$vars = ["jugador" => $jugador, "equipo" => $nombreAtaca, "rival" => $nombreDefien];
+				$añadir($m, "contexto", $frase($azar() < 0.6 ? "posesion" : "presion", $vars), $lado);
+				$ultimoNotable = $m;
+			}
+		}
+
+		if (!$mediaMarcada) {
+			$añadir(45, "descanso", $frase("descanso"));
+			$añadir(46, "reanuda", $frase("reanuda"));
+		}
+
+		$añadir(self::PARTIDO_MINUTOS, "descuento", $frase("descuento"), null, ["descuento" => $descuento]);
+		$añadir($minutoFinal, "final", $frase("final"));
+
+		usort($eventos, fn($a, $b) => $a["minuto"] <=> $b["minuto"]);
+
+		/* Los id se renumeran DESPUÉS de ordenar, no al crear. El descuento y
+		   el descanso se añaden fuera del recorrido de tramos, así que el orden
+		   de creación no es el cronológico y los id salían saltados (un id 16
+		   en el minuto 90 antes que un id 15 en el 92). Un id que no avanza con
+		   el reloj es una trampa para cualquier reproducción que lo use como
+		   cursor de "por dónde voy". */
+		foreach ($eventos as $i => &$evento) {
+			$evento["id"] = $i + 1;
+		}
+		unset($evento);
+
+		// La posesión se contó en tramos; se pasa a porcentaje ya redondeado
+		// para que el cliente solo pinte, sin recalcular nada.
+		$totalTramos = max(1, $stats["local"]["posesion"] + $stats["visitante"]["posesion"]);
+		$pctLocal = (int) round($stats["local"]["posesion"] * 100 / $totalTramos);
+		$stats["local"]["posesion"]     = $pctLocal;
+		$stats["visitante"]["posesion"] = 100 - $pctLocal;
+
+		return [
+			"eventos"   => $eventos,
+			"stats"     => $stats,
+			"descuento" => $descuento,
+			"minutos"   => $minutoFinal,
+			// En modo natural este es el marcador que el partido ha producido y
+			// que hay que guardar; en modo reparto coincide con el que entró.
+			"goles"     => [$marcador["local"], $marcador["visitante"]],
+		];
+	}
+
+	/* ======================================================================
+	   MINIJUEGOS  (Biblia §2)
+	   ----------------------------------------------------------------------
+	   El motor no sabe jugar a ninguno: las reglas de cada uno viven en
+	   db/minijuegos.php y aquí solo está lo común — qué remate llega y qué
+	   pasa con la opción que eligió el jugador.
+
+	   Todo es DETERMINISTA a partir del duelo y del id del evento, nunca de
+	   mt_rand(). El motivo es de seguridad, no de estilo: el navegador manda
+	   qué OPCIÓN eligió, y el servidor tiene que poder recalcular por su
+	   cuenta qué remate llegaba en esa jugada. Si el remate se sorteara al
+	   vuelo, un cliente podría pedir el mismo evento hasta que le saliera
+	   favorable.
+	   ====================================================================== */
+
+	public static function catalogoMinijuegos() {
+		static $catalogo = null;
+		if ($catalogo === null) $catalogo = require __DIR__ . "/minijuegos.php";
+		return $catalogo;
+	}
+
+	/**
+	 * Qué minijuego cuelga de un evento concreto, o null si ese evento no
+	 * ofrece decisión. Solo las ocasiones marcadas como interactivas por el
+	 * motor son candidatas (§1.5 regla 3: nunca todas).
+	 */
+	public static function minijuegoDeEvento(array $evento, $defiendo = false) {
+		if (empty($evento["interactivo"])) return null;
+		/* La familia depende del LADO desde el que se mire la misma jugada: un
+		   remate del rival es "disparo" para quien lo tira y "porteria" para
+		   quien lo tiene que parar. Sin esta distinción, Muralla Humana no
+		   aparecía nunca — el motor solo marcaba "porteria" en las paradas, y
+		   un gol (que es justo lo que hay que parar) quedaba fuera. */
+		$familia = $defiendo ? ($evento["familia_def"] ?? null) : ($evento["familia"] ?? null);
+		if (!$familia) return null;
+
+		$quiero = $defiendo ? "defiendo" : "ataco";
+		foreach (self::catalogoMinijuegos() as $clave => $mj) {
+			// El lado también tiene que casar: "disparo" existe en las dos
+			// lecturas de la misma jugada, y sin esta comprobación una ocasión
+			// del rival ofrecería el minijuego de rematar.
+			if ($mj["familia"] === $familia && ($mj["lado"] ?? "defiendo") === $quiero) {
+				return ["clave" => $clave] + $mj;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Cómo sale el portero rival en esta jugada. Espejo exacto de
+	 * remateDeJugada(): se deduce de SU carta, con el desvío medido contra la
+	 * media de los once que tiene en el campo, para que el reparto salga
+	 * parejo aunque el catálogo esté sesgado.
+	 */
+	public static function estiloPorteroDeJugada(array $evento, array $cartasDefensor, $semilla) {
+		$nombre = $evento["protagonistas"]["portero"] ?? null;
+		$carta = null;
+		foreach ($cartasDefensor as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "espera";
+
+		// Un portero de mucha Defensa se lanza; uno de mucha Técnica lee y sale.
+		$perfil = fn($c) => ((float) ($c["defensa"] ?? 0) + (float) ($c["tecnica"] ?? 0)) > 0
+			? ((float) $c["defensa"] - (float) $c["tecnica"]) / ((float) $c["defensa"] + (float) $c["tecnica"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasDefensor);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		$k = 3.0;
+		$pesos = [
+			"tierra" => max(0.05, 1 + $k * $desvio),
+			"achica" => max(0.05, 1 - $k * $desvio),
+			"espera" => 1.0,
+		];
+
+		$azar = self::azarSembrado(fmod($semilla * 4409 + $evento["id"] * 0.021, 1));
+		$corte = $azar() * array_sum($pesos);
+		foreach ($pesos as $tipo => $peso) {
+			$corte -= $peso;
+			if ($corte <= 0) return $tipo;
+		}
+		return "espera";
+	}
+
+	/** El dato oculto que hay que adivinar, según lo que declare el catálogo. */
+	public static function ocultoDeJugada(array $minijuego, array $evento, array $cartas, $semilla) {
+		return ($minijuego["oculto"] ?? "remate") === "estilo_portero"
+			? self::estiloPorteroDeJugada($evento, $cartas, $semilla)
+			: self::remateDeJugada($evento, $cartas, $semilla);
+	}
+
+	/** Pista sobre el portero rival: espejo de pistaRemate(). */
+	public static function pistaPortero(array $evento, array $cartasDefensor) {
+		$nombre = $evento["protagonistas"]["portero"] ?? null;
+		$carta = null;
+		foreach ($cartasDefensor as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "No sabes cómo suele salir.";
+
+		$perfil = fn($c) => ((float) ($c["defensa"] ?? 0) + (float) ($c["tecnica"] ?? 0)) > 0
+			? ((float) $c["defensa"] - (float) $c["tecnica"]) / ((float) $c["defensa"] + (float) $c["tecnica"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasDefensor);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		if ($desvio > 0.02)  return $carta["nombre"] . " se lanza pronto al suelo.";
+		if ($desvio < -0.02) return $carta["nombre"] . " sale a comerte el ángulo.";
+		return $carta["nombre"] . " no se define hasta el final.";
+	}
+
+	/**
+	 * Qué remate llega en esa jugada. Se deduce de las estadísticas de quien
+	 * remata, no de un sorteo ciego: un delantero de mucho Ataque tiende al
+	 * disparo potente y uno de mucha Técnica al colocado. Así la pista que se
+	 * le enseña al jugador (§3.2 palanca 3) puede ser HONESTA — se basa en
+	 * algo real de la carta que tiene enfrente, que es justo lo que §3.3 exige
+	 * para que la dificultad alta siga siendo un reto legítimo y no una lotería.
+	 */
+	public static function remateDeJugada(array $evento, array $cartasAtacante, $semilla) {
+		$nombre = $evento["protagonistas"]["jugador"] ?? null;
+		$carta = null;
+		foreach ($cartasAtacante as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "colocado";
+
+		$ataque  = (float) ($carta["ataque"] ?? 0);
+		$tecnica = (float) ($carta["tecnica"] ?? 0);
+
+		/* Pesos RELATIVOS, no umbrales absolutos. La diferencia importa:
+		   comparar `ataque > tecnica` directamente ataba el reparto a cómo esté
+		   el catálogo hoy, y hoy está sesgado a Técnica (solo 5 cartas de 44
+		   tienen Ataque dominante). Con umbrales absolutos salía "colocado" el
+		   54 % de las veces, y entonces la opción que gana a colocado era
+		   dominante — exactamente lo que prohíbe §1.5 regla 2.
+
+		   Así el reparto se mantiene repartido aunque el catálogo crezca o se
+		   reequilibre: si todas las cartas fueran idénticas saldría un tercio
+		   de cada tipo, y la desviación de cada carta solo lo inclina un poco.
+		   La pista sigue siendo honesta (§3.3): un rematador de más Ataque
+		   dispara potente más a menudo, solo que no siempre. */
+		$perfil = fn($c) => ((float) ($c["ataque"] ?? 0) + (float) ($c["tecnica"] ?? 0)) > 0
+			? ((float) $c["ataque"] - (float) $c["tecnica"]) / ((float) $c["ataque"] + (float) $c["tecnica"])
+			: 0.0;
+
+		/* El desvío se mide contra la MEDIA DE LOS ONCE QUE ESTÁN EN EL CAMPO,
+		   no contra cero. Contra cero, el sesgo del catálogo (más Técnica que
+		   Ataque de media) empujaba siempre hacia "colocado" y dejaba dominante
+		   a la opción que le gana. Centrado en la alineación se normaliza solo:
+		   la pregunta pasa a ser "¿este rematador es más potente QUE SUS
+		   COMPAÑEROS?", que además es la lectura que un jugador puede hacer de
+		   verdad mirando la alineación rival. */
+		$medias = array_map($perfil, $cartasAtacante);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+
+		$desvio = $perfil($carta) - $media;
+		$k = 3.0;   // el desvío ya viene centrado, así que es mucho más pequeño
+		$pesos = [
+			"potente"  => max(0.05, 1 + $k * $desvio),
+			"colocado" => max(0.05, 1 - $k * $desvio),
+			"raso"     => 1.0,
+		];
+
+		// El id del evento entra en la semilla: dos ocasiones del mismo
+		// rematador en el mismo partido no tienen por qué salir iguales.
+		$azar = self::azarSembrado(fmod($semilla * 7919 + $evento["id"] * 0.013, 1));
+		$corte = $azar() * array_sum($pesos);
+		foreach ($pesos as $tipo => $peso) {
+			$corte -= $peso;
+			if ($corte <= 0) return $tipo;
+		}
+		return "colocado";
+	}
+
+	/**
+	 * Resuelve la elección del jugador contra el remate que llegaba.
+	 * Devuelve "acierto" (la para) o "fallo" (no llega).
+	 *
+	 * No hay castigo por elegir mal: o paras el gol o el gol entra igual que
+	 * habría entrado. Es deliberado — el minijuego solo puede mejorar tu
+	 * partido, nunca empeorarlo, así que ofrecerlo jamás es una trampa.
+	 */
+	public static function resolverMinijuego(array $minijuego, $claveOpcion, $remate) {
+		$opcion = null;
+		foreach ($minijuego["opciones"] as $o) {
+			if ($o["clave"] === $claveOpcion) { $opcion = $o; break; }
+		}
+		if (!$opcion) {   // opción inventada por el cliente: se trata como no decidir
+			foreach ($minijuego["opciones"] as $o) {
+				if (!empty($o["segura"])) { $opcion = $o; break; }
+			}
+		}
+		if (!$opcion) return "fallo";
+
+		return (($opcion["gana"] ?? null) === $remate) ? "acierto" : "fallo";
+	}
+
+	/**
+	 * La pista que se le enseña al jugador antes de decidir (§3.2 palanca 3).
+	 *
+	 * Es HONESTA en el sentido de §3.3: no revela el remate, revela la
+	 * TENDENCIA real del que remata, que es la misma que sesga el sorteo del
+	 * remate. Un delantero marcadamente potente disparará potente más a menudo,
+	 * pero puede sorprenderte — igual que en el fútbol real. Quien lee la pista
+	 * acierta más que 1 de cada 3; quien no la lee, no.
+	 */
+	public static function pistaRemate(array $evento, array $cartasAtacante) {
+		$nombre = $evento["protagonistas"]["jugador"] ?? null;
+		$carta = null;
+		foreach ($cartasAtacante as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "No le has visto rematar todavía.";
+
+		$perfil = fn($c) => ((float) ($c["ataque"] ?? 0) + (float) ($c["tecnica"] ?? 0)) > 0
+			? ((float) $c["ataque"] - (float) $c["tecnica"]) / ((float) $c["ataque"] + (float) $c["tecnica"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasAtacante);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		if ($desvio > 0.02)  return $carta["nombre"] . " pega más fuerte que sus compañeros.";
+		if ($desvio < -0.02) return $carta["nombre"] . " es de los que la colocan.";
+		return $carta["nombre"] . " no tiene un remate marcado.";
+	}
+
+	/** La opción que se aplica sola si no se decide a tiempo (§1.5 regla 4). */
+	public static function opcionSegura(array $minijuego) {
+		foreach ($minijuego["opciones"] as $o) {
+			if (!empty($o["segura"])) return $o["clave"];
+		}
+		return $minijuego["opciones"][0]["clave"] ?? null;
+	}
+
+	/**
+	 * ¿Cabe cambiar el marcador en esta jugada sin contradecir al ganador?
+	 *
+	 * Es la restricción dura de §1.3 aplicada a los minijuegos de impacto
+	 * "jugada". El margen real suele ser de UN gol: con un 2-1 a mi favor puedo
+	 * parar el gol del rival (2-0), pero encajar otro haría 2-2, que ya no es
+	 * la victoria que salió del sorteo. Por eso un minijuego que puede mover el
+	 * marcador solo se OFRECE donde quepa: así cualquier resultado que consiga
+	 * el jugador es siempre aplicable y nunca hay que desdecirse después.
+	 *
+	 * $mios/$suyos son los goles ya guardados, desde el punto de vista de quien
+	 * mira. $delta es lo que le pasaría a los goles del RIVAL (-1 parar, +1
+	 * encajar).
+	 */
+	public static function cabeCambioMarcador($mios, $suyos, $delta, $ganoYo) {
+		$nuevos = $suyos + $delta;
+		if ($nuevos < 0) return false;
+		return $ganoYo ? ($mios > $nuevos) : ($nuevos > $mios);
+	}
+
+	/* ======================================================================
+	   PARTIDO EN VIVO  (migración 014)
+	   ----------------------------------------------------------------------
+	   El partido narrado dejó de ser cosa del navegador. Antes cada jugador lo
+	   reproducía en SU reloj, al cargar la página con ?nuevo=1, y un minijuego
+	   solo detenía su tiempo: con dos personas en el mismo duelo eso significa
+	   que veían minutos distintos y que la pausa de uno no existía para el otro.
+
+	   Ahora el minuto lo manda el servidor y sale del reloj de pared. No hay
+	   ningún proceso de fondo llevándolo —NO HAY CRON (§8)—: se deriva en cada
+	   sondeo, igual que ya se hace con el plazo del Aumento.
+
+	   Regla acordada con Alejandro: si no estás atento, te lo pierdes. El
+	   partido no espera indefinidamente a nadie.
+	   ====================================================================== */
+
+	/** Deja constancia de que este jugador sigue delante del partido. */
+	public function latirPartido($id_duelo, $id_usuario) {
+		$this->pdo->prepare("
+			UPDATE duelos
+			SET latido_creador = IF(id_creador = :u1, NOW(), latido_creador),
+			    latido_rival   = IF(id_rival   = :u2, NOW(), latido_rival)
+			WHERE id_duelo = :d
+		")->execute([":u1" => $id_usuario, ":u2" => $id_usuario, ":d" => $id_duelo]);
+	}
+
+	/** Segundos que el partido lleva corriendo, descontando las pausas. */
+	private static function segundosDePartido(array $duelo) {
+		if (!$duelo["partido_inicio"]) return 0.0;
+		$corrido = time() - strtotime($duelo["partido_inicio"]) - (int) $duelo["partido_pausa_seg"];
+		// Si está parado ahora mismo, lo que lleve parado tampoco cuenta.
+		if ($duelo["partido_pausado_en"]) {
+			$corrido -= time() - strtotime($duelo["partido_pausado_en"]);
+		}
+		return max(0.0, (float) $corrido);
+	}
+
+	/** Arranca el reloj si ya toca: están los dos, o se acabó la espera. */
+	private function arrancarPartidoSiToca(array $duelo) {
+		if ($duelo["partido_inicio"]) return $duelo;
+
+		$espera = (int) $this->config("partido_espera_seg", 15);
+		$maxLatido = (int) $this->config("partido_latido_max", 12);
+
+		$presente = fn($latido) => $latido && (time() - strtotime($latido)) <= $maxLatido;
+		$ambos = $presente($duelo["latido_creador"]) && $presente($duelo["latido_rival"]);
+		$seAcaboLaEspera = $duelo["resuelto"] && (time() - strtotime($duelo["resuelto"])) >= $espera;
+
+		if (!$ambos && !$seAcaboLaEspera) return $duelo;
+
+		// El WHERE con partido_inicio IS NULL evita que dos sondeos simultáneos
+		// arranquen el reloj dos veces y le roben segundos al partido.
+		$this->pdo->prepare("
+			UPDATE duelos SET partido_inicio = NOW()
+			WHERE id_duelo = :d AND partido_inicio IS NULL AND estado = 'resuelto'
+		")->execute([":d" => $duelo["id_duelo"]]);
+
+		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$stmt->execute([":d" => $duelo["id_duelo"]]);
+		return $stmt->fetch(PDO::FETCH_ASSOC);
+	}
+
+	/** Detiene el reloj para los DOS jugadores. */
+	private function pausarPartido($id_duelo) {
+		$this->pdo->prepare("
+			UPDATE duelos SET partido_pausado_en = NOW()
+			WHERE id_duelo = :d AND partido_pausado_en IS NULL
+		")->execute([":d" => $id_duelo]);
+	}
+
+	/** Reanuda, sumando lo que estuvo parado para que no cuente como partido. */
+	private function reanudarPartido($id_duelo) {
+		$this->pdo->prepare("
+			UPDATE duelos
+			SET partido_pausa_seg = partido_pausa_seg + TIMESTAMPDIFF(SECOND, partido_pausado_en, NOW()),
+			    partido_pausado_en = NULL
+			WHERE id_duelo = :d AND partido_pausado_en IS NOT NULL
+		")->execute([":d" => $id_duelo]);
+	}
+
+	/** Los minijuegos ya resueltos de un duelo, indexados por evento+usuario. */
+	public function minijuegosResueltos($id_duelo) {
+		$stmt = $this->pdo->prepare("SELECT * FROM duelo_minijuegos WHERE id_duelo = :d");
+		$stmt->execute([":d" => $id_duelo]);
+		$fuera = [];
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $f) {
+			$fuera[$f["id_evento"] . ":" . $f["id_usuario"]] = $f;
+		}
+		return $fuera;
+	}
+
+	/**
+	 * Quién juega el minijuego de cada evento, visto desde fuera de los dos
+	 * jugadores. Devuelve [id_evento => id_usuario].
+	 *
+	 * Hace falta mirar el duelo desde los DOS lados porque narracionDuelo()
+	 * razona en primera persona: una ocasión es "ataque mío" para uno y
+	 * "ocasión del rival" para el otro, y el minijuego solo se le ofrece a
+	 * quien defiende. Las dos lecturas nunca se contradicen —cada evento tiene
+	 * un único defensor— así que juntarlas es seguro.
+	 */
+	private function duenosDeMinijuego($id_duelo, $idCreador, $idRival) {
+		$duenos = [];
+		foreach ([$idCreador, $idRival] as $quien) {
+			$n = $this->narracionDuelo($id_duelo, $quien);
+			if (empty($n["ok"])) continue;
+			foreach ($n["eventos"] as $e) {
+				if (!empty($e["interactivo"]) && !empty($e["minijuego"])) {
+					$duenos[$e["id"]] = $quien;
+				}
+			}
+		}
+		return $duenos;
+	}
+
+	/**
+	 * EL SONDEO. Devuelve en qué minuto va el partido, qué se ha narrado hasta
+	 * ahí y si hay un minijuego esperando decisión.
+	 *
+	 * Todo se evalúa aquí, en diferido: arrancar el reloj, pausarlo al llegar a
+	 * un minijuego, resolver por fallback al que no contesta y reanudar. No hay
+	 * nada corriendo de fondo entre sondeo y sondeo.
+	 */
+	public function estadoPartido($id_duelo, $id_usuario) {
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
+		if ($duelo["estado"] !== "resuelto") return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+
+		$this->latirPartido($id_duelo, $id_usuario);
+		$duelo = $this->arrancarPartidoSiToca($this->obtenerDuelo($id_duelo, $id_usuario));
+
+		$narracion = $this->narracionDuelo($id_duelo, $id_usuario);
+		if (empty($narracion["ok"])) return $narracion;
+
+		if (!$duelo["partido_inicio"]) {
+			return ["ok" => true, "fase" => "esperando", "minuto" => 0, "eventos" => [],
+			        "nombres" => $narracion["nombres"], "marcador" => [0, 0]];
+		}
+
+		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
+		$minutos  = (int) $narracion["minutos"];
+		$avance   = min(1.0, self::segundosDePartido($duelo) / $duracion);
+		$minutoActual = $avance * $minutos;
+
+		$resueltos = $this->minijuegosResueltos($id_duelo);
+		$duenos    = $this->duenosDeMinijuego($id_duelo, (int) $duelo["id_creador"], (int) $duelo["id_rival"]);
+
+		/* ¿Hay un minijuego que ya toca y que nadie ha resuelto? El partido se
+		   detiene AHÍ, aunque el reloj de pared siga corriendo: el minuto no
+		   avanza mientras partido_pausado_en esté puesto. */
+		$pendiente = null;
+		foreach ($narracion["eventos"] as $e) {
+			if (empty($duenos[$e["id"]])) continue;
+			if ($e["minuto"] > $minutoActual) break;
+			if (isset($resueltos[$e["id"] . ":" . $duenos[$e["id"]]])) continue;
+			$pendiente = $e;
+			break;
+		}
+
+		if ($pendiente) {
+			$this->pausarPartido($id_duelo);
+			$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+
+			$plazo = (int) ($pendiente["minijuego"]["plazo"] ?? 9);
+			$parado = $duelo["partido_pausado_en"] ? time() - strtotime($duelo["partido_pausado_en"]) : 0;
+
+			// Se acabó el plazo: decide el sistema por quien no contestó, con la
+			// opción SEGURA (§1.5 regla 4), y el partido sigue para los dos.
+			if ($parado >= $plazo) {
+				$this->resolverMinijuegoDuelo($id_duelo, $duenos[$pendiente["id"]], (int) $pendiente["id"], "");
+				$this->reanudarPartido($id_duelo);
+				$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+				$pendiente = null;
+			}
+		}
+
+		// El minuto se recalcula tras haber podido pausar/reanudar arriba.
+		$avance = min(1.0, self::segundosDePartido($duelo) / $duracion);
+		$minutoActual = $avance * $minutos;
+
+		$hasta = [];
+		foreach ($narracion["eventos"] as $e) {
+			if ($e["minuto"] > $minutoActual) break;
+			$hasta[] = $e;
+		}
+		$ultimo = end($hasta) ?: null;
+
+		$mio = $pendiente && (int) $duenos[$pendiente["id"]] === (int) $id_usuario;
+
+		return [
+			"ok"        => true,
+			"fase"      => $pendiente ? "minijuego" : ($avance >= 1 ? "final" : "jugando"),
+			"minuto"    => (int) floor($minutoActual),
+			"minutos"   => $minutos,
+			"avance"    => round($avance, 4),
+			"eventos"   => $hasta,
+			"marcador"  => $ultimo ? $ultimo["marcador"] : [0, 0],
+			"stats"     => $narracion["stats"],
+			"nombres"   => $narracion["nombres"],
+			// Solo se manda el minijuego a quien le toca defender; al otro se le
+			// dice que espere, para que vea por qué se ha parado el partido.
+			"minijuego" => ($pendiente && $mio) ? $pendiente["minijuego"] + ["id_evento" => $pendiente["id"]] : null,
+			"esperando_rival" => (bool) ($pendiente && !$mio),
+			/* Puntuación de actuación (§4.6 y §6.4): independiente de ganar o
+			   perder. Es lo que hace que una jugada siga importando cuando el
+			   marcador ya no puede moverse, y lo que da algo que optimizar a
+			   quien pierde. Se deriva de lo guardado, no se acumula aparte. */
+			"actuacion" => $this->actuacionDuelo($id_duelo, $id_usuario),
+		];
+	}
+
+	/**
+	 * EL VEREDICTO DEL PARTIDO  (§1.5 regla 7 y §6.1)
+	 *
+	 * "Incluso una derrota debe generar su propio resumen narrado con algún
+	 * dato memorable y específico, nunca limitarse a mostrar 'has perdido'."
+	 * Hasta ahora la pantalla de resultado enseñaba exactamente eso: la palabra
+	 * Victoria o Derrota y el marcador.
+	 *
+	 * La gracia está en el DATO, no en la frase: se buscan hechos concretos de
+	 * ESE partido y se elige el más memorable. Por eso van ordenados por peso —
+	 * haber sacado un gol bajo palos se cuenta antes que haber tenido la
+	 * posesión, aunque las dos cosas sean verdad.
+	 *
+	 * Del mecanismo 4 de Copero (§6.1): lo que sale de aquí tiene que poder
+	 * pegarse en Discord tal cual. De ahí "compartible", en una sola línea.
+	 */
+	public function veredictoDuelo($id_duelo, $id_usuario) {
+		$n = $this->narracionDuelo($id_duelo, $id_usuario);
+		if (empty($n["ok"])) return null;
+
+		$duelo  = $this->obtenerDuelo($id_duelo, $id_usuario);
+		$mios   = (int) $n["marcador"][0];
+		$suyos  = (int) $n["marcador"][1];
+		$ganoYo = (bool) $n["gano_yo"];
+		$act    = $this->actuacionDuelo($id_duelo, $id_usuario);
+
+		// Goles narrados, en orden, para poder hablar de minutos concretos.
+		$goles = [];
+		foreach ($n["eventos"] as $e) {
+			if ($e["tipo"] === "gol") $goles[] = $e;
+		}
+
+		/* El gol decisivo: el último que dejó al ganador por delante para no
+		   volver a igualarse. Es el minuto que de verdad se recuerda, mucho más
+		   que el del último gol del partido. */
+		$decisivo = null;
+		foreach ($goles as $g) {
+			$vaGanandoElGanador = $ganoYo
+				? $g["marcador"][0] > $g["marcador"][1]
+				: $g["marcador"][1] > $g["marcador"][0];
+			if ($vaGanandoElGanador && $decisivo === null) $decisivo = $g;
+			if (!$vaGanandoElGanador) $decisivo = null;   // se volvió a igualar
+		}
+
+		// ¿El que acabó ganando llegó a ir por detrás? Eso es una remontada.
+		$huboRemontada = false;
+		foreach ($goles as $g) {
+			$ganadorDetras = $ganoYo
+				? $g["marcador"][0] < $g["marcador"][1]
+				: $g["marcador"][1] < $g["marcador"][0];
+			if ($ganadorDetras) $huboRemontada = true;
+		}
+
+		// Jugadas de minijuego que llegaron a cambiar el marcador.
+		$miParada = null; $miGol = null;
+		$catalogo = self::catalogoMinijuegos();
+		foreach ($this->minijuegosResueltos($id_duelo) as $r) {
+			if (!$r["aplicado"] || (int) $r["id_usuario"] !== (int) $id_usuario) continue;
+			foreach ($n["eventos"] as $e) {
+				if ((int) $e["id"] !== (int) $r["id_evento"]) continue;
+				if (($catalogo[$r["minijuego"]]["lado"] ?? "defiendo") === "defiendo") $miParada = $e;
+				else $miGol = $e;
+			}
+		}
+
+		$rival = $n["nombres"]["suyo"];
+		$titular = $ganoYo ? "Victoria" : "Derrota";
+
+		/* Los hechos, del más memorable al más genérico. El primero que aplique
+		   es el que se cuenta. */
+		if ($miParada) {
+			$detalle = "Sacaste bajo palos el gol del " . $miParada["minuto"] . "'. Sin esa mano, otro partido.";
+		} elseif ($miGol) {
+			$detalle = "La del " . $miGol["minuto"] . "' la metiste tú eligiendo dónde poner el remate.";
+		} elseif ($decisivo && $decisivo["minuto"] > self::PARTIDO_MINUTOS) {
+			$detalle = $ganoYo
+				? "La ganaste en el descuento, en el " . $decisivo["minuto"] . "'."
+				: "Se te escapó en el descuento, en el " . $decisivo["minuto"] . "'.";
+		} elseif ($huboRemontada) {
+			$detalle = $ganoYo
+				? "Ibas por detrás y le diste la vuelta."
+				: "La tenías y se te dio la vuelta.";
+		} elseif ($ganoYo && $suyos === 0) {
+			$detalle = "Sin encajar un gol en todo el partido.";
+		} elseif (!$ganoYo && $decisivo && $decisivo["minuto"] >= 70) {
+			/* "Aguantaste hasta el X" SOLO si X es tarde. Sin este corte salía
+			   "Aguantaste hasta el 15'", que promete épica y la desmiente con el
+			   número: aguantar quince minutos no es resistir, es encajar pronto.
+			   Se leía como una burla involuntaria. */
+			$detalle = "Aguantaste hasta el " . $decisivo["minuto"] . "'.";
+		} elseif (!$ganoYo && ($n["stats"]["mias"]["posesion"] ?? 0) >= 58) {
+			$detalle = "Mandaste el partido (" . $n["stats"]["mias"]["posesion"] . "% de posesión) y aun así se perdió.";
+		} elseif (!$ganoYo && $decisivo && $decisivo["minuto"] <= 20) {
+			$detalle = "Te lo pusieron cuesta arriba en el " . $decisivo["minuto"] . "' y ya no hubo vuelta.";
+		} elseif (abs($mios - $suyos) >= 3) {
+			$detalle = $ganoYo ? "Sin discusión en ningún momento." : "No hubo partido.";
+		} elseif (($n["stats"]["mias"]["paradas"] ?? 0) >= 3) {
+			$detalle = "Tu portero firmó " . $n["stats"]["mias"]["paradas"] . " paradas.";
+		} else {
+			$detalle = $ganoYo ? "Ajustada hasta el final." : "Se decidió por poco.";
+		}
+
+		// La actuación va aparte: no compite con el hecho, lo acompaña.
+		$actuacion = $act["jugados"]
+			? "Acertaste " . $act["aciertos"] . " de " . $act["jugados"] . " decisiones."
+			: null;
+
+		$compartible = sprintf("%s %d-%d %s. %s%s",
+			$n["nombres"]["mio"], $mios, $suyos, $rival, $detalle,
+			$actuacion ? " " . $actuacion : "");
+
+		return [
+			"titular"     => $titular,
+			"detalle"     => $detalle,
+			"actuacion"   => $actuacion,
+			"compartible" => $compartible,
+			"stats"       => $n["stats"],
+		];
+	}
+
+	/** Aciertos del jugador en los minijuegos de este duelo. */
+	public function actuacionDuelo($id_duelo, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT COUNT(*) AS jugados,
+			       SUM(resultado = 'acierto') AS aciertos
+			FROM duelo_minijuegos WHERE id_duelo = :d AND id_usuario = :u
+		");
+		$stmt->execute([":d" => $id_duelo, ":u" => $id_usuario]);
+		$f = $stmt->fetch(PDO::FETCH_ASSOC);
+		return ["jugados" => (int) $f["jugados"], "aciertos" => (int) $f["aciertos"]];
+	}
+
+	/**
+	 * Resuelve un minijuego y lo deja escrito. Es la única vía: el resultado
+	 * tiene que ser el mismo para los dos jugadores y sobrevivir al sondeo, así
+	 * que no puede vivir en la sesión de nadie.
+	 */
+	public function resolverMinijuegoDuelo($id_duelo, $id_usuario, $id_evento, $opcion) {
+		$narracion = $this->narracionDuelo($id_duelo, $id_usuario);
+		if (empty($narracion["ok"])) return $narracion;
+
+		$evento = null;
+		foreach ($narracion["eventos"] as $e) {
+			if ((int) $e["id"] === (int) $id_evento) { $evento = $e; break; }
+		}
+		if (!$evento || empty($evento["interactivo"]) || empty($evento["minijuego"])) {
+			return ["ok" => false, "error" => "Esa jugada no admite decisión."];
+		}
+
+		$catalogo  = self::catalogoMinijuegos();
+		$minijuego = $catalogo[$evento["minijuego"]["clave"]] ?? null;
+		if (!$minijuego) return ["ok" => false, "error" => "Minijuego desconocido."];
+
+		if ($opcion === "" || $opcion === null) $opcion = self::opcionSegura($minijuego);
+
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+
+		/* De qué alineación sale el dato oculto depende de qué se adivina: el
+		   REMATE lo elige quien ataca, el ESTILO DEL PORTERO quien defiende. */
+		$idAtacante = $evento["lado"] === "local" ? (int) $duelo["id_creador"] : (int) $duelo["id_rival"];
+		$idDefensor = $evento["lado"] === "local" ? (int) $duelo["id_rival"]   : (int) $duelo["id_creador"];
+		$cartas = $this->listarAlineacionDuelo(
+			$id_duelo,
+			($minijuego["oculto"] ?? "remate") === "estilo_portero" ? $idDefensor : $idAtacante
+		);
+
+		$remate    = self::ocultoDeJugada($minijuego, $evento, $cartas, (float) $duelo["valor_sorteo"]);
+		$resultado = self::resolverMinijuego($minijuego, $opcion, $remate);
+
+		/* INSERT IGNORE es la defensa contra resolver dos veces la misma jugada:
+		   la clave primaria (duelo, evento, usuario) lo impide en la propia base
+		   de datos. Antes esto se guardaba en $_SESSION, que ni servía para dos
+		   jugadores ni sobrevivía a un cambio de pestaña. */
+		$stmt = $this->pdo->prepare("
+			INSERT IGNORE INTO duelo_minijuegos
+				(id_duelo, id_evento, id_usuario, minijuego, opcion, resultado)
+			VALUES (:d, :e, :u, :m, :o, :r)
+		");
+		$stmt->execute([
+			":d" => $id_duelo, ":e" => $id_evento, ":u" => $id_usuario,
+			":m" => $evento["minijuego"]["clave"], ":o" => $opcion, ":r" => $resultado,
+		]);
+		if ($stmt->rowCount() === 0) {
+			return ["ok" => false, "error" => "Esa jugada ya estaba resuelta."];
+		}
+
+		$parado = false;
+		if ($resultado === "acierto") {
+			// Defendiendo se le quita un gol al rival; atacando me sumo uno.
+			$parado = ($minijuego["lado"] ?? "defiendo") === "defiendo"
+				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario))
+				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario));
+			if ($parado) {
+				$this->pdo->prepare("
+					UPDATE duelo_minijuegos SET aplicado = 1
+					WHERE id_duelo = :d AND id_evento = :e AND id_usuario = :u
+				")->execute([":d" => $id_duelo, ":e" => $id_evento, ":u" => $id_usuario]);
+			}
+		}
+
+		// Resuelta la jugada, el partido sigue para los dos.
+		$this->reanudarPartido($id_duelo);
+
+		$refrescado = $this->obtenerDuelo($id_duelo, $id_usuario);
+		$soyCreador = (int) $refrescado["id_creador"] === (int) $id_usuario;
+
+		return [
+			"ok" => true, "resultado" => $resultado, "remate" => $remate, "parado" => $parado,
+			"marcador" => $soyCreador
+				? [(int) $refrescado["goles_creador"], (int) $refrescado["goles_rival"]]
+				: [(int) $refrescado["goles_rival"], (int) $refrescado["goles_creador"]],
+		];
+	}
+
+	/**
+	 * Le quita un gol al rival de $id_usuario en un duelo ya resuelto, porque
+	 * el jugador paró esa ocasión en un minijuego (impacto "jugada").
+	 *
+	 * La condición de §1.3 —el marcador no puede contradecir al ganador ya
+	 * sorteado— va DENTRO del WHERE, no comprobada antes en PHP. Es a propósito:
+	 * comprobar y luego actualizar deja una ventana entre las dos consultas por
+	 * la que dos peticiones a la vez podrían restar dos goles y empatar un
+	 * partido que alguien había ganado. Aquí, o la fila cumple la condición en
+	 * el momento exacto del UPDATE o no se toca nada.
+	 *
+	 * Devuelve true solo si de verdad se descontó.
+	 */
+	public function descontarGolRival($id_duelo, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			UPDATE duelos SET
+				goles_creador = goles_creador - IF(id_creador = :u1, 0, 1),
+				goles_rival   = goles_rival   - IF(id_creador = :u2, 1, 0)
+			WHERE id_duelo = :d
+			  AND estado = 'resuelto'
+			  AND (id_creador = :u3 OR id_rival = :u4)
+			  /* nada baja de cero */
+			  AND IF(id_creador = :u5, goles_rival, goles_creador) > 0
+			  /* y el ganador sorteado sigue ganando DESPUÉS de restar */
+			  AND IF(
+			        id_ganador = :u6,
+			        IF(id_creador = :u7, goles_creador, goles_rival)
+			          > IF(id_creador = :u8, goles_rival, goles_creador) - 1,
+			        IF(id_creador = :u9, goles_rival, goles_creador) - 1
+			          > IF(id_creador = :u10, goles_creador, goles_rival)
+			      )
+		");
+		$stmt->execute(array_fill_keys(
+			[":u1", ":u2", ":u3", ":u4", ":u5", ":u6", ":u7", ":u8", ":u9", ":u10"],
+			(int) $id_usuario
+		) + [":d" => (int) $id_duelo]);
+
+		return $stmt->rowCount() > 0;
+	}
+
+	/**
+	 * Le suma un gol a $id_usuario porque metió una ocasión propia en un
+	 * minijuego de ataque. Espejo de descontarGolRival().
+	 *
+	 * Misma cautela: la condición de §1.3 va DENTRO del WHERE. Aquí importa
+	 * incluso más, porque sumarle goles al que perdió el sorteo es justo lo
+	 * que podría darle la vuelta al resultado.
+	 */
+	public function sumarGolPropio($id_duelo, $id_usuario) {
+		$stmt = $this->pdo->prepare("
+			UPDATE duelos SET
+				goles_creador = goles_creador + IF(id_creador = :u1, 1, 0),
+				goles_rival   = goles_rival   + IF(id_creador = :u2, 0, 1)
+			WHERE id_duelo = :d
+			  AND estado = 'resuelto'
+			  AND (id_creador = :u3 OR id_rival = :u4)
+			  /* el ganador sorteado sigue ganando DESPUÉS de sumar */
+			  AND IF(
+			        id_ganador = :u5,
+			        1 = 1,   /* si gano yo, marcar más nunca cambia quién gana */
+			        IF(id_creador = :u6, goles_rival, goles_creador)
+			          > IF(id_creador = :u7, goles_creador, goles_rival) + 1
+			      )
+		");
+		$stmt->execute(array_fill_keys(
+			[":u1", ":u2", ":u3", ":u4", ":u5", ":u6", ":u7"], (int) $id_usuario
+		) + [":d" => (int) $id_duelo]);
+
+		return $stmt->rowCount() > 0;
+	}
+
+	/**
+	 * La narración completa de un duelo resuelto, ya desde el punto de vista de
+	 * quien la pide y con los minijuegos que puede jugar.
+	 *
+	 * Vive aquí y no en el endpoint porque la usan DOS sitios (pintar el
+	 * partido y resolver un minijuego) y tienen que ver exactamente lo mismo:
+	 * si el endpoint que valida una jugada generase la narración con reglas
+	 * distintas a las que la pintaron, aceptaría o rechazaría jugadas que el
+	 * jugador nunca vio, o al revés.
+	 */
+	public function narracionDuelo($id_duelo, $id_usuario) {
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
+		if ($duelo["estado"] !== "resuelto") return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+
+		$idCreador = (int) $duelo["id_creador"];
+		$idRival   = (int) $duelo["id_rival"];
+		$formC = $duelo["formacion_creador"] ?: self::FORMACION_BASE;
+		$formR = $duelo["formacion_rival"]   ?: self::FORMACION_BASE;
+
+		$cartasC = $this->listarAlineacionDuelo($id_duelo, $idCreador);
+		$cartasR = $this->listarAlineacionDuelo($id_duelo, $idRival);
+		if (!$cartasC || !$cartasR) {
+			return ["ok" => false, "error" => "Este partido es anterior al motor de narración."];
+		}
+
+		/* La narración se genera SIEMPRE desde el marcador ORIGINAL del partido,
+		   no desde el que hay guardado ahora. Cada gol parado en un minijuego
+		   baja el marcador guardado, y si se regenerase desde ahí, el reparto de
+		   goles cambiaría a mitad de encuentro: jugadas ya narradas se moverían
+		   de minuto y el relato daría un salto. Se reconstruye el original
+		   sumando lo parado, y las paradas se aplican después como una capa. */
+		/* El marcador REAL, antes de reconstruir el original. Se guarda aparte
+		   porque la reconstrucción de abajo modifica $duelo para poder generar
+		   el relato, y a partir de ahí sus goles ya no son los que están en la
+		   base de datos: son los que HABÍA antes de las paradas. Confundirlos
+		   hacía que esta función informara del marcador antiguo. */
+		$golesRealesC = (int) $duelo["goles_creador"];
+		$golesRealesR = (int) $duelo["goles_rival"];
+
+		$catalogo = self::catalogoMinijuegos();
+		$parados = [];    // goles que el portero acabó sacando
+		$marcados = [];   // ocasiones falladas que acabaron dentro
+		foreach ($this->minijuegosResueltos($id_duelo) as $r) {
+			if (!$r["aplicado"]) continue;
+			$idEv = (int) $r["id_evento"];
+			$defendia = (($catalogo[$r["minijuego"]]["lado"] ?? "defiendo") === "defiendo");
+
+			if ($defendia) {
+				$parados[$idEv] = true;
+				// el gol lo encajaba quien NO paró
+				if ((int) $r["id_usuario"] === $idCreador) $duelo["goles_rival"]++;
+				else                                       $duelo["goles_creador"]++;
+			} else {
+				$marcados[$idEv] = true;
+				// el gol lo metió quien atacaba, así que el original tenía uno menos
+				if ((int) $r["id_usuario"] === $idCreador) $duelo["goles_creador"]--;
+				else                                       $duelo["goles_rival"]--;
+			}
+		}
+
+		$sim = self::generarEventosPartido(
+			["nombre" => $duelo["creador"], "fuerza" => self::fuerzaAlineacion($cartasC, $formC),
+			 "cartas" => $cartasC, "formacion" => $formC, "goles" => (int) $duelo["goles_creador"]],
+			["nombre" => $duelo["rival"], "fuerza" => self::fuerzaAlineacion($cartasR, $formR),
+			 "cartas" => $cartasR, "formacion" => $formR, "goles" => (int) $duelo["goles_rival"]],
+			(float) $duelo["valor_sorteo"],
+			["dificultad" => $duelo["dificultad"]]
+		);
+
+		/* Las jugadas paradas dejan de ser gol y el marcador que arrastra cada
+		   evento se recalcula. Sin esto el relato seguiría cantando un gol que
+		   el jugador acaba de sacar. */
+		if ($parados || $marcados) {
+			$acum = ["local" => 0, "visitante" => 0];
+			foreach ($sim["eventos"] as &$ev) {
+				if ($ev["tipo"] === "gol" && isset($parados[$ev["id"]])) {
+					$ev["tipo"]  = "parada";
+					$ev["texto"] = "Paradón. El remate se queda fuera.";
+					$ev["destacado"] = false;
+					$sim["stats"][$ev["lado"] === "local" ? "visitante" : "local"]["paradas"]++;
+				} elseif ($ev["tipo"] !== "gol" && isset($marcados[$ev["id"]])) {
+					$ev["tipo"]  = "gol";
+					$ev["texto"] = "¡Dentro! La coloca donde no llegaba.";
+					$ev["destacado"] = true;
+					$acum[$ev["lado"]]++;
+				} elseif ($ev["tipo"] === "gol") {
+					$acum[$ev["lado"]]++;
+				}
+				$ev["marcador"] = [$acum["local"], $acum["visitante"]];
+			}
+			unset($ev);
+		}
+
+		$soyCreador = $idCreador === (int) $id_usuario;
+		$miLado = $soyCreador ? "local" : "visitante";
+		// Con los goles REALES, no con los reconstruidos: el presupuesto de lo
+		// que todavía cabe mover tiene que salir de lo que hay guardado ahora.
+		$mios  = $soyCreador ? $golesRealesC : $golesRealesR;
+		$suyos = $soyCreador ? $golesRealesR : $golesRealesC;
+		$ganoYo = (int) $duelo["id_ganador"] === (int) $id_usuario;
+
+		/* Presupuesto de cambios de marcador. Se consume en orden cronológico:
+		   si el primer minijuego ya agotó el margen, los siguientes se ofrecen
+		   igual pero sin poder tocar el resultado (impacto degradado). Nunca al
+		   revés: prometer un efecto y luego no aplicarlo sería peor que no
+		   ofrecerlo. */
+		$paradasLibres = 0;
+		while (self::cabeCambioMarcador($mios, $suyos - $paradasLibres, -1, $ganoYo)) {
+			$paradasLibres++;
+		}
+
+		/* Presupuesto para las ocasiones PROPIAS. Marcar de más no compromete el
+		   resultado si ya ganas, pero dejarlo sin tope era un error medible: el
+		   que iba ganando recibía 5 o 6 decisiones y podía convertir un 1-0 en
+		   un 6-0, mientras que el que perdía —justo quien más quiere agarrarse
+		   al partido— no recibía ninguna. Se acota a dos por bando. */
+		$golesLibres = 0;
+		while (!$ganoYo && ($suyos > $mios + $golesLibres + 1)) $golesLibres++;
+		if ($ganoYo) $golesLibres = 2;
+		$golesLibres = min(2, $golesLibres);
+
+		/* Techo de decisiones por partido, sumando ataque y defensa. §1.5 regla 3
+		   lo pide explícitamente, pero el motivo de fondo es de ritmo: el reloj
+		   se detiene para LOS DOS en cada decisión, así que este número no vale
+		   por jugador sino por partido — dos jugadores a tres decisiones son
+		   seis paradas, y la mitad las pasas mirando cómo decide el otro.
+		   Va en configuracion, no como constante, porque es puro calibrado. */
+		$ofrecidos = 0;
+		$MAX_OFRECIDOS = max(1, (int) $this->config("partido_minijuegos_max", 2));
+
+		foreach ($sim["eventos"] as &$e) {
+			$e["mio"] = $e["lado"] === null ? null : ($e["lado"] === $miLado);
+			$e["marcador"] = $soyCreador ? $e["marcador"] : [$e["marcador"][1], $e["marcador"][0]];
+			$e["momentum"] = $soyCreador ? $e["momentum"] : -$e["momentum"];
+
+			if ($e["mio"] === null) { $e["interactivo"] = false; continue; }
+			$defiendo = ($e["mio"] === false);
+
+			/* Las dos caras de la misma moneda:
+			   · DEFENDIENDO — un gol del rival que todavía cabe parar.
+			   · ATACANDO    — una ocasión propia FALLADA que todavía cabe meter.
+			   Las dos son el momento más dramático que puede dar el partido y el
+			   presupuesto ya las limita a una o dos por encuentro, así que se
+			   ofrecen SIEMPRE en vez de dejarlas además al dado del ritmo
+			   interactivo: al azar salían en uno de cada tres partidos. */
+			/* Se ofrece si la jugada tiene sentido para ese lado, hasta el techo
+			   por partido. Puede cambiar el marcador solo si además queda
+			   presupuesto — pero eso NO decide si se ofrece.
+
+			   Antes sí lo decidía, y el resultado medido era que quien perdía
+			   por un gol se quedaba con CERO decisiones: con un margen mínimo no
+			   cabe mover nada sin contradecir el sorteo. Justo el partido en el
+			   que más quieres pelear era el que no te dejaba tocar nada.
+
+			   Cuando no cabe cambiar el marcador, la jugada sigue contando para
+			   la puntuación de actuación (§4.6 y §6.4: "un puntaje independiente
+			   del resultado, algo real que optimizar"), así que la decisión
+			   nunca es un "continuar" disfrazado y §1.5 regla 2 se respeta.
+
+			   Quien decide de verdad si el marcador se mueve es la base de datos
+			   —la condición de §1.3 va dentro del UPDATE—, no este flag. */
+			$tieneSentido = $defiendo ? ($e["tipo"] === "gol") : ($e["tipo"] !== "gol");
+			if (!$tieneSentido || $ofrecidos >= $MAX_OFRECIDOS) { $e["interactivo"] = false; continue; }
+
+			// Se marca ANTES de preguntar por el minijuego: minijuegoDeEvento()
+			// exige que el evento ya sea interactivo, y quien decide eso aquí es
+			// el criterio de arriba, no el dado del ritmo que trae el motor.
+			$e["interactivo"] = true;
+			$mj = self::minijuegoDeEvento($e, $defiendo);
+			if (!$mj) { $e["interactivo"] = false; continue; }
+
+			$ofrecidos++;
+			$cambiaMarcador = $defiendo ? ($paradasLibres > 0) : ($golesLibres > 0);
+			if ($cambiaMarcador) { $defiendo ? $paradasLibres-- : $golesLibres--; }
+
+			$plazo = $mj["plazo"][$duelo["dificultad"] ?? "pvp"] ?? $mj["plazo"]["pvp"] ?? 9;
+			$e["minijuego"] = [
+				"clave"     => $mj["clave"],
+				"nombre"    => $mj["nombre"],
+				"titulo"    => $mj["titulo"],
+				"enunciado" => strtr($mj["enunciado"], [
+					"{jugador}" => $e["protagonistas"]["jugador"] ?? "El rival",
+					"{portero}" => $e["protagonistas"]["portero"] ?? "tu portero",
+				]),
+				"plazo"     => $plazo,
+				/* La pista habla de la TENDENCIA de la carta rival implicada,
+				   nunca del dato concreto: ese no viaja al cliente ni aquí ni en
+				   ningún sitio, o bastaría con mirar la respuesta de red.
+				   Defendiendo se lee al REMATADOR; atacando, al PORTERO. */
+				"pista"     => $defiendo
+					? self::pistaRemate($e, $e["lado"] === "local" ? $cartasC : $cartasR)
+					: self::pistaPortero($e, $e["lado"] === "local" ? $cartasR : $cartasC),
+				"opciones"  => array_map(fn($o) => [
+					"clave" => $o["clave"], "nombre" => $o["nombre"], "pista" => $o["pista"],
+				], $mj["opciones"]),
+			];
+		}
+		unset($e);
+
+		return [
+			"ok"        => true,
+			"eventos"   => $sim["eventos"],
+			"stats"     => [
+				"mias"  => $soyCreador ? $sim["stats"]["local"] : $sim["stats"]["visitante"],
+				"suyas" => $soyCreador ? $sim["stats"]["visitante"] : $sim["stats"]["local"],
+			],
+			"minutos"   => $sim["minutos"],
+			"descuento" => $sim["descuento"],
+			"marcador"  => [$mios, $suyos],
+			"gano_yo"   => $ganoYo,
+			"nombres"   => [
+				"mio"  => $soyCreador ? $duelo["creador"] : $duelo["rival"],
+				"suyo" => $soyCreador ? $duelo["rival"]   : $duelo["creador"],
+			],
+		];
+	}
+
+	/* marcadorDuelo() se retiró aquí: era la fórmula PROVISIONAL que inventaba
+	   cuántos goles caían en un PvP a partir del valor de sorteo. La sustituye
+	   el modo natural de generarEventosPartido() (§1.3): el marcador ya no se
+	   calcula aparte, es el número de ocasiones de la simulación que acabaron
+	   dentro. Las CADENAS siguen con marcadorCadena(), intacto. */
 
 	/**
 	 * Resuelve un duelo aceptado: calcula fuerzas, aplica la curva Elo, sortea,
@@ -2829,25 +4310,42 @@ class Tcg
 			$idGanador  = $ganaCreador ? $idCreador : $idRival;
 			$idPerdedor = $ganaCreador ? $idRival : $idCreador;
 
-			// El PvP conserva su marcador; las cadenas usan el suyo, que sí puede
-			// dejar la portería a cero y por tanto permite el rango S.
-			[$golesGanador, $golesPerdedor] = $esPve
-				? $this->marcadorCadena(
+			if ($esPve) {
+				// Las cadenas conservan su marcador propio, que sí puede dejar la
+				// portería a cero y por tanto permite el rango S. Se dejan como
+				// estaban hasta que se trabajen aparte.
+				[$golesGanador, $golesPerdedor] = $this->marcadorCadena(
 					$ganaCreador ? $fuerzaCreador : $fuerzaRival,
 					$ganaCreador ? $fuerzaRival : $fuerzaCreador,
 					$ganaCreador ? $formCreador : $formRival,
 					$ganaCreador ? $formRival : $formCreador
-				)
-				: $this->marcadorDuelo(
-					$ganaCreador ? $fuerzaCreador : $fuerzaRival,
-					$ganaCreador ? $fuerzaRival : $fuerzaCreador,
-					$sorteo
 				);
-
-			// En una cadena el jugador es siempre el creador, así que su rango se
-			// lee de los goles del creador.
-			$golesCreador = $ganaCreador ? $golesGanador : $golesPerdedor;
-			$golesRival   = $ganaCreador ? $golesPerdedor : $golesGanador;
+				$golesCreador = $ganaCreador ? $golesGanador : $golesPerdedor;
+				$golesRival   = $ganaCreador ? $golesPerdedor : $golesGanador;
+			} else {
+				/* PvP — §1.3: el marcador NACE de la simulación. Ya no hay una
+				   fórmula aparte que invente cuántos goles caen: se juega el
+				   partido minuto a minuto y el marcador es, literalmente, el
+				   número de ocasiones que acabaron dentro. La curva Elo sigue
+				   decidiendo quién gana antes que nada (§1.1); la simulación solo
+				   tiene prohibido contradecirla, y de eso se encarga el propio
+				   motor con `gana`. */
+				$sim = self::generarEventosPartido(
+					[
+						"nombre" => "local", "fuerza" => $fuerzaCreador, "goles" => null,
+						"cartas" => $this->listarAlineacionDuelo($id_duelo, $idCreador),
+						"formacion" => $formCreador,
+					],
+					[
+						"nombre" => "visitante", "fuerza" => $fuerzaRival, "goles" => null,
+						"cartas" => $this->listarAlineacionDuelo($id_duelo, $idRival),
+						"formacion" => $formRival,
+					],
+					$sorteo,
+					["gana" => $ganaCreador ? "local" : "visitante"]
+				);
+				[$golesCreador, $golesRival] = $sim["goles"];
+			}
 			$rango = $esPve ? $this->rangoPartido($golesCreador, $golesRival) : null;
 
 			// --- mover las apuestas ---
@@ -3773,10 +5271,12 @@ class Tcg
 	/**
 	 * Marcador de un partido de cadena.
 	 *
-	 * Sustituye a marcadorDuelo() SOLO en PvE; el PvP se queda con el suyo por
-	 * decisión de Alejandro. El motivo de existir es concreto: con la fórmula
-	 * del PvP la portería a cero era imposible (0 de 200.000 simulaciones), y
-	 * sin portería a cero el rango S no se puede conseguir nunca.
+	 * SOLO PvE. El PvP ya no usa fórmula: su marcador nace de la simulación
+	 * minuto a minuto (§1.3, modo natural de generarEventosPartido). Esta se
+	 * mantiene intacta mientras las cadenas no se trabajen aparte. El motivo de
+	 * existir sigue siendo concreto: con la fórmula que tenía antes el PvP, la
+	 * portería a cero era imposible (0 de 200.000 simulaciones), y sin portería
+	 * a cero el rango S no se puede conseguir nunca.
 	 *
 	 * Cada lado marca según un Poisson cuya media es su ataque contra el muro
 	 * rival. Poisson es el modelo estándar de goles en fútbol y, a diferencia

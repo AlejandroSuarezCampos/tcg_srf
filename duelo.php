@@ -338,6 +338,47 @@ include __DIR__ . '/navbar.php';
         </span>
       </h1>
 
+      <?php
+      /* VEREDICTO DEL PARTIDO (§1.5 regla 7). Solo en duelos PvP: las cadenas
+         tienen su propio sello de rango justo debajo y no conviene que compitan.
+         Se calcula en servidor para que el texto sea el mismo en las dos
+         cuentas y para que compartirlo no dependa de lo que viera el navegador. */
+      $veredicto = (!$esCadena && $resuelto) ? $db->veredictoDuelo($id_duelo, $id_usuario) : null;
+      if ($veredicto):
+      ?>
+        <div class="veredicto">
+          <p class="veredicto-detalle"><?= htmlspecialchars($veredicto['detalle']) ?></p>
+          <?php if ($veredicto['actuacion']): ?>
+            <p class="veredicto-actuacion"><?= htmlspecialchars($veredicto['actuacion']) ?></p>
+          <?php endif; ?>
+
+          <?php /* Mecanismo 4 de Copero (§6.1): el resumen tiene que poder
+                   pegarse en Discord tal cual, sin que el jugador lo redacte. */ ?>
+          <button type="button" class="btn btn-ghost btn-sm veredicto-copiar"
+                  data-copiar="<?= htmlspecialchars($veredicto['compartible']) ?>">
+            <i class="ph ph-copy" aria-hidden="true"></i> Copiar resumen
+          </button>
+
+          <?php /* Aquí sí caben las estadísticas: el partido ya terminó, así
+                   que no compiten con el relato ni con el momentum (§1.4). */ ?>
+          <dl class="veredicto-stats">
+            <?php foreach ([
+                'Posesión' => [$veredicto['stats']['mias']['posesion'] . '%', $veredicto['stats']['suyas']['posesion'] . '%'],
+                'Tiros'    => [$veredicto['stats']['mias']['tiros'],    $veredicto['stats']['suyas']['tiros']],
+                'A puerta' => [$veredicto['stats']['mias']['a_puerta'], $veredicto['stats']['suyas']['a_puerta']],
+                'Paradas'  => [$veredicto['stats']['mias']['paradas'],  $veredicto['stats']['suyas']['paradas']],
+                'Córners'  => [$veredicto['stats']['mias']['corners'],  $veredicto['stats']['suyas']['corners']],
+                'Faltas'   => [$veredicto['stats']['mias']['faltas'],   $veredicto['stats']['suyas']['faltas']],
+            ] as $etiqueta => $par): ?>
+              <div>
+                <dt><?= $etiqueta ?></dt>
+                <dd class="mono"><?= $par[0] ?> <span aria-hidden="true">·</span> <?= $par[1] ?></dd>
+              </div>
+            <?php endforeach; ?>
+          </dl>
+        </div>
+      <?php endif; ?>
+
       <?php if ($esCadena && $duelo['rango']): ?>
         <p class="rango-sello rango-<?= strtolower($duelo['rango']) ?>">
           <span class="rango-letra" aria-hidden="true"><?= $duelo['rango'] ?></span>
@@ -506,16 +547,30 @@ include __DIR__ . '/navbar.php';
      El resultado ya está decidido en el servidor (arriba, en $duelo). Esto es
      solo la puesta en escena de "verlo pasar" antes de enseñar la pantalla de
      resultado, que ya está renderizada debajo, cubierta por este modal.
-     Reloj de partido + goles que van apareciendo: un marcador deportivo, nunca
-     ruleta ni tragaperras (briefing: "evitar estética de casino").
      Sin JavaScript, este modal nunca se abre y el resultado ya está visible.
+
+     DOS MODOS, a propósito:
+       · narrado (DUELOS PvP)  — el motor de eventos de la Biblia §1: relato
+         minuto a minuto, momentum y estadísticas en vivo.
+       · clasico (CADENAS PvE) — reloj + insignia de gol, tal y como estaba.
+         Las cadenas se dejan intactas hasta que se trabajen aparte; su
+         marcador (marcadorCadena) da resultados como 4-8 que el modo narrado
+         deja en evidencia, y eso es una decisión de balance, no de pantalla.
      ========================================================================== -->
+<?php $modoSimulacion = $esCadena ? 'clasico' : 'narrado'; ?>
 <div class="modal simulacion" id="simulacionPartido" role="dialog" aria-modal="true"
-     aria-labelledby="simulacionTitulo" aria-hidden="true">
+     aria-labelledby="simulacionTitulo" aria-hidden="true"
+     data-modo="<?= $modoSimulacion ?>"
+     data-id-duelo="<?= (int) $duelo['id_duelo'] ?>">
   <div class="modal-caja modal-caja--ancha">
     <div class="modal-head">
       <h2 id="simulacionTitulo">Partido en juego</h2>
-      <button type="button" class="modal-cerrar" data-saltar-simulacion aria-label="Ver resultado">
+      <?php /* En cadenas el aspa lleva al resultado, que ya está decidido. En
+               un duelo PvP no: el partido sigue para el rival aunque tú
+               cierres, así que prometer "ver resultado" sería mentir — lo que
+               verías es el marcador de este instante, no el final. */ ?>
+      <button type="button" class="modal-cerrar" data-saltar-simulacion
+              aria-label="<?= $modoSimulacion === 'clasico' ? 'Ver resultado' : 'Salir del partido' ?>">
         <i class="ph ph-x" aria-hidden="true"></i>
       </button>
     </div>
@@ -541,12 +596,67 @@ include __DIR__ . '/navbar.php';
         <div class="progreso-riel"><div class="progreso-relleno" id="simBarra" style="width:0%"></div></div>
       </div>
 
-      <div class="simulacion-eventos" id="simEventos" aria-hidden="true"></div>
+      <?php if ($modoSimulacion === 'narrado'): ?>
+        <!-- MOMENTUM (Biblia §1.4): media móvil de quién genera las ocasiones
+             más recientes. Es un indicador de lectura, no toca ningún cálculo.
+             El centro es el empate; la aguja se va hacia el lado que manda. -->
+        <div class="sim-momentum" id="simMomentum" aria-hidden="true">
+          <span class="sim-momentum-riel"><span class="sim-momentum-aguja" id="simMomentumAguja"></span></span>
+          <span class="sim-momentum-etiqueta">Momentum</span>
+        </div>
+
+        <!-- El relato. aria-live="polite" y no "assertive": son decenas de
+             eventos seguidos y un lector de pantalla interrumpiría sin parar.
+             El veredicto final sí se anuncia aparte, en la pantalla de debajo. -->
+        <div class="sim-relato" id="simRelato" aria-live="polite" aria-atomic="false"></div>
+
+        <!-- MINIJUEGO (Biblia §2). El partido se detiene aquí y espera una
+             decisión real. El plazo lo fija el catálogo; si se agota, se
+             aplica la opción SEGURA, nunca la de más premio (§1.5 regla 4). -->
+        <div class="sim-minijuego" id="simMinijuego" hidden>
+          <p class="sim-mj-titulo" id="simMjTitulo"></p>
+          <p class="sim-mj-enunciado" id="simMjEnunciado"></p>
+          <!-- Reloj de decisión. La barra comunica la urgencia de un vistazo
+               (§3.4), pero con "reducir movimiento" no se anima, así que el
+               número de al lado es el que lleva de verdad la cuenta: sin él,
+               esa preferencia te dejaría decidiendo a ciegas. -->
+          <div class="sim-mj-tiempo">
+            <div class="sim-mj-reloj" aria-hidden="true">
+              <span class="sim-mj-reloj-relleno" id="simMjBarra"></span>
+            </div>
+            <span class="sim-mj-segundos mono" id="simMjSegundos" role="timer" aria-live="off"></span>
+          </div>
+          <div class="sim-mj-opciones" id="simMjOpciones" role="group"
+               aria-labelledby="simMjEnunciado"></div>
+          <p class="sim-mj-resultado" id="simMjResultado" role="status" hidden></p>
+        </div>
+
+        <?php /* Las estadísticas en vivo (posesión, tiros, paradas) se quitaron
+                 de aquí por decisión de Alejandro: durante el partido distraen
+                 de lo que de verdad se está mirando, que es el relato y el
+                 momentum. La §1.4 de la Biblia las pedía en pantalla; siguen
+                 calculándose en el motor y el sondeo las sigue enviando, así
+                 que reaparecen en cuanto haya dónde ponerlas sin estorbar. */ ?>
+      <?php else: ?>
+        <!-- Cadenas: la insignia de gol suelta de siempre. -->
+        <div class="simulacion-eventos" id="simEventos" aria-hidden="true"></div>
+      <?php endif; ?>
     </div>
 
-    <div class="modal-pie">
-      <button type="button" class="btn btn-ghost" data-saltar-simulacion>Ver resultado</button>
-    </div>
+    <?php if ($modoSimulacion === 'clasico'): ?>
+      <div class="modal-pie">
+        <!-- Solo en CADENAS. Ahí el partido lo ves tú solo y el resultado ya
+             está decidido, así que saltarlo es legítimo (§4.3: el juego tiene
+             que caber en una sesión de cinco minutos). -->
+        <button type="button" class="btn btn-ghost" data-saltar-simulacion>Ver resultado</button>
+      </div>
+    <?php endif; ?>
+    <?php /* En DUELOS PvP no hay botón de saltar. El partido es compartido:
+             saltártelo no detiene al rival, que puede seguir parando goles y
+             moviendo el marcador después de que tú hayas salido. Con el botón,
+             una cuenta terminaba viendo 4-2 y la otra 4-3. Cerrar sigue siendo
+             posible con Esc o con el aspa —un modal tiene que poder cerrarse
+             (§13)—, pero deja de ser lo que la pantalla te invita a hacer. */ ?>
   </div>
 </div>
 <?php endif; ?>

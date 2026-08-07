@@ -1,29 +1,55 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión 5 (2026-08-06).
+> Documento de traspaso, versión 7 (2026-08-07).
 > Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
 > misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
 > fichero es todo el contexto necesario: no hace falta la conversación anterior.
 >
-> **Sustituye a las versiones anteriores.** Desde la v4 se ha construido la
-> **ceremonia de cajas/sobres en pseudo-3D** (migración `013`, componente
-> `components/caja3d.php`, panel `panel/plantillas.php`) — ver §14, reescrito
-> por completo porque lo entregado **no** es el plan original de vitrina con
-> scroll y secuencia FUT: es más sencillo y ya está en producción. Además,
-> **el repo ya no tiene `.git`** — ver la nota de git más abajo, es importante.
+> **Sustituye a las versiones anteriores.**
 >
-> Lo siguiente ya no es la ceremonia de sobres: ver §12.
+> **Lo grande de la v7: el partido dejó de ser un botón.** Un duelo PvP ya no
+> se resuelve y se enseña — ahora se JUEGA: el servidor narra el encuentro
+> minuto a minuto, los dos jugadores lo ven a la vez, y el reloj se detiene
+> para ambos cuando salta un minijuego. Todo eso es nuevo y vive en el §15,
+> que es la sección que hay que leer antes de tocar nada de duelos.
+>
+> Con ello entraron: el **motor de eventos** (§15.1), el **marcador PvP nacido
+> de la simulación** —que jubiló la fórmula provisional `marcadorDuelo()`—, el
+> **partido en vivo** (migración `014`), los **dos primeros minijuegos** del
+> catálogo (§15.4), la **puntuación de actuación** y el **veredicto de partido**
+> (§15.6). Las **cadenas se quedaron intactas** a propósito (§15.7).
+>
+> **Hay una biblia de diseño nueva** en `branding/Biblia/` (cuatro ficheros
+> `.md`) con el catálogo completo de ~90 minijuegos, la psicología de
+> retención y el veredicto de priorización. Lo construido en la v7 sale de
+> ahí. Léela si vas a seguir por los minijuegos; el §15 cita sus secciones.
+>
+> **Aviso de balance medido, no supuesto** (§15.8): hoy pensar bien un equipo
+> aporta prácticamente nada frente a la rareza bruta, porque los compos premian
+> MEZCLAR afinidades en vez de enfocarlas. Está cuantificado y no se ha tocado:
+> es una decisión de Alejandro.
+>
+> **De la v6 sigue vigente:** esta copia se abrió con la BD local
+> desactualizada (faltaba la `013`) aunque las comprobaciones de §5.2 daban
+> bien. Antes de diagnosticar algo como "roto", comprueba si la BD
+> sencillamente no está al día: lo más probable es que ninguna migración falle
+> en silencio, sino que faltaba aplicarla. El `gd` de PHP, que el §8 daba por
+> problemático, **ya está activo** en CLI y en Apache.
 
 ---
 
 ## Cómo arrancar en un chat nuevo
 
 Estás recogiendo un proyecto con **Fases 0, 1 y 2 cerradas**, más la ceremonia
-de sobres en pseudo-3D (§14) ya construida encima. Está construido y
-funcionando contra la base de datos real: Deck Builder, Duelos PvP completos
-(Capas 1, 2 y 3), simulación de partido, Misiones, formaciones alternativas,
-**Cadenas de Partido (PvE)** y la **apertura de sobres con cajas 3D CSS**. No
-lo rehagas ni lo revises salvo que Alejandro lo pida.
+de sobres en pseudo-3D (§14) y el **partido narrado en vivo con minijuegos**
+(§15) construidos encima. Está construido y funcionando contra la base de datos
+real: Deck Builder, Duelos PvP completos (Capas 1, 2 y 3), Misiones,
+formaciones alternativas, **Cadenas de Partido (PvE)**, la **apertura de sobres
+con cajas 3D CSS** y el **partido PvP jugable minuto a minuto**. No lo rehagas
+ni lo revises salvo que Alejandro lo pida.
+
+**Si vas a tocar duelos, lee el §15 antes que nada.** Es lo más nuevo, lo que
+más se ha movido, y tiene reglas propias que no se deducen del resto.
 
 **Lo primero que tienes que hacer, en este orden:**
 
@@ -42,14 +68,18 @@ lo rehagas ni lo revises salvo que Alejandro lo pida.
    ejemplo, si Alejandro volvió a descomprimir un ZIP), sigue aplicando el
    aviso antiguo: no asumas commits/ramas/remoto, y considera `git init` antes
    de cambios grandes, avisando primero.
-5. Comprobar que la BD está al día (todas las migraciones hasta la `013`):
+5. Comprobar que la BD está al día (todas las migraciones hasta la `014`):
    ```
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"        -- 9
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cromo_rasgos;"  -- 38
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cadena_nodos;"  -- 18
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM plantillas_3d;" -- 0 si nadie ha subido arte aún
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM duelo_minijuegos;"          -- existe = 014 aplicada
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT clave,valor FROM configuracion WHERE clave LIKE 'partido%';"  -- 4 filas
    ```
    Si alguna de las tres primeras da 0 o la tabla no existe, aplica §5.2.
+   Si `duelo_minijuegos` no existe, el partido en vivo (§15) no puede
+   funcionar: aplica la `014`.
 6. Auditar la codificación (§5.3), que ya ha mordido dos veces:
    `C:\xampp\php\php.exe db/migraciones/004_reparar_codificacion.php`
 
@@ -58,12 +88,12 @@ bueno.** Es la forma de trabajar acordada: plan → aprobación → implementaci
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Si Alejandro no dice por dónde seguir**, pregunta entre: subir arte real a
-**panel/plantillas.php** para que las cajas dejen de mostrar el degradado por
-defecto, la **Fase 3** (panel de administración al sistema nuevo, §12), o los
-**mecanismos de sesión que quedan del documento de balance** (anti-tilt, pity
-del Aumento, matchmaking anti-repetición, validador de balance — §10.7). Son
-trabajos independientes entre sí.
+**Si Alejandro no dice por dónde seguir**, pregunta entre: **más minijuegos**
+del catálogo de la Biblia (§15.4 explica el contrato y qué familias están sin
+usar), **llevar el partido narrado a las cadenas** (§15.7, hoy siguen con el
+modo clásico), **el desequilibrio de compos** que el §15.8 deja medido, subir
+arte real a **panel/plantillas.php** (§14), o la **Fase 3** (§12). Son trabajos
+independientes entre sí.
 
 ---
 
@@ -99,6 +129,17 @@ entrenadores y escudos reales de una comunidad activa, no personajes de ficción
 - `Superliga_Frontier_TCG_Sistema_Compos_Balance.md` — la especificación de la
   Capa 2, el balance y el PvE, con más de 100M de duelos simulados detrás.
   **Está en Descargas, no en el repo; pídeselo a Alejandro si lo necesitas.**
+- **`Biblia/` — cuatro `.md` con la sesión de diseño completa.** De aquí sale
+  todo el §15. Contiene el motor de eventos (§1 de la Biblia), el catálogo de
+  ~90 minijuegos (§2), el escalado de dificultad (§3), la psicología de
+  retención (§4), el análisis de Copero/Wordle/Suika/Balatro (§6), el Pase de
+  Temporada (§7) y el **veredicto de priorización** (§13.3), que es el que
+  marcó el orden de trabajo de la v7. Cuando el §15 cita "§1.5 regla 6" o
+  "§4.6" se refiere a ESTA biblia, no a este documento.
+- `Rangos_estadisticas_SRF.xlsx` / `.csv` — rangos de estadísticas por rareza
+  y posición para crear cartas nuevas (§15.8). El `.csv` es el que sirve para
+  inserciones automáticas; el `.xlsx` lleva además el porqué y la
+  verificación de balance.
 
 **Cuenta de pruebas dedicada:** usuario `Claude` (id 9), contraseña `123456`,
 `dictador=1`, ~1M de monedas, 22 cromos distintos (48 copias) y un mazo titular
@@ -126,12 +167,18 @@ buscan por nombre.
 | **Fase 2 — Duelos Capa 1** | Fuerza de mazo + curva Elo + sala en vivo | ✅ Construido |
 | **Fase 2 — Duelos Capa 3** | Aumento pre-partido (tiers, plazo, fallback) | ✅ Construido |
 | **Fase 2 — Duelos Capa 2** | **Compos: rasgos, ciclo, malus, Tensión** | ✅ **Construido (§10)** |
-| **Fase 2 — Simulación de partido** | Modal de 7 s con reloj y goles antes del resultado | ✅ Construido |
+| **Fase 2 — Simulación de partido** | Modal de reloj + goles. **Ya solo lo usan las CADENAS** (modo clásico, §15.7) | ✅ Construido |
 | **Fase 2 — Misiones** | `misiones.php`, progreso derivado, reclamo | ✅ **Construido (§11)** |
 | **Fase 2 — Formaciones** | 8 formaciones, desbloqueables por cofre de cadena | ✅ Construido |
 | **Fase 2 — Cadenas de Partido (PvE)** | Mapa de nodos, 5 dificultades, rangos, loot | ✅ **Construido (§11b)** |
-| **Fase 2 — Minijuegos** | Solo la tabla `minijuegos_partidas` | ⬜ Aplazados por Alejandro |
-| **§14 — Cajas y sobres en pseudo-3D** | `caja3d.php`, `panel/plantillas.php`, migración `013` | ✅ **Construido, sin arte real subido aún** |
+| **§14 — Cajas y sobres en pseudo-3D** | `caja3d.php`, `panel/plantillas.php`, migración `013` | ✅ **Construido; arte real en curso** — 3 elementos recortados en disco, ver nota de v6 |
+| **§15 — Motor de eventos narrado** | El partido se cuenta minuto a minuto (Biblia §1) | ✅ **Construido** |
+| **§15 — Marcador PvP desde la simulación** | Jubila la fórmula provisional `marcadorDuelo()` (Biblia §1.3) | ✅ **Construido** |
+| **§15 — Partido en vivo (PvP)** | Reloj en servidor, los dos jugadores a la vez, migración `014` | ✅ **Construido** |
+| **§15 — Minijuegos** | Catálogo + 2 entradas jugables de ~90 (Biblia §2) | 🟡 **Empezado** |
+| **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
+| **§15 — Partido narrado en cadenas** | Las cadenas siguen con el modo clásico | ⬜ **Sin empezar, a propósito** |
+| **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **Fase 3 — Pulido y escala** | Panel admin, motion unificado, doc de expansiones | ⬜ Pendiente |
 
 > **El modelo de combate cambió en `93642b2`.** Cada línea ya no puntúa con una
@@ -163,7 +210,8 @@ componente de tarjeta con todos sus estados, y `styleguide.php`.
 migrada de forma aditiva y repetible, constructor de mazos con formación real
 sobre un campo, y duelos jugables de principio a fin (crear sala → esperar
 rival con latido → aumento pre-partido → **compos** → resolución con curva de
-probabilidad → simulación de partido → resultado con desglose completo).
+probabilidad → **partido narrado en vivo con minijuegos (§15)** → resultado con
+veredicto y desglose completo).
 
 ---
 
@@ -193,18 +241,23 @@ tcg_srf/
 │   │   ├── layout.css      nav, hero, filtros, pie, MAZOS, DUELOS, COMPOS
 │   │   └── styleguide.css  solo para styleguide.php
 │   ├── js/
-│   │   ├── ui.js         modales, toasts, tabs, nav, plegables, SRF.confirmar
+│   │   ├── ui.js         modales, toasts, tabs, nav, plegables, SRF.confirmar,
+│   │   │                 SRF.copiar (portapapeles, §15.6)
 │   │   ├── ceremonia.js  SRF.ceremonia(cartas)
 │   │   ├── sobres.js · mercado.js · album.js · coleccion.js
 │   │   ├── perfil.js · configuracion.js
 │   │   ├── mazos.js      asignación hueco→jugador
 │   │   ├── duelos.js     lobby, tipo de apuesta, confirmación
-│   │   ├── duelo.js      latido, sondeo, cuenta atrás, SIMULACIÓN DE PARTIDO
+│   │   ├── duelo.js      latido, sondeo, cuenta atrás, y LOS DOS MODOS de
+│   │   │                 partido: narrado (PvP, sondea al servidor) y clásico
+│   │   │                 (cadenas, reloj local). Ver §15.7.
 │   │   ├── sobres.js     apertura de cajas/sobres 3D + tilt (§14, usa GSAP)
 │   │   └── vendor/
 │   │       └── gsap/gsap.min.js  ← único vendor real hoy. Three.js sigue sin usarse.
 │   ├── fonts/            ← Geist autoalojada (4 .woff2)
-│   ├── ajax/             ← canjear_codigo.php, monedas.php, duelo_estado.php
+│   ├── ajax/             ← canjear_codigo.php, monedas.php, duelo_estado.php,
+│   │                       duelo_narracion.php (sondeo del partido, §15.3),
+│   │                       duelo_minijuego.php (resuelve una jugada, §15.4)
 │   └── img/
 │       ├── Cromos/...    ← arte optimizado a WebP
 │       ├── plantillas/   ← creada al vuelo por subirPlantilla(); vacía si
@@ -212,14 +265,24 @@ tcg_srf/
 │       └── _originales_sin_optimizar/  ← PNG originales, no borrados
 ├── db/
 │   ├── conexion.php      ← instancia $db (sin tocar)
-│   ├── consultas.php     ← clase Tcg, ~3970 líneas. TODA la lógica vive aquí.
+│   ├── consultas.php     ← clase Tcg, ~4600 líneas. TODA la lógica vive aquí.
+│   ├── plantillas_narracion.php  ← frases del relato por tipo de evento (§15.2).
+│   │                               Es DATOS, no lógica: un array y nada más.
+│   ├── minijuegos.php    ← catálogo de minijuegos (§15.4). Cada entrada declara
+│   │                        su familia, su impacto y sus opciones. Añadir uno
+│   │                        es añadir un array, no tocar el motor.
 │   ├── migraciones/
 │   │   ├── 002_duelos_misiones_mazos.sql   Fase 2
 │   │   ├── 003_capa2_compos.sql            Capa 2
 │   │   ├── 004_reparar_codificacion.php    utilidad (§5.3)
 │   │   ├── 005 a 012                       Misiones, formaciones, PvE (§11, §11b)
-│   │   └── 013_plantillas_3d.sql           tabla plantillas_3d (§14)
+│   │   ├── 013_plantillas_3d.sql           tabla plantillas_3d (§14)
+│   │   └── 014_partido_en_vivo.sql         reloj de partido + duelo_minijuegos (§15)
 │   └── tcg.sql
+├── branding/
+│   ├── CLAUDE.md         ← este documento
+│   ├── Biblia/           ← 4 .md: la sesión de diseño de la que sale el §15
+│   └── Rangos_estadisticas_SRF.xlsx/.csv  ← rangos para crear cartas (§15.8)
 ├── panel/                ← admin, TODAVÍA CON EL SISTEMA VIEJO salvo
 │                            plantillas.php (Fase 3, ver §12)
 │   └── plantillas.php    ← sube/recorta/previsualiza el arte de cajas y
@@ -364,12 +427,26 @@ De la Fase 2 (`002`): `mazos`, `mazo_cartas`, `duelos`, `duelo_apuestas`,
 `duelo_alineaciones`, `duelo_aumentos`, `configuracion`, `misiones`,
 `misiones_progreso`, `minijuegos_partidas`.
 
+> `minijuegos_partidas` es de la Fase 2 y **no la usa el sistema de minijuegos
+> del §15**, que guarda en `duelo_minijuegos`. Sigue vacía y sin referencias en
+> el código: no la confundas con la nueva ni escribas en ella.
+
 De la Capa 2 (`003`): `rasgos`, `cromo_rasgos`, `duelo_compos`.
 
 De Misiones/Formaciones/PvE (`005`-`012`): ver §11 y §11b.
 
 De la ceremonia 3D (`013`): `plantillas_3d` — una fila por caja/sobre con
 plantilla subida (§14).
+
+Del partido en vivo (`014`, §15):
+- `duelo_minijuegos` — una fila por jugada de minijuego resuelta. La clave
+  primaria es `(id_duelo, id_evento, id_usuario)` y **es la defensa contra
+  resolver dos veces la misma jugada**: sin ella, repetir la petición con la
+  opción ganadora restaría un gol por envío.
+- Columnas nuevas en `duelos`: `partido_inicio`, `partido_pausado_en`,
+  `partido_pausa_seg` (el reloj) y `latido_creador` / `latido_rival` (presencia
+  real de cada uno; el `ultimo_latido` de siempre solo servía para el creador
+  esperando en la sala).
 
 ### 5.2 Cómo aplicar las migraciones
 
@@ -384,6 +461,30 @@ Las dos SQL son aditivas y re-ejecutables. Después de `003`, ejecuta una vez:
 ```php
 $db->derivarRasgosConfiguracion();   // rellena cromo_rasgos, debe devolver 38
 ```
+
+**`013` puede faltar aunque `002`/`003` estén bien** — ya pasó (v6, 2026-08-07):
+una copia con `rasgos`/`cromo_rasgos`/`cadena_nodos` correctos tenía
+`plantillas_3d` inexistente. Aplícala igual que las anteriores:
+```
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/013_plantillas_3d.sql
+```
+Si la tabla falta, `Tcg::subirPlantilla()` (§14.1) **ya ha escrito los PNG
+recortados en disco** antes de intentar el `INSERT` — el fallo es solo en la
+última línea de la función. Síntoma: `assets/img/plantillas/{tipo}_{id}/`
+tiene los recortes correctos pero la caja/sobre sigue mostrando el degradado
+por defecto (`rutasPlantilla()` lee de la tabla, no del disco). Aplicar la
+migración no revive esas filas solas: si esto pasa, hay que volver a subir la
+plantilla desde `panel/plantillas.php` para que el `INSERT` se ejecute.
+
+**`014` es obligatoria para que los duelos funcionen.** Sin ella no existe
+`duelo_minijuegos` ni el reloj del partido, y el sondeo de §15.3 revienta:
+```
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/014_partido_en_vivo.sql
+```
+Es aditiva y re-ejecutable. **Ojo con sus valores de `configuracion`: entran con
+`INSERT IGNORE`**, así que cambiar el valor por defecto dentro del `.sql` NO
+toca una base ya migrada — hay que hacer el `UPDATE` a mano. Es a propósito:
+si sobrescribiera, cada re-ejecución borraría el calibrado de Alejandro.
 
 ### 5.3 ⚠️ TRAMPA DE CODIFICACIÓN — léela antes de aplicar nada
 
@@ -423,6 +524,10 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `coherencia_malus_rate` | 3.0 | cuánta coherencia se exige por punto de rareza |
 | `coherencia_malus_tope` | 18 | tope % del malus |
 | `tension_tiers_0..3` | 60,30,10 … 43,36,21 | probabilidades Plata/Oro/Prisma |
+| `partido_duracion_seg` | 45 | duración real del partido narrado, **sin contar las pausas** (§15.3) |
+| `partido_espera_seg` | 15 | cuánto se espera a que aparezcan los dos antes de arrancar igual |
+| `partido_latido_max` | 12 | segundos sin latido para dar a alguien por ausente |
+| `partido_minijuegos_max` | 2 | decisiones por jugador y partido. **Cuidado al subirlo:** el reloj se para para los DOS en cada una, así que 3 son seis pausas y el partido se hace eterno (§15.5) |
 
 ---
 
@@ -447,8 +552,15 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
   retrato puede ser menor si el **botón completo** llega a 44px.
 - Todo operable por teclado. El deck builder nunca ha usado arrastre, solo
   "elegir hueco → elegir jugador", así que cumple SC 2.5.7 por diseño.
-- `prefers-reduced-motion` cubre las ceremonias. La simulación de partido ni
-  siquiera abre su modal si está activo: va directo al resultado.
+- `prefers-reduced-motion` cubre las ceremonias. **Regla que salió de un fallo
+  real: reduce el MOVIMIENTO, nunca el JUEGO.** El partido de cadenas sí se
+  salta con esta preferencia (allí es decoración: el marcador ya está decidido
+  y no hay nada que decidir), pero el **partido PvP no se salta jamás** — se ve
+  entero y se juega entero, solo sin animaciones. Durante un tiempo sí se
+  saltaba, y eso significaba que quien tuviera la preferencia puesta no jugaba
+  ninguno de sus minijuegos, nunca paraba un gol, y encima su rival esperaba
+  15 s a alguien que no iba a aparecer: una desventaja competitiva atada a un
+  ajuste de accesibilidad. Ver §15.7.
 - `aria-live` para resultados de sobre y duelo. El reloj del aumento usa
   `role="timer" aria-live="off"` a propósito.
 - Un solo `<h1>` por página. En `duelo.php` el veredicto ES el `<h1>`, con
@@ -482,18 +594,33 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
   animaciones no se pueden cronometrar ahí; hay que validar la lógica por
   partes (estado final, algoritmos aislados) y decir honestamente que el ritmo
   visual no se ha visto.
-- PHP CLI en `C:\xampp\php\php.exe`. **`extension=gd` estaba comentada tanto
-  para CLI como para el PHP que carga Apache** (contradice lo que decía esta
-  misma línea en versiones anteriores del documento — verificado con
-  `php -m`, ninguno de los dos la traía activa). Se descomentó en
-  `C:\xampp\php\php.ini`, pero **Apache corre como servicio de Windows
-  (`Apache2.4`) y una sesión sin privilegios de administrador no puede
-  reiniciarlo** (`Restart-Service` da "Acceso denegado"). Si `panel/plantillas.php`
-  da `Fatal error: Call to undefined function imagecreatetruecolor()`, ese es
-  el motivo: reinicia Apache a mano (XAMPP Control Panel: Stop → Start, o
-  `services.msc` → Apache2.4 → Reiniciar) para que recoja el cambio.
+- PHP CLI en `C:\xampp\php\php.exe`. **`extension=gd` ya está activa** tanto en
+  CLI (`php -m` la lista) como en el PHP que carga Apache (verificado v6,
+  2026-08-07: `panel/plantillas.php` no da `Fatal error: Call to undefined
+  function imagecreatetruecolor()`). Si en otra copia vuelve a faltar,
+  descoméntala en `C:\xampp\php\php.ini` y **reinicia Apache a mano** (XAMPP
+  Control Panel: Stop → Start, o `services.msc` → Apache2.4 → Reiniciar):
+  corre como servicio de Windows y una sesión sin privilegios de administrador
+  no puede reiniciarlo (`Restart-Service` da "Acceso denegado").
 - Apache y MariaDB a veces están parados. Si XAMPP los deja a medias, mata los
   procesos `httpd`/`mysqld` y relanza desde `C:\xampp\`.
+
+- **El panel del navegador de pruebas no tiene el FOCO** (`document.hasFocus()`
+  es `false`), además de no componer fotogramas. Eso rompe cosas que en un
+  navegador de verdad funcionan: `navigator.clipboard` rechaza sin foco, y
+  `document.execCommand('copy')` también. Si algo relacionado con el
+  portapapeles "falla", comprueba `document.hasFocus()` antes de tocar el
+  código — probablemente no está roto, es que no se puede probar desde aquí.
+- **Para probar animaciones con GSAP se puede bombear el ticker a mano**:
+  `gsap.ticker.tick()` en un bucle avanza las timelines aunque
+  `requestAnimationFrame` esté pausado por tener el panel oculto. Es la única
+  forma de verificar una secuencia animada en este arnés.
+- **Para probar cambios que escriben en la BD, usa una copia desechable** en vez
+  de tocar datos reales:
+  ```
+  mysqldump -u root tcg | mysql -u root tcg_prueba
+  ```
+  Se hizo así para probar `resolverDuelo()` y el antiabuso de los minijuegos.
 
 ### Verificar pantallas con sesión
 
@@ -542,12 +669,28 @@ puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
   Editar el mazo o reasignar un rasgo después no cambia un duelo en curso —
   verificado con una prueba de "trampa".
 - **No hay cron.** Todo lo que necesita "pasar el tiempo" (vencer el plazo de
-  aumento, abandonar una sala) se evalúa de forma perezosa en cada carga o
-  sondeo. **Misiones debe seguir el mismo patrón.**
+  aumento, abandonar una sala, **avanzar el minuto del partido y vencer el
+  plazo de un minijuego**) se evalúa de forma perezosa en cada carga o sondeo.
+  **Misiones debe seguir el mismo patrón.**
 - **Un `<button>` no puede contener otro `<button>`** — el navegador cierra el
   exterior de golpe al primero interior. Por eso las cajas abribles en
   `sobres.php` son `<div role="button" tabindex="0">`, no `<button>`: su
   interior lleva hasta 50 `<button>` de sobre individual (§14).
+- **⚠️ Una regla de `display` propia le gana SIEMPRE al atributo `hidden`.**
+  `[hidden]` es una regla del navegador, y cualquier `display: flex/grid/block`
+  que escribas tiene más prioridad, sin importar la especificidad. El síntoma
+  engaña muchísimo: el JavaScript pone `elemento.hidden = true` correctamente,
+  pero el elemento **se sigue viendo**, así que parece que el JS no se ejecuta.
+  Ya ha mordido en **cinco** sitios (`.submenu-tipos`, `.cer-escena`,
+  `.cer-walkout`, `.cer-aviso-motion`, `.ceremonia-mesa`). **Si escribes una
+  regla de `display` sobre algo que el JS oculta con `hidden`, cuélgala de
+  `:not([hidden])`.**
+- **Nunca uses `mt_rand()` en código que se ejecute al pintar una pantalla.**
+  El motor de eventos y los minijuegos usan un generador propio sembrado
+  (`Tcg::azarSembrado`) por dos motivos: tocar el estado global del generador
+  desde una lectura contaminaría el sorteo de cualquier duelo o sobre que se
+  resolviera después en la misma petición, y además hace falta que el servidor
+  pueda **recalcular** el mismo resultado para validar lo que manda el cliente.
 
 ---
 
@@ -557,16 +700,23 @@ puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
   convenciones técnicas.**
 - Nombres de clases CSS y de funciones **en español**. Comentarios en español,
   explicando **por qué**, no qué.
-- **Sin dependencias de npm ni build step.** GSAP/Three.js son la única
-  excepción autorizada, reservada a §14, y **aún no vendorizados**.
+- **Sin dependencias de npm ni build step.** GSAP es la única excepción
+  autorizada y ya está vendorizada (`assets/js/vendor/gsap/`); Three.js sigue
+  autorizado para §14 pero no se ha necesitado.
 - JS sin framework, en IIFE, con `'use strict'`. API pública en `window.SRF`:
-  `abrirModal`, `cerrarModal`, `toast`, `confirmar`, `ceremonia`.
+  `abrirModal`, `cerrarModal`, `toast`, `confirmar`, `ceremonia`, `copiar`.
 - Escapar siempre con `htmlspecialchars()`. PDO preparado siempre.
-- **Toda la capa de datos vive en la clase `Tcg`** (`db/consultas.php`, ~2630
+- **Toda la capa de datos vive en la clase `Tcg`** (`db/consultas.php`, ~5480
   líneas), agrupada por comentarios de sección (`MAZOS`, `DUELOS`, `AUMENTO
-  PRE-PARTIDO`, `CAPA 2 — COMPOS`, `CONFIGURACIÓN`). No se crean clases nuevas.
+  PRE-PARTIDO`, `CAPA 2 — COMPOS`, `MOTOR DE EVENTOS`, `MINIJUEGOS`, `PARTIDO
+  EN VIVO`, `CONFIGURACIÓN`). No se crean clases nuevas.
+  - **Excepción a "todo en Tcg": los DATOS puros van en su propio fichero**
+    (`db/plantillas_narracion.php`, `db/minijuegos.php`). Son arrays que se
+    editan a mano y crecen mucho; meterlos en la clase la haría ilegible sin
+    aportar nada. La lógica que los consume sí vive en `Tcg`.
 - **Patrón "sala en vivo" sin websockets**: latido periódico + sondeo +
   `navigator.sendBeacon` en `pagehide`. Ver `duelo.js` + `assets/ajax/duelo_estado.php`.
+  **El partido en vivo del §15 usa exactamente el mismo patrón**, no otro.
 
 ### Decisiones ya tomadas — no volver a abrirlas
 
@@ -809,8 +959,14 @@ ventaja de poder.
 ## 12. Pendientes, en orden aproximado
 
 1. **Subir arte real de cajas/sobres** en `panel/plantillas.php` (§14) — el
-   motor está construido y probado, pero sin plantillas subidas todo cae al
-   degradado por defecto. Es trabajo de contenido, no de código.
+   motor está construido y probado. Ya hay un primer intento en marcha:
+   `caja_expansion_3`, `caja_sobre_2` y `sobre_2` tienen los recortes
+   correctos en `assets/img/plantillas/`, pero sin fila en `plantillas_3d`
+   (la migración `013` faltaba en esta copia, ver nota de v6 y §5.2) siguen
+   mostrando el degradado por defecto. **Hay que volver a subirlas desde el
+   panel** para que el `INSERT` se ejecute contra la tabla ya creada — no
+   basta con que los ficheros existan. El resto es trabajo de contenido, no
+   de código.
 2. **Fase 3** — panel de administración al sistema nuevo (hoy sigue con
    Bootstrap Icons y su propio `admin.css`, salvo `plantillas.php` que ya usa
    el sistema nuevo), motion unificado de las ceremonias, y documentar cómo
@@ -821,14 +977,31 @@ ventaja de poder.
    pity del Aumento, matchmaking anti-repetición PvP, validador de balance.
 5. **Más contenido de Cadenas**: hoy hay 2 cadenas y 18 nodos. El motor
    aguanta más sin tocar código; es trabajo de datos.
-6. **Minijuegos** — ni contenido ni pantalla, aplazados por Alejandro.
-7. **Resolver los hallazgos abiertos de §10.6.**
-8. **Calibrar `duelo_k`/`duelo_p_min`/`duelo_p_max`** con duelos reales.
-9. **Algoritmo definitivo del marcador de goles PvP**, hoy placeholder
-   funcional (`marcadorDuelo()`): nunca contradice al ganador ya sorteado,
-   pero no se considera el diseño final. El PvE ya usa su propia fórmula
-   (`pve_goles_*`).
-10. **`_legacy/` se puede borrar** cuando Alejandro confirme.
+6. **`_legacy/` se puede borrar** cuando Alejandro confirme.
+
+**Pendientes que nacieron con el §15:**
+
+7. **Más minijuegos.** El contrato está hecho y probado; faltan 88 del catálogo
+   de la Biblia. Las familias `balon_parado` y `defensa` ya las emite el motor y
+   no las usa nadie (§15.4). Empezar por ahí es barato.
+8. **El desequilibrio de compos** que §15.8 deja medido: hoy mezclar afinidades
+   rinde más que enfocarlas, así que construir bien un equipo casi no importa.
+   Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
+   de balance, no de código.
+9. **Llevar el partido narrado a las cadenas** (§15.7). Antes hay que arreglar
+   `marcadorCadena()`: da 4-8 y 9-5, y narrados se leen como un partido roto.
+   Ahí vive el problema original de la Biblia (*"simular hasta ganar"*).
+10. **El resto del escalado de dificultad** (Biblia §3). Hoy salen por
+    dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
+    acierto, la fiabilidad de la pista y el coste del fallo.
+11. **Calibrar `duelo_k`** con duelos reales — §15.8 sugiere que es la palanca
+    real del equilibrio, no los rangos de estadísticas.
+12. **Resolver los hallazgos abiertos de §10.6** (relacionado con el 8).
+
+**Ya no están pendientes** (estaban en la v6):
+- ~~Algoritmo definitivo del marcador PvP~~ — hecho: nace de la simulación
+  (§15.1) y `marcadorDuelo()` se retiró.
+- ~~Minijuegos aplazados~~ — empezados (§15.4).
 
 ---
 
@@ -857,6 +1030,10 @@ Si tocas Duelos, además:
 - Comprobar en `duelo_aumentos` que las opciones de un jugador **nunca**
   aparecen en la respuesta que recibe el otro.
 - Comprobar que editar el mazo tras comprometerse no cambia el resultado.
+- **Abrir el mismo duelo desde las DOS cuentas y comprobar que ven el mismo
+  marcador.** Ya falló una vez (4-2 contra 4-3, ver §15.7) y no se detecta
+  jugando con una sola cuenta.
+- Si tocas el partido narrado, la lista completa está en **§15.9**.
 
 Si tocas la Capa 2, además:
 - `SELECT HEX(nombre) FROM rasgos WHERE clave='montana';` → debe contener `c3b1`.
@@ -868,8 +1045,12 @@ Si tocas la Capa 2, además:
 
 ## 14. Cajas y sobres en pseudo-3D (CONSTRUIDO, distinto del plan original)
 
-**Estado: construido y funcionando**, con `admin` aún sin subir arte real (cae
-al degradado por defecto). Especificado en un prompt aparte
+**Estado: construido y funcionando.** Hay un primer intento de arte real para
+`caja_expansion_3`, `caja_sobre_2` y `sobre_2` (recortes ya en disco), pero
+sigue cayendo al degradado por defecto porque la fila correspondiente en
+`plantillas_3d` no se llegó a grabar — ver la nota de v6 al principio del
+documento y §5.2/§12. El resto de expansiones/sobres sigue sin arte subido.
+Especificado en un prompt aparte
 (`prompt-claude-code-sobres-3d.md` — **no vive en el repo**, solo se cita en
 comentarios de código; si lo necesitas entero, pídeselo a Alejandro) que
 describe un sistema **más simple** que el plan que tenía este documento en su
@@ -896,10 +1077,10 @@ ni de secuencia FUT independiente. Lo construido es:
   **submenú** de cajas pequeñas por tipo (`sobres.php`, sección "Fase 2" en el
   propio fichero) en vez de meter todos los sobres en la caja de expansión.
 - Clicar un sobre individual dispara la compra + apertura real
-  (`abrirSobre()`) y reutiliza el modal/reveal **ya existente** de
-  `partials/ceremonia.php` + `assets/js/ceremonia.js` (sin cambios: el reveal
-  de cartas por rareza es el mismo desde la Fase 1). §14 solo cambia cómo se
-  llega hasta ahí, no lo que pasa al abrir un sobre.
+  (`abrirSobre()`) y reutiliza el modal/reveal de `partials/ceremonia.php` +
+  `assets/js/ceremonia.js`. §14 solo cambia cómo se llega hasta ahí, no lo que
+  pasa al abrir un sobre. (La ceremonia SÍ se reescribió después — ver §14.2 —,
+  pero por su cuenta, no por §14.)
 - **GSAP sí se usa aquí** (`assets/js/vendor/gsap/gsap.min.js`,
   `gsap.quickTo()` para el tilt al cursor de cada caja, `gsap.timeline()` para
   abrir/cerrar la tapa). Es el primer uso real de GSAP en el proyecto.
@@ -1126,3 +1307,258 @@ Además de §13, si tocas la ceremonia de cajas/sobres:
   `mousemove`) no sea la única forma de interactuar con la caja — hoy el clic
   para abrir funciona igual sin tilt, pero si se añade motion nuevo aquí debe
   respetar la preferencia como el resto del sitio (§7).
+
+---
+
+## 15. El partido narrado en vivo (CONSTRUIDO, lo más nuevo del proyecto)
+
+Implementa la **Biblia** (`branding/Biblia/`), sobre todo su §1 (motor de
+eventos), §2 (minijuegos) y el veredicto de priorización de su §13.3, que fue el
+que marcó el orden: *"el motor de eventos es la pieza fundacional de la que
+dependen literalmente todas las demás"*.
+
+**Todas las referencias tipo "§1.5 regla 6" o "§4.6" de esta sección apuntan a
+la Biblia, no a este documento.**
+
+El problema que venía a resolver (Biblia §0.2): un duelo era *un botón que se
+pulsa y un resultado que aparece*. Todo el trabajo de las tres capas no se veía
+nunca desplegarse. Hoy un duelo PvP se juega.
+
+### 15.1 El motor de eventos
+
+`Tcg::generarEventosPartido()`, en `db/consultas.php`. Es una capa que va
+**encima** del resultado, nunca dentro (§1.1): quién gana lo siguen decidiendo
+las tres capas cerradas y la curva Elo.
+
+- La **posesión** se reparte ponderada por la línea de **MEDIO**, no por el
+  total (§1.2). El **Ataque** contra `Defensa + Portería` decide qué tramos
+  acaban en ocasión.
+- **No guarda nada.** La narración se regenera de forma determinista desde el
+  `valor_sorteo` que el duelo ya tiene almacenado. Un mismo duelo se narra igual
+  siempre (necesario para que el veredicto compartible siga cuadrando) y dos
+  intentos distintos del mismo nodo se narran distinto solos, porque cada duelo
+  tiene su propio sorteo. Eso es la regla 6 de §1.5 sin pagar una columna JSON
+  por duelo.
+- **Momentum** (§1.4): media móvil de quién ha generado las ocasiones recientes,
+  en −100..100. No toca ningún cálculo, pero **varios minijuegos del catálogo no
+  hacen otra cosa que moverlo**, así que tenía que existir antes que ellos.
+- Garantiza un mínimo de interacción: si el azar deja un hueco largo sin nada que
+  leer, fuerza un evento de contexto (§1.5 regla 8).
+
+**El contrato de un evento se rompe caro** — es la superficie a la que se van a
+enganchar las ~90 entradas del catálogo:
+
+```
+id · minuto · tipo · lado · texto · marcador · momentum
+familia · familia_def · interactivo · protagonistas   (solo en ocasiones)
+```
+
+- `familia` es la del que **ataca**; `familia_def`, la del que **defiende**. La
+  misma jugada es `disparo` para quien remata y `porteria` para quien la para.
+  Sin esa distinción, Muralla Humana no aparecía nunca.
+- `protagonistas` viaja ya resuelto. Si el minijuego volviera a elegir jugador
+  por su cuenta, contradiría el texto que el jugador acaba de leer.
+- Los `id` se renumeran **después** de ordenar por minuto. El descuento y el
+  descanso se añaden fuera del recorrido de tramos, así que el orden de creación
+  no es el cronológico y los id salían saltados.
+
+### 15.2 Las frases
+
+`db/plantillas_narracion.php` — un array, sin lógica. La regla 6 de §1.5 (la que
+la Biblia llama *"la corrección más importante de toda la sesión"*) exige que
+repetir un nodo se lea distinto, y eso no se consigue con probabilidad sino con
+**volumen**: el motor consume las frases **sin reemplazo** dentro de un mismo
+partido, así que el número de variantes de cada bloque es literalmente el techo
+de variedad de ese partido.
+
+**Añade variantes solo al FINAL de cada array**: la elección es determinista a
+partir del sorteo, así que insertar en medio reescribe la narración de los
+duelos ya jugados.
+
+### 15.3 El partido en vivo (migración `014`)
+
+Antes cada jugador reproducía el partido en SU reloj, al cargar la página con
+`?nuevo=1`. Con dos personas en el mismo duelo eso no se sostiene: veían minutos
+distintos y la pausa de uno no existía para el otro.
+
+Ahora **el minuto lo manda el servidor**, derivado del reloj de pared en cada
+sondeo (no hay cron):
+
+```
+minuto = (NOW() − partido_inicio − partido_pausa_seg) × ritmo
+```
+
+- `assets/ajax/duelo_narracion.php` es el sondeo (1/s). `Tcg::estadoPartido()`
+  hace todo en diferido: arrancar el reloj, pausar al llegar a un minijuego,
+  aplicar el fallback de quien no contesta y reanudar.
+- Cuando toca un minijuego, `partido_pausado_en` detiene el reloj **para los
+  dos**. Al otro se le dice *"el rival está decidiendo"*, en vez de dejarle el
+  reloj congelado sin explicación.
+- **Regla acordada con Alejandro: si no estás atento, te lo pierdes.** El partido
+  arranca cuando los dos han latido o al vencer `partido_espera_seg`, y no espera
+  indefinidamente a nadie.
+- El cliente **no tiene reloj propio** en modo narrado: solo pinta lo que dice el
+  sondeo.
+
+### 15.4 Los minijuegos
+
+`db/minijuegos.php` es el catálogo. El motor no sabe jugar a ninguno: lee de ahí
+qué ofrecer. **Añadir el minijuego 40 es añadir un array, no tocar el motor.**
+
+Cada entrada declara su `impacto`, y eso lo decidió Alejandro explícitamente —
+**lo declara el minijuego, no el tipo de duelo**:
+
+- `ninguno` — solo suma a la puntuación de actuación.
+- `jugada` — puede cambiar el desenlace de ESA jugada (un gol pasa a parada o al
+  revés). Cambia el marcador, **nunca el ganador**.
+- `partido` — reservado, sin usar. Exige mover la resolución del duelo a después
+  del partido, y eso está sin decidir.
+
+**Por qué `jugada` es seguro en PvP, verificado en el código y no supuesto:** el
+reparto de la apuesta usa solo `id_ganador`, las misiones cuentan duelos y
+victorias (nunca goles), y el `rango` se calcula únicamente en PvE. **En un duelo
+PvP el marcador no lo lee nadie más que la pantalla que lo pinta.** Si algún día
+pasa a valer para algo, hay que releer esto.
+
+Construidos 2 de ~90:
+
+| Clave | Familia | Lado | Qué adivinas |
+|---|---|---|---|
+| `muralla_humana` | `porteria` | defiendes | qué remate llega |
+| `elige_tu_veneno` | `disparo` | atacas | cómo sale el portero |
+
+Son **espejo** el uno del otro: sus tres opciones encajan una a una, así que lo
+que aprendes parando te sirve para rematar. Familias que el motor ya emite y
+**nadie usa todavía**: `balon_parado` (59 eventos medidos) y `defensa` (47).
+
+**Tres reglas que costaron sangre:**
+
+1. **Ciclo cerrado obligatorio.** Cada opción para exactamente un tipo, y cada
+   tipo lo para exactamente una opción. La primera versión hacía que cada opción
+   ganase a una y perdiera contra otra, y entonces el remate `potente` no lo
+   paraba **ninguna**: un tercio de las jugadas estaban decididas antes de elegir.
+2. **El dato oculto NO viaja al cliente.** Solo va una pista sobre la tendencia
+   de la carta rival. Si viajara, bastaría con mirar la respuesta de red para
+   acertar siempre.
+3. **El desvío se mide contra la media de los ONCE que están en el campo**, no
+   contra cero. Contra cero, el sesgo del catálogo (más Técnica que Ataque)
+   empujaba siempre al mismo tipo de remate y dejaba una **opción dominante**
+   (+27 de balance), que es justo lo que prohíbe §1.5 regla 2. Centrado, las tres
+   opciones quedan a ~33 % y solo leer la pista sube al 37 %.
+
+### 15.5 Cuántas decisiones, y por qué tan pocas
+
+`partido_minijuegos_max` = **2 por jugador**. El número no vale por jugador sino
+**por partido**: el reloj se para para los dos en cada decisión, así que dos
+jugadores a tres son **seis pausas**, y el partido se hacía eterno (medido:
+2 min 20 s). Hoy son ~62 s con 4 pausas.
+
+Una decisión se ofrece si la jugada tiene sentido para ese lado, hasta el techo.
+**Que pueda cambiar el marcador NO decide si se ofrece**: antes sí, y el
+resultado medido era que **quien perdía por un gol se quedaba con cero
+decisiones** — con margen mínimo no cabe mover nada sin contradecir el sorteo, y
+justo el partido en el que más quieres pelear era el que no te dejaba tocar nada.
+Cuando no cabe, la jugada sigue contando para la actuación (§4.6), así que nunca
+es un "continuar" disfrazado.
+
+Quien decide de verdad si el marcador se mueve es **la base de datos**: la
+condición de §1.3 va dentro del `UPDATE` de `descontarGolRival()` y
+`sumarGolPropio()`, no comprobada antes en PHP. Comprobar y luego actualizar deja
+una ventana por la que dos peticiones a la vez podrían empatar un partido que
+alguien había ganado. Verificado martilleando 25 peticiones seguidas: solo se
+aplica una.
+
+### 15.6 Veredicto y actuación
+
+- **Actuación** (§4.6, §6.4): aciertos sobre decisiones jugadas. Se deriva de
+  `duelo_minijuegos`, no se acumula aparte. Es lo que da sentido a una jugada
+  cuando el marcador ya no puede moverse.
+- **Veredicto** (§1.5 regla 7): cada partido cierra con un dato concreto, también
+  al perder. `Tcg::veredictoDuelo()` busca hechos reales del encuentro y elige el
+  más memorable — una parada tuya se cuenta antes que la posesión. Se calcula en
+  servidor para que **las dos cuentas lean el mismo texto**.
+  - Ojo al tono: *"Aguantaste hasta el X"* solo sale si X ≥ 70'. Sin ese corte
+    salía "Aguantaste hasta el 15'", que promete épica y la desmiente con el
+    número: se leía como una burla involuntaria.
+- **Copiar al portapapeles** (`SRF.copiar`, en `ui.js`): del mecanismo 4 de
+  Copero (§6.1), el resumen tiene que poder pegarse en Discord tal cual.
+  `navigator.clipboard` **rechaza si el documento no tiene el foco**, no solo si
+  el sitio va por `http`; por eso el método viejo con textarea no es el respaldo
+  para `http` sino el respaldo para cuando la API moderna dice que no.
+
+### 15.7 Duelos y cadenas están SEPARADOS a propósito
+
+`duelo.php` decide el modo con `$esCadena ? 'clasico' : 'narrado'` y lo publica en
+`data-modo`. `duelo.js` se ramifica ahí.
+
+| | Duelos PvP | Cadenas PvE |
+|---|---|---|
+| Modo | `narrado` | `clasico` — **intacto** |
+| Reloj | servidor | local (rAF) |
+| Minijuegos | sí | no |
+| Marcador | nace de la simulación (§1.3) | `marcadorCadena()`, sin tocar |
+| Botón "Ver resultado" | **no** | sí |
+| Movimiento reducido | se juega igual, sin animación | se salta |
+
+**El botón de saltar se quitó del PvP** porque saltártelo no detiene al rival,
+que puede seguir parando goles después de que hayas salido: una cuenta acababa
+viendo 4-2 y la otra 4-3. Cerrar sigue siendo posible con Esc o el aspa (§13
+exige que un modal se pueda cerrar), pero el aspa dice *"Salir del partido"*, no
+*"Ver resultado"*, porque lo segundo sería mentir.
+
+Ese mismo bug tenía **dos causas encadenadas**, las dos corregidas: el cliente
+solo actualizaba el marcador final cuando el gol lo parabas tú, y el servidor
+informaba del marcador **original** en vez del actual (la reconstrucción que hace
+`narracionDuelo()` para generar el relato sobrescribía los goles del duelo). Si
+vuelve a bailar un marcador, mira esos dos sitios.
+
+**Llevar el partido narrado a las cadenas está sin hacer, a propósito.** Ahí vive
+el problema original de la Biblia (§0.2, *"simular hasta ganar"*), así que es
+donde más valdría — pero antes hay que arreglar `marcadorCadena()`, que da
+resultados como 4-8 y 9-5. Narrados, se leen como un partido roto: doce goles
+seguidos sin una sola parada.
+
+### 15.8 ⚠️ El equilibrio está medido y NO cumple lo que se buscaba
+
+Alejandro pidió que un equipo bien pensado pudiera ganar a uno de todo SRF. Se
+midió pasando equipos completos por el motor real. **No se cumple, y la causa no
+son las estadísticas de las cartas:**
+
+```
+Raro bien pensado  vs SRF surtido   11,2 %
+Raro MAL pensado   vs SRF surtido   11,0 %
+```
+
+Pensar bien el equipo aporta **dos décimas**. El motivo: un equipo **surtido
+activa 8 rasgos** de compos y un monotipo solo 4. **El sistema premia mezclar
+afinidades, no enfocarlas** — es el hallazgo 1 del §10.6 de este documento, ahora
+con número.
+
+Ensanchar los rangos de estadísticas casi no lo mueve (de ±7 a ±25 lleva al Raro
+del 11 % al 23 %, y con ±25 la rareza ya no significa nada). **La palanca es
+`duelo_k`**: subirla de 400 a 1000 lleva al Raro al 30 % y al Épico al 39 %.
+
+Los rangos para crear cartas nuevas están en
+`branding/Rangos_estadisticas_SRF.xlsx` / `.csv`, ajustados por mínimos cuadrados
+sobre las 38 cartas reales (desviación máxima 5,6 puntos) y con solape
+deliberado entre rarezas contiguas. Las 38 cartas actuales encajan dentro de sus
+rangos.
+
+**Nada de esto se ha tocado: es balance, y el balance lo decide Alejandro.**
+
+### 15.9 Comprobaciones si tocas el partido
+
+Además de §13:
+
+- El marcador narrado debe cuadrar con el guardado en **todos** los duelos
+  resueltos, no en una muestra. La invariante dura de §1.3 es que el ganador del
+  sorteo siempre acaba con más goles: se midió sobre 4.000 partidos sintéticos y
+  debe dar **0 violaciones**.
+- Ninguna opción de un minijuego puede tener ventaja eligiéndola siempre a ciegas
+  (las tres a ~33 %), y leer la pista debe quedar por encima.
+- El dato oculto (`remate`, `estilo_portero`) **no puede aparecer** en el JSON que
+  se manda al cliente antes de decidir.
+- Resolver dos veces la misma jugada debe devolver *"Esa jugada ya estaba
+  resuelta"* y no volver a mover el marcador.
+- Con movimiento reducido, un duelo PvP debe **abrir el modal y ofrecer sus
+  minijuegos** igual; lo único que cambia es que nada se anima.

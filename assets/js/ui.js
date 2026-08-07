@@ -331,12 +331,63 @@
     if (e.key === 'Escape') confirmarPendiente = null;
   });
 
+  /* COPIAR AL PORTAPAPELES — cualquier elemento con data-copiar.
+     Vive aquí y no en la pantalla que lo estrena porque no tiene nada de
+     específico: en cuanto haya un segundo sitio que quiera ofrecer "copia
+     esto", ya está resuelto.
+
+     navigator.clipboard solo existe en contexto seguro (https o localhost), y
+     este proyecto se sirve por http en red local, así que hace falta el camino
+     viejo con un textarea temporal. Sin él, copiar fallaría en silencio justo
+     en el escenario en el que se juega. */
+  function copiarConCaja(texto) {
+    return new Promise(function (resolver, rechazar) {
+      var caja = document.createElement('textarea');
+      caja.value = texto;
+      // fuera de la vista pero seleccionable: display:none no se puede copiar
+      caja.setAttribute('readonly', '');
+      caja.style.position = 'fixed';
+      caja.style.left = '-9999px';
+      document.body.appendChild(caja);
+      caja.select();
+      try {
+        document.execCommand('copy') ? resolver() : rechazar();
+      } catch (e) { rechazar(e); }
+      caja.remove();
+    });
+  }
+
+  function copiarTexto(texto) {
+    /* La API moderna solo existe en contexto seguro, y AUN ASÍ rechaza si el
+       documento no tiene el foco o si el permiso está denegado — comprobado:
+       falla en una pestaña de fondo aunque todo lo demás esté bien. Por eso el
+       camino viejo no es solo para http: es el respaldo cuando la moderna dice
+       que no. Sin esta cadena, copiar fallaba en silencio en casos normales. */
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(texto).catch(function () {
+        return copiarConCaja(texto);
+      });
+    }
+    return copiarConCaja(texto);
+  }
+
+  function iniciarCopiar() {
+    document.addEventListener('click', function (e) {
+      var boton = e.target.closest && e.target.closest('[data-copiar]');
+      if (!boton) return;
+      copiarTexto(boton.dataset.copiar)
+        .then(function () { toast('Resumen copiado.', 'success'); })
+        .catch(function () { toast('No se ha podido copiar.', 'danger'); });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     iniciarReveal();
     iniciarNav();
     iniciarTabs();
     iniciarPlegables();
     iniciarConfirmar();
+    iniciarCopiar();
   });
 
   /* API pública.
@@ -348,4 +399,5 @@
   SRF.cerrarModal = cerrarModal;
   SRF.toast = toast;
   SRF.confirmar = confirmar;
+  SRF.copiar = copiarTexto;
 })();

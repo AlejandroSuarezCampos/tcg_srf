@@ -40,6 +40,7 @@ $base = $base ?? '';
         <div class="cer-walkout-rayos"></div>
         <div class="cer-walkout-texto">
           <span class="cer-walkout-rareza" id="cerWalkoutRareza"></span>
+          <span class="cer-walkout-nombre" id="cerWalkoutNombre"></span>
         </div>
       </div>
 

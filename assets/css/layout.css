@@ -992,6 +992,50 @@
 .partido.es-victoria .partido-veredicto { color: var(--success); }
 .partido.es-derrota  .partido-veredicto { color: var(--frost-dim); }
 
+/* ---- VEREDICTO DEL PARTIDO (§1.5 regla 7) ----
+   El dato memorable del encuentro, también al perder. Va justo bajo el
+   titular y por encima de todo lo demás porque es lo que se lee y lo que se
+   comparte; las estadísticas quedan debajo, de apoyo. */
+.veredicto {
+  margin-bottom: var(--space-5);
+  text-align: center;
+}
+.veredicto-detalle {
+  margin: 0 auto var(--space-2);
+  max-width: 46ch;
+  font-size: var(--fs-body);
+  color: var(--frost);
+}
+.veredicto-actuacion {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.veredicto-copiar { margin-bottom: var(--space-4); }
+
+.veredicto-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.veredicto-stats > div { text-align: center; }
+.veredicto-stats dt {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+.veredicto-stats dd {
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  color: var(--frost);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- sello de rango (S/A/B) de las cadenas ----
    Primer guiño retro de las Cadenas: letra grande y maciza, borde duro y sin
    degradados, como el rango de un marcador de recreativa. La paleta sigue
@@ -1412,6 +1456,14 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
 
 .simulacion-barra { position: relative; z-index: 1; width: 100%; max-width: 360px; }
 
+/* ==========================================================================
+   MODO CLÁSICO — el que usan las CADENAS (PvE).
+   Reloj + una insignia de gol que aparece y se va. No narra el partido: solo
+   dramatiza el camino hasta un marcador que el servidor ya decidió.
+   Los duelos PvP usan el modo narrado, más abajo. Se mantienen los dos a
+   propósito mientras las cadenas se quedan como estaban.
+   ========================================================================== */
+
 /* espacio reservado para el evento de gol: fijo, para que aparecer y
    desaparecer no haga saltar el resto del modal */
 .simulacion-eventos {
@@ -1449,9 +1501,221 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   100% { opacity: 0; transform: translateY(-6px) scale(.98); }
 }
 /* red de seguridad: este modal no debería llegar a abrirse con movimiento
-     reducido (el JS lo evita), pero si algo falla, el evento se queda fijo
-     en vez de animarse */
-  :root[data-motion="reduce"] .simulacion-evento { animation: none; }
+   reducido (el JS lo evita), pero si algo falla, el evento se queda fijo
+   en vez de animarse */
+:root[data-motion="reduce"] .simulacion-evento { animation: none; }
+
+/* ==========================================================================
+   MODO NARRADO — el que usan los DUELOS PvP (Biblia §1).
+   ========================================================================== */
+
+/* --- MOMENTUM (Biblia §1.4) ---
+   Barra simétrica: el centro es el equilibrio y la aguja se desplaza hacia
+   quien está generando las ocasiones. Indicador de LECTURA, no toca ningún
+   cálculo del duelo. */
+.sim-momentum {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sim-momentum-riel {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--danger) 45%, transparent),
+    var(--line) 46% 54%,
+    color-mix(in srgb, var(--amber) 55%, transparent));
+}
+.sim-momentum-aguja {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--frost);
+  box-shadow: 0 0 10px rgba(0, 0, 0, .7);
+  /* el centrado va en el propio transform, así que "left" es la única
+     propiedad que anima: mover translateX aquí lo descentraría */
+  transform: translate(-50%, -50%);
+  transition: left var(--t-media) var(--ease), background var(--t-micro) var(--ease);
+}
+.sim-momentum-aguja.es-mio { background: var(--amber-light); }
+.sim-momentum-etiqueta {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+
+/* --- EL RELATO ---
+   Alto FIJO para las últimas líneas: si creciera con el contenido, cada
+   evento nuevo empujaría el modal entero y el marcador daría saltos. */
+.sim-relato {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.sim-linea {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+  animation: simLinea var(--t-media) var(--ease) both;
+}
+.sim-linea-min {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
+  color: var(--frost-dim);
+  opacity: .7;
+}
+.sim-linea.es-hito { color: var(--frost-dim); font-style: italic; opacity: .75; }
+.sim-linea.es-gol-mio {
+  color: var(--amber-light);
+  font-weight: var(--fw-semibold);
+}
+.sim-linea.es-gol-suyo {
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}
+@keyframes simLinea {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- MINIJUEGO (§2) ---
+   El partido se para aquí. `:not([hidden])` es obligatorio, como en el resto
+   de esta pantalla: una regla de display de autor le gana siempre al [hidden]
+   del navegador, y el panel se quedaría visible todo el partido. */
+.sim-minijuego:not([hidden]) {
+  position: relative;
+  z-index: 8;
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel) 92%, var(--amber) 8%);
+  animation: simLinea var(--t-media) var(--ease) both;
+}
+.sim-mj-titulo {
+  margin: 0;
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--amber-light);
+}
+.sim-mj-enunciado {
+  margin: 0;
+  text-align: center;
+  font-weight: var(--fw-semibold);
+  color: var(--frost);
+}
+/* reloj de decisión: la barra se vacía (§3.4 pide que la urgencia se VEA) y el
+   número lleva la cuenta. El número no es redundante: con "reducir movimiento"
+   la barra no se anima, así que sin él esa preferencia dejaría al jugador
+   decidiendo sin saber cuánto le queda. */
+.sim-mj-tiempo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.sim-mj-segundos {
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  font-variant-numeric: tabular-nums;
+}
+.sim-mj-reloj {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+.sim-mj-reloj-relleno {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--amber);
+  transform-origin: left center;
+}
+.sim-mj-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.sim-mj-opcion {
+  flex: 1 1 130px;
+  min-height: 44px;          /* objetivo táctil (§7) */
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--void-2);
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.sim-mj-opcion:hover:not(:disabled) { border-color: var(--amber); background: var(--amber-soft); }
+.sim-mj-opcion:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-opcion:disabled { opacity: .45; cursor: default; }
+.sim-mj-opcion b { display: block; font-weight: var(--fw-semibold); }
+.sim-mj-opcion span {
+  display: block;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  margin-top: 2px;
+}
+.sim-mj-resultado:not([hidden]) {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+.sim-mj-resultado.es-acierto { color: var(--success); }
+.sim-mj-resultado.es-fallo   { color: var(--danger); }
+.sim-mj-resultado.es-neutro  { color: var(--frost-dim); }
+
+:root[data-motion="reduce"] .sim-minijuego:not([hidden]) { animation: none; }
+:root[data-motion="reduce"] .sim-mj-reloj-relleno { transition: none; }
+
+/* Las estadísticas en vivo (§1.4) se retiraron del partido por decisión de
+   Alejandro: durante el encuentro compiten con el relato y el momentum, que es
+   lo que se está mirando. El motor las sigue calculando y el sondeo las sigue
+   enviando en d.stats, así que recuperarlas —en la pantalla de resultado, por
+   ejemplo— es escribir el marcado, no rehacer nada. */
+
+/* con movimiento reducido el partido SÍ se ve y se juega; lo que se apaga son
+   las animaciones */
+:root[data-motion="reduce"] .sim-linea { animation: none; }
+:root[data-motion="reduce"] .sim-momentum-aguja { transition: none; }
 
 /* entrada del marcador al llegar recién resuelto */
 .partido.es-revelando .partido-marcador,
