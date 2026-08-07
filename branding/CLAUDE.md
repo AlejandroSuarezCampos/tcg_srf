@@ -994,8 +994,11 @@ importados):
 ### 15.4 Equipos: coincidencia difusa
 
 Para cada equipo del JSON con jugadores a importar, comparar su nombre
-(normalizado: minúsculas, sin tildes vía `iconv(...TRANSLIT...)`, trim) contra
-los nombres existentes en `equipos`:
+(normalizado: minúsculas, con las vocales acentuadas y la "ñ" sustituidas a
+mano antes de pasar por `iconv(...TRANSLIT...)` —el `iconv` de PHP en Windows
+no translitera bien en todos los builds—, y con cualquier carácter que no sea
+alfanumérico o espacio eliminado al final, trim) contra los nombres
+existentes en `equipos`:
 - **Coincidencia exacta tras normalizar** → usa ese `id_equipo`, sin
   preguntar.
 - **Similar pero no exacta** (`similar_text()` ≥ 75%) → se lista en el paso 1
@@ -1158,10 +1161,18 @@ clase (antes del `}` que cierra `Tcg`, hoy línea 3971).
 	// Minúsculas, sin tildes, sin espacios repetidos — para comparar nombres
 	// de equipo y claves de afinidad sin que un acento o una mayúscula rompa
 	// el match (el JSON oficial mezcla "Aire"/"aire", "Montaña"/"montaña"...).
+	// (Versión revisada en la Tarea 5: el iconv de PHP en Windows no
+	// transliteraba de forma fiable en todos los builds, así que las vocales
+	// acentuadas y la "ñ" se sustituyen a mano antes del iconv, y un
+	// preg_replace final limpia cualquier carácter que no sea alfanumérico o
+	// espacio, por si el iconv deja algo suelto.)
 	public function normalizarTexto(string $s): string {
 		$s = trim(mb_strtolower($s, 'UTF-8'));
+		$s = str_replace(['ñ', 'á', 'é', 'í', 'ó', 'ú', 'à', 'è', 'ì', 'ò', 'ù'],
+		                   ['n', 'a', 'e', 'i', 'o', 'u', 'a', 'e', 'i', 'o', 'u'], $s);
 		$translit = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s);
 		if ($translit !== false) { $s = $translit; }
+		$s = preg_replace('/[^a-z0-9\s]/i', '', $s);
 		return preg_replace('/\s+/', ' ', $s);
 	}
 
