@@ -771,6 +771,19 @@
         };
         var defendia = voz.grupo === 'remate';
         var dice = frases[voz.grupo][d.resultado === 'acierto' ? 'acierto' : 'fallo'];
+        /* Tres desenlaces, no dos. Un acierto ya NO garantiza el gol: sube la
+           probabilidad, así que se puede leer bien la jugada y que no entre. Sin
+           este caso el jugador acertaba, no pasaba nada y no había nada en
+           pantalla que se lo explicara — parecía que el minijuego no servía.
+
+           `podia_mover` distingue eso de una decisión que nunca iba a tocar el
+           marcador (impacto "ninguno", o una defensa sobre una jugada que ya
+           acabó sin gol), donde no hay nada que justificar. */
+        if (d.resultado === 'acierto' && d.podia_mover && !d.parado) {
+          dice += defendia
+            ? ' La tocas, pero se te escapa y entra igual.'
+            : ' Le ganas la acción y la estrellas en el palo.';
+        }
         if (d.parado) {
           dice += defendia
             ? ' ¡Paradón! El gol no sube al marcador.'

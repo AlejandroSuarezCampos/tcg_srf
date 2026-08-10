@@ -4402,11 +4402,33 @@ class Tcg
 		   gol no tiene ningún gol que quitar ni que sumar: cuenta para la
 		   puntuación de actuación (§4.6) y ahí se queda. Hasta ahora esta clave
 		   no la leía nadie y el marcador se movía por `lado` a secas. */
+		/* ¿Podía esta jugada mover el marcador? Viaja al cliente porque sin ese
+		   dato no puede explicar un acierto que no acabó en gol: distinguir "lo
+		   hiciste bien y no entró" de "esto solo contaba para la actuación". */
+		$podiaMover = ($minijuego["impacto"] ?? "jugada") === "jugada"
+			&& (($minijuego["lado"] ?? "defiendo") === "defiendo"
+				? $evento["tipo"] === "gol"
+				: $evento["tipo"] !== "gol");
+
 		if ($resultado === "acierto" && ($minijuego["impacto"] ?? "jugada") === "jugada") {
+			/* EL ACIERTO SUBE LA PROBABILIDAD, NO REGALA EL GOL. Decisión de
+			   Alejandro: "si ganas un minijuego en un punto decisivo que sea
+			   ocasión de gol". Así puedes leerle la intención y que se te vaya al
+			   palo, como en el fútbol — y el minijuego sigue sin poder empeorarte
+			   la jugada, porque fallar deja las cosas como estaban.
+
+			   El sorteo es DETERMINISTA por (duelo, evento): resolverMinijuegoDuelo
+			   se puede reintentar y el sondeo repite, así que con azar real el
+			   mismo acierto podría entrar una vez y no la siguiente. Sal propia
+			   (8663) para no correlacionar con qué minijuego salió ni con el dato
+			   oculto. */
+			$probGol = (float) $this->config("partido_minijuego_prob_gol", 0.70);
+			$entra = self::azarDeJugada((float) $duelo["valor_sorteo"], (int) $id_evento, 8663) < $probGol;
+
 			// Defendiendo se le quita un gol al rival; atacando me sumo uno.
-			$parado = ($minijuego["lado"] ?? "defiendo") === "defiendo"
+			$parado = $entra && (($minijuego["lado"] ?? "defiendo") === "defiendo"
 				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario))
-				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario));
+				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario)));
 			if ($parado) {
 				$this->pdo->prepare("
 					UPDATE duelo_minijuegos SET aplicado = 1
@@ -4423,6 +4445,9 @@ class Tcg
 
 		return [
 			"ok" => true, "resultado" => $resultado, "remate" => $remate, "parado" => $parado,
+			// Para que el cliente pueda contar un acierto que no acabó en gol sin
+			// confundirlo con una decisión que solo sumaba a la actuación.
+			"podia_mover" => $podiaMover,
 			"marcador" => $soyCreador
 				? [(int) $refrescado["goles_creador"], (int) $refrescado["goles_rival"]]
 				: [(int) $refrescado["goles_rival"], (int) $refrescado["goles_creador"]],

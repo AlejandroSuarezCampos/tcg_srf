@@ -715,6 +715,7 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `partido_latido_max` | 12 | segundos sin latido para dar a alguien por ausente |
 | `partido_minijuegos_max` | 2 | decisiones por jugador y partido. **Cuidado al subirlo:** el reloj se para para los DOS en cada una, así que 3 son seis pausas y el partido se hace eterno (§15.5) |
 | `partido_minijuegos_sin_impacto_max` | 1 | cuántas de esas decisiones pueden ser de impacto `"ninguno"` (árbitro y defensivas sin gol que mover). **No sube el total ni las pausas**, solo acota cuántas pueden ser irrelevantes para el marcador. Migración `017`; sin él, el 13,94 % de los jugadores gastaba las dos en decisiones que no cambian nada (§15.5) |
+| `partido_minijuego_prob_gol` | 0.70 | probabilidad de que un ACIERTO acabe moviendo el marcador. Antes era siempre 1: leer bien la jugada equivalia a marcar. Fallar sigue sin castigar. Migracion `020` (§15.4f) |
 
 ---
 
@@ -1814,6 +1815,34 @@ entera, así que adivinar algo de tus cartas no sería adivinar nada.
    empujaba siempre al mismo tipo de remate y dejaba una **opción dominante**
    (+27 de balance), que es justo lo que prohíbe §1.5 regla 2. Centrado, las tres
    opciones quedan a ~33 % y solo leer la pista sube al 37 %.
+
+### 15.4f Un acierto SUBE la probabilidad de gol, ya no lo regala (`020`)
+
+Decisión de Alejandro: *"si ganas un minijuego en un punto decisivo que sea
+ocasión de gol"*. Hasta la migración `020` un acierto movía el marcador **siempre**
+(100 %), así que leer bien la jugada equivalía a marcar. Ahora entra con
+`partido_minijuego_prob_gol` (0,70): puedes adivinarle la intención y que se
+estrelle en el palo.
+
+**Lo que NO cambia: fallar sigue sin castigar.** El minijuego solo puede mejorar tu
+partido, nunca empeorarlo (ver `resolverMinijuego`), así que un fallo deja la
+jugada exactamente como estaba. La probabilidad se aplica **solo al acierto**.
+
+**El sorteo es determinista por (duelo, evento)**, con sal propia (8663). No es
+opcional: el sondeo repite y la resolución se puede reintentar, así que con azar
+real el mismo acierto entraría una vez y no la siguiente, y los dos jugadores
+verían desenlaces distintos. Medido: reparto al 70,0 %, determinista, y sin
+correlación con la elección de minijuego (50,8 % contra el 50 % esperado).
+
+> ⚠️ **Esto obligó a un tercer desenlace en el cliente.** Antes había dos —acertaste
+> o falleste— y ahora hay tres, porque un acierto puede no acabar en gol. Sin
+> cubrirlo, el jugador acertaba, no pasaba nada y **no había nada en pantalla que
+> se lo explicara**: parecía que el minijuego no servía. La respuesta lleva
+> `podia_mover` para distinguirlo de una decisión que nunca iba a tocar el marcador
+> (impacto `ninguno`, o una defensa sobre una jugada que ya acabó sin gol), donde
+> no hay nada que justificar.
+>
+> Si añades un desenlace nuevo, mira las tres ramas de `duelo.js`, no dos.
 
 ### 15.4e ⚠️ El bucle del §1.3 aplanaba TODOS los partidos
 
