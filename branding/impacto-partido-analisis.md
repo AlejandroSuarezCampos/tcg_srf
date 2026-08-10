@@ -16,6 +16,27 @@
 >    probabilidad de marcar en ESA ocasión**; no regala el gol.
 > 3. **Empate → tanda de penaltis.** Y con eso se cierra el partido.
 >
+> ### ✅ El pago: la parte que asustaba YA ESTÁ RESUELTA
+>
+> Decisión de Alejandro: *"aceptas el duelo, el dinero se le quita a ambos, y
+> cuando ya se ha decidido un ganador se entrega al que gane."* **Eso ya es
+> exactamente lo que hace el código**, y verificarlo cambia el tamaño del Paso 3:
+>
+> - el creador paga al crear la sala (`consultas.php:1961`),
+> - el rival paga al aceptar (`consultas.php:2024`),
+> - las cartas apostadas se marcan `bloqueada`.
+>
+> O sea que **el bote ya está retenido antes del partido** y lo único que
+> `resolverDuelo()` hace al final es ENTREGARLO (`monedas = monedas + :bote`).
+> No hay que inventar retención, ni tocar `crearDuelo()`, ni `aceptarDuelo()`:
+> solo **mover el momento de la entrega** y decidir el ganador ahí.
+>
+> **Y eso cierra la pregunta del abandono sin regla nueva.** El dinero no es de
+> nadie mientras se juega, así que irse no lo recupera: al que falta se le aplican
+> las opciones seguras —lo que el motor ya hace al vencer un plazo (§15.3, *"si no
+> estás atento, te lo pierdes"*)—, el partido se resuelve solo y el bote va a quien
+> gane.
+>
 > ### ⚠️ Compensación aceptada explícitamente por Alejandro
 >
 > Está medido y avisado dos veces: con el partido decidiendo, **el favorito gana
