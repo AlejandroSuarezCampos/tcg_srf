@@ -3978,25 +3978,16 @@ class Tcg
 		return $minijuego["opciones"][0]["clave"] ?? null;
 	}
 
-	/**
-	 * ¿Cabe cambiar el marcador en esta jugada sin contradecir al ganador?
-	 *
-	 * Es la restricción dura de §1.3 aplicada a los minijuegos de impacto
-	 * "jugada". El margen real suele ser de UN gol: con un 2-1 a mi favor puedo
-	 * parar el gol del rival (2-0), pero encajar otro haría 2-2, que ya no es
-	 * la victoria que salió del sorteo. Por eso un minijuego que puede mover el
-	 * marcador solo se OFRECE donde quepa: así cualquier resultado que consiga
-	 * el jugador es siempre aplicable y nunca hay que desdecirse después.
-	 *
-	 * $mios/$suyos son los goles ya guardados, desde el punto de vista de quien
-	 * mira. $delta es lo que le pasaría a los goles del RIVAL (-1 parar, +1
-	 * encajar).
-	 */
-	public static function cabeCambioMarcador($mios, $suyos, $delta, $ganoYo) {
-		$nuevos = $suyos + $delta;
-		if ($nuevos < 0) return false;
-		return $ganoYo ? ($mios > $nuevos) : ($nuevos > $mios);
-	}
+	/* cabeCambioMarcador() se retiró aquí.
+	   Era la restricción dura de §1.3 aplicada a los minijuegos: "¿cabe mover
+	   el marcador sin contradecir al ganador ya sorteado?". Con el partido
+	   decidiendo el resultado, no hay ningún ganador previo que respetar, así
+	   que la pregunta ya no existe. Lo que ocupa su sitio es
+	   `partido_presupuesto_marcador` en narracionDuelo(): un tope de diseño
+	   sobre cuánto puede mover cada jugador, no una condición de coherencia.
+
+	   No se deja como función muerta a propósito: dejarla invitaría a volver a
+	   llamarla, y volver a llamarla reimplantaría el §1.3 a medias. */
 
 	/* ======================================================================
 	   PARTIDO EN VIVO  (migración 014)
@@ -4013,6 +4004,19 @@ class Tcg
 	   Regla acordada con Alejandro: si no estás atento, te lo pierdes. El
 	   partido no espera indefinidamente a nadie.
 	   ====================================================================== */
+
+	/**
+	 * Los dos estados en los que un duelo TIENE partido que mirar.
+	 *
+	 * `en_juego` es el partido de un PvP mientras se juega: montado y sembrado,
+	 * pero sin ganador todavía porque lo decide el propio encuentro.
+	 * `resuelto` es un partido ya terminado —y también un PvE, que se resuelve
+	 * de una vez porque no tiene minijuegos que puedan mover nada.
+	 *
+	 * Todo lo que lee el partido (narración, sondeo, reloj, marcador) acepta los
+	 * dos. Lo que necesita un GANADOR ya escrito exige `resuelto` a secas.
+	 */
+	const ESTADOS_CON_PARTIDO = ["en_juego", "resuelto"];
 
 	/** Deja constancia de que este jugador sigue delante del partido. */
 	public function latirPartido($id_duelo, $id_usuario) {
@@ -4052,7 +4056,8 @@ class Tcg
 		// arranquen el reloj dos veces y le roben segundos al partido.
 		$this->pdo->prepare("
 			UPDATE duelos SET partido_inicio = NOW()
-			WHERE id_duelo = :d AND partido_inicio IS NULL AND estado = 'resuelto'
+			WHERE id_duelo = :d AND partido_inicio IS NULL
+			  AND estado IN ('en_juego', 'resuelto')
 		")->execute([":d" => $duelo["id_duelo"]]);
 
 		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
@@ -4076,6 +4081,100 @@ class Tcg
 			    partido_pausado_en = NULL
 			WHERE id_duelo = :d AND partido_pausado_en IS NOT NULL
 		")->execute([":d" => $id_duelo]);
+	}
+
+	/**
+	 * ¿Ha terminado ya el partido? Entonces se cierra.
+	 *
+	 * Es el enganche perezoso de la liquidación (§8, no hay cron): lo llaman el
+	 * sondeo del partido, la propia página del duelo y el listado de duelos, así
+	 * que basta con que UNO de los dos jugadores vuelva a mirar para que el bote
+	 * se entregue. No hay nada corriendo de fondo esperando el minuto 90.
+	 *
+	 * ⚠️ LO QUE OBLIGA A LAS DOS RAMAS DE ABANDONO
+	 * Desde que el duelo se decide en el campo, el dinero de los dos está
+	 * RETENIDO hasta que alguien liquide. Un partido que se queda a medias ya no
+	 * es un partido perdido: es un bote que no vuelve a nadie. Y hay dos formas
+	 * de quedarse a medias sin que el reloj llegue nunca al final:
+	 *
+	 *   · el partido no ARRANCA nunca, porque arrancarlo es cosa del sondeo y
+	 *     nadie volvió a abrir la pantalla (o volvió sin JavaScript);
+	 *   · el partido se queda PARADO en una decisión, porque quien la tenía que
+	 *     tomar se fue y el plazo solo lo aplica el sondeo de alguien presente.
+	 *
+	 * Las dos se resuelven con el mismo umbral, `partido_abandono_seg`, holgado a
+	 * propósito: quien llega tarde a su partido todavía puede jugarlo entero, y
+	 * solo cuando ya no va a aparecer nadie se cierra con el marcador tal cual
+	 * está. Es la regla de §15.3 ("si no estás atento, te lo pierdes") llevada a
+	 * su conclusión: te pierdes el partido, no la apuesta.
+	 */
+	public function cerrarPartidoSiToca($id_duelo) {
+		$leer = function () use ($id_duelo) {
+			$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+			$stmt->execute([":d" => $id_duelo]);
+			return $stmt->fetch(PDO::FETCH_ASSOC);
+		};
+		$duelo = $leer();
+		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
+
+		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
+		$abandono = max($duracion, (int) $this->config("partido_abandono_seg", 3600));
+
+		// Nadie ha llegado a ver este partido, y ya no va a venir.
+		if (!$duelo["partido_inicio"]) {
+			$montado = $duelo["resuelto"] ? time() - strtotime($duelo["resuelto"]) : 0;
+			if ($montado < $abandono) return false;
+			return (bool) $this->liquidarPartido($id_duelo)["ok"];
+		}
+
+		/* Parado en una decisión que nadie va a tomar: este partido está
+		   abandonado y se cierra tal cual, sin mirar el reloj.
+
+		   Lo primero que probé aquí fue reanudar y dejar que el reloj siguiera su
+		   curso, y la prueba lo tumbó: reanudar suma el tiempo parado a
+		   `partido_pausa_seg` —que es lo correcto, ese rato no era partido—, así
+		   que el encuentro vuelve al minuto en el que se detuvo y todavía le
+		   faltan segundos. Hacía falta una segunda visita para cerrarlo. Un
+		   partido que lleva una hora congelado no necesita que le contemos los
+		   minutos que le quedaban: necesita cerrarse.
+
+		   La decisión pendiente simplemente no se juega, y eso es lo correcto: no
+		   hay nadie a quien aplicarle la opción segura, y sin jugarla no mueve el
+		   marcador. El resultado es el que la simulación dejó escrito. */
+		if ($duelo["partido_pausado_en"]) {
+			if (time() - strtotime($duelo["partido_pausado_en"]) < $abandono) return false;
+			return (bool) $this->liquidarPartido($id_duelo)["ok"];
+		}
+
+		if (self::segundosDePartido($duelo) < $duracion) return false;
+
+		return (bool) $this->liquidarPartido($id_duelo)["ok"];
+	}
+
+	/**
+	 * Barre los partidos en juego de un jugador y cierra los que ya han
+	 * terminado. Lo llama el listado de duelos.
+	 *
+	 * Sin esto quedaba un caso sin cubrir: si los DOS cierran la pestaña a mitad
+	 * de partido y ninguno vuelve a abrir ese duelo en concreto, nadie liquida y
+	 * el bote se queda retenido. Abrir la lista de duelos es lo primero que hace
+	 * cualquiera al volver, así que es donde tiene que estar la red.
+	 *
+	 * Acotado a los duelos DEL JUGADOR: es una limpieza perezosa, no una tarea
+	 * de mantenimiento, y no debe crecer con el tamaño de la base.
+	 */
+	public function cerrarPartidosPendientes($id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT id_duelo FROM duelos
+			WHERE estado = 'en_juego' AND (id_creador = :u1 OR id_rival = :u2)
+		");
+		$stmt->execute([":u1" => (int) $id_usuario, ":u2" => (int) $id_usuario]);
+
+		$cerrados = 0;
+		foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
+			if ($this->cerrarPartidoSiToca((int) $id)) $cerrados++;
+		}
+		return $cerrados;
 	}
 
 	/**
@@ -4272,7 +4371,9 @@ class Tcg
 	public function estadoPartido($id_duelo, $id_usuario) {
 		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
 		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
-		if ($duelo["estado"] !== "resuelto") return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+		if (!in_array($duelo["estado"], self::ESTADOS_CON_PARTIDO, true)) {
+			return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+		}
 
 		$this->latirPartido($id_duelo, $id_usuario);
 		$duelo = $this->arrancarPartidoSiToca($this->obtenerDuelo($id_duelo, $id_usuario));
@@ -4281,8 +4382,13 @@ class Tcg
 		if (empty($narracion["ok"])) return $narracion;
 
 		if (!$duelo["partido_inicio"]) {
+			// `decidido` va también aquí, aunque en esta fase el cliente no lo
+			// mire: una respuesta que cambia de forma según la fase es una trampa
+			// esperando a que alguien lea la clave en el sitio equivocado.
 			return ["ok" => true, "fase" => "esperando", "minuto" => 0, "eventos" => [],
-			        "nombres" => $narracion["nombres"], "marcador" => [0, 0]];
+			        "nombres" => $narracion["nombres"], "marcador" => [0, 0],
+			        "decidido" => $duelo["estado"] === "resuelto",
+			        "por_tanda" => (bool) ($duelo["resuelto_por_tanda"] ?? 0)];
 		}
 
 		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
@@ -4326,6 +4432,17 @@ class Tcg
 		$avance = min(1.0, self::segundosDePartido($duelo) / $duracion);
 		$minutoActual = $avance * $minutos;
 
+		/* FINAL DEL PARTIDO — aquí se decide el duelo.
+		   El marcador que hay guardado en este momento ES el resultado: lo puso
+		   la simulación y lo movieron las decisiones de los dos jugadores. Se
+		   determina el ganador, se rompe el empate en la tanda si hace falta y se
+		   entrega el bote. Lo piden los DOS jugadores en cada sondeo; que se
+		   pague una sola vez lo garantiza el WHERE de liquidarPartido(). */
+		if ($avance >= 1) {
+			$this->cerrarPartidoSiToca($id_duelo);
+			$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		}
+
 		$hasta = [];
 		foreach ($narracion["eventos"] as $e) {
 			if ($e["minuto"] > $minutoActual) break;
@@ -4349,6 +4466,13 @@ class Tcg
 			// dice que espere, para que vea por qué se ha parado el partido.
 			"minijuego" => ($pendiente && $mio) ? $pendiente["minijuego"] + ["id_evento" => $pendiente["id"]] : null,
 			"esperando_rival" => (bool) ($pendiente && !$mio),
+			/* Si el duelo ya está decidido. La pantalla de resultado se renderiza
+			   en el servidor y se pintó ANTES de que el partido acabara, cuando
+			   todavía no había ganador: con esto el cliente sabe que al terminar
+			   tiene que ir a por ella en vez de destapar una pantalla en blanco.
+			   Ver el final de assets/js/duelo.js. */
+			"decidido"  => $duelo["estado"] === "resuelto",
+			"por_tanda" => (bool) ($duelo["resuelto_por_tanda"] ?? 0),
 			/* Puntuación de actuación (§4.6 y §6.4): independiente de ganar o
 			   perder. Es lo que hace que una jugada siga importando cuando el
 			   marcador ya no puede moverse, y lo que da algo que optimizar a
@@ -4423,11 +4547,24 @@ class Tcg
 		}
 
 		$rival = $n["nombres"]["suyo"];
-		$titular = $ganoYo ? "Victoria" : "Derrota";
+
+		/* La TANDA va antes que cualquier otro hecho, y no por dramatismo: si el
+		   partido acabó empatado, el marcador que se enseña arriba no explica por
+		   sí solo por qué hay un ganador. Callarlo dejaría un 1-1 con la palabra
+		   "Victoria" al lado, que se lee como un error del juego. */
+		$porTanda = !empty($duelo["resuelto_por_tanda"]);
+
+		$titular = $porTanda
+			? ($ganoYo ? "Victoria en los penaltis" : "Derrota en los penaltis")
+			: ($ganoYo ? "Victoria" : "Derrota");
 
 		/* Los hechos, del más memorable al más genérico. El primero que aplique
 		   es el que se cuenta. */
-		if ($miParada) {
+		if ($porTanda) {
+			$detalle = $ganoYo
+				? "Se fue a los penaltis y los ganaste."
+				: "Se fue a los penaltis y se perdió ahí.";
+		} elseif ($miParada) {
 			$detalle = "Sacaste bajo palos el gol del " . $miParada["minuto"] . "'. Sin esa mano, otro partido.";
 		} elseif ($miGol) {
 			$detalle = "La del " . $miGol["minuto"] . "' la metiste tú eligiendo dónde poner el remate.";
@@ -4464,8 +4601,9 @@ class Tcg
 			? "Acertaste " . $act["aciertos"] . " de " . $act["jugados"] . " decisiones."
 			: null;
 
-		$compartible = sprintf("%s %d-%d %s. %s%s",
-			$n["nombres"]["mio"], $mios, $suyos, $rival, $detalle,
+		$compartible = sprintf("%s %d-%d%s %s. %s%s",
+			$n["nombres"]["mio"], $mios, $suyos, $porTanda ? " (pen.)" : "",
+			$rival, $detalle,
 			$actuacion ? " " . $actuacion : "");
 
 		return [
@@ -4474,6 +4612,7 @@ class Tcg
 			"actuacion"   => $actuacion,
 			"compartible" => $compartible,
 			"stats"       => $n["stats"],
+			"por_tanda"   => $porTanda,
 		];
 	}
 
@@ -4603,15 +4742,21 @@ class Tcg
 	}
 
 	/**
-	 * Le quita un gol al rival de $id_usuario en un duelo ya resuelto, porque
-	 * el jugador paró esa ocasión en un minijuego (impacto "jugada").
+	 * Le quita un gol al rival de $id_usuario, porque el jugador paró esa
+	 * ocasión en un minijuego (impacto "jugada").
 	 *
-	 * La condición de §1.3 —el marcador no puede contradecir al ganador ya
-	 * sorteado— va DENTRO del WHERE, no comprobada antes en PHP. Es a propósito:
-	 * comprobar y luego actualizar deja una ventana entre las dos consultas por
-	 * la que dos peticiones a la vez podrían restar dos goles y empatar un
-	 * partido que alguien había ganado. Aquí, o la fila cumple la condición en
-	 * el momento exacto del UPDATE o no se toca nada.
+	 * ESTE UPDATE ES DONDE SE DECIDE EL DUELO. Ya no hay un ganador escrito al
+	 * que este marcador tenga que dar la razón: el marcador ES el resultado, y
+	 * liquidarPartido() lo lee tal cual al final. Por eso desapareció de aquí la
+	 * condición de §1.3 —"el ganador sorteado sigue ganando después de restar"—
+	 * que antes ocupaba la mitad del WHERE: si siguiera puesta, con id_ganador
+	 * en NULL durante `en_juego` daría siempre falso y ninguna parada contaría.
+	 *
+	 * Lo que sí sigue dentro del WHERE, y no comprobado antes en PHP, es que
+	 * nada baje de cero. Comprobar y luego actualizar deja una ventana entre las
+	 * dos consultas por la que dos peticiones simultáneas restarían dos goles;
+	 * aquí, o la fila cumple la condición en el momento exacto del UPDATE o no
+	 * se toca nada.
 	 *
 	 * Devuelve true solo si de verdad se descontó.
 	 */
@@ -4621,21 +4766,13 @@ class Tcg
 				goles_creador = goles_creador - IF(id_creador = :u1, 0, 1),
 				goles_rival   = goles_rival   - IF(id_creador = :u2, 1, 0)
 			WHERE id_duelo = :d
-			  AND estado = 'resuelto'
+			  AND estado = 'en_juego'
 			  AND (id_creador = :u3 OR id_rival = :u4)
 			  /* nada baja de cero */
 			  AND IF(id_creador = :u5, goles_rival, goles_creador) > 0
-			  /* y el ganador sorteado sigue ganando DESPUÉS de restar */
-			  AND IF(
-			        id_ganador = :u6,
-			        IF(id_creador = :u7, goles_creador, goles_rival)
-			          > IF(id_creador = :u8, goles_rival, goles_creador) - 1,
-			        IF(id_creador = :u9, goles_rival, goles_creador) - 1
-			          > IF(id_creador = :u10, goles_creador, goles_rival)
-			      )
 		");
 		$stmt->execute(array_fill_keys(
-			[":u1", ":u2", ":u3", ":u4", ":u5", ":u6", ":u7", ":u8", ":u9", ":u10"],
+			[":u1", ":u2", ":u3", ":u4", ":u5"],
 			(int) $id_usuario
 		) + [":d" => (int) $id_duelo]);
 
@@ -4644,11 +4781,12 @@ class Tcg
 
 	/**
 	 * Le suma un gol a $id_usuario porque metió una ocasión propia en un
-	 * minijuego de ataque. Espejo de descontarGolRival().
+	 * minijuego de ataque. Espejo de descontarGolRival() y, como él, uno de los
+	 * dos únicos sitios por los que el marcador de un partido en juego se mueve.
 	 *
-	 * Misma cautela: la condición de §1.3 va DENTRO del WHERE. Aquí importa
-	 * incluso más, porque sumarle goles al que perdió el sorteo es justo lo
-	 * que podría darle la vuelta al resultado.
+	 * `estado = 'en_juego'` dentro del WHERE hace además de cierre: en cuanto
+	 * liquidarPartido() pasa el duelo a `resuelto`, un minijuego que llegue
+	 * tarde ya no puede cambiar un resultado que se acaba de pagar.
 	 */
 	public function sumarGolPropio($id_duelo, $id_usuario) {
 		$stmt = $this->pdo->prepare("
@@ -4656,18 +4794,11 @@ class Tcg
 				goles_creador = goles_creador + IF(id_creador = :u1, 1, 0),
 				goles_rival   = goles_rival   + IF(id_creador = :u2, 0, 1)
 			WHERE id_duelo = :d
-			  AND estado = 'resuelto'
+			  AND estado = 'en_juego'
 			  AND (id_creador = :u3 OR id_rival = :u4)
-			  /* el ganador sorteado sigue ganando DESPUÉS de sumar */
-			  AND IF(
-			        id_ganador = :u5,
-			        1 = 1,   /* si gano yo, marcar más nunca cambia quién gana */
-			        IF(id_creador = :u6, goles_rival, goles_creador)
-			          > IF(id_creador = :u7, goles_creador, goles_rival) + 1
-			      )
 		");
 		$stmt->execute(array_fill_keys(
-			[":u1", ":u2", ":u3", ":u4", ":u5", ":u6", ":u7"], (int) $id_usuario
+			[":u1", ":u2", ":u3", ":u4"], (int) $id_usuario
 		) + [":d" => (int) $id_duelo]);
 
 		return $stmt->rowCount() > 0;
@@ -4686,7 +4817,9 @@ class Tcg
 	public function narracionDuelo($id_duelo, $id_usuario) {
 		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
 		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
-		if ($duelo["estado"] !== "resuelto") return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+		if (!in_array($duelo["estado"], self::ESTADOS_CON_PARTIDO, true)) {
+			return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
+		}
 
 		$idCreador = (int) $duelo["id_creador"];
 		$idRival   = (int) $duelo["id_rival"];
@@ -4775,25 +4908,34 @@ class Tcg
 		$suyos = $soyCreador ? $golesRealesR : $golesRealesC;
 		$ganoYo = (int) $duelo["id_ganador"] === (int) $id_usuario;
 
-		/* Presupuesto de cambios de marcador. Se consume en orden cronológico:
-		   si el primer minijuego ya agotó el margen, los siguientes se ofrecen
-		   igual pero sin poder tocar el resultado (impacto degradado). Nunca al
-		   revés: prometer un efecto y luego no aplicarlo sería peor que no
-		   ofrecerlo. */
-		$paradasLibres = 0;
-		while (self::cabeCambioMarcador($mios, $suyos - $paradasLibres, -1, $ganoYo)) {
-			$paradasLibres++;
-		}
+		/* ---------------------------------------------------------------
+		   PRESUPUESTO DE CAMBIOS DE MARCADOR — ya no es la §1.3
 
-		/* Presupuesto para las ocasiones PROPIAS. Marcar de más no compromete el
-		   resultado si ya ganas, pero dejarlo sin tope era un error medible: el
-		   que iba ganando recibía 5 o 6 decisiones y podía convertir un 1-0 en
-		   un 6-0, mientras que el que perdía —justo quien más quiere agarrarse
-		   al partido— no recibía ninguna. Se acota a dos por bando. */
-		$golesLibres = 0;
-		while (!$ganoYo && ($suyos > $mios + $golesLibres + 1)) $golesLibres++;
-		if ($ganoYo) $golesLibres = 2;
-		$golesLibres = min(2, $golesLibres);
+		   Antes esto medía el MARGEN que dejaba libre un ganador ya sorteado:
+		   con un 2-1 a favor cabía parar el gol del rival (2-0) pero no encajar
+		   otro (2-2), porque eso contradecía el resultado que el sorteo había
+		   fijado antes del primer minuto. De ahí venía todo:
+		   cabeCambioMarcador(), el $ganoYo de este cálculo y la asimetría entre
+		   el que iba ganando y el que iba perdiendo.
+
+		   Con el partido decidiendo, ESE LÍMITE DESAPARECE: no hay ningún
+		   resultado previo al que no se pueda contradecir, y poder empatar un
+		   partido o darle la vuelta es exactamente lo que se ha ido a buscar.
+
+		   Lo que queda por acotar es otra cosa, y es de diseño, no de
+		   coherencia: CUÁNTO puede mover el marcador un jugador con sus
+		   minijuegos en un partido. Se deja en un gol —el mismo margen que en
+		   la práctica autorizaba la §1.3, para no meter en el mismo cambio
+		   "los minijuegos deciden" y "los minijuegos deciden el doble"— y va en
+		   configuracion (§5.4) porque es puro calibrado.
+
+		   Se consume en orden cronológico: si la primera decisión ya lo agotó,
+		   las siguientes se ofrecen igual pero sin poder tocar el resultado.
+		   Nunca al revés: prometer un efecto y luego no aplicarlo sería peor
+		   que no ofrecerlo. */
+		$presupuesto = max(0, (int) $this->config("partido_presupuesto_marcador", 1));
+		$paradasLibres = $presupuesto;   // ocasiones del rival que puedo sacar
+		$golesLibres   = $presupuesto;   // ocasiones mías falladas que puedo meter
 
 		/* Techo de decisiones por partido, sumando ataque y defensa. §1.5 regla 3
 		   lo pide explícitamente, pero el motivo de fondo es de ritmo: el reloj
@@ -4823,15 +4965,15 @@ class Tcg
 		   IMPACTO "partido": lo que arrastra de las decisiones YA JUGADAS
 
 		   Es la tercera clase de impacto (§15.4b) y la que la Biblia pide para
-		   sus entradas de ritmo y moral. Lo que la hace posible sin mover la
-		   resolución del duelo —decisión de Alejandro tras medirlo, ver
-		   branding/impacto-partido-analisis.md— es que el efecto NO toca el
-		   desenlace de ninguna jugada: **amplía el presupuesto** con el que las
-		   jugadas siguientes pueden mover el marcador, o da una decisión más.
+		   sus entradas de ritmo y moral. El efecto NO toca el desenlace de
+		   ninguna jugada: **amplía el presupuesto** con el que las jugadas
+		   siguientes pueden mover el marcador, o da una decisión más.
 
-		   Por qué eso es seguro: el presupuesto sigue pasando por
-		   cabeCambioMarcador(), así que un efecto de partido puede darte más
-		   oportunidades pero NUNCA puede contradecir al ganador (§1.3).
+		   Sigue teniendo sentido ahora que el partido decide, y de hecho más:
+		   el presupuesto pasó de ser el margen que dejaba el §1.3 a ser un tope
+		   de diseño (`partido_presupuesto_marcador`), así que ampliarlo es una
+		   recompensa clara y acotada — un gol más de los que puedes mover, no
+		   una excepción a ninguna regla.
 
 		   Y por qué solo puede CONCEDER: resolverMinijuego() no castiga elegir
 		   mal —"el minijuego solo puede mejorar tu partido, nunca empeorarlo,
@@ -5065,12 +5207,19 @@ class Tcg
 	   dentro. Las CADENAS siguen con marcadorCadena(), intacto. */
 
 	/**
-	 * Resuelve un duelo aceptado: calcula fuerzas, aplica la curva Elo, sortea,
-	 * mueve las apuestas y guarda toda la trazabilidad.
+	 * MONTA el partido de un duelo aceptado: congela fuerzas, compos y aumentos,
+	 * aplica la curva Elo, siembra el sorteo, simula el encuentro para saber
+	 * cuántos goles caen y guarda toda la trazabilidad.
 	 *
-	 * Las capas 2 (rasgos) y 3 (aumento) todavía no existen, así que el TOTAL
-	 * final coincide hoy con el bruto. El punto donde se enganchan está marcado
-	 * abajo; la curva de resolución no cambiará cuando lleguen.
+	 * OJO CON EL NOMBRE: en PvP esto ya NO resuelve nada. Deja el duelo en
+	 * `en_juego`, sin ganador y sin haber entregado el bote. Lo que decide es el
+	 * partido, y quien lo cierra es liquidarPartido() al llegar al minuto final.
+	 * En PvE (cadenas) sí resuelve de una vez, como siempre: no hay minijuegos
+	 * que puedan mover nada, así que no habría nada que esperar.
+	 *
+	 * Se conserva el nombre a propósito: es el paso del ciclo de vida que los
+	 * demás sitios conocen (duelo.php y duelo_estado.php lo llaman al cerrarse
+	 * la fase de aumento) y renombrarlo solo movería la confusión de sitio.
 	 */
 	public function resolverDuelo($id_duelo) {
 		try {
@@ -5175,8 +5324,17 @@ class Tcg
 			$sorteo = mt_rand() / (mt_getrandmax() + 1);   // [0,1)
 			$ganaCreador = $sorteo < $p;
 
-			$idGanador  = $ganaCreador ? $idCreador : $idRival;
-			$idPerdedor = $ganaCreador ? $idRival : $idCreador;
+			/* EN PvP EL SORTEO YA NO DECIDE QUIÉN GANA.
+			   Decide el partido: el marcador se acumula durante el encuentro y el
+			   ganador se escribe al final, en liquidarPartido(). $sorteo conserva
+			   sus otros dos trabajos —sembrar toda la narración (valor_sorteo,
+			   §15.1) y dejar constancia del "partías con un X %"—, así que sigue
+			   guardándose igual.
+			   En PvE sí decide: las cadenas no tienen minijuegos, su marcador lo
+			   pone marcadorCadena() y su rango y su botín cuelgan de él. Se dejan
+			   exactamente como estaban hasta que se trabajen aparte. */
+			$idGanador  = $esPve ? ($ganaCreador ? $idCreador : $idRival) : null;
+			$idPerdedor = $esPve ? ($ganaCreador ? $idRival : $idCreador) : null;
 
 			if ($esPve) {
 				// Las cadenas conservan su marcador propio, que sí puede dejar la
@@ -5191,13 +5349,17 @@ class Tcg
 				$golesCreador = $ganaCreador ? $golesGanador : $golesPerdedor;
 				$golesRival   = $ganaCreador ? $golesPerdedor : $golesGanador;
 			} else {
-				/* PvP — §1.3: el marcador NACE de la simulación. Ya no hay una
-				   fórmula aparte que invente cuántos goles caen: se juega el
-				   partido minuto a minuto y el marcador es, literalmente, el
-				   número de ocasiones que acabaron dentro. La curva Elo sigue
-				   decidiendo quién gana antes que nada (§1.1); la simulación solo
-				   tiene prohibido contradecirla, y de eso se encarga el propio
-				   motor con `gana`. */
+				/* PvP — el marcador NACE de la simulación, y ahora también manda.
+				   Se juega el partido minuto a minuto y el marcador es,
+				   literalmente, el número de ocasiones que acabaron dentro.
+
+				   MODO NATURAL: ya no se pasa `gana`. Esa clave existía para que
+				   la simulación no pudiera contradecir al ganador pre-sorteado
+				   (§1.3), y hacía dos cosas de las que ahora hay que
+				   desprenderse: forzaba un margen a favor de ese ganador e
+				   IMPEDÍA EL EMPATE. Sin ella el marcador sale como salga —
+				   empates incluidos, que es justo lo que hace falta para que la
+				   tanda de penaltis tenga sentido. */
 				$sim = self::generarEventosPartido(
 					[
 						"nombre" => "local", "fuerza" => $fuerzaCreador, "goles" => null,
@@ -5210,36 +5372,48 @@ class Tcg
 						"formacion" => $formRival,
 					],
 					$sorteo,
-					["gana" => $ganaCreador ? "local" : "visitante"] + $this->opcionesPenalti()
+					$this->opcionesPenalti()
 				);
 				[$golesCreador, $golesRival] = $sim["goles"];
 			}
 			$rango = $esPve ? $this->rangoPartido($golesCreador, $golesRival) : null;
 
-			// --- mover las apuestas ---
-			if ($duelo["tipo_apuesta"] === "monedas") {
-				// El bote son las dos apuestas, ya retenidas al entrar.
-				$bote = ((int) $duelo["monedas"]) * 2;
-				$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :bote WHERE id_usuario = :id")
-					->execute([":bote" => $bote, ":id" => $idGanador]);
-			} else {
-				$stmtCarta = $this->pdo->prepare("
-					SELECT id_coleccion FROM duelo_apuestas
-					WHERE id_duelo = :id_duelo AND id_usuario = :id_usuario
-				");
-				$stmtCarta->execute([":id_duelo" => $id_duelo, ":id_usuario" => $idPerdedor]);
-				$copiaPerdida = $stmtCarta->fetchColumn();
-				if ($copiaPerdida) {
-					$this->pdo->prepare("
-						UPDATE coleccion SET id_usuario = :ganador, bloqueada = 0
-						WHERE id_coleccion = :id_coleccion
-					")->execute([":ganador" => $idGanador, ":id_coleccion" => $copiaPerdida]);
+			/* --- mover las apuestas: SOLO EN PvE ---
+			   En PvP el bote se entrega al terminar el partido (liquidarPartido),
+			   porque hasta entonces no hay ganador a quien entregárselo. Aplazarlo
+			   no deja nada a medias: lo apostado está RETENIDO de los dos desde que
+			   entraron —el creador en crearDuelo(), el rival en aceptarDuelo(), y la
+			   carta marcada `bloqueada`—, así que el modelo de pago no cambia. Lo
+			   único que se mueve es el momento de la entrega. */
+			if ($esPve) {
+				if ($duelo["tipo_apuesta"] === "monedas") {
+					// El bote son las dos apuestas, ya retenidas al entrar.
+					$bote = ((int) $duelo["monedas"]) * 2;
+					$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :bote WHERE id_usuario = :id")
+						->execute([":bote" => $bote, ":id" => $idGanador]);
+				} else {
+					$stmtCarta = $this->pdo->prepare("
+						SELECT id_coleccion FROM duelo_apuestas
+						WHERE id_duelo = :id_duelo AND id_usuario = :id_usuario
+					");
+					$stmtCarta->execute([":id_duelo" => $id_duelo, ":id_usuario" => $idPerdedor]);
+					$copiaPerdida = $stmtCarta->fetchColumn();
+					if ($copiaPerdida) {
+						$this->pdo->prepare("
+							UPDATE coleccion SET id_usuario = :ganador, bloqueada = 0
+							WHERE id_coleccion = :id_coleccion
+						")->execute([":ganador" => $idGanador, ":id_coleccion" => $copiaPerdida]);
+					}
 				}
 			}
 
+			/* `resuelto = NOW()` se sigue escribiendo aquí aunque en PvP el duelo
+			   no quede resuelto todavía: es la hora de referencia con la que
+			   arrancarPartidoSiToca() cuenta partido_espera_seg. Lo que marca es
+			   "el partido ya está montado", que es exactamente cuando toca. */
 			$this->pdo->prepare("
 				UPDATE duelos SET
-					estado = 'resuelto',
+					estado = :estado,
 					id_ganador = :id_ganador,
 					goles_creador = :goles_creador,
 					goles_rival = :goles_rival,
@@ -5261,6 +5435,7 @@ class Tcg
 				":cbc" => $cicloCreador,                  ":cbr" => $cicloRival,
 				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
 				":tc"  => $composCreador["tension_nivel"], ":tr" => $composRival["tension_nivel"],
+				":estado"        => $esPve ? "resuelto" : "en_juego",
 				":id_ganador"    => $idGanador,
 				":goles_creador" => $golesCreador,
 				":goles_rival"   => $golesRival,

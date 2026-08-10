@@ -992,6 +992,18 @@
 .partido.es-victoria .partido-veredicto { color: var(--success); }
 .partido.es-derrota  .partido-veredicto { color: var(--frost-dim); }
 
+/* "en los penaltis" cuelga del titular cuando el duelo se decidió en la tanda.
+   Va en su propia línea y más pequeño: es la aclaración de por qué hay un
+   ganador con el marcador empatado, no parte del veredicto. Sin esto heredaría
+   el tamaño del <h1> y competiría con la palabra que importa. */
+.partido-tanda {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  color: var(--frost-dim);
+}
+
 /* ---- VEREDICTO DEL PARTIDO (§1.5 regla 7) ----
    El dato memorable del encuentro, también al perder. Va justo bajo el
    titular y por encima de todo lo demás porque es lo que se lee y lo que se

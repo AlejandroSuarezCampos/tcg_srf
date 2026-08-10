@@ -1842,14 +1842,14 @@ return [
        GRUPO G — IMPACTO "partido": lo que arrastra al resto del encuentro.
 
        La tercera clase de impacto, y la que la Biblia pide para sus entradas de
-       ritmo y moral. Decisión de Alejandro tras medirlo (ver
-       branding/impacto-partido-analisis.md): el efecto **NO mueve la resolución
-       del duelo**. El ganador lo sigue decidiendo la curva Elo.
+       ritmo y moral. El efecto **no toca el desenlace de ninguna jugada**: lo
+       que hace un `partido` es AMPLIAR EL PRESUPUESTO con el que las jugadas
+       siguientes pueden mover el marcador, o dar una decisión más.
 
-       Lo que hace un `partido` es AMPLIAR EL PRESUPUESTO con el que las jugadas
-       siguientes pueden mover el marcador, o dar una decisión más. Y es seguro
-       porque ese presupuesto sigue pasando por cabeCambioMarcador(): puede darte
-       más oportunidades, nunca contradecir al ganador (§1.3).
+       Desde que el partido decide el duelo, ese presupuesto
+       (`partido_presupuesto_marcador`) es un tope de diseño y no el margen que
+       dejaba libre un ganador pre-sorteado, así que ampliarlo es una recompensa
+       acotada y directa: un gol más de los que puedes mover.
 
        Cada entrada declara `efecto`, y el verificador lo exige:
          · `presupuesto_gol`    → una ocasión propia más podrá acabar en gol

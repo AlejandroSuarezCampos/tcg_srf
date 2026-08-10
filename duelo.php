@@ -55,14 +55,40 @@ if (in_array($duelo['estado'], ['aceptado', 'listo_para_resolver'], true)) {
     $duelo = $db->obtenerDuelo($id_duelo, $id_usuario);
 }
 
+// Y un partido que ya ha llegado al minuto final se CIERRA: se decide el
+// ganador con el marcador que ha quedado y se entrega el bote. Está aquí además
+// de en el sondeo porque así basta con que uno de los dos vuelva a mirar el
+// duelo para que se liquide, aunque los dos cerraran la pestaña a mitad.
+if ($duelo['estado'] === 'en_juego') {
+    $db->cerrarPartidoSiToca($id_duelo);
+    $duelo = $db->obtenerDuelo($id_duelo, $id_usuario);
+}
+
 $soyCreador = (int) $duelo['id_creador'] === $id_usuario;
 $idRival    = $soyCreador ? (int) $duelo['id_rival'] : (int) $duelo['id_creador'];
 $nombreYo   = $soyCreador ? $duelo['creador'] : $duelo['rival'];
 $nombreOtro = $soyCreador ? ($duelo['rival'] ?? 'Esperando rival') : $duelo['creador'];
 
 $esperando = $duelo['estado'] === 'creado';
-$resuelto  = $duelo['estado'] === 'resuelto';
 $eligiendo = $duelo['estado'] === 'aumento_pendiente';
+
+/* DOS COSAS DISTINTAS, y confundirlas es el error fácil de esta pantalla:
+     · $jugado   — el partido EXISTE: alineaciones y compos congeladas, sorteo
+       escrito, hay marcador que mirar. Vale también mientras se juega.
+     · $resuelto — el duelo está DECIDIDO: hay ganador y el bote ya se entregó.
+   Durante `en_juego` la primera es cierta y la segunda no, así que todo lo que
+   dependa de quién ganó tiene que colgar de $resuelto, nunca de $jugado. */
+$enJuego  = $duelo['estado'] === 'en_juego';
+$resuelto = $duelo['estado'] === 'resuelto';
+$jugado   = $enJuego || $resuelto;
+$porTanda = $resuelto && !empty($duelo['resuelto_por_tanda']);
+
+/* La ceremonia (el modal del partido) se hace al llegar recién montado el
+   duelo... y SIEMPRE que el partido siga en juego. Esto último es lo que hace
+   que recargar a mitad de encuentro vuelva a meterte en el partido en vez de
+   dejarte fuera mirando una pantalla de resultado que todavía no existe: el
+   minuto lo manda el servidor, así que reincorporarse es sumarse donde va. */
+$ceremonia = $enJuego || isset($_GET['nuevo']);
 
 // Un partido de cadena (PvE) no tiene plazo: el briefing lo dice explícitamente
 // y, además, no hay nadie esperando al otro lado a quien hacer esperar. Sin
@@ -100,13 +126,15 @@ $efectoStat   = [
 
 // Alineaciones congeladas. Ambas visibles: no dan ventaja (están congeladas y
 // el duelo ya está decidido) y son lo que permite entender el resultado.
-$miAlineacion    = $resuelto ? $db->listarAlineacionDuelo($id_duelo, $id_usuario) : [];
-$suAlineacion    = $resuelto ? $db->listarAlineacionDuelo($id_duelo, $idRival) : [];
+$miAlineacion    = $jugado ? $db->listarAlineacionDuelo($id_duelo, $id_usuario) : [];
+$suAlineacion    = $jugado ? $db->listarAlineacionDuelo($id_duelo, $idRival) : [];
 
-// Los aumentos se destapan A LA VEZ, y solo con el duelo ya resuelto: verlos
+// Los aumentos se destapan A LA VEZ, y solo con el partido ya montado: verlos
 // antes daría ventaja a quien eligiera después (§6.3 lo marca como anti-abuso).
-$miAumento = $resuelto ? $db->aumentoElegido($id_duelo, $id_usuario) : null;
-$suAumento = $resuelto ? $db->aumentoElegido($id_duelo, $idRival) : null;
+// Con el partido en juego ya no hay ventaja posible — están congelados y no se
+// pueden cambiar— así que se destapan al empezar, no al terminar.
+$miAumento = $jugado ? $db->aumentoElegido($id_duelo, $id_usuario) : null;
+$suAumento = $jugado ? $db->aumentoElegido($id_duelo, $idRival) : null;
 // Formaciones CONGELADAS. Un duelo anterior a que existieran las formaciones
 // no tiene ninguna guardada y fue, por definición, un 1-4-4-2.
 $miFormacion = ($soyCreador ? $duelo['formacion_creador'] : $duelo['formacion_rival']) ?: Tcg::FORMACION_BASE;
@@ -118,15 +146,15 @@ $suFuerza        = $suAlineacion ? Tcg::fuerzaAlineacion($suAlineacion, $suForma
 // Capa 2. Se leen las compos CONGELADAS del duelo, no se recalculan: si un
 // rasgo se reasignó después desde el panel, este duelo debe seguir explicándose
 // con lo que había cuando se jugó.
-$misCompos = $resuelto ? $db->listarComposDuelo($id_duelo, $id_usuario) : [];
-$susCompos = $resuelto ? $db->listarComposDuelo($id_duelo, $idRival) : [];
+$misCompos = $jugado ? $db->listarComposDuelo($id_duelo, $id_usuario) : [];
+$susCompos = $jugado ? $db->listarComposDuelo($id_duelo, $idRival) : [];
 
-$miCiclo  = $resuelto ? (float) ($soyCreador ? $duelo['ciclo_bonus_creador'] : $duelo['ciclo_bonus_rival']) : 0;
-$suCiclo  = $resuelto ? (float) ($soyCreador ? $duelo['ciclo_bonus_rival'] : $duelo['ciclo_bonus_creador']) : 0;
-$miMalus  = $resuelto ? (float) ($soyCreador ? $duelo['malus_coh_creador'] : $duelo['malus_coh_rival']) : 0;
-$suMalus  = $resuelto ? (float) ($soyCreador ? $duelo['malus_coh_rival'] : $duelo['malus_coh_creador']) : 0;
-$miAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_creador'] : $duelo['afinidad_dom_rival']) : null;
-$suAfinDom = $resuelto ? ($soyCreador ? $duelo['afinidad_dom_rival'] : $duelo['afinidad_dom_creador']) : null;
+$miCiclo  = $jugado ? (float) ($soyCreador ? $duelo['ciclo_bonus_creador'] : $duelo['ciclo_bonus_rival']) : 0;
+$suCiclo  = $jugado ? (float) ($soyCreador ? $duelo['ciclo_bonus_rival'] : $duelo['ciclo_bonus_creador']) : 0;
+$miMalus  = $jugado ? (float) ($soyCreador ? $duelo['malus_coh_creador'] : $duelo['malus_coh_rival']) : 0;
+$suMalus  = $jugado ? (float) ($soyCreador ? $duelo['malus_coh_rival'] : $duelo['malus_coh_creador']) : 0;
+$miAfinDom = $jugado ? ($soyCreador ? $duelo['afinidad_dom_creador'] : $duelo['afinidad_dom_rival']) : null;
+$suAfinDom = $jugado ? ($soyCreador ? $duelo['afinidad_dom_rival'] : $duelo['afinidad_dom_creador']) : null;
 
 $catalogoRasgos = $db->rasgosCatalogo();
 
@@ -198,13 +226,18 @@ function panel_compos($quien, array $compos, $afinDom, $ciclo, $malus, array $ca
     <?php
 }
 
-$misGoles = $resuelto ? (int) ($soyCreador ? $duelo['goles_creador'] : $duelo['goles_rival']) : 0;
-$susGoles = $resuelto ? (int) ($soyCreador ? $duelo['goles_rival'] : $duelo['goles_creador']) : 0;
+/* El marcador guardado. Mientras el partido está EN JUEGO este número es el
+   resultado que la simulación tiene previsto, no el que se ha visto: el modal
+   lo tapa y lo va destapando minuto a minuto, y las decisiones de los dos
+   jugadores todavía pueden moverlo. Al terminar, el JS recarga la página y este
+   valor ya es el definitivo. */
+$misGoles = $jugado ? (int) ($soyCreador ? $duelo['goles_creador'] : $duelo['goles_rival']) : 0;
+$susGoles = $jugado ? (int) ($soyCreador ? $duelo['goles_rival'] : $duelo['goles_creador']) : 0;
 $gane     = $resuelto && (int) $duelo['id_ganador'] === $id_usuario;
 
 // Probabilidad que tuvo ESTE jugador, no siempre la del creador.
 $miProbabilidad = null;
-if ($resuelto && $duelo['probabilidad_victoria_creador'] !== null) {
+if ($jugado && $duelo['probabilidad_victoria_creador'] !== null) {
     $p = (float) $duelo['probabilidad_victoria_creador'];
     $miProbabilidad = $soyCreador ? $p : 1 - $p;
 }
@@ -307,10 +340,14 @@ include __DIR__ . '/navbar.php';
       <?php endif; ?>
     </div>
 
-  <?php elseif ($resuelto): ?>
-    <!-- PANTALLA DE PARTIDO -->
-    <div class="partido<?= $gane ? ' es-victoria' : ' es-derrota' ?>" id="partido"
-         data-nuevo="<?= isset($_GET['nuevo']) ? '1' : '0' ?>">
+  <?php elseif ($jugado): ?>
+    <!-- PANTALLA DE PARTIDO
+         Mientras el duelo está en juego esto queda DEBAJO del modal del partido
+         y todavía no hay ganador, así que no se pinta ni victoria ni derrota: al
+         acabar, el JS recarga la página y entonces sí. -->
+    <div class="partido<?= $enJuego ? '' : ($gane ? ' es-victoria' : ' es-derrota') ?>" id="partido"
+         data-nuevo="<?= $ceremonia ? '1' : '0' ?>"
+         data-revelar="<?= isset($_GET['revelar']) ? '1' : '0' ?>">
 
       <div class="partido-marcador">
         <div class="partido-lado">
@@ -330,12 +367,21 @@ include __DIR__ . '/navbar.php';
            mueva el foco aquí al terminar, para que un lector de pantalla
            anuncie el resultado sin tener que ir a buscarlo. -->
       <h1 class="partido-veredicto" tabindex="-1">
-        <?= $gane ? 'Victoria' : 'Derrota' ?>
-        <span class="sr-only">
-          contra <?= htmlspecialchars($nombreOtro) ?>,
-          <?= $misGoles ?> a <?= $susGoles ?>
-          <?php if ($esCadena && $duelo['rango']): ?>, rango <?= $duelo['rango'] ?><?php endif; ?>
-        </span>
+        <?php if ($enJuego): ?>
+          Partido en juego
+        <?php else: ?>
+          <?= $gane ? 'Victoria' : 'Derrota' ?>
+          <?php /* Un empate con la palabra "Victoria" al lado se lee como un
+                   error del juego, así que la tanda se dice en el titular y no
+                   solo en el veredicto de abajo. */ ?>
+          <?php if ($porTanda): ?><span class="partido-tanda">en los penaltis</span><?php endif; ?>
+          <span class="sr-only">
+            contra <?= htmlspecialchars($nombreOtro) ?>,
+            <?= $misGoles ?> a <?= $susGoles ?>
+            <?php if ($porTanda): ?>, decidido en la tanda de penaltis<?php endif; ?>
+            <?php if ($esCadena && $duelo['rango']): ?>, rango <?= $duelo['rango'] ?><?php endif; ?>
+          </span>
+        <?php endif; ?>
       </h1>
 
       <?php
@@ -541,13 +587,19 @@ include __DIR__ . '/navbar.php';
 
 </main>
 
-<?php if ($resuelto && isset($_GET['nuevo'])): ?>
+<?php if ($jugado && $ceremonia): ?>
 <!-- ==========================================================================
      SIMULACIÓN DEL PARTIDO
-     El resultado ya está decidido en el servidor (arriba, en $duelo). Esto es
-     solo la puesta en escena de "verlo pasar" antes de enseñar la pantalla de
-     resultado, que ya está renderizada debajo, cubierta por este modal.
-     Sin JavaScript, este modal nunca se abre y el resultado ya está visible.
+     En PvP esto NO es una puesta en escena: es el partido. El duelo está en
+     `en_juego` y sin ganador, el minuto lo manda el servidor y las decisiones
+     que se toman aquí mueven el marcador de verdad. Cuando el reloj llega al
+     final se liquida el duelo y esta pantalla va a buscar el resultado.
+     En cadenas (PvE) sí es ceremonia: ahí el resultado ya está decidido y
+     renderizado debajo, cubierto por este modal.
+
+     Sin JavaScript este modal nunca se abre. En cadenas eso significa ver el
+     resultado directamente; en PvP, que el partido se juega igual —lo lleva el
+     servidor— y que las decisiones se resuelven solas con la opción segura.
 
      DOS MODOS, a propósito:
        · narrado (DUELOS PvP)  — el motor de eventos de la Biblia §1: relato
@@ -561,7 +613,13 @@ include __DIR__ . '/navbar.php';
 <div class="modal simulacion" id="simulacionPartido" role="dialog" aria-modal="true"
      aria-labelledby="simulacionTitulo" aria-hidden="true"
      data-modo="<?= $modoSimulacion ?>"
-     data-id-duelo="<?= (int) $duelo['id_duelo'] ?>">
+     data-id-duelo="<?= (int) $duelo['id_duelo'] ?>"
+     <?php /* Si el duelo YA está decidido, la pantalla de resultado que hay
+              debajo es correcta y cerrar el modal basta para destaparla. Si no
+              lo está —el caso normal en PvP—, el ganador se escribe cuando el
+              partido termina, así que al acabar hay que ir a buscar esa pantalla
+              al servidor en vez de destapar una que no dice nada. */ ?>
+     data-decidido="<?= $resuelto ? '1' : '0' ?>">
   <div class="modal-caja modal-caja--ancha">
     <div class="modal-head">
       <h2 id="simulacionTitulo">Partido en juego</h2>

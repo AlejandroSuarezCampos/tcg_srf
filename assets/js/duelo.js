@@ -136,7 +136,13 @@
       var res = await fetch(url, { method: 'POST', body: cuerpo });
       var datos = await res.json();
 
-      if (datos.ok && datos.estado === 'resuelto') {
+      /* 'en_juego' es el estado normal de un PvP recién montado: el partido
+         empieza sin ganador y lo decide el propio encuentro. 'resuelto' se
+         sigue aceptando porque es lo que devuelven las cadenas (PvE), que se
+         resuelven de una vez. Comprobar solo 'resuelto' dejaba a los dos
+         jugadores esperando en la pantalla de aumento hasta que el reloj
+         llegase a cero, con el partido ya montado al otro lado. */
+      if (datos.ok && (datos.estado === 'en_juego' || datos.estado === 'resuelto')) {
         clearInterval(sondeo);
         clearInterval(reloj);
         window.location.href = 'duelo.php?id=' + idDuelo + '&nuevo=1';
@@ -172,11 +178,20 @@
   var partido = document.getElementById('partido');
   if (!partido) return;
 
-  /* solo se hace ceremonia al llegar recién resuelto; volver a mirar un duelo
-     antiguo enseña el resultado sin teatro */
-  if (partido.dataset.nuevo !== '1') return;
-
   var veredicto = partido.querySelector('.partido-veredicto');
+
+  /* Se vuelve del partido con ?revelar=1: el encuentro acabó, el servidor
+     liquidó el duelo y esta carga ya trae la pantalla de resultado de verdad.
+     Solo queda destaparla con su animación y llevar el foco al veredicto, que es
+     lo que hace que un lector de pantalla anuncie el resultado. */
+  if (partido.dataset.revelar === '1') {
+    revelarResultado();
+    return;
+  }
+
+  /* solo se hace ceremonia con el partido en juego o al llegar recién montado;
+     volver a mirar un duelo antiguo enseña el resultado sin teatro */
+  if (partido.dataset.nuevo !== '1') return;
 
   /* Si un minijuego llegó a parar un gol, el servidor ya actualizó el marcador
      guardado, pero la pantalla de resultado que hay DEBAJO del modal se
@@ -907,7 +922,21 @@
       .then(function (d) {
         if (!d || !d.ok) { terminar(); return; }
         pintarEstado(d);
-        if (d.fase === 'final') { window.setTimeout(terminar, 1500); return; }
+        if (d.fase === 'final') {
+          /* EL DUELO SE DECIDE AQUÍ, al terminar el partido, así que la pantalla
+             de resultado que hay debajo de este modal se renderizó cuando
+             todavía no había ganador: destaparla enseñaría "Partido en juego"
+             donde debería decir Victoria o Derrota. Hay que ir a buscar la de
+             verdad al servidor.
+
+             Se comprueba `d.decidido` —la respuesta del sondeo, no lo que
+             creyera esta página— para no poder entrar en un bucle de recargas si
+             la liquidación no llegó a completarse: sin ganador escrito, mejor
+             quedarse aquí que recargar en redondo. */
+          var hayQueRecargar = simulacion.dataset.decidido === '0' && d.decidido;
+          window.setTimeout(hayQueRecargar ? irAlResultado : terminar, 1500);
+          return;
+        }
         sondeo = window.setTimeout(sondear, 1000);
       })
       // Un fallo de red no debe matar el partido: se reintenta más despacio.
@@ -920,6 +949,18 @@
     if (raf) window.cancelAnimationFrame(raf);
     if (sondeo) window.clearTimeout(sondeo);
     SRF.cerrarModal('simulacionPartido');
+  }
+
+  /* Ir a por la pantalla de resultado ya decidida. `revelar=1` le dice que
+     llegue destapada, con la misma animación y el mismo salto de foco que si el
+     modal se hubiera cerrado aquí; sin él repetiría la ceremonia entera.
+     replace() y no href: el partido no es un paso al que volver con Atrás. */
+  function irAlResultado() {
+    terminado = true;
+    if (raf) window.cancelAnimationFrame(raf);
+    if (sondeo) window.clearTimeout(sondeo);
+    window.location.replace('duelo.php?id='
+      + encodeURIComponent(simulacion.dataset.idDuelo) + '&revelar=1');
   }
 
   /* único punto de salida: da igual si se llega por el reloj, por "Ver

@@ -48,6 +48,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+/* Red de seguridad del bote (§8, todo perezoso). Un partido en juego tiene el
+   dinero de los dos RETENIDO hasta que alguien lo liquide, y si los dos cierran
+   la pestaña a mitad no queda nadie que lo haga. Volver a la lista de duelos es
+   lo primero que hace cualquiera al reaparecer, así que aquí se cierran los
+   partidos propios que ya han terminado. */
+$db->cerrarPartidosPendientes($id_usuario);
+
 $abiertos  = $db->listarDuelosAbiertos($id_usuario);
 $misDuelos = $db->listarMisDuelos($id_usuario, 12);
 $rarezas   = $db->listarRarezas();
@@ -268,6 +275,11 @@ include __DIR__ . '/navbar.php';
                         –
                         <?= $soyCreador ? (int) $d['goles_rival'] : (int) $d['goles_creador'] ?>
                       </span>
+                      <?php /* Sin esto un empate aparecería junto a "Victoria" sin
+                               nada que lo explique. */ ?>
+                      <?php if (!empty($d['resuelto_por_tanda'])): ?>
+                        <span class="t-caption t-dim">pen.</span>
+                      <?php endif; ?>
                     <?php else: ?>
                       <span class="t-dim">—</span>
                     <?php endif; ?>

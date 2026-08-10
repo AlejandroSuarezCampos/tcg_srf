@@ -1,6 +1,6 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión 7 (2026-08-07).
+> Documento de traspaso, versión 7.4 (2026-08-10).
 > Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
 > misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
 > fichero es todo el contexto necesario: no hace falta la conversación anterior.
@@ -190,6 +190,48 @@
 > variedad* aparecen las decisiones solo se ve jugando o midiendo el reparto
 > dentro de un mismo partido. Ninguna de las dos las habría cazado contando
 > entradas.
+>
+> ---
+>
+> ## ⚠️ v7.4 — EL PARTIDO DECIDE EL DUELO. Es el cambio más grande del motor.
+>
+> **Si vienes a tocar duelos, lee el §15.10 antes que nada de esta sección.**
+>
+> Hasta la v7.3 el ganador se sorteaba **antes del primer minuto** y el partido
+> era su puesta en escena. Alejandro lo vio y lo dijo mejor que cualquier
+> análisis: *"pero entonces no tendrían sentido los minijuegos, porque el
+> resultado viene dado ya de antes"*. Se comprobó y era literal — en PvP los goles
+> se leían en 4 sitios y la actuación en 2, **todos de pantalla**.
+>
+> Ahora: `resolverDuelo()` deja el duelo en **`en_juego`** sin ganador y sin pagar,
+> la simulación corre en **modo natural** (empates incluidos: **32 %** entre
+> iguales), los minijuegos mueven el marcador de verdad, y al llegar al minuto
+> final `liquidarPartido()` escribe el ganador y entrega el bote. **Un empate se
+> decide en la tanda de penaltis.**
+>
+> Cuatro cosas que hay que saber sí o sí:
+>
+> 1. **Las migraciones `019` y `021` son OBLIGATORIAS.** Es la primera vez que hay
+>    migraciones que no se pueden saltar: sin `en_juego` en el enum, ningún duelo
+>    PvP se monta. Ver §5.2.
+> 2. **La §1.3 ya no existe.** `cabeCambioMarcador()` se borró y su condición salió
+>    del `UPDATE` de `descontarGolRival()`. Si la ves en un comentario, el
+>    comentario está desfasado. **No la vuelvas a poner**: con `id_ganador` en
+>    `NULL` durante `en_juego` daría siempre falso y ninguna parada contaría.
+> 3. **Un duelo `en_juego` tiene el dinero de los dos retenido.** Por eso
+>    `cerrarPartidoSiToca()` tiene dos ramas de abandono, y por eso el cierre se
+>    llama desde tres sitios (sondeo, `duelo.php`, `duelos.php`). Un partido a
+>    medias ya no es un partido perdido: es un bote que no vuelve a nadie.
+> 4. **El coste está medido y aceptado: el favorito pasa del 69,1 % al 91,0 %.**
+>    Alejandro lo aceptó a cambio de que los minijuegos cuenten. Las palancas para
+>    recalibrar son `duelo_k` y `partido_presupuesto_marcador`.
+>
+> **Las cadenas (PvE) están intactas** y tienen prueba propia que lo demuestra,
+> porque el cambio pasa justo por dentro de `resolverDuelo()`.
+>
+> Verificado jugando un duelo real de punta a punta entre dos cuentas, sobre una
+> copia desechable: acabó **2-2, lo decidió la tanda**, el bote se entregó una vez
+> y la pantalla de resultado llegó bien (*"Derrota en los penaltis"*).
 
 ---
 
@@ -335,8 +377,9 @@ buscan por nombre.
 | **§15 — Partido en vivo (PvP)** | Reloj en servidor, los dos jugadores a la vez, migración `016` | ✅ **Construido** |
 | **§15 — Minijuegos** | Catálogo + **75** entradas jugables de ~100 (65 nombres de la Biblia) (Biblia §2). **Los 10 huecos alcanzables están cubiertos** y **las 4 primitivas construidas** | 🟡 **En marcha** (lo que falta necesita sistemas nuevos, no entradas) |
 | **§15 — Las 4 primitivas de interfaz** | `eleccion` 44 · `medidor` 6 · `zona` 7 · `arrastre` 5 (§15.4b). Las cuatro de la Biblia | ✅ **Construido** |
-| **§15 — `impacto: "partido"`** | 13 entradas que arrastran al resto del encuentro, sin mover la resolución del duelo (§15.4d) | ✅ **Construido** |
+| **§15 — `impacto: "partido"`** | 13 entradas que arrastran al resto del encuentro ampliando el presupuesto de marcador (§15.4d) | ✅ **Construido** |
 | **§15 — Margen de los partidos** | El bucle del §1.3 aplanaba el 88,8 % de los duelos a un gol; ahora conserva la forma natural (§15.4e) | ✅ **Arreglado** |
+| **§15 — EL PARTIDO DECIDE EL DUELO** | Se acabó el ganador pre-sorteado: el duelo queda `en_juego`, el marcador manda, el empate va a **la tanda de penaltis** y el bote se entrega al terminar. Migraciones `019`–`022` (§15.10) | ✅ **Construido** |
 | **§15 — El penalti** | Familia propia, con el insignia del catálogo y su espejo defensivo. Migración `018` (§15.4c) | ✅ **Construido** |
 | **§15 — Familia Árbitro** | Decisiones disciplinarias sobre el evento de tarjeta, con un 4.º dato oculto | ✅ **Construido** |
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
@@ -672,6 +715,24 @@ C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/mi
 No es obligatoria para que los duelos funcionen —el código lee 1 por defecto—,
 pero sin ella el valor no se puede calibrar sin tocar código.
 
+**`018` a `022` son las del partido que decide el duelo** (§15.10). De estas
+**`019` y `021` SÍ son obligatorias**, y es la primera vez que hay migraciones que
+no se pueden saltar:
+
+| | qué hace | ¿obligatoria? |
+|---|---|---|
+| `018_penalti.sql` | parámetros del penalti como evento | no, hay valores por defecto |
+| `019_partido_decide.sql` | **añade `en_juego` al enum `estado`** | **SÍ** — sin ella, `resolverDuelo()` no puede guardar el estado y ningún duelo PvP se monta |
+| `020_minijuego_prob_gol.sql` | `partido_minijuego_prob_gol` | no |
+| `021_resuelto_por_tanda.sql` | **columna `resuelto_por_tanda`** | **SÍ** — la escribe `liquidarPartido()` en cada cierre |
+| `022_presupuesto_marcador.sql` | presupuesto de marcador y plazo de abandono | no, pero sin ella no se calibran |
+
+```
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/019_partido_decide.sql
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/021_resuelto_por_tanda.sql
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/022_presupuesto_marcador.sql
+```
+
 ### 5.3 ⚠️ TRAMPA DE CODIFICACIÓN — léela antes de aplicar nada
 
 **El flag `--default-character-set=utf8mb4` NO es opcional.** Sin él, en Windows
@@ -716,6 +777,8 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `partido_minijuegos_max` | 2 | decisiones por jugador y partido. **Cuidado al subirlo:** el reloj se para para los DOS en cada una, así que 3 son seis pausas y el partido se hace eterno (§15.5) |
 | `partido_minijuegos_sin_impacto_max` | 1 | cuántas de esas decisiones pueden ser de impacto `"ninguno"` (árbitro y defensivas sin gol que mover). **No sube el total ni las pausas**, solo acota cuántas pueden ser irrelevantes para el marcador. Migración `017`; sin él, el 13,94 % de los jugadores gastaba las dos en decisiones que no cambian nada (§15.5) |
 | `partido_minijuego_prob_gol` | 0.70 | probabilidad de que un ACIERTO acabe moviendo el marcador. Antes era siempre 1: leer bien la jugada equivalia a marcar. Fallar sigue sin castigar. Migracion `020` (§15.4f) |
+| `partido_presupuesto_marcador` | 1 | goles que puede mover cada jugador con sus minijuegos en un partido. **Sustituyó a la §1.3 como límite** y ya no es una restricción de coherencia sino un tope de diseño: subirlo hace que pesen más los minijuegos y menos la fuerza del mazo, bajarlo a 0 los deja en pura actuación. Migración `022` (§15.10) |
+| `partido_abandono_seg` | 3600 | tras esto, un partido `en_juego` que no arranca o que se quedó parado se cierra solo. **No es un adorno:** hasta que alguien liquide, el dinero de los dos está retenido. Holgado a propósito, para que quien llegue tarde pueda jugar su partido entero. Migración `022` (§15.10) |
 
 ---
 
@@ -1248,23 +1311,28 @@ ventaja de poder.
    - **Sin banquillo, sustituciones, lesiones ni cansancio**: bloquea Emergencia
      en la Enfermería, La Revolución del Banquillo, Exprimir al Límite, Cazar al
      Cansado, El Novato Congelado…
-   - **Sin prórroga ni tanda de penaltis**: bloquea El Orden del Destino, Guerra
-     Psicológica, El Gol que lo Cambia Todo…
+   - ~~Sin prórroga ni tanda de penaltis~~ — **la tanda existe** (§15.10), pero se
+     resuelve en servidor y **no se juega**. El Orden del Destino, Guerra
+     Psicológica, Tiempo Extra y El Gol que lo Cambia Todo siguen bloqueadas por
+     eso: lo que falta ya no es la tanda, es hacerla interactiva. Es el bloque
+     desbloqueable más barato que queda.
    - **`impacto: "partido"` sigue sin decidir** (§15.4): 17 entradas, el bloque
      más grande de lo que queda. Bloquea todo lo que arrastra a jugadas
      siguientes — El Milagro Imposible, Dormir el Partido, El Grito de Guerra,
      La Sincronía Perfecta, La Relajación Peligrosa…
      **Hay análisis escrito: `branding/impacto-partido-analisis.md`**, con el
      inventario de qué se rompe (con `fichero:línea`), cuatro caminos y una
-     recomendación. Dos cosas de ahí que conviene saber sin abrirlo:
-     - **`valor_sorteo` hace dos trabajos**: es el mismo número que se sortea en
-       `consultas.php:4904` para decidir el ganador (`$sorteo < $p`, `:4905`) y el
-       que después siembra toda la narración. Hoy eso garantiza gratis que relato y resultado no se
-       contradigan; moverlo obliga a separarlos en dos.
-     - **La parte difícil no es código, es diseño**: hoy irse del partido no
-       cuesta nada porque el duelo ya está resuelto y pagado (§15.3, "si no
-       estás atento, te lo pierdes"). Si el partido decidiera, abandonar pasaría
-       a ser una jugada, y hay que decidir qué ocurre entonces.
+     recomendación. Dos cosas de ahí que conviene saber sin abrirlo, **las dos ya
+     resueltas en §15.10**:
+     - **`valor_sorteo` hacía dos trabajos**: decidir el ganador y sembrar la
+       narración. Ya solo hace el segundo — en PvP el ganador lo decide el
+       marcador—, así que **no hubo que separarlo en dos números** y la garantía
+       de que relato y resultado no se contradigan sigue saliendo gratis.
+     - **La parte difícil no era código, era diseño**: si el partido decide,
+       abandonar pasa a ser una jugada. Se resolvió sin inventar ninguna regla,
+       porque **lo apostado ya estaba retenido de los dos** desde que entraron:
+       irse no devuelve nada, y las dos ramas de abandono de
+       `cerrarPartidoSiToca()` garantizan que el bote acabe entregándose.
      - **DECIDIDO Y CONSTRUIDO** (§15.4d): se acotó `partido` al presupuesto y al
        ritmo, nunca al ganador. Van **13 entradas**. Las **4 que no caben** y por
        qué, para no volver a intentarlo:
@@ -1895,11 +1963,12 @@ declara `efecto`, y el verificador lo exige:
 | `presupuesto_parada` | un gol del rival más podrá pararse |
 | `decision` | una decisión más en el partido (tope +1, por el coste de pausas) |
 
-**Es seguro por construcción, no por cuidado al escribirlo:** la condición del
-§1.3 vive **dentro del `UPDATE`** de `descontarGolRival()`
-([consultas.php:4417](db/consultas.php:4417)), así que el presupuesto es solo una
-**oferta** y la base de datos sigue siendo el juez. Un efecto de partido puede
-darte más oportunidades; no puede contradecir al ganador.
+**Sigue teniendo sentido ahora que el partido decide el duelo, y de hecho más.**
+El presupuesto pasó de ser *el margen que dejaba libre el ganador pre-sorteado* a
+ser un **tope de diseño** (`partido_presupuesto_marcador`, §15.10), así que
+ampliarlo es una recompensa clara y acotada: un gol más de los que puedes mover.
+Antes era una concesión dentro de una restricción de coherencia; ahora es
+directamente lo que dice que es.
 
 El efecto **se reconstruye** de las filas de `duelo_minijuegos` en cada sondeo
 (`minijuegosResueltos()`), así que los dos jugadores ven lo mismo, sobrevive a
@@ -1913,9 +1982,11 @@ recargar la página y no hace falta guardar estado nuevo en ninguna parte.
 > puede salir peor"—. No es un olvido del catálogo: es esa regla, y cambiarla es
 > otra decisión.
 
-> **Lo que quedó en suspenso:** la **tanda de penaltis** se había decidido para
-> romper empates, pero con esta opción **no hay empates posibles** (el §1.3 fuerza
-> un ganador), así que no hay nada que romper. Sus 4 entradas siguen pendientes.
+> **Lo que quedó en suspenso y ya está resuelto:** la **tanda de penaltis** se
+> había decidido para romper empates, pero mientras el §1.3 forzaba un ganador
+> **no había empates posibles**. Con el partido decidiendo (§15.10) los empates
+> existen —**el 32 % de los partidos entre iguales**— y la tanda ya se juega en
+> servidor. Sus 4 entradas interactivas siguen pendientes.
 
 ### 15.4c El penalti (migración `018`)
 
@@ -2121,12 +2192,17 @@ entrada con `impacto: "ninguno"` habría sumado un gol de la nada. Ahora la leen
 los dos sitios que importan: `resolverMinijuegoDuelo()` para aplicar el gol y
 `narracionDuelo()` para gastar presupuesto.
 
-Quien decide de verdad si el marcador se mueve es **la base de datos**: la
-condición de §1.3 va dentro del `UPDATE` de `descontarGolRival()` y
-`sumarGolPropio()`, no comprobada antes en PHP. Comprobar y luego actualizar deja
-una ventana por la que dos peticiones a la vez podrían empatar un partido que
-alguien había ganado. Verificado martilleando 25 peticiones seguidas: solo se
-aplica una.
+Quien decide de verdad si el marcador se mueve es **la base de datos**:
+`descontarGolRival()` y `sumarGolPropio()` llevan sus condiciones dentro del
+`UPDATE`, no comprobadas antes en PHP. Comprobar y luego actualizar deja una
+ventana por la que dos peticiones a la vez aplicarían el cambio dos veces.
+Verificado martilleando 25 peticiones seguidas: solo se aplica una.
+
+> ⚠️ **Lo que iba en ese `UPDATE` y ya NO va:** la condición de §1.3, "el ganador
+> sorteado sigue ganando después de mover el gol". Se retiró en §15.10 junto con
+> `cabeCambioMarcador()`. Si la ves en un comentario viejo, el comentario está
+> desfasado: **ahora el marcador ES el resultado**, y lo único que queda dentro
+> del `UPDATE` es que nada baje de cero y que el duelo siga `en_juego`.
 
 ### 15.6 Veredicto y actuación
 
@@ -2156,7 +2232,9 @@ aplica una.
 | Modo | `narrado` | `clasico` — **intacto** |
 | Reloj | servidor | local (rAF) |
 | Minijuegos | sí | no |
-| Marcador | nace de la simulación (§1.3) | `marcadorCadena()`, sin tocar |
+| Marcador | nace de la simulación, **y decide** (§15.10) | `marcadorCadena()`, sin tocar |
+| Estado tras montarse | `en_juego`, sin ganador | `resuelto` de una vez |
+| Cuándo se paga | al terminar el partido | en el acto |
 | Botón "Ver resultado" | **no** | sí |
 | Movimiento reducido | se juega igual, sin animación | se salta |
 
@@ -2211,9 +2289,13 @@ rangos.
 Además de §13:
 
 - El marcador narrado debe cuadrar con el guardado en **todos** los duelos
-  resueltos, no en una muestra. La invariante dura de §1.3 es que el ganador del
-  sorteo siempre acaba con más goles: se midió sobre 4.000 partidos sintéticos y
-  debe dar **0 violaciones**.
+  resueltos, no en una muestra.
+- **La invariante de §1.3 ya NO se comprueba porque ya no existe** (§15.10). Lo
+  que hay que comprobar en su lugar es que el `id_ganador` de un duelo `resuelto`
+  cuadre con su marcador, o que `resuelto_por_tanda` explique por qué no.
+- **Un duelo no puede quedarse en `en_juego` para siempre**: ahí el dinero de los
+  dos está retenido. Las dos ramas de abandono de `cerrarPartidoSiToca()` son lo
+  que lo garantiza, y las dos tienen prueba.
 - **Pasa el verificador**, que cubre esto y seis cosas más de una vez:
   ```
   C:\xampp\php\php.exe db/verificar_minijuegos.php
@@ -2246,6 +2328,133 @@ Además de §13:
   resuelta"* y no volver a mover el marcador.
 - Con movimiento reducido, un duelo PvP debe **abrir el modal y ofrecer sus
   minijuegos** igual; lo único que cambia es que nada se anima.
+
+### 15.10 EL PARTIDO DECIDE EL DUELO (migraciones `019`–`022`)
+
+**Es el cambio más grande del motor de duelos, y viene de una crítica de Alejandro
+que era certera:** *"pero entonces no tendrían sentido los minijuegos, porque el
+resultado viene dado ya de antes"*. Tenía razón, y se pudo medir: en PvP los goles
+se leían en 4 sitios y la actuación en 2, **todos de pantalla**. Nada mecánico
+dependía de ellos. Un minijuego podía cambiar el relato, nunca el resultado.
+
+Lo que pidió, textual: *"que si ganas un duelo tengas más posibilidades en esa
+ocasión de marcar un gol, no crees el resultado al iniciar el partido, que se vaya
+decidiendo según se resuelvan los minijuegos, y si se queda en empate a penaltis y
+gg"*.
+
+#### Cómo funciona ahora
+
+| Antes | Ahora |
+|---|---|
+| `resolverDuelo()` sorteaba el ganador y **pagaba** antes del minuto 1 | Deja el duelo en **`en_juego`**, sin ganador y sin pagar |
+| La simulación recibía `gana` y tenía prohibido contradecir el sorteo | **Modo natural**: el marcador sale como salga, empates incluidos |
+| Un empate era imposible | **32 % de los partidos entre iguales** acaban empatados |
+| El minijuego movía el marcador dentro del margen que dejaba el ganador | El minijuego mueve el marcador, y **el marcador es el resultado** |
+| — | Un empate se rompe en **`tandaDePenaltis()`** |
+| — | **`liquidarPartido()`** escribe el ganador y entrega el bote al terminar |
+
+El pago **no cambió, y esto sorprendió al investigarlo**: ya funcionaba como hacía
+falta. Cada uno deja lo apostado al entrar (`crearDuelo`, `aceptarDuelo`; la carta
+queda `bloqueada`), así que Paso 3 se redujo a **mover el momento de la entrega**,
+no a rehacer el flujo. Es también lo que cierra la pregunta del abandono sin
+inventar ninguna regla nueva.
+
+#### Las tres piezas nuevas
+
+- **`liquidarPartido($id_duelo)`** — decide con el marcador, rompe el empate en la
+  tanda, entrega el bote, pasa a `resuelto`.
+  > ⚠️ **La llaman los DOS jugadores en cada sondeo.** Que el bote se entregue una
+  > sola vez **no lo garantiza el PHP**: lo garantiza `WHERE id_duelo = :d AND
+  > estado = 'en_juego'` **dentro del `UPDATE`**, con `rowCount() === 0` →
+  > `rollBack()` y no se paga. Comprobar y luego pagar deja una ventana por la que
+  > dos sondeos simultáneos pagarían dos veces. Probado con cinco llamadas
+  > seguidas: **una liquida, el bote se entrega una vez.**
+- **`tandaDePenaltis()`** — 5 lanzamientos y muerte súbita, cada penalti de Ataque
+  contra Portería rival, acotado al 55-90 %. **Determinista** desde `valor_sorteo`
+  (sal 9161): los dos jugadores la piden a la vez y con azar real cada uno
+  calcularía un ganador distinto. El tope de 40 rondas no es decoración — sin él
+  dos porterías fuertes podrían no resolver nunca y el duelo se quedaría sin
+  liquidar. Por ahora **se resuelve en servidor y no se juega**.
+- **`cerrarPartidoSiToca()`** — el enganche perezoso (§8, no hay cron). Lo llaman
+  el sondeo, `duelo.php` y `duelos.php`.
+
+#### ⚠️ Las dos ramas de abandono, y por qué son obligatorias
+
+Desde que el duelo se decide en el campo, **un partido a medias ya no es un
+partido perdido: es un bote que no vuelve a nadie.** Y hay dos formas de que el
+reloj no llegue nunca al final:
+
+1. **El partido no arranca**, porque arrancarlo es cosa del sondeo y nadie volvió
+   a abrir la pantalla (o volvió sin JavaScript).
+2. **El partido se queda parado** en una decisión, porque el plazo solo lo aplica
+   el sondeo de alguien presente.
+
+Las dos se cierran pasado `partido_abandono_seg` (3600 s, holgado a propósito:
+quien llega tarde todavía puede jugar su partido entero). Es §15.3 llevada a su
+conclusión — *te pierdes el partido, no la apuesta*.
+
+> **Lo primero que escribí en la rama 2 estaba mal y lo tumbó la prueba:**
+> reanudaba el reloj y dejaba que siguiera su curso. Pero reanudar suma el tiempo
+> parado a `partido_pausa_seg` —correcto, ese rato no era partido—, así que el
+> encuentro vuelve al minuto en el que se detuvo y **todavía le faltan segundos**:
+> hacía falta una segunda visita para cerrarlo. Un partido congelado una hora no
+> necesita que le contemos los minutos que le quedaban.
+
+#### Lo que se retiró, y que no vuelva
+
+- **`cabeCambioMarcador()` se borró.** Era la §1.3 aplicada a los minijuegos.
+  No se dejó como función muerta a propósito: dejarla invitaría a volver a
+  llamarla, y volver a llamarla reimplantaría la §1.3 a medias.
+- **La condición de §1.3 salió del `UPDATE`** de `descontarGolRival()` y
+  `sumarGolPropio()`. **Si se hubiera dejado, con `id_ganador` en `NULL` durante
+  `en_juego` daría siempre falso y ninguna parada contaría** — un fallo que se ve
+  como "los minijuegos no hacen nada".
+- **El presupuesto de marcador ya no es un margen, es un tope de diseño:**
+  `partido_presupuesto_marcador` (1 gol por jugador). Se dejó en 1 porque es el
+  margen que la §1.3 autorizaba en la práctica, para no meter en el mismo cambio
+  *"los minijuegos deciden"* y *"los minijuegos deciden el doble"*. Subirlo hace
+  que pesen más los minijuegos y menos la fuerza del mazo; bajarlo a 0 los deja en
+  pura actuación.
+
+#### El coste aceptado, con número
+
+Con el partido decidiendo, **el favorito pasa del 69,1 % al 91,0 %** de victorias.
+Está medido y **Alejandro lo aceptó a cambio de que los minijuegos cuenten**. No
+hay forma de tener a la vez el equilibrio de antes, marcadores con forma de fútbol
+y que el partido decida: aplanar la conversión de goles para que cuadre con el Elo
+da 52 % de empates y 0,84 goles por partido, que no es fútbol. **Las palancas para
+recalibrarlo son `duelo_k` y, ahora, `partido_presupuesto_marcador`.**
+
+#### El cliente tuvo que cambiar, y aquí está la trampa
+
+La pantalla de resultado la **renderiza el servidor**, y con el duelo en `en_juego`
+se renderiza **sin ganador**. Destaparla al terminar enseñaría *"Partido en
+juego"* donde debería decir Victoria o Derrota. Solución: al llegar a `fase:
+final`, el cliente **recarga a `duelo.php?id=X&revelar=1`**, que trae la pantalla
+de verdad ya destapada, con su animación y el foco en el veredicto (lo que hace
+que un lector de pantalla lo anuncie).
+
+- `data-decidido` dice si la pantalla de debajo sirve; `d.decidido` del sondeo
+  dice si el servidor ya escribió el ganador. **Se exigen las dos** para no poder
+  entrar en un bucle de recargas si la liquidación no llegó a completarse.
+- **Recargar a mitad de partido te reincorpora al partido**, no te deja fuera: el
+  minuto lo manda el servidor, así que `$ceremonia = $enJuego || ?nuevo`.
+- En `duelo.php` hay que distinguir **`$jugado`** (el partido existe: alineaciones
+  y compos congeladas, hay marcador) de **`$resuelto`** (hay ganador y el bote ya
+  se entregó). Confundirlos es el error fácil de esa pantalla.
+- El sondeo de la fase de aumento comprobaba `estado === 'resuelto'` para pasar al
+  partido. Con el estado nuevo **dejaba a los dos jugadores esperando** hasta que
+  el reloj llegase a cero, con el partido ya montado al otro lado.
+- Un empate con la palabra "Victoria" al lado **se lee como un error del juego**,
+  así que la tanda se dice en el titular (`.partido-tanda`), en el veredicto, en el
+  resumen compartible (`(pen.)`) y en el listado de duelos.
+
+#### Qué NO cambió
+
+**Las cadenas (PvE) están intactas**, y tienen prueba propia para demostrarlo
+porque el cambio pasa justo por dentro de `resolverDuelo()`: no tienen minijuegos,
+así que no hay nada que esperar y se siguen resolviendo de una vez, con su rango y
+su botín en el acto.
 
 ---
 

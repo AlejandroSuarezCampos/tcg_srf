@@ -1,5 +1,45 @@
 # `impacto: "partido"` — qué se rompe y qué caminos hay
 
+> # ✅ CERRADO Y CONSTRUIDO (2026-08-10) — LEE ESTO PRIMERO
+>
+> **Este documento es un registro de decisiones, y la mitad de lo que contiene
+> quedó SUPERADO por la decisión final.** Se conserva entero porque las mediciones
+> siguen valiendo y porque explica por qué se cambió de opinión dos veces, pero
+> **no lo leas como especificación**: para eso está el **§15.10 del CLAUDE.md**.
+>
+> **Lo que se construyó al final fue la opción C: el partido decide el duelo.**
+>
+> | | dónde |
+> |---|---|
+> | `resolverDuelo()` deja el duelo en `en_juego`, sin ganador y sin pagar | `consultas.php` |
+> | La simulación corre en **modo natural** (sin `gana`): empates posibles, **32 %** entre iguales | `generarEventosPartido()` |
+> | Los minijuegos mueven el marcador de verdad, con tope `partido_presupuesto_marcador` | `narracionDuelo()` |
+> | Al final, `liquidarPartido()` decide, rompe el empate en la tanda y entrega el bote | `consultas.php` |
+> | `tandaDePenaltis()` — 5 tiros y muerte súbita, determinista | `consultas.php` |
+> | `cerrarPartidoSiToca()` — enganche perezoso, con **dos ramas de abandono** | `consultas.php` |
+> | Migraciones `019`–`022`; **`019` y `021` son obligatorias** | `db/migraciones/` |
+>
+> **Lo que se retiró:** `cabeCambioMarcador()` (borrada, no dejada muerta) y la
+> condición de §1.3 dentro del `UPDATE` de `descontarGolRival()` /
+> `sumarGolPropio()`. La §1.3 **ya no existe**.
+>
+> **Lo que se confirmó al construirlo:** las dos cosas que este documento marcaba
+> como caras resultaron no serlo.
+> - **`valor_sorteo` NO hubo que separar en dos números** (§3.1). En PvP dejó de
+>   decidir el ganador y se quedó solo como semilla del relato, así que la garantía
+>   de que relato y resultado no se contradigan sigue saliendo gratis.
+> - **El abandono no necesitó ninguna regla nueva** (§3.2), porque lo apostado ya
+>   estaba retenido de los dos. Lo que sí hizo falta fue *garantizar que el bote
+>   acabe entregándose*: de ahí las dos ramas de abandono.
+>
+> **Verificado jugando un duelo real entre dos cuentas** sobre una copia
+> desechable: acabó **2-2, lo decidió la tanda**, el bote se entregó una sola vez y
+> la pantalla de resultado llegó correcta. Las cadenas (PvE) siguen intactas, con
+> prueba propia.
+>
+> **El coste sigue siendo el que este documento midió y Alejandro aceptó: el
+> favorito pasa del 69,1 % al 91,0 %.**
+
  ## 🔄 DECISIÓN POSTERIOR (2026-08-10, misma sesión) — el partido SÍ decide
 >
 > Con la opción B construida, Alejandro señaló el agujero que la dejaba hueca:
