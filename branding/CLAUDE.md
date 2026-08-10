@@ -229,9 +229,12 @@
 > **Las cadenas (PvE) están intactas** y tienen prueba propia que lo demuestra,
 > porque el cambio pasa justo por dentro de `resolverDuelo()`.
 >
-> Verificado jugando un duelo real de punta a punta entre dos cuentas, sobre una
-> copia desechable: acabó **2-2, lo decidió la tanda**, el bote se entregó una vez
-> y la pantalla de resultado llegó bien (*"Derrota en los penaltis"*).
+> **Verificado sobre 300 duelos jugados enteros por el camino real** (25 con carta),
+> más uno a mano en el navegador entre dos cuentas que acabó 2-2 y lo decidió la
+> tanda. Las cifras que importan: **300/300 liquidados, 0 colgados, el total de
+> monedas y de copias no cambia, y el 58,3 % de los duelos acabó con un marcador
+> distinto al que salió de la simulación** — antes era el 0 %. Tabla completa en el
+> §15.10.
 
 ---
 
@@ -2430,10 +2433,25 @@ gg"*.
 | — | **`liquidarPartido()`** escribe el ganador y entrega el bote al terminar |
 
 El pago **no cambió, y esto sorprendió al investigarlo**: ya funcionaba como hacía
-falta. Cada uno deja lo apostado al entrar (`crearDuelo`, `aceptarDuelo`; la carta
-queda `bloqueada`), así que Paso 3 se redujo a **mover el momento de la entrega**,
-no a rehacer el flujo. Es también lo que cierra la pregunta del abandono sin
-inventar ninguna regla nueva.
+falta. Cada uno deja lo apostado al entrar (`crearDuelo`, `aceptarDuelo`), así que
+Paso 3 se redujo a **mover el momento de la entrega**, no a rehacer el flujo. Es
+también lo que cierra la pregunta del abandono sin inventar ninguna regla nueva.
+
+> ⚠️ **Cómo se retiene una CARTA apostada, que no es lo que parece.** Durante un
+> rato este documento afirmó que se marca `bloqueada`. **Es falso, y no había ni una
+> línea de código que lo hiciera.** `bloqueada` es el candado manual del jugador
+> contra la venta (§9) y el duelo no lo toca.
+>
+> Lo que retiene la copia es que las consultas de *"¿puedo apostar o vender esta
+> carta?"* excluyen las que tienen fila en `duelo_apuestas` con el duelo en
+> **`estado NOT IN ('resuelto','cancelado')`** — tres sitios:
+> `listarCopiasApostables()`, `publicarAnuncio()` y el selector de apuesta.
+>
+> **Que sea un `NOT IN` y no una lista positiva es lo que salvó este cambio**: el
+> estado nuevo `en_juego` cae dentro sin tocar nada. Si hubiera estado escrito como
+> `estado IN ('creado','aceptado',…)`, la carta se habría liberado a mitad de
+> partido y se habría podido vender la que estabas jugando. Verificado sobre 25
+> duelos de carta: la copia sigue retenida mientras el partido se juega.
 
 #### Las tres piezas nuevas
 
@@ -2492,9 +2510,47 @@ conclusión — *te pierdes el partido, no la apuesta*.
   que pesen más los minijuegos y menos la fuerza del mazo; bajarlo a 0 los deja en
   pura actuación.
 
+#### Medido sobre 300 duelos jugados enteros por el camino real
+
+No simulados aparte: **creados, aceptados, con aumentos cerrados, sondeados y con
+cada decisión respondida**, 25 de ellos apostando CARTA. Es la comprobación de
+referencia si vuelves a tocar el partido.
+
+| contabilidad — lo que no puede fallar | |
+|---|---|
+| duelos liquidados | **300 / 300** |
+| duelos que se quedaron en `en_juego` | **0** |
+| **total de monedas del sistema** | **NO cambia** (cada uno pone, el ganador cobra) |
+| **total de copias de carta** | **NO cambia**, solo cambian de dueño |
+| ganador que no cuadra con el marcador (ni lo explica la tanda) | **0** |
+| copias traspasadas y desbloqueadas | **25 / 25** |
+
+| la forma del partido | |
+|---|---|
+| goles por partido | **2,42** |
+| margen 0 / 1 / 2 / 3 / 4+ | **27,7 % / 36,3 % / 21,3 % / 11,3 % / 3,3 %** |
+| empates en el campo → tanda | **27,7 %**, todos y solo ellos |
+| decisiones jugadas | 1.446 (**4,82 por duelo**) |
+| aciertos | 32,8 % (contestando a ciegas y rotando opción) |
+| aciertos que MOVIERON el marcador | **311** |
+| duelos que acabaron con un marcador distinto al simulado | **58,3 %** |
+
+**Ese 58,3 % es la respuesta a la queja que originó todo esto.** Antes era 0 %: el
+resultado venía dado. La distribución de márgenes también es sana —compárala con el
+**88,8 % en margen 1** que el bucle del §1.3 producía (§15.4e)—.
+
+> ⚠️ **El 27,7 % de tandas es alto y conviene tenerlo en el radar.** Es realista
+> para una liga, pero en un duelo suelto significa que **más de uno de cada cuatro
+> se decide en los penaltis**, que hoy no se juegan: se resuelven en servidor. Es el
+> argumento más fuerte para hacer la tanda interactiva. No hay dial que lo baje: sale
+> de la simulación natural.
+
 #### El coste aceptado, con número
 
-Con el partido decidiendo, **el favorito pasa del 69,1 % al 91,0 %** de victorias.
+En los 300 duelos con mazos REALES el reparto fue **72 % / 28 %** — el mazo fuerte
+gana, pero el flojo gana más de uno de cada cuatro. La cifra que sigue en pie como
+aviso es la del caso extremo sintético: con 240 contra 100,
+**el favorito pasa del 69,1 % al 91,0 %** de victorias.
 Está medido y **Alejandro lo aceptó a cambio de que los minijuegos cuenten**. No
 hay forma de tener a la vez el equilibrio de antes, marcadores con forma de fútbol
 y que el partido decida: aplanar la conversión de goles para que cuadre con el Elo

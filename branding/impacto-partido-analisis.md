@@ -64,7 +64,11 @@
 >
 > - el creador paga al crear la sala (`consultas.php:1961`),
 > - el rival paga al aceptar (`consultas.php:2024`),
-> - las cartas apostadas se marcan `bloqueada`.
+> - las cartas apostadas quedan retenidas. **CORRECCIÓN posterior:** aquí decía
+>   *"se marcan `bloqueada`"* y **era falso** — no hay ni una línea que lo haga.
+>   Lo que las retiene es que las consultas de apostar y vender excluyen las
+>   copias con fila en `duelo_apuestas` cuyo duelo esté en `estado NOT IN
+>   ('resuelto','cancelado')`. Ver el aviso del §15.10 del CLAUDE.md.
 >
 > O sea que **el bote ya está retenido antes del partido** y lo único que
 > `resolverDuelo()` hace al final es ENTREGARLO (`monedas = monedas + :bote`).

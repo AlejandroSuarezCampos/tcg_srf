@@ -5382,9 +5382,18 @@ class Tcg
 			   En PvP el bote se entrega al terminar el partido (liquidarPartido),
 			   porque hasta entonces no hay ganador a quien entregárselo. Aplazarlo
 			   no deja nada a medias: lo apostado está RETENIDO de los dos desde que
-			   entraron —el creador en crearDuelo(), el rival en aceptarDuelo(), y la
-			   carta marcada `bloqueada`—, así que el modelo de pago no cambia. Lo
-			   único que se mueve es el momento de la entrega. */
+			   entraron —las monedas se descuentan en crearDuelo() y aceptarDuelo()—
+			   así que el modelo de pago no cambia. Lo único que se mueve es el
+			   momento de la entrega.
+
+			   OJO CON LA CARTA, que no funciona como parece: NO se marca
+			   `bloqueada` (esa columna es el candado manual del jugador contra la
+			   venta, y nadie la toca aquí). Lo que la retiene es que las consultas
+			   de "¿puedo apostar/vender esta copia?" excluyen las que tienen fila
+			   en `duelo_apuestas` con el duelo en `estado NOT IN
+			   ('resuelto','cancelado')`. Que sea un NOT IN es lo que hace que
+			   `en_juego` quede retenido sin tocar nada — si fuera una lista
+			   positiva, la carta se habría liberado a mitad de partido. */
 			if ($esPve) {
 				if ($duelo["tipo_apuesta"] === "monedas") {
 					// El bote son las dos apuestas, ya retenidas al entrar.
