@@ -5407,6 +5407,8 @@ class Tcg
 				}
 			}
 
+			$estadoNuevo = $esPve ? "resuelto" : "en_juego";
+
 			/* `resuelto = NOW()` se sigue escribiendo aquí aunque en PvP el duelo
 			   no quede resuelto todavía: es la hora de referencia con la que
 			   arrancarPartidoSiToca() cuenta partido_espera_seg. Lo que marca es
@@ -5435,7 +5437,7 @@ class Tcg
 				":cbc" => $cicloCreador,                  ":cbr" => $cicloRival,
 				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
 				":tc"  => $composCreador["tension_nivel"], ":tr" => $composRival["tension_nivel"],
-				":estado"        => $esPve ? "resuelto" : "en_juego",
+				":estado"        => $estadoNuevo,
 				":id_ganador"    => $idGanador,
 				":goles_creador" => $golesCreador,
 				":goles_rival"   => $golesRival,
@@ -5446,6 +5448,31 @@ class Tcg
 				":k"      => $k,
 				":id_duelo" => $id_duelo,
 			]);
+
+			/* ⚠️ COMPROBAR QUE EL ESTADO SE GUARDÓ DE VERDAD. No es paranoia:
+			   esta base NO corre con STRICT_TRANS_TABLES, así que si a la columna
+			   `estado` le falta el valor 'en_juego' —la migración `019` sin
+			   aplicar— MariaDB **no da error**: TRUNCA a cadena vacía y sigue con
+			   un simple warning, que PDO no convierte en excepción. Medido:
+			   guarda '' y avisa "Data truncated for column 'estado'".
+
+			   Lo que dejaría es lo peor que puede pasar aquí: un duelo con lo
+			   apostado ya retenido a los DOS, en un estado que no existe, que
+			   liquidarPartido() nunca podrá cerrar porque exige `en_juego`. El
+			   bote no volvería a nadie y nada avisaría.
+
+			   Así que se relee y, si no cuadra, se deshace todo. Un duelo que no
+			   arranca y lo dice es infinitamente mejor que uno que se queda con el
+			   dinero. La `021` no necesita esto: una columna que no existe sí da
+			   error y la transacción se deshace sola. */
+			$comprobar = $this->pdo->prepare("SELECT estado FROM duelos WHERE id_duelo = :d");
+			$comprobar->execute([":d" => $id_duelo]);
+			if ($comprobar->fetchColumn() !== $estadoNuevo) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" =>
+					"La base de datos no admite el estado '$estadoNuevo'. "
+					. "Falta aplicar db/migraciones/019_partido_decide.sql."];
+			}
 
 			// Progreso y recompensas de cadena: dentro de la misma transacción
 			// que el resultado, para que no pueda quedar un duelo resuelto

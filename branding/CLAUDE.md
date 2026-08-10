@@ -722,10 +722,26 @@ no se pueden saltar:
 | | qué hace | ¿obligatoria? |
 |---|---|---|
 | `018_penalti.sql` | parámetros del penalti como evento | no, hay valores por defecto |
-| `019_partido_decide.sql` | **añade `en_juego` al enum `estado`** | **SÍ** — sin ella, `resolverDuelo()` no puede guardar el estado y ningún duelo PvP se monta |
+| `019_partido_decide.sql` | **añade `en_juego` al enum `estado`** | **SÍ** — sin ella ningún duelo PvP se monta |
 | `020_minijuego_prob_gol.sql` | `partido_minijuego_prob_gol` | no |
 | `021_resuelto_por_tanda.sql` | **columna `resuelto_por_tanda`** | **SÍ** — la escribe `liquidarPartido()` en cada cierre |
 | `022_presupuesto_marcador.sql` | presupuesto de marcador y plazo de abandono | no, pero sin ella no se calibran |
+
+**La diferencia entre obligatoria y opcional es de qué cambian**, y conviene
+entenderla para clasificar bien las que vengan: las opcionales solo añaden filas a
+`configuracion`, y el código las lee con `$this->config("clave", POR_DEFECTO)`, así
+que sin la migración funciona igual y lo único que pierdes es poder calibrar el
+número sin tocar código. Las obligatorias cambian **la forma de la tabla** —un
+valor de enum, una columna—, y para eso no hay valor por defecto posible: el PHP no
+puede inventarse una columna que no está.
+
+> ⚠️ **`019` sin aplicar NO da un error limpio, y por eso hay una red en el
+> código.** MariaDB aquí no es estricta: guardar un valor que el enum no conoce
+> **trunca a cadena vacía con un simple warning** que PDO no convierte en
+> excepción. `resolverDuelo()` relee el estado y deshace la transacción si no
+> cuadra, devolviendo un error que dice qué migración falta. Sin esa red, el duelo
+> quedaría cobrado a los dos y sin poder cerrarse nunca. Ver la primera trampa del
+> §8.
 
 ```
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/019_partido_decide.sql
@@ -828,6 +844,36 @@ fácil" (cita de folclore, en `partials/footer.php`). No inventes chistes nuevos
 ---
 
 ## 8. Trampas conocidas
+
+### ⚠️ La base de datos NO es estricta: guarda mal y no avisa
+
+**Esta es la trampa más peligrosa del proyecto, porque falla en silencio y con
+dinero dentro.** `sql_mode` aquí es
+`NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION` — **sin
+`STRICT_TRANS_TABLES`**. Consecuencia medida:
+
+```sql
+-- columna: ENUM('creado','resuelto')
+UPDATE prueba SET estado = 'en_juego';
+-- NO da error. Guarda '' (cadena vacía) y deja un Warning 1265,
+-- "Data truncated for column 'estado'", que PDO NO convierte en excepción.
+```
+
+Así que **un valor de ENUM que no existe se traga sin protestar**. Y lo mismo
+pasa con un `VARCHAR` demasiado corto (trunca), o un número fuera de rango (lo
+acota). Solo las columnas que **no existen** dan error de verdad
+(`Unknown column`), y esas sí deshacen la transacción solas.
+
+Por qué importa tanto aquí: si alguien lleva el código a una copia sin la
+migración `019`, `resolverDuelo()` dejaría un duelo **con lo apostado ya retenido
+a los dos**, en un estado que no existe, que `liquidarPartido()` nunca podría
+cerrar porque exige `en_juego`. **El bote no volvería a nadie y nada avisaría.**
+
+**Cómo se protege, y cómo protegerlo si añades algo parecido:** después de
+escribir un valor del que depende el flujo, **reléelo y compáralo**. Está hecho en
+`resolverDuelo()` (§15.10) y devuelve un error que dice *qué migración falta*, con
+prueba propia en una copia a la que se le quita el valor del enum a propósito.
+**No basta con `try/catch`:** un warning no lanza excepción.
 
 ### Entorno
 
