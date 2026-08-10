@@ -2736,6 +2736,44 @@ class Tcg
 	 * Generador determinista [0,1). LCG clásico: da igual que sea de calidad
 	 * estadística mediocre, aquí solo reparte narración, no decide resultados.
 	 */
+	/**
+	 * Valor de azar para UNA jugada concreta: sembrado con el sorteo del duelo y
+	 * adelantado hasta el turno de ese evento.
+	 *
+	 * ⚠️ EXISTE PARA CORREGIR UN MAL USO QUE SE NOTABA JUGANDO. Antes cada sitio
+	 * hacía `azarSembrado(fmod($semilla * K + $id * c, 1))` y cogía su PRIMER
+	 * valor, usando el generador como si fuera una función hash. No lo es: el
+	 * primer valor de un LCG es casi lineal en su estado inicial, así que con el
+	 * sorteo del duelo fijo y el id del evento avanzando a pasos constantes el
+	 * valor avanzaba TAMBIÉN a pasos constantes y el resultado caía en ciclos
+	 * cortos.
+	 *
+	 * Medido en el duelo 1859 (sorteo 0.2025): los eventos 5 y 17 daban 0.073069
+	 * y 0.074081 — semillas muy distintas, valor casi idéntico— y por tanto el
+	 * mismo minijuego dos veces en el mismo partido. La firma del problema es que
+	 * con 5 candidatas la colisión entre eventos CONSECUTIVOS era del 0,0 %:
+	 * imposible, no improbable, que es lo que delata un patrón fijo en vez de un
+	 * reparto.
+	 *
+	 * Un LCG usado EN SECUENCIA sí está bien distribuido, que es para lo que
+	 * sirve. Medido tras el cambio: colisiones al 25,1 % / 20,1 % / 33,4 % para
+	 * 4 / 5 / 3 candidatas, contra el 25 / 20 / 33,3 % teórico.
+	 *
+	 * `$sal` separa unos sorteos de otros (qué minijuego sale, qué remate llega,
+	 * cómo sale el portero…) para que conocer uno no dé información del resto.
+	 *
+	 * NO se toca `generarEventosPartido()`, que saca muchos valores seguidos de
+	 * una sola siembra: ese uso ya era correcto. Por eso el relato de un duelo
+	 * antiguo —minutos, goles, frases— sigue saliendo idéntico; lo único que
+	 * cambia es qué minijuego se ofrece y qué dato oculto toca.
+	 */
+	private static function azarDeJugada($semilla, $idEvento, $sal) {
+		$azar = self::azarSembrado(fmod((float) $semilla * $sal + 0.5, 1));
+		$turnos = max(0, (int) $idEvento);
+		for ($k = 0; $k < $turnos; $k++) $azar();
+		return $azar();
+	}
+
 	private static function azarSembrado($semilla) {
 		$estado = (int) (fmod(abs((float) $semilla), 1.0) * 2147483647);
 		if ($estado <= 0) $estado = 123456789;
@@ -2854,6 +2892,20 @@ class Tcg
 	 * simulación sin poder contradecir nunca al ganador ya sorteado, que es la
 	 * única restricción dura que §1.3 mantiene del sistema anterior.
 	 */
+	/**
+	 * Las dos probabilidades del penalti, leídas de `configuracion` (migración
+	 * `018`). Están aparte porque `generarEventosPartido()` es estático y no
+	 * puede leerlas, así que los dos llamantes las inyectan por $opciones — y
+	 * los dos tienen que pasar lo MISMO: uno narra el partido y el otro lo
+	 * resuelve, y si difirieran el marcador guardado no cuadraría con el relato.
+	 */
+	private function opcionesPenalti() {
+		return [
+			"penalti_prob_gol"   => (float) $this->config("partido_penalti_prob_gol", 0.12),
+			"penalti_prob_fallo" => (float) $this->config("partido_penalti_prob_fallo", 0.018),
+		];
+	}
+
 	public static function generarEventosPartido(array $local, array $visitante, $semilla, array $opciones = []) {
 		$azar       = self::azarSembrado($semilla);
 		$plantillas = require __DIR__ . "/plantillas_narracion.php";
@@ -2869,6 +2921,20 @@ class Tcg
 			"muy_dificil" => 0.60, "extremo" => 0.70,
 		];
 		$ritmoInteractivo = $ritmoPorDificultad[$opciones["dificultad"] ?? ""] ?? 0.45;
+
+		/* Frecuencia del penalti (migración `018`). Llegan por $opciones porque
+		   este método es estático y no puede leer `configuracion` por su cuenta;
+		   los dos llamantes se la pasan. Los valores por defecto son los mismos
+		   que siembra la migración, así que una base sin ella funciona igual. */
+		$probPenaltiGol   = (float) ($opciones["penalti_prob_gol"]   ?? 0.12);
+		$probPenaltiFallo = (float) ($opciones["penalti_prob_fallo"] ?? 0.018);
+
+		/* Conversión de ocasión en gol. Los valores por defecto son los que el
+		   motor tenía escritos a fuego, así que sin pasar nada se comporta igual
+		   que antes. `sens` es el dial del equilibrio cuando el partido decide el
+		   resultado (ver abajo, donde se usa). */
+		$golBase = (float) ($opciones["gol_base"] ?? 0.06);
+		$golSens = (float) ($opciones["gol_sens"] ?? 0.30);
 
 		$bandos = ["local" => $local, "visitante" => $visitante];
 		$porLinea = [];
@@ -2940,11 +3006,18 @@ class Tcg
 		if ($modoNatural) {
 			foreach ($tramos as $i => $t) {
 				if (!$t["ocasion"]) continue;
-				// Conversión acotada: ni una ocasión clarísima es gol seguro, ni
-				// una mala es imposible. Calibrado para dar marcadores con forma
-				// de fútbol (la mayoría 0-3) en vez de los 7-6 de la fórmula
-				// provisional.
-				$pGol = max(0.05, min(0.45, 0.06 + $t["peligro"] * 0.30));
+				/* Conversión acotada: ni una ocasión clarísima es gol seguro, ni
+				   una mala es imposible. Calibrado para dar marcadores con forma
+				   de fútbol (la mayoría 0-3) en vez de los 7-6 de la fórmula
+				   provisional.
+
+				   `sens` (cuánto pesa el peligro de la ocasión) es EL DIAL DEL
+				   EQUILIBRIO cuando el resultado lo decide el partido, y por eso
+				   sale a `configuracion`: cuanto más alto, más manda la fuerza del
+				   mazo y menos opciones tiene el débil. Medido sin tocarlo, un
+				   240 contra 100 pasaba del 69,1 % de la curva Elo al 91,0 %.
+				   Ver branding/impacto-partido-analisis.md. */
+				$pGol = max(0.05, min(0.45, $golBase + $t["peligro"] * $golSens));
 				$tramos[$i]["gol"] = $azar() < $pGol;
 			}
 
@@ -2952,16 +3025,46 @@ class Tcg
 				return count(array_filter($tramos, fn($t) => $t["lado"] === $lado && $t["gol"]));
 			};
 
-			/* Única restricción dura que §1.3 conserva del sistema anterior: la
-			   simulación no puede contradecir al ganador ya sorteado. Se corrige
-			   con el mínimo destrozo posible —ascender la mejor ocasión fallada
-			   del ganador, y solo si no queda ninguna, anular el peor gol del
-			   perdedor— en vez de rehacer el marcador entero. */
-			$gana = ($opciones["gana"] ?? null) === "visitante" ? "visitante" : "local";
+			/* Restricción dura de §1.3 CUANDO el ganador viene ya sorteado: la
+			   simulación no puede contradecirlo. Se corrige con el mínimo destrozo
+			   posible —ascender la mejor ocasión fallada del ganador, y solo si no
+			   queda ninguna, anular el peor gol del perdedor— en vez de rehacer el
+			   marcador entero.
+
+			   SIN `gana` NO SE FUERZA NADA: el marcador natural que acaban de dar
+			   las ocasiones se queda tal cual, y con él pueden salir EMPATES, que
+			   con el ganador pre-sorteado eran imposibles. Es el modo que hace
+			   falta para que el resultado se resuelva a lo largo del partido.
+
+			   Antes esta línea era `... ?? null) === "visitante" ? "visitante" :
+			   "local"`, así que un llamante que olvidara pasar `gana` hacía ganar
+			   al local en silencio. Ahora la ausencia significa lo que parece. */
+			$gana = null;
+			if (($opciones["gana"] ?? null) !== null) {
+				$gana = $opciones["gana"] === "visitante" ? "visitante" : "local";
+			}
 			$pierde = $gana === "local" ? "visitante" : "local";
 
+			/* POR CUÁNTO debe ganar. Antes era siempre "por uno", y eso aplanaba el
+			   partido: medido, el 88,8 % de los duelos acababa con un gol de
+			   margen, cuando el reparto NATURAL de la simulación es sano (margen 0
+			   el 36 %, 1 el 44,8 %, 2 el 15,1 %, 3 el 3,5 %). El bucle se lo comía
+			   entero, y de paso INFLABA el marcador un 60 % (1,53 → 2,47 goles por
+			   partido) ascendiendo ocasiones hasta que el ganador se ponía delante.
+
+			   Ahora se conserva la FORMA del partido que la simulación había
+			   producido: si naturalmente iba a ser un 3-1, acaba 3-1 aunque haya que
+			   dárselo al otro. Solo los empates naturales tienen que romperse, y
+			   esos sí pasan a margen 1, que es el mínimo destrozo de verdad.
+
+			   Sigue siendo la restricción dura de §1.3 —el ganador del sorteo acaba
+			   con más goles—, solo que sin cobrarse la variedad por el camino. */
+			$margenNatural = $gana === null ? 0 : abs($cuenta($gana) - $cuenta($pierde));
+			$margenObjetivo = max(1, $margenNatural);
+
 			$vueltas = 0;
-			while ($cuenta($gana) <= $cuenta($pierde) && $vueltas++ < 60) {
+			while ($gana !== null && ($cuenta($gana) - $cuenta($pierde)) < $margenObjetivo
+			       && $vueltas++ < 60) {
 				// 1º ascender la mejor ocasión que el ganador ya falló
 				$candidatos = array_keys(array_filter(
 					$tramos, fn($t) => $t["lado"] === $gana && $t["ocasion"] && !$t["gol"]
@@ -3129,6 +3232,55 @@ class Tcg
 					"interactivo" => $azar() < $ritmoInteractivo,
 				];
 
+				/* PENALTI. Una de cada veinticinco ocasiones se convierte en pena
+				   máxima: da ~0,2 por partido, que es la frecuencia real del
+				   fútbol y la que la Biblia pide para lo memorable ("construido
+				   para ser memorable antes que frecuente", §2.4).
+
+				   Lo importante del diseño: NO es un tipo de evento nuevo. Se
+				   emite con los tipos `gol` / `parada` / `tiro_fuera` de siempre
+				   y lo único propio es la FAMILIA (`penalti`) y las frases. Así
+				   el marcador sigue naciendo del sorteo, el presupuesto de §15.5
+				   sigue contando igual, $tieneSentido no se toca y los minijuegos
+				   de penalti se enganchan por familia como cualquier otro. Es el
+				   mismo truco que ya usaba `gol_asistido`: la clave de la frase y
+				   el tipo del evento no tienen por qué coincidir. */
+				/* El sesgo hacia las ocasiones que YA eran gol es lo que hace que un
+				   penalti se sienta como un penalti. Sin él salía marcado solo el
+				   29 % de las veces —en el fútbol real es el ~78 %— y la pena
+				   máxima se leía como una moneda al aire que casi siempre falla.
+
+				   Y no toca el marcador ni el ganador: el desenlace de cada ocasión
+				   ya viene decidido por el sorteo (§15.1, la narración es una capa
+				   ENCIMA del resultado). Lo único que se elige aquí es a cuál de
+				   esas ocasiones ya resueltas se le pone el traje de penalti.
+				   Una sola tirada en las dos ramas, para no desplazar el resto del
+				   sorteo según el camino.
+
+				   Las dos probabilidades son CALIBRABLES (§5.4, migración `018`)
+				   porque hay un equilibrio real que decidir: un penalti marcado da
+				   la decisión al que defiende y uno fallado al que ataca, así que
+				   cuanto más realista es el acierto, menos aparece El Momento de la
+				   Verdad. Ese trato es de Alejandro, no del código. */
+				$esPenalti = $azar() < ($tramo["gol"] ? $probPenaltiGol : $probPenaltiFallo);
+				if ($esPenalti) {
+					/* Un penalti ES una falta, y hay que contarla: las frases dicen
+					   "falta dentro del área" y "mano en el área", así que sin esto
+					   el relato hablaba de una infracción que las estadísticas del
+					   partido no registraban nunca. La comete el que defiende. */
+					$stats[$contOc]["faltas"]++;
+
+					/* Se señala aparte de la ejecución para que el relato tenga el
+					   latido de un penalti: primero la pena máxima, luego el tiro.
+
+					   Va como `contexto` y NO como `falta` a propósito: el tipo
+					   `falta` lleva familia `balon_parado`, así que la señalización
+					   se convertiría en candidata de los minijuegos de balón parado
+					   y le ofrecería al jugador "¿por dónde pasas la barrera?" sobre
+					   un penalti. `contexto` no trae familia y se excluye solo. */
+					$añadir($m, "contexto", $frase("penalti_senalado", $vars), $ladoOc);
+				}
+
 				if ($tramo["gol"]) {
 					$marcador[$ladoOc]++;
 					$stats[$ladoOc]["a_puerta"]++;
@@ -3136,9 +3288,33 @@ class Tcg
 					// "X asiste a X" se lee como un fallo, no como una jugada.
 					$tipo = ($asiste !== $jugador && $azar() < 0.55) ? "gol_asistido" : "gol";
 					$empujarMomentum($ladoOc, 40.0);   // un gol pesa más que una ocasión
-					$añadir($m, "gol", $frase($tipo, $vars), $ladoOc,
+					$añadir($m, "gol", $frase($esPenalti ? "penalti_gol" : $tipo, $vars), $ladoOc,
 						$gancho + ["destacado" => true,
-						           "familia" => "disparo", "familia_def" => "porteria"]);
+						           "familia" => $esPenalti ? "penalti" : "disparo",
+						           "familia_def" => $esPenalti ? "penalti" : "porteria"]);
+				} elseif ($esPenalti) {
+					/* Penalti fallado. Se reparte entre parada y fuera para que el
+					   atacante reciba su minijuego en los dos casos (los dos son
+					   `tipo !== "gol"`), y el relato no repita siempre "lo paró". */
+					if ($azar() < 0.7) {
+						$stats[$ladoOc]["a_puerta"]++;
+						$stats[$contOc]["paradas"]++;
+						/* `familia_def` en NULL a propósito: en un penalti ya parado
+						   no queda nada que defender. Con la familia puesta, quien
+						   defendía recibía "elige dónde esperarle" sobre una pena
+						   máxima que su portero acababa de sacar, y encima gastaba
+						   una de sus dos decisiones sin poder mover nada, porque
+						   descontarGolRival() solo actúa sobre `tipo === "gol"`.
+						   El verificador no lo caza: comprueba que una entrada
+						   LLEGUE, no que sirva de algo cuando llega. */
+						$añadir($m, "parada", $frase("penalti_parado", $vars), $ladoOc,
+							$gancho + ["destacado" => true,
+							           "familia" => "penalti", "familia_def" => null]);
+					} else {
+						$añadir($m, "tiro_fuera", $frase("penalti_fuera", $vars), $ladoOc,
+							$gancho + ["destacado" => true,
+							           "familia" => "penalti", "familia_def" => null]);
+					}
 				} else {
 					$dado = $azar();
 					if ($dado < 0.34) {
@@ -3170,10 +3346,24 @@ class Tcg
 				$stats[$contra]["faltas"]++;
 				if ($azar() < 0.22) {
 					$stats[$contra]["tarjetas"]++;
-					// La tarjeta es del que la ve, pero la falta la sufre el que
-					// atacaba: el balón parado resultante es SUYO.
+					/* La tarjeta es del que la ve, pero la falta la sufre el que
+					   atacaba: el balón parado resultante es SUYO.
+
+					   Los protagonistas viajan también aquí, y eso es lo que abre
+					   la familia `arbitro` (§15.4). Antes se calculaban dos líneas
+					   más arriba y se tiraban solo en esta rama, así que el hueco
+					   llegaba —304 de cada 600 partidos— pero era inservible: sin
+					   protagonistas el dato oculto caía siempre en su valor por
+					   defecto y una opción ganaba el 100 % de las tarjetas.
+
+					   OJO al reparto, que aquí está del revés respecto al resto
+					   del motor: `jugador` es del equipo que SUFRE la falta y
+					   `defensa` el que la comete y ve la tarjeta, mientras que el
+					   `lado` del evento es el SANCIONADO. Es la razón de que
+					   `reaccion_rival` exista como cuarto dato oculto. */
 					$añadir($m, "tarjeta", $frase("tarjeta", $vars), $contra,
-						["familia" => "arbitro", "interactivo" => false]);
+						["familia" => "arbitro", "interactivo" => false,
+						 "protagonistas" => ["jugador" => $jugador, "defensa" => $defensa]]);
 				} else {
 					$añadir($m, "falta", $frase("falta", $vars), $lado,
 						["familia" => "balon_parado", "interactivo" => $azar() < $ritmoInteractivo,
@@ -3260,6 +3450,29 @@ class Tcg
 	 * ofrece decisión. Solo las ocasiones marcadas como interactivas por el
 	 * motor son candidatas (§1.5 regla 3: nunca todas).
 	 */
+	/**
+	 * Vocabulario de la primitiva "zona" (Biblia §2.1, clic-en-zona): qué huecos
+	 * tiene cada lienzo. Es fuente única de verdad para tres sitios que TIENEN
+	 * que coincidir o la zona se pinta fuera del mapa:
+	 *   · el catálogo, que declara `lienzo` y la `zona` de cada opción,
+	 *   · el verificador, que comprueba que la zona existe en ese lienzo,
+	 *   · el CSS, cuyas `grid-template-areas` usan literalmente estos nombres.
+	 *
+	 * Si añades un hueco aquí, añádelo también a la plantilla del lienzo en
+	 * layout.css: el cliente pone `grid-area` con el nombre tal cual, así que un
+	 * nombre que el CSS no conozca deja la zona colocada automáticamente y el
+	 * mapa se descuadra sin avisar.
+	 */
+	const LIENZOS_ZONA = [
+		// El marco de la portería visto de frente: dos alturas por tres palos.
+		"porteria" => ["escuadra_izq", "centro_alto", "escuadra_der",
+		               "raso_izq", "centro_bajo", "raso_der"],
+		// El área vista desde arriba, con la frontal por detrás del punto.
+		"area"     => ["primer_palo", "punto_penalti", "segundo_palo", "frontal"],
+		// El último tercio visto desde arriba: bandas y centro.
+		"campo"    => ["banda_izq", "centro", "banda_der"],
+	];
+
 	public static function minijuegoDeEvento(array $evento, $defiendo = false, $semilla = 0.0) {
 		if (empty($evento["interactivo"])) return null;
 		/* La familia depende del LADO desde el que se mire la misma jugada: un
@@ -3298,10 +3511,10 @@ class Tcg
 		   opción eligió, y resolverMinijuegoDuelo() vuelve a preguntar por este
 		   camino qué minijuego era. Si aquí hubiera azar real, el servidor
 		   podría recalcular una entrada distinta a la que se jugó.
-		   Multiplicador propio (3313) para no correlacionar QUÉ minijuego sale
-		   con el dato oculto que se sortea después con 7919 / 4409 / 6271. */
-		$azar = self::azarSembrado(fmod($semilla * 3313 + ($evento["id"] ?? 0) * 0.029, 1));
-		return $candidatos[(int) floor($azar() * count($candidatos)) % count($candidatos)];
+		   Sal propia (3313) para no correlacionar QUÉ minijuego sale con el dato
+		   oculto que se sortea después con 7919 / 4409 / 6271 / 5147. */
+		$v = self::azarDeJugada($semilla, $evento["id"] ?? 0, 3313);
+		return $candidatos[(int) floor($v * count($candidatos)) % count($candidatos)];
 	}
 
 	/**
@@ -3333,8 +3546,9 @@ class Tcg
 			"espera" => 1.0,
 		];
 
-		$azar = self::azarSembrado(fmod($semilla * 4409 + $evento["id"] * 0.021, 1));
-		$corte = $azar() * array_sum($pesos);
+		// Un solo valor, ya bien mezclado (ver azarDeJugada).
+		$corteAzar = self::azarDeJugada($semilla, $evento["id"], 4409);
+		$corte = $corteAzar * array_sum($pesos);
 		foreach ($pesos as $tipo => $peso) {
 			$corte -= $peso;
 			if ($corte <= 0) return $tipo;
@@ -3378,8 +3592,9 @@ class Tcg
 			"salta"   => 1.0,
 		];
 
-		$azar = self::azarSembrado(fmod($semilla * 6271 + $evento["id"] * 0.017, 1));
-		$corte = $azar() * array_sum($pesos);
+		// Un solo valor, ya bien mezclado (ver azarDeJugada).
+		$corteAzar = self::azarDeJugada($semilla, $evento["id"], 6271);
+		$corte = $corteAzar * array_sum($pesos);
 		foreach ($pesos as $tipo => $peso) {
 			$corte -= $peso;
 			if ($corte <= 0) return $tipo;
@@ -3409,16 +3624,100 @@ class Tcg
 	}
 
 	/**
-	 * ¿El dato oculto lo pone el equipo que DEFIENDE la jugada?
+	 * Cómo se toma el rival la falta que le acabas de hacer. CUARTO dato oculto,
+	 * y el que abre la familia `arbitro` entera (Biblia §2.4).
+	 *
+	 * Se lee del JUGADOR QUE SUFRE LA FALTA, que está en la alineación CONTRARIA
+	 * a la del evento: en un evento de tarjeta el `lado` es el equipo SANCIONADO
+	 * —el que recibe la decisión—, así que el que está en el suelo es su rival.
+	 *
+	 * Esa inversión es exactamente la razón por la que hacía falta un dato nuevo
+	 * en vez de reutilizar uno de los tres anteriores: los tres leen al equipo
+	 * que defiende una jugada, y en una tarjeta no hay jugada que defender. Con
+	 * `colocacion_defensa` el lector habría buscado a `protagonistas.defensa`,
+	 * que aquí es TU propio amonestado, en la alineación equivocada — no lo
+	 * habría encontrado nunca y habría devuelto siempre su valor por defecto,
+	 * dejando una opción ganando el 100 % de las tarjetas.
+	 *
+	 * Tampoco se lee tu propio amonestado a propósito: tu alineación la ves
+	 * entera, así que "adivinar" algo de tus cartas no sería adivinar nada.
+	 */
+	public static function reaccionRivalDeJugada(array $evento, array $cartasRival, $semilla) {
+		$nombre = $evento["protagonistas"]["jugador"] ?? null;
+		$carta = null;
+		foreach ($cartasRival as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "sigue";
+
+		// Mucha Técnica lo alarga en el suelo; mucho Ataque se levanta a por el
+		// árbitro. Mismo esquema relativo y centrado que los otros tres datos.
+		$perfil = fn($c) => ((float) ($c["tecnica"] ?? 0) + (float) ($c["ataque"] ?? 0)) > 0
+			? ((float) $c["tecnica"] - (float) $c["ataque"]) / ((float) $c["tecnica"] + (float) $c["ataque"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasRival);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		$k = 3.0;
+		$pesos = [
+			"teatro"   => max(0.05, 1 + $k * $desvio),
+			"protesta" => max(0.05, 1 - $k * $desvio),
+			"sigue"    => 1.0,
+		];
+
+		// Multiplicador propio (5147), sin repetir los de los otros datos ni el
+		// de la elección de minijuego: si compartieran semilla, saber uno daría
+		// información del otro.
+		// Un solo valor, ya bien mezclado (ver azarDeJugada).
+		$corteAzar = self::azarDeJugada($semilla, $evento["id"], 5147);
+		$corte = $corteAzar * array_sum($pesos);
+		foreach ($pesos as $tipo => $peso) {
+			$corte -= $peso;
+			if ($corte <= 0) return $tipo;
+		}
+		return "sigue";
+	}
+
+	/** Pista sobre el rival que está en el suelo: espejo de pistaRemate(). */
+	public static function pistaReaccionRival(array $evento, array $cartasRival) {
+		$nombre = $evento["protagonistas"]["jugador"] ?? null;
+		$carta = null;
+		foreach ($cartasRival as $c) {
+			if ($c["nombre"] === $nombre) { $carta = $c; break; }
+		}
+		if (!$carta) return "No sabes de qué pie calza.";
+
+		$perfil = fn($c) => ((float) ($c["tecnica"] ?? 0) + (float) ($c["ataque"] ?? 0)) > 0
+			? ((float) $c["tecnica"] - (float) $c["ataque"]) / ((float) $c["tecnica"] + (float) $c["ataque"])
+			: 0.0;
+		$medias = array_map($perfil, $cartasRival);
+		$media  = $medias ? array_sum($medias) / count($medias) : 0.0;
+		$desvio = $perfil($carta) - $media;
+
+		if ($desvio > 0.02)  return $carta["nombre"] . " es de los que lo alargan en el suelo.";
+		if ($desvio < -0.02) return $carta["nombre"] . " se va a ir a por el árbitro.";
+		return $carta["nombre"] . " no suele hacer aspavientos.";
+	}
+
+	/**
+	 * ¿El dato oculto lo pone el equipo CONTRARIO al del evento?
 	 *
 	 * Fuente única de verdad para saber de qué alineación hay que sacar las
 	 * cartas. La usan resolverMinijuegoDuelo() (para calcular el dato) y
 	 * narracionDuelo() (para calcular la pista), y tienen que coincidir: si una
 	 * mirase la alineación equivocada, la pista hablaría de una carta y el
 	 * sorteo saldría de otra.
+	 *
+	 * El nombre habla de "el defensor" porque los tres primeros datos ocultos
+	 * leían siempre a quien defendía la jugada. Con `reaccion_rival` eso dejó de
+	 * ser literal —ahí se lee al rival que sufre la falta, que es quien ATACABA—,
+	 * pero la pregunta que responde la función es la misma y no ha cambiado: ¿hay
+	 * que mirar la alineación de enfrente del `lado` del evento?
 	 */
 	public static function datoOcultoLoPoneElDefensor(array $minijuego) {
-		return in_array($minijuego["oculto"] ?? "remate", ["estilo_portero", "colocacion_defensa"], true);
+		return in_array($minijuego["oculto"] ?? "remate",
+			["estilo_portero", "colocacion_defensa", "reaccion_rival"], true);
 	}
 
 	/** El dato oculto que hay que adivinar, según lo que declare el catálogo. */
@@ -3426,6 +3725,7 @@ class Tcg
 		switch ($minijuego["oculto"] ?? "remate") {
 			case "estilo_portero":     return self::estiloPorteroDeJugada($evento, $cartas, $semilla);
 			case "colocacion_defensa": return self::estiloDefensaDeJugada($evento, $cartas, $semilla);
+			case "reaccion_rival":     return self::reaccionRivalDeJugada($evento, $cartas, $semilla);
 			default:                   return self::remateDeJugada($evento, $cartas, $semilla);
 		}
 	}
@@ -3435,6 +3735,7 @@ class Tcg
 		switch ($minijuego["oculto"] ?? "remate") {
 			case "estilo_portero":     return self::pistaPortero($evento, $cartas);
 			case "colocacion_defensa": return self::pistaDefensa($evento, $cartas);
+			case "reaccion_rival":     return self::pistaReaccionRival($evento, $cartas);
 			default:                   return self::pistaRemate($evento, $cartas);
 		}
 	}
@@ -3515,8 +3816,9 @@ class Tcg
 
 		// El id del evento entra en la semilla: dos ocasiones del mismo
 		// rematador en el mismo partido no tienen por qué salir iguales.
-		$azar = self::azarSembrado(fmod($semilla * 7919 + $evento["id"] * 0.013, 1));
-		$corte = $azar() * array_sum($pesos);
+		// Un solo valor, ya bien mezclado (ver azarDeJugada).
+		$corteAzar = self::azarDeJugada($semilla, $evento["id"], 7919);
+		$corte = $corteAzar * array_sum($pesos);
 		foreach ($pesos as $tipo => $peso) {
 			$corte -= $peso;
 			if ($corte <= 0) return $tipo;
@@ -3574,6 +3876,98 @@ class Tcg
 		if ($desvio > 0.02)  return $carta["nombre"] . " pega más fuerte que sus compañeros.";
 		if ($desvio < -0.02) return $carta["nombre"] . " es de los que la colocan.";
 		return $carta["nombre"] . " no tiene un remate marcado.";
+	}
+
+	/**
+	 * Elige QUÉ jugadas de un partido llevan decisión, repartidas a lo largo del
+	 * encuentro en vez de dárselas a las primeras que valgan.
+	 *
+	 * El problema que resuelve, medido y no supuesto: al abrir los huecos
+	 * defensivos (v7.3) las candidatas tempranas se multiplicaron, y coger las
+	 * primeras gastaba el techo en los primeros minutos —minuto mediano 10',
+	 * última decisión en el 17', 88 % antes del 30'—. El partido se quedaba
+	 * plano el resto del tiempo y repetía siempre el mismo tipo de jugada,
+	 * porque las frecuentes al principio son siempre las mismas.
+	 *
+	 * Cómo reparte: divide el partido en tantas ventanas iguales como decisiones
+	 * quepan y coge una de cada ventana. Dentro de una ventana prefiere las que
+	 * PUEDEN mover el marcador; las de impacto "ninguno" solo entran si queda
+	 * cupo (§15.5). Las ventanas que se quedan vacías se rellenan al final con
+	 * las candidatas que sobren, para no perder una decisión por un reparto
+	 * desafortunado de los eventos.
+	 *
+	 * DETERMINISTA de principio a fin, y no es un detalle: resolverMinijuegoDuelo()
+	 * vuelve a llamar a narracionDuelo() para recalcular qué se jugó, así que con
+	 * azar real aquí el servidor podría elegir una jugada distinta a la que el
+	 * jugador tenía delante.
+	 *
+	 * @param array $candidatas  [["i"=>indice, "minuto"=>int, "mueve"=>bool], ...]
+	 * @return array             [indice_de_evento => true]
+	 */
+	private static function repartirDecisiones(array $candidatas, $max, $maxSinImpacto, $minutos, $semilla) {
+		if (!$candidatas || $max <= 0) return [];
+
+		$minutos = max(1, (int) $minutos);
+		// Multiplicador propio, sin repetir los de los datos ocultos ni el de la
+		// elección de minijuego: el reparto no debe correlacionar con ellos.
+		$azar = self::azarSembrado(fmod($semilla * 7717 + 0.137, 1));
+
+		$elegidas = [];
+		$usadas = [];
+		$yaVistas = [];      // claves de minijuego ya repartidas en este partido
+		$sinImpacto = 0;
+
+		// Coge una candidata de $pool, sin azar global y de forma reproducible.
+		$coger = function (array $pool) use (&$usadas, &$yaVistas, &$sinImpacto, &$elegidas, $candidatas, $azar) {
+			// Dentro de la ventana manda la que puede mover el marcador.
+			$conImpacto = array_filter($pool, fn($c) => $c["mueve"]);
+			if ($conImpacto) $pool = $conImpacto;
+
+			/* Y entre esas, las que NO repiten un minijuego ya visto en este
+			   partido. Con el reparto ya arreglado repetir es una colisión
+			   legítima (1/n), pero se sigue notando: con cinco variantes
+			   disponibles, jugar dos veces la misma en el mismo encuentro es
+			   justo lo que §1.5 regla 6 quiere evitar. Si TODAS repiten se coge
+			   igual — antes repetir que quedarse sin decisión. */
+			$frescas = array_filter($pool, fn($c) => !isset($yaVistas[$c["clave"]]));
+			if ($frescas) $pool = $frescas;
+
+			$claves = array_keys($pool);
+			$k = $claves[(int) floor($azar() * count($claves)) % count($claves)];
+			$usadas[$k] = true;
+			$yaVistas[$candidatas[$k]["clave"]] = true;
+			if (!$candidatas[$k]["mueve"]) $sinImpacto++;
+			$elegidas[$candidatas[$k]["i"]] = true;
+		};
+
+		$disponible = function ($k, $c) use (&$usadas, &$sinImpacto, $maxSinImpacto) {
+			if (isset($usadas[$k])) return false;
+			return $c["mueve"] || $sinImpacto < $maxSinImpacto;
+		};
+
+		// Una por ventana.
+		for ($v = 0; $v < $max; $v++) {
+			$desde = ($v * $minutos) / $max;
+			$hasta = (($v + 1) * $minutos) / $max;
+
+			$pool = [];
+			foreach ($candidatas as $k => $c) {
+				if (!$disponible($k, $c)) continue;
+				if ($c["minuto"] < $desde || $c["minuto"] >= $hasta) continue;
+				$pool[$k] = $c;
+			}
+			if ($pool) $coger($pool);
+		}
+
+		// Ventanas vacías: se rellena con lo que sobre, en orden cronológico, para
+		// no dejar sin decisión a quien tuvo los eventos mal repartidos.
+		foreach ($candidatas as $k => $c) {
+			if (count($elegidas) >= $max) break;
+			if (!$disponible($k, $c)) continue;
+			$coger([$k => $c]);
+		}
+
+		return $elegidas;
 	}
 
 	/** La opción que se aplica sola si no se decide a tiempo (§1.5 regla 4). */
@@ -4003,7 +4397,12 @@ class Tcg
 		}
 
 		$parado = false;
-		if ($resultado === "acierto") {
+		/* El marcador solo se mueve si la ENTRADA lo declara (impacto "jugada").
+		   Una decisión disciplinaria o una defensa sobre una jugada que no era
+		   gol no tiene ningún gol que quitar ni que sumar: cuenta para la
+		   puntuación de actuación (§4.6) y ahí se queda. Hasta ahora esta clave
+		   no la leía nadie y el marcador se movía por `lado` a secas. */
+		if ($resultado === "acierto" && ($minijuego["impacto"] ?? "jugada") === "jugada") {
 			// Defendiendo se le quita un gol al rival; atacando me sumo uno.
 			$parado = ($minijuego["lado"] ?? "defiendo") === "defiendo"
 				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario))
@@ -4168,7 +4567,7 @@ class Tcg
 			["nombre" => $duelo["rival"], "fuerza" => self::fuerzaAlineacion($cartasR, $formR),
 			 "cartas" => $cartasR, "formacion" => $formR, "goles" => (int) $duelo["goles_rival"]],
 			(float) $duelo["valor_sorteo"],
-			["dificultad" => $duelo["dificultad"]]
+			["dificultad" => $duelo["dificultad"]] + $this->opcionesPenalti()
 		);
 
 		/* Las jugadas paradas dejan de ser gol y el marcador que arrastra cada
@@ -4232,7 +4631,108 @@ class Tcg
 		$ofrecidos = 0;
 		$MAX_OFRECIDOS = max(1, (int) $this->config("partido_minijuegos_max", 2));
 
-		foreach ($sim["eventos"] as &$e) {
+		/* Cuántas de esas decisiones pueden ser de impacto "ninguno" — las que
+		   no pueden mover el marcador (familia árbitro y las defensivas sobre
+		   jugadas que ya acabaron sin gol).
+
+		   Hace falta un tope PROPIO porque al abrir los tres huecos defensivos
+		   nuevos esas decisiones pasaron a ser mayoría de las candidatas, y
+		   quien cobrara las dos se quedaba sin poder tocar el resultado: el
+		   mismo problema que §15.5 arregló en su día por el otro lado ("quien
+		   perdía por un gol se quedaba con cero decisiones").
+
+		   No sube el número de PAUSAS, que es el coste de ritmo real: el total
+		   sigue siendo partido_minijuegos_max. Solo acota cuántas de ellas
+		   pueden ser irrelevantes para el marcador. */
+		$MAX_SIN_IMPACTO = max(0, (int) $this->config("partido_minijuegos_sin_impacto_max", 1));
+
+		/* ---------------------------------------------------------------
+		   IMPACTO "partido": lo que arrastra de las decisiones YA JUGADAS
+
+		   Es la tercera clase de impacto (§15.4b) y la que la Biblia pide para
+		   sus entradas de ritmo y moral. Lo que la hace posible sin mover la
+		   resolución del duelo —decisión de Alejandro tras medirlo, ver
+		   branding/impacto-partido-analisis.md— es que el efecto NO toca el
+		   desenlace de ninguna jugada: **amplía el presupuesto** con el que las
+		   jugadas siguientes pueden mover el marcador, o da una decisión más.
+
+		   Por qué eso es seguro: el presupuesto sigue pasando por
+		   cabeCambioMarcador(), así que un efecto de partido puede darte más
+		   oportunidades pero NUNCA puede contradecir al ganador (§1.3).
+
+		   Y por qué solo puede CONCEDER: resolverMinijuego() no castiga elegir
+		   mal —"el minijuego solo puede mejorar tu partido, nunca empeorarlo,
+		   así que ofrecerlo jamás es una trampa"—. Esa regla deja fuera del
+		   motor a la familia de Decisiones Negativas de la Biblia, donde una
+		   rama "solo puede salir peor". No es un olvido: es esa regla.
+
+		   Se reconstruye de las filas guardadas en cada sondeo, así que los dos
+		   jugadores ven lo mismo y sobrevive a recargar la página. */
+		$resueltos = $this->minijuegosResueltos($id_duelo);
+		$decisionesExtra = 0;
+		foreach ($resueltos as $fila) {
+			if ((int) $fila["id_usuario"] !== (int) $id_usuario) continue;
+			if ($fila["resultado"] !== "acierto") continue;
+
+			$entrada = self::catalogoMinijuegos()[$fila["minijuego"]] ?? null;
+			if (!$entrada || ($entrada["impacto"] ?? "jugada") !== "partido") continue;
+
+			switch ($entrada["efecto"] ?? null) {
+				case "presupuesto_gol":    $golesLibres++;    break;
+				case "presupuesto_parada": $paradasLibres++;  break;
+				case "decision":           $decisionesExtra++; break;
+			}
+		}
+		// El techo de decisiones puede crecer, pero con tope: cada decisión para
+		// el reloj de los DOS, y §15.5 midió que seis pausas hacen el partido
+		// eterno. Una más como mucho.
+		$MAX_OFRECIDOS += min(1, $decisionesExtra);
+
+		/* ---------------------------------------------------------------
+		   QUÉ JUGADAS LLEVAN DECISIÓN — se reparten por el partido
+
+		   Antes se ofrecían las PRIMERAS jugadas que valían. Con los huecos
+		   defensivos abiertos (v7.3) eso se volvió un defecto medible: las
+		   candidatas tempranas se multiplicaron y el techo se gastaba enseguida
+		   —minuto mediano 10', última decisión del partido en el 17', 88 % de
+		   ellas antes del 30'—, así que el encuentro se quedaba plano durante
+		   más de una hora de juego y encima repetía el mismo tipo de jugada,
+		   porque las frecuentes al principio son siempre las mismas. Se notaba
+		   como "me sale siempre el mismo minijuego".
+
+		   La lista de eventos ya está completa aquí, así que en vez de ir
+		   cogiendo las primeras se ELIGE repartiendo por ventanas iguales del
+		   encuentro. Sigue siendo función pura de la lista y del sorteo del
+		   duelo, que es obligatorio: resolverMinijuegoDuelo() vuelve a pasar por
+		   aquí para recalcular qué minijuego se jugó, y si esto tuviera azar real
+		   podría recalcular otro distinto.
+		   --------------------------------------------------------------- */
+		$candidatas = [];
+		foreach ($sim["eventos"] as $i => $ev) {
+			if ($ev["lado"] === null) continue;
+			$defiende = (($ev["lado"] === $miLado) === false);
+			$vale = $defiende ? !empty($ev["familia_def"]) : ($ev["tipo"] !== "gol");
+			if (!$vale) continue;
+
+			// Copia local: minijuegoDeEvento() exige el evento ya interactivo.
+			$ev["interactivo"] = true;
+			$mjCand = self::minijuegoDeEvento($ev, $defiende, (float) $duelo["valor_sorteo"]);
+			if (!$mjCand) continue;
+
+			$candidatas[] = [
+				"i"      => $i,
+				"minuto" => (int) $ev["minuto"],
+				"mueve"  => (($mjCand["impacto"] ?? "jugada") === "jugada"),
+				"clave"  => $mjCand["clave"],
+			];
+		}
+
+		$elegidas = self::repartirDecisiones(
+			$candidatas, $MAX_OFRECIDOS, $MAX_SIN_IMPACTO,
+			(int) ($sim["minutos"] ?? 90), (float) $duelo["valor_sorteo"]
+		);
+
+		foreach ($sim["eventos"] as $i => &$e) {
 			$e["mio"] = $e["lado"] === null ? null : ($e["lado"] === $miLado);
 			$e["marcador"] = $soyCreador ? $e["marcador"] : [$e["marcador"][1], $e["marcador"][0]];
 			$e["momentum"] = $soyCreador ? $e["momentum"] : -$e["momentum"];
@@ -4263,30 +4763,75 @@ class Tcg
 
 			   Quien decide de verdad si el marcador se mueve es la base de datos
 			   —la condición de §1.3 va dentro del UPDATE—, no este flag. */
-			$tieneSentido = $defiendo ? ($e["tipo"] === "gol") : ($e["tipo"] !== "gol");
-			if (!$tieneSentido || $ofrecidos >= $MAX_OFRECIDOS) { $e["interactivo"] = false; continue; }
+			/* DEFENDER YA NO EXIGE UN GOL. Antes la condición era `tipo === "gol"`,
+			   y eso dejaba las familias `defensa` y `balon_parado` defensivas en
+			   CERO huecos: un gol siempre es familia_def "porteria", así que no
+			   había forma de que llegaran. Se daban por "baratas de empezar" y en
+			   realidad eran inalcanzables.
+
+			   Ahora defender tiene sentido en cualquier jugada del rival que
+			   traiga `familia_def`, que son exactamente cuatro: el gol (porteria),
+			   la parada de tu portero (porteria), el despeje de tu defensa
+			   (defensa) y el córner que te han sacado (balon_parado). Las demás se
+			   excluyen solas porque minijuegoDeEvento() no encuentra familia:
+			   `tiro_fuera` la trae en null y `falta` no la trae.
+
+			   Las tres nuevas NO pueden mover el marcador —no hay gol que quitar
+			   en una jugada que ya acabó sin gol—, así que van con impacto
+			   "ninguno" y suman solo a la actuación. Para que eso no le robe el
+			   sitio a las que sí cuentan, hay un tope aparte más abajo. */
+			/* Quién lleva decisión ya lo decidió repartirDecisiones() más arriba,
+			   con los dos techos aplicados. Aquí solo se consulta: así el filtro
+			   de "qué jugada vale" vive en UN sitio y no en dos que se pueden
+			   desincronizar. */
+			if (!isset($elegidas[$i])) { $e["interactivo"] = false; continue; }
 
 			// Se marca ANTES de preguntar por el minijuego: minijuegoDeEvento()
-			// exige que el evento ya sea interactivo, y quien decide eso aquí es
-			// el criterio de arriba, no el dado del ritmo que trae el motor.
+			// exige que el evento ya sea interactivo.
 			$e["interactivo"] = true;
 			$mj = self::minijuegoDeEvento($e, $defiendo, (float) $duelo["valor_sorteo"]);
 			if (!$mj) { $e["interactivo"] = false; continue; }
 
-			$ofrecidos++;
-			$cambiaMarcador = $defiendo ? ($paradasLibres > 0) : ($golesLibres > 0);
+			/* Solo las entradas de impacto "jugada" pueden tocar el marcador, y
+			   por tanto solo ellas gastan presupuesto. Antes esta clave estaba
+			   declarada en el catálogo pero NO la leía nadie —las tres menciones
+			   en este fichero eran comentarios—, así que una entrada disciplinaria
+			   o defensiva sin gol que quitar habría movido el marcador igual y
+			   habría consumido margen que le hacía falta a la siguiente jugada. */
+			$mueveMarcador = (($mj["impacto"] ?? "jugada") === "jugada");
+
+			$cambiaMarcador = $mueveMarcador
+				&& ($defiendo ? ($paradasLibres > 0) : ($golesLibres > 0));
 			if ($cambiaMarcador) { $defiendo ? $paradasLibres-- : $golesLibres--; }
 
-			$plazo = $mj["plazo"][$duelo["dificultad"] ?? "pvp"] ?? $mj["plazo"]["pvp"] ?? 9;
+			$dificultad = $duelo["dificultad"] ?? "pvp";
+			$plazo = $mj["plazo"][$dificultad] ?? $mj["plazo"]["pvp"] ?? 9;
+
+			/* Los nombres se sustituyen en el TÍTULO además del enunciado. Antes
+			   solo en el enunciado, y una entrada con un nombre en el título
+			   habría enseñado el marcador crudo "{defensa}" en pantalla. */
+			$nombres = [
+				"{jugador}" => $e["protagonistas"]["jugador"] ?? "El rival",
+				"{portero}" => $e["protagonistas"]["portero"] ?? "tu portero",
+				"{defensa}" => $e["protagonistas"]["defensa"] ?? "la defensa",
+				"{asiste}"  => $e["protagonistas"]["asiste"]  ?? "un compañero",
+			];
+
 			$e["minijuego"] = [
 				"clave"     => $mj["clave"],
 				"nombre"    => $mj["nombre"],
-				"titulo"    => $mj["titulo"],
-				"enunciado" => strtr($mj["enunciado"], [
-					"{jugador}" => $e["protagonistas"]["jugador"] ?? "El rival",
-					"{portero}" => $e["protagonistas"]["portero"] ?? "tu portero",
-					"{defensa}" => $e["protagonistas"]["defensa"] ?? "la defensa",
-				]),
+				"titulo"    => strtr($mj["titulo"], $nombres),
+				"enunciado" => strtr($mj["enunciado"], $nombres),
+				/* Cómo se elige, no qué se decide (Biblia §2.1). El cliente pinta
+				   botones o el medidor según esto; el servidor resuelve igual en
+				   los dos casos, así que una entrada puede cambiar de primitiva
+				   sin tocar nada más. `velocidad` son los ms de ida y vuelta de
+				   la aguja y es la palanca de dificultad del medidor (§3.2),
+				   igual que el plazo lo es de la decisión. */
+				"primitiva" => $mj["primitiva"] ?? "eleccion",
+				"velocidad" => $mj["velocidad"][$dificultad] ?? $mj["velocidad"]["pvp"] ?? 2200,
+				// Qué mapa dibujar en la primitiva "zona". Vacío en las demás.
+				"lienzo"    => $mj["lienzo"] ?? null,
 				"plazo"     => $plazo,
 				/* La pista habla de la TENDENCIA de la carta rival implicada,
 				   nunca del dato concreto: ese no viaja al cliente ni aquí ni en
@@ -4301,8 +4846,22 @@ class Tcg
 					self::datoOcultoLoPoneElDefensor($mj)
 						? ($e["lado"] === "local" ? $cartasR : $cartasC)
 						: ($e["lado"] === "local" ? $cartasC : $cartasR)),
+				/* `segura` sí viaja, y no filtra nada: dice cuál es la opción
+				   CONSERVADORA, no contra qué valor gana. El cliente la necesita
+				   para colocar la aguja del medidor al arrancar, de forma que si
+				   el navegador no llega a pintar ni un fotograma (pestaña en
+				   segundo plano) pulsar "Parar" caiga en la conservadora y no en
+				   la primera de la lista. Además el jugador la acaba conociendo
+				   igual, porque es la que el servidor aplica al agotarse el
+				   plazo. */
 				"opciones"  => array_map(fn($o) => [
 					"clave" => $o["clave"], "nombre" => $o["nombre"], "pista" => $o["pista"],
+					"segura" => !empty($o["segura"]),
+					// Dónde va cada opción en el mapa. Nula fuera de la primitiva
+					// "zona"; el cliente la usa como `grid-area` tal cual.
+					"zona"   => $o["zona"] ?? null,
+					// Hacia qué lado hay que arrastrar. Nulo fuera de "arrastre".
+					"sector" => $o["sector"] ?? null,
 				], $mj["opciones"]),
 			];
 		}
@@ -4478,7 +5037,7 @@ class Tcg
 						"formacion" => $formRival,
 					],
 					$sorteo,
-					["gana" => $ganaCreador ? "local" : "visitante"]
+					["gana" => $ganaCreador ? "local" : "visitante"] + $this->opcionesPenalti()
 				);
 				[$golesCreador, $golesRival] = $sim["goles"];
 			}

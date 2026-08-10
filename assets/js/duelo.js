@@ -345,6 +345,16 @@
   var mjSegundos  = document.getElementById('simMjSegundos');
   var mjOpciones  = document.getElementById('simMjOpciones');
   var mjResultado = document.getElementById('simMjResultado');
+  var mjMedidor   = document.getElementById('simMjMedidor');
+  var mjPista     = document.getElementById('simMjPista');
+  var mjAguja     = document.getElementById('simMjAguja');
+  var mjParar     = document.getElementById('simMjParar');
+  var mjZonas     = document.getElementById('simMjZonas');
+  var mjLienzo    = document.getElementById('simMjLienzo');
+  var mjArrastre  = document.getElementById('simMjArrastre');
+  var mjLona      = document.getElementById('simMjLona');
+  var mjGuia      = document.getElementById('simMjGuia');
+  var mjSectorNom = document.getElementById('simMjSectorNombre');
 
   var panelPuesto = null;   // qué hay pintado ahora: id de evento, 'rival' o null
   var enviando = false;
@@ -360,8 +370,173 @@
     mjTexto.textContent = mj.enunciado + (mj.pista ? '  ' + mj.pista : '');
     mjResultado.hidden = true;
     mjResultado.className = 'sim-mj-resultado';
-    mjOpciones.innerHTML = '';
     panel.hidden = false;
+
+    /* La PRIMITIVA decide cómo se elige, no qué se decide: las dos ramas mandan
+       la misma clave de opción por el mismo endpoint, y el servidor no sabe ni
+       le importa con qué mando se eligió.
+
+       Con movimiento reducido se cae siempre a los botones: cazar una aguja ES
+       movimiento, y sin aguja no hay medidor que jugar. Es el §7 aplicado —
+       se reduce el movimiento, nunca el juego: quien tenga la preferencia
+       puesta decide exactamente lo mismo, solo con otro mando. */
+    if (mj.primitiva === 'medidor' && !reducido)      pintarMedidor(mj);
+    else if (mj.primitiva === 'zona' && mj.lienzo)    pintarZonas(mj);
+    else if (mj.primitiva === 'arrastre')             pintarArrastre(mj);
+    else                                             pintarBotones(mj);
+
+    arrancarCuenta(mj.plazo);
+  }
+
+  /* Deja el panel con el mando que toque. Es el ÚNICO sitio que enciende y apaga
+     mandos, para que no haya forma de que dos queden puestos por descuido.
+
+     'arrastre' es el único que enseña dos cosas a la vez —la lona y los botones—
+     y no es un despiste: WCAG 2.2 SC 2.5.7 exige que toda función de arrastre
+     tenga alternativa de un solo puntero, así que los botones son parte de la
+     primitiva, no un extra. */
+  function soloEsteMando(cual) {
+    pararMedidor();
+    pararArrastre();
+    mjOpciones.hidden = !(cual === 'botones' || cual === 'arrastre');
+    mjMedidor.hidden  = (cual !== 'medidor');
+    mjZonas.hidden    = (cual !== 'zonas');
+    mjArrastre.hidden = (cual !== 'arrastre');
+  }
+
+  /* ---- ARRASTRE (Biblia §2.2, Familia DS) -------------------------------
+     Se arrastra desde el balón hacia donde se quiere jugar. El ángulo cae en uno
+     de TRES SECTORES de 60° que reparten el semiplano superior, y ese sector es
+     la opción. La Biblia lo describe así de explícito: el sistema interpreta el
+     arrastre "como perteneciente a uno de varios sectores de dirección
+     predefinidos", sin física real.
+
+     Sectores iguales para que a ciegas las tres opciones sigan valiendo 1/3, que
+     es lo que mide el verificador: izquierda −90..−30, centro −30..+30,
+     derecha +30..+90, medidos desde la vertical. */
+  var arrastre = null;
+  var SECTORES = ['izquierda', 'centro', 'derecha'];
+  var MINIMO_ARRASTRE = 24;   // px; por debajo es un toque, no un gesto
+
+  function pintarArrastre(mj) {
+    soloEsteMando('arrastre');
+    pintarOpcionesEn(mj);       // la alternativa exigida por SC 2.5.7
+    mjGuia.style.height = '0px';
+    mjGuia.style.transform = 'rotate(0deg)';
+    mjSectorNom.textContent = '';
+    arrastre = { idEvento: mj.id_evento, opciones: mj.opciones, activo: false };
+  }
+
+  function sectorDeGesto(dx, dy) {
+    // Ángulo desde la vertical hacia arriba; positivo a la derecha.
+    var grados = Math.atan2(dx, -dy) * 180 / Math.PI;
+    if (grados < -30) return 'izquierda';
+    if (grados >  30) return 'derecha';
+    return 'centro';
+  }
+
+  function opcionDeSector(sector) {
+    if (!arrastre) return null;
+    var i = SECTORES.indexOf(sector);
+    // Se busca por `sector` declarado; si una entrada no lo trae, cae al orden.
+    var porSector = arrastre.opciones.filter(function (o) { return o.sector === sector; })[0];
+    return porSector || arrastre.opciones[i] || null;
+  }
+
+  function pararArrastre() {
+    arrastre = null;
+    mjLona.classList.remove('esta-arrastrando');
+  }
+
+  mjLona.addEventListener('pointerdown', function (e) {
+    if (!arrastre) return;
+    arrastre.activo = true;
+    mjLona.classList.add('esta-arrastrando');
+    if (mjLona.setPointerCapture) mjLona.setPointerCapture(e.pointerId);
+  });
+
+  mjLona.addEventListener('pointermove', function (e) {
+    if (!arrastre || !arrastre.activo) return;
+    var caja = mjLona.getBoundingClientRect();
+    var ox = caja.left + caja.width / 2;      // el balón, abajo en el centro
+    var oy = caja.bottom - 12;
+    var dx = e.clientX - ox;
+    var dy = e.clientY - oy;
+    var largo = Math.sqrt(dx * dx + dy * dy);
+
+    mjGuia.style.height = Math.min(largo, caja.height) + 'px';
+    mjGuia.style.transform = 'rotate(' + (Math.atan2(dx, -dy) * 180 / Math.PI) + 'deg)';
+
+    if (largo >= MINIMO_ARRASTRE) {
+      var op = opcionDeSector(sectorDeGesto(dx, dy));
+      mjSectorNom.textContent = op ? op.nombre : '';
+    } else {
+      mjSectorNom.textContent = '';
+    }
+  });
+
+  mjLona.addEventListener('pointerup', function (e) {
+    if (!arrastre || !arrastre.activo) return;
+    arrastre.activo = false;
+    mjLona.classList.remove('esta-arrastrando');
+
+    var caja = mjLona.getBoundingClientRect();
+    var dx = e.clientX - (caja.left + caja.width / 2);
+    var dy = e.clientY - (caja.bottom - 12);
+    if (Math.sqrt(dx * dx + dy * dy) < MINIMO_ARRASTRE) {
+      /* Un toque no es un gesto: sin este mínimo, tocar la lona resolvía la
+         jugada con el ángulo que saliera, que es un accidente esperando. Se
+         deja la guía a cero y el jugador arrastra otra vez o usa los botones. */
+      mjGuia.style.height = '0px';
+      mjSectorNom.textContent = '';
+      return;
+    }
+
+    var op = opcionDeSector(sectorDeGesto(dx, dy));
+    var idEvento = arrastre.idEvento;
+    if (!op) return;
+    pararArrastre();
+    decidir(idEvento, op.clave);
+  });
+
+  /* ---- CLIC-EN-ZONA (Biblia §2.1, primera primitiva) --------------------
+     Las tres opciones se colocan sobre el mapa que diga `lienzo`, cada una en
+     su `zona`. La zona se aplica como `grid-area` con el nombre que manda el
+     servidor: los huecos de Tcg::LIENZOS_ZONA y las grid-template-areas de
+     layout.css son la misma lista de nombres, y el verificador comprueba que no
+     se desincronicen.
+
+     No necesita degradarse con movimiento reducido: son <button> normales, el
+     teclado funciona solo y no hay nada animado. */
+  function pintarZonas(mj) {
+    soloEsteMando('zonas');
+    mjOpciones.innerHTML = '';
+    mjLienzo.innerHTML = '';
+    mjLienzo.className = 'sim-mj-lienzo es-' + mj.lienzo;
+
+    mj.opciones.forEach(function (o) {
+      var z = document.createElement('button');
+      z.type = 'button';
+      z.className = 'sim-mj-zona-btn';
+      z.style.gridArea = o.zona;
+      z.innerHTML = '<b></b><span></span>';
+      z.querySelector('b').textContent = o.nombre;
+      z.querySelector('span').textContent = o.pista;
+      z.addEventListener('click', function () { decidir(mj.id_evento, o.clave); });
+      mjLienzo.appendChild(z);
+    });
+  }
+
+  function pintarBotones(mj) {
+    soloEsteMando('botones');
+    pintarOpcionesEn(mj);
+  }
+
+  /* Construye los tres botones de opción. Está aparte de pintarBotones() porque
+     el ARRASTRE también los necesita —son su alternativa de un solo puntero
+     (SC 2.5.7)— y no puede llamar a pintarBotones(), que le cambiaría el mando. */
+  function pintarOpcionesEn(mj) {
+    mjOpciones.innerHTML = '';
 
     mj.opciones.forEach(function (o) {
       var b = document.createElement('button');
@@ -373,9 +548,120 @@
       b.addEventListener('click', function () { decidir(mj.id_evento, o.clave); });
       mjOpciones.appendChild(b);
     });
-
-    arrancarCuenta(mj.plazo);
   }
+
+  /* ---- MEDIDOR (Biblia §2.1, segunda primitiva) -------------------------
+     La aguja va y viene sobre las tres zonas; la zona donde se detiene es la
+     opción elegida.
+
+     El tiempo se acumula DENTRO del rAF, nunca del reloj de pared. Es
+     deliberado: el navegador deja de componer fotogramas en una pestaña de
+     fondo, y con reloj de pared la aguja saltaría al volver a una posición que
+     el jugador no ha visto pasar. Así lo que se ve y lo que se resuelve son
+     siempre lo mismo. El PLAZO sí va por reloj de pared y en el servidor, así
+     que irse de la pestaña no congela la jugada: te la resuelve con la opción
+     segura, igual que antes. */
+  var medidor = null;
+
+  function pintarMedidor(mj) {
+    soloEsteMando('medidor');
+    mjOpciones.innerHTML = '';
+    mjParar.disabled = false;
+
+    Array.prototype.forEach.call(mjPista.querySelectorAll('.sim-mj-zona'),
+      function (z) { mjPista.removeChild(z); });
+
+    // Las zonas van en el orden del catálogo, y ahí la opción segura está en el
+    // MEDIO a propósito: es la única que la aguja cruza dos veces por ciclo, o
+    // sea la más fácil de acertar. Fallar el pulso te deja en lo conservador.
+    mj.opciones.forEach(function (o) {
+      var z = document.createElement('div');
+      z.className = 'sim-mj-zona';
+      z.innerHTML = '<b></b><span></span>';
+      z.querySelector('b').textContent = o.nombre;
+      z.querySelector('span').textContent = o.pista;
+      mjPista.insertBefore(z, mjAguja);
+    });
+
+    /* La aguja ARRANCA en el centro de la zona segura, no en el extremo
+       izquierdo, y esto no es estético: si el navegador no llega a pintar ni un
+       fotograma —pestaña en segundo plano, donde requestAnimationFrame se
+       pausa— `pos` se queda con su valor inicial, y pulsar "Parar" resolvería
+       con la zona que hubiera ahí. Arrancando en 0 eso era siempre la PRIMERA
+       opción de la lista, que no es la conservadora: convertía un fallo de
+       fotogramas en una decisión arriesgada tomada sin querer.
+       Con la segura de partida, lo peor que puede pasar coincide con lo que ya
+       hace el servidor al agotarse el plazo (§1.5 regla 4). */
+    var iSegura = mj.opciones.length >> 1;          // el centro, por si no viene
+    mj.opciones.forEach(function (o, i) { if (o.segura) iSegura = i; });
+    var posInicial = (iSegura + 0.5) / mj.opciones.length;
+
+    medidor = {
+      idEvento: mj.id_evento,
+      opciones: mj.opciones,
+      ciclo: Math.max(700, mj.velocidad || 2200),   // ms de ida y vuelta completa
+      // El tramo de ida cubre la primera mitad del ciclo, así que este desfase
+      // deja la aguja justo en `posInicial` y siguiendo hacia la derecha.
+      t: Math.max(700, mj.velocidad || 2200) * (posInicial / 2),
+      ultimo: 0,
+      pos: posInicial,
+      raf: null
+    };
+
+    // Se pinta ya, sin esperar al primer fotograma: si no llega, el jugador
+    // tiene que ver dónde está la aguja que va a detener.
+    mjAguja.style.left = (posInicial * 100) + '%';
+    marcarZonaViva(zonaDeMedidor());
+
+    medidor.raf = window.requestAnimationFrame(latirMedidor);
+  }
+
+  function latirMedidor(ahora) {
+    if (!medidor) return;
+    if (!medidor.ultimo) medidor.ultimo = ahora;
+    medidor.t += ahora - medidor.ultimo;
+    medidor.ultimo = ahora;
+
+    // Ida y vuelta 0 → 1 → 0. La posición es función pura del tiempo
+    // acumulado, así que detenerla y recalcularla da exactamente lo mismo.
+    var fase = (medidor.t % medidor.ciclo) / medidor.ciclo;
+    medidor.pos = fase < 0.5 ? fase * 2 : 2 - fase * 2;
+
+    mjAguja.style.left = (medidor.pos * 100) + '%';
+    marcarZonaViva(zonaDeMedidor());
+
+    medidor.raf = window.requestAnimationFrame(latirMedidor);
+  }
+
+  /* Zonas de ancho igual: cada una vale exactamente 1/3 de la pista, así que a
+     ciegas las tres siguen valiendo lo mismo y el medidor no toca el equilibrio
+     que mide el verificador — solo añade una capa de ejecución encima. */
+  function zonaDeMedidor() {
+    if (!medidor) return 0;
+    var n = medidor.opciones.length;
+    return Math.min(n - 1, Math.floor(medidor.pos * n));
+  }
+
+  function marcarZonaViva(idx) {
+    Array.prototype.forEach.call(mjPista.querySelectorAll('.sim-mj-zona'),
+      function (z, i) { z.classList.toggle('es-viva', i === idx); });
+  }
+
+  function pararMedidor() {
+    if (medidor && medidor.raf) window.cancelAnimationFrame(medidor.raf);
+    medidor = null;
+  }
+
+  mjParar.addEventListener('click', function () {
+    if (!medidor) return;
+    var idx      = zonaDeMedidor();
+    var opcion   = medidor.opciones[idx];
+    var idEvento = medidor.idEvento;
+    mjParar.disabled = true;
+    pararMedidor();
+    marcarZonaViva(idx);          // la zona que salió se queda encendida
+    decidir(idEvento, opcion.clave);
+  });
 
   /* La cuenta atrás. El número va SIEMPRE; la barra solo se anima si el
      jugador no ha pedido reducir el movimiento. Poner la transición en línea
@@ -400,7 +686,16 @@
     cuenta = window.setInterval(function () {
       quedan--;
       mjSegundos.textContent = (quedan > 0 ? quedan : 0) + 's';
-      if (quedan <= 0) pararCuenta();
+      if (quedan <= 0) {
+        pararCuenta();
+        /* Agotado el plazo la jugada ya no es tuya: el servidor la resuelve con
+           la opción segura en su siguiente sondeo. Se detiene la aguja y se
+           bloquea el botón para no prometer una decisión que ya no cuenta —
+           dejarla girando invitaba a pulsar y llevarse la segura sin entender
+           por qué. */
+        pararMedidor();
+        mjParar.disabled = true;
+      }
     }, 1000);
   }
 
@@ -430,21 +725,52 @@
         if (!d || !d.ok) { ocultarPanel(); return; }
 
         /* El dato oculto solo se conoce DESPUÉS de decidir: antes no viaja.
-           Hay dos vocabularios porque hay dos cosas que adivinar — el remate
-           que te llega si defiendes, y cómo sale el portero si atacas. */
-        var mote = {
-          potente: 'un cañonazo', colocado: 'un tiro colocado', raso: 'un tiro raso',
-          achica: 'a comerte el ángulo', tierra: 'al suelo', espera: 'plantado'
-        }[d.remate] || d.remate;
-        var defendia = ['potente', 'colocado', 'raso'].indexOf(d.remate) !== -1;
-
-        var dice;
-        if (d.resultado === 'acierto') {
-          dice = defendia ? 'Leíste ' + mote + '.' : 'Salió ' + mote + ' y se la adivinaste.';
-        } else {
-          dice = defendia ? 'Llegó ' + mote + '. No te dio tiempo.'
-                          : 'Salió ' + mote + '. Se te fue fuera.';
-        }
+           Cada valor trae su mote y su GRUPO, porque la frase de cierre no se
+           lee igual según lo que se estaba adivinando: parar un remate, batir a
+           un portero o superar a una defensa colocada son tres cosas distintas.
+           El grupo hace falta de verdad, no es adorno: sin él los cuatro
+           minijuegos de balón parado cerraban con "Salió salta y se la
+           adivinaste", enseñando el valor crudo del servidor. */
+        var vocabulario = {
+          potente:  { mote: 'un cañonazo',              grupo: 'remate' },
+          colocado: { mote: 'un tiro colocado',         grupo: 'remate' },
+          raso:     { mote: 'un tiro raso',             grupo: 'remate' },
+          achica:   { mote: 'a comerte el ángulo',      grupo: 'portero' },
+          tierra:   { mote: 'al suelo',                 grupo: 'portero' },
+          espera:   { mote: 'plantado',                 grupo: 'portero' },
+          salta:    { mote: 'a saltar',                 grupo: 'defensa' },
+          aguanta:  { mote: 'a aguantar la posición',   grupo: 'defensa' },
+          sale:     { mote: 'a romper hacia el balón',  grupo: 'defensa' },
+          protesta: { mote: 'se fue a por el árbitro',  grupo: 'arbitro' },
+          teatro:   { mote: 'lo alargó en el suelo',    grupo: 'arbitro' },
+          sigue:    { mote: 'se levantó y siguió',      grupo: 'arbitro' }
+        };
+        var voz   = vocabulario[d.remate] || { mote: d.remate, grupo: 'remate' };
+        var mote  = voz.mote;
+        var frases = {
+          remate: {
+            acierto: 'Leíste ' + mote + '.',
+            fallo:   'Llegó ' + mote + '. No te dio tiempo.'
+          },
+          portero: {
+            acierto: 'Salió ' + mote + ' y se la adivinaste.',
+            fallo:   'Salió ' + mote + '. Se te fue fuera.'
+          },
+          defensa: {
+            acierto: 'La defensa fue ' + mote + ' y se la colaste.',
+            fallo:   'La defensa fue ' + mote + '. Ahí se quedó.'
+          },
+          /* Familia Árbitro: son de impacto "ninguno", así que aquí NO se puede
+             prometer nada del marcador — no hay gol que mover en una tarjeta.
+             Lo que se gana es puntuación de actuación (§4.6), y el texto tiene
+             que reflejar eso y no dejar al jugador esperando un gol. */
+          arbitro: {
+            acierto: 'El rival ' + mote + ', y lo tenías leído.',
+            fallo:   'El rival ' + mote + '. No lo viste venir.'
+          }
+        };
+        var defendia = voz.grupo === 'remate';
+        var dice = frases[voz.grupo][d.resultado === 'acierto' ? 'acierto' : 'fallo'];
         if (d.parado) {
           dice += defendia
             ? ' ¡Paradón! El gol no sube al marcador.'
@@ -467,6 +793,9 @@
   function ocultarPanel() {
     pararCuenta();
     mjSegundos.textContent = '';
+    // Fuera los tres mandos: si aparece uno nuevo, soloEsteMando() es el único
+    // sitio que hay que tocar.
+    soloEsteMando(null);
     panel.hidden = true;
     panelPuesto = null;
   }
@@ -484,6 +813,10 @@
      se deja lleno en vez de a medias. */
   function avisoEnPanel(titulo, texto) {
     pararCuenta();
+    /* Un aviso no tiene decisión: fuera TODOS los mandos, no solo los botones.
+       Sin parar el medidor la aguja seguía girando bajo el texto de "esperando
+       al rival", como si todavía hubiera algo que cazar. */
+    soloEsteMando('botones');    // el hueco vacío de las opciones, sin nada dentro
     mjSegundos.textContent = '';
     mjTitulo.textContent = titulo;
     mjTexto.textContent = texto;

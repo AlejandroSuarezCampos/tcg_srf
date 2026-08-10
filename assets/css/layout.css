@@ -1663,7 +1663,11 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   background: var(--amber);
   transform-origin: left center;
 }
-.sim-mj-opciones {
+/* `:not([hidden])` obligatorio: el medidor y los botones se alternan desde JS
+   con la propiedad `hidden`, y una regla de display de autor le gana siempre.
+   Sin esto se verían los dos a la vez y parecería que el JS no se ejecuta —
+   la misma trampa que ya mordió en cinco sitios más del proyecto. */
+.sim-mj-opciones:not([hidden]) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -1694,6 +1698,249 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   color: var(--frost-dim);
   margin-top: 2px;
 }
+/* --- MEDIDOR (Biblia §2.1, segunda primitiva) ---
+   La aguja recorre las tres zonas en bucle y el jugador la detiene: la zona
+   donde para ES la opción elegida, así que el ciclo cerrado, la pista y la
+   opción segura del catálogo siguen valiendo sin tocar nada del servidor.
+
+   La zona del MEDIO se cruza dos veces por ciclo, así que es la más fácil de
+   acertar; por eso las entradas de medidor colocan ahí la opción segura y
+   nunca la de más premio. Es §1.5 regla 4 llevada a la ejecución: fallar el
+   pulso te deja en lo conservador, no en lo arriesgado. */
+.sim-mj-medidor:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+/* `min-height`, NUNCA `height`. Con altura fija más el `overflow: hidden` que
+   recorta la aguja en los bordes, la pista de cada zona se cortaba por abajo: el
+   nombre y su pista no caben en 62 px cuando la columna mide un tercio del panel,
+   y en móvil la pista pasa a tres líneas y desaparece media frase. Medido: hacían
+   falta 63 px de 60 disponibles ya en escritorio. */
+.sim-mj-pista {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--void-2);
+  overflow: hidden;
+}
+.sim-mj-zona {
+  flex: 1 1 0;
+  min-width: 0;              /* que se recorte el texto, no las zonas */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-1);
+  text-align: center;
+  border-right: 1px solid var(--line);
+  transition: background var(--t-micro) var(--ease);
+}
+.sim-mj-zona:last-child { border-right: 0; }
+.sim-mj-zona b {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--frost);
+}
+.sim-mj-zona span {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.sim-mj-zona.es-viva { background: var(--amber-soft); }
+.sim-mj-aguja {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  margin-left: -1.5px;       /* centrada en su posición, no a su derecha */
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber);
+}
+.sim-mj-parar {
+  width: 100%;
+  min-height: 44px;          /* objetivo táctil (§7) */
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.sim-mj-parar:hover:not(:disabled) { background: var(--amber); color: var(--amber-ink); }
+.sim-mj-parar:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-parar:disabled { opacity: .45; cursor: default; }
+
+/* --- CLIC-EN-ZONA (Biblia §2.1, primera primitiva) ---
+   Las opciones van colocadas sobre un mapa. Los nombres de las áreas de la
+   rejilla son LITERALMENTE los huecos de Tcg::LIENZOS_ZONA: el JS pone
+   `grid-area` con el valor que manda el servidor, así que un hueco que no esté
+   en la plantilla de su lienzo se auto-coloca y descuadra el mapa sin dar
+   error. El verificador comprueba que no pase. */
+.sim-mj-zonas:not([hidden]) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.sim-mj-lienzo {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-width: 400px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+/* El marco de la portería visto de frente: postes y travesaño con el borde.
+
+   Filas con MÍNIMO y crecimiento, nunca `aspect-ratio`. La proporción fija
+   calculaba la altura a partir del ancho, y en móvil las celdas recortaban el
+   texto: medido, 105 px necesarios de 84 disponibles a 375 px de ventana. Así el
+   mapa conserva su forma en pantalla ancha (las filas se quedan en su mínimo) y
+   crece solo cuando la pista de una opción ocupa más líneas. Mismo fallo que
+   tenía el medidor con `height` fija. */
+.sim-mj-lienzo.es-porteria {
+  grid-template-rows: repeat(2, minmax(96px, auto));
+  border: 3px solid var(--frost-dim);
+  border-bottom-width: 1px;              /* la línea de gol se insinúa */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    repeating-linear-gradient(0deg,  transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    var(--void-2);
+  grid-template-areas:
+    "escuadra_izq centro_alto escuadra_der"
+    "raso_izq     centro_bajo raso_der";
+}
+/* El área vista desde arriba, con la frontal por detrás del punto de penalti. */
+.sim-mj-lienzo.es-area {
+  grid-template-rows: repeat(2, minmax(92px, auto));   /* ver la nota de es-porteria */
+  border: 2px solid color-mix(in srgb, var(--frost) 45%, transparent);
+  border-top-width: 3px;                 /* la línea de gol, arriba */
+  background: color-mix(in srgb, var(--success) 7%, var(--void-2));
+  grid-template-areas:
+    "primer_palo punto_penalti segundo_palo"
+    ".           frontal       .";
+}
+/* El último tercio visto desde arriba: bandas y centro. */
+.sim-mj-lienzo.es-campo {
+  grid-template-rows: minmax(190px, auto);             /* ver la nota de es-porteria */
+  border: 2px solid color-mix(in srgb, var(--frost) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, var(--void-2));
+  grid-template-areas: "banda_izq centro banda_der";
+}
+.sim-mj-zona-btn {
+  min-height: 44px;                      /* objetivo táctil (§7) */
+  padding: var(--space-1);
+  border: 1px dashed color-mix(in srgb, var(--frost) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--void) 55%, transparent);
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.sim-mj-zona-btn b {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+}
+.sim-mj-zona-btn span {
+  display: block;
+  margin-top: 2px;
+  color: var(--frost-dim);
+}
+.sim-mj-zona-btn:hover:not(:disabled) { border-color: var(--amber); background: var(--amber-soft); }
+.sim-mj-zona-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-zona-btn:disabled { opacity: .45; cursor: default; }
+
+/* --- ARRASTRE (Biblia §2.2, Familia DS) ---
+   Se arrastra desde el balón; el ángulo cae en uno de tres sectores. Los botones
+   de opción siguen visibles a la vez, por WCAG 2.2 SC 2.5.7. */
+.sim-mj-arrastre:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+}
+.sim-mj-lona {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 2 / 1.15;
+  border: 2px solid color-mix(in srgb, var(--frost) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background:
+    /* los tres sectores, insinuados desde el balón */
+    conic-gradient(from 215deg at 50% 100%,
+      color-mix(in srgb, var(--amber) 9%, transparent) 0 40deg,
+      transparent 40deg 50deg,
+      color-mix(in srgb, var(--amber) 9%, transparent) 50deg 90deg,
+      transparent 90deg 100deg,
+      color-mix(in srgb, var(--amber) 9%, transparent) 100deg 140deg,
+      transparent 140deg),
+    color-mix(in srgb, var(--success) 7%, var(--void-2));
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;          /* sin esto el navegador se lleva el gesto al scroll */
+}
+.sim-mj-lona.esta-arrastrando { cursor: grabbing; }
+.sim-mj-balon {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--frost);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--frost) 60%, transparent);
+}
+/* La guía se dibuja como una línea que nace en el balón y gira con el gesto. */
+.sim-mj-guia {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 3px;
+  height: 0;
+  margin-left: -1.5px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(to top, var(--amber), transparent);
+  pointer-events: none;
+}
+.sim-mj-sector-nombre {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  color: var(--amber-light);
+  pointer-events: none;
+}
+.sim-mj-arrastre-ayuda {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  text-align: center;
+}
+:root[data-motion="reduce"] .sim-mj-guia { transition: none; }
+
 .sim-mj-resultado:not([hidden]) {
   margin: 0;
   font-weight: var(--fw-semibold);
@@ -1705,6 +1952,10 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
 
 :root[data-motion="reduce"] .sim-minijuego:not([hidden]) { animation: none; }
 :root[data-motion="reduce"] .sim-mj-reloj-relleno { transition: none; }
+/* Con movimiento reducido el medidor no se ofrece: duelo.js cae a los botones,
+   porque una aguja que hay que cazar ES movimiento y sin ella no hay juego que
+   jugar. Esta regla es el cinturón por si alguna vez se pintara igual. */
+:root[data-motion="reduce"] .sim-mj-zona { transition: none; }
 
 /* Las estadísticas en vivo (§1.4) se retiraron del partido por decisión de
    Alejandro: durante el encuentro compiten con el relato y el momentum, que es

@@ -21,6 +21,12 @@
  *   7. Determinismo: misma semilla y evento, mismo minijuego. El servidor tiene
  *      que poder recalcular lo que el cliente jugó.
  *   8. Que leer la pista pague (>33 %) pero no lo resuelva solo (<70 %).
+ *   9. Primitiva conocida, y si es "medidor", que traiga `velocidad` completa.
+ *  10. Que la opción segura de un medidor esté EN EL CENTRO. Es la única zona
+ *      que la aguja cruza dos veces por ciclo, o sea la más fácil de acertar:
+ *      si la segura no estuviera ahí, fallar el pulso llevaría a la opción de
+ *      más premio en vez de a la conservadora, que es lo contrario de lo que
+ *      pide §1.5 regla 4.
  */
 
 if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
@@ -36,6 +42,7 @@ $valores = [
     "remate"             => ["potente", "colocado", "raso"],
     "estilo_portero"     => ["achica", "tierra", "espera"],
     "colocacion_defensa" => ["salta", "aguanta", "sale"],
+    "reaccion_rival"     => ["protesta", "teatro", "sigue"],
 ];
 
 /* Once sintético. "hueco" y no "posicion": plantillaPorLinea() clasifica por el
@@ -58,7 +65,17 @@ function equipoStub($sem) {
 /* Recorre partidos simulados y entrega cada minijuego ofrecido, ya con las
    cartas del bando correcto. Replica el mapeo de narracionDuelo(): quien ataca
    la jugada es $e["lado"], y el dato oculto puede salir de cualquiera de los
-   dos bandos según lo que se adivine. */
+   dos bandos según lo que se adivine.
+
+   El filtro de abajo tiene que ser LITERALMENTE el $tieneSentido de
+   narracionDuelo(). Defender ya no exige un gol, sino que la jugada del rival
+   traiga `familia_def` — si esta copia se quedara con la condición vieja, las
+   entradas defensivas sobre parada/despeje/córner saldrían aquí como código
+   muerto aunque en el partido real se ofrezcan.
+
+   NO se aplica el presupuesto por partido (partido_minijuegos_max ni el tope de
+   las de impacto "ninguno"): aquí se mide si una entrada es ALCANZABLE, no
+   cuántas caben en un encuentro. */
 function recorrer($n, callable $fn) {
     for ($d = 0; $d < $n; $d++) {
         $s = ($d * 0.00317) - floor($d * 0.00317);
@@ -66,13 +83,13 @@ function recorrer($n, callable $fn) {
         foreach ($sim["eventos"] as $e) {
             if ($e["lado"] === null) continue;
             foreach ([true, false] as $def) {
-                if ($def ? ($e["tipo"] !== "gol") : ($e["tipo"] === "gol")) continue;
+                if ($def ? empty($e["familia_def"]) : ($e["tipo"] === "gol")) continue;
                 $e["interactivo"] = true;
                 $mj = Tcg::minijuegoDeEvento($e, $def, $s);
                 if (!$mj) continue;
                 $cAt = $e["lado"] === "local" ? equipoStub(1)["cartas"] : equipoStub(2)["cartas"];
                 $cDf = $e["lado"] === "local" ? equipoStub(2)["cartas"] : equipoStub(1)["cartas"];
-                $fn($e, $mj, Tcg::datoOcultoLoPoneElDefensor($mj) ? $cDf : $cAt, $s);
+                $fn($e, $mj, Tcg::datoOcultoLoPoneElDefensor($mj) ? $cDf : $cAt, $s, $def);
             }
         }
     }
@@ -100,10 +117,92 @@ foreach ($cat as $clave => $mj) {
             if (stripos($o["clave"], $v) !== false) $ko("$clave/{$o['clave']}: la clave delata '$v'");
         }
     }
-    $faltan = array_diff(["pvp","facil","medio","dificil","muy_dificil","extremo"], array_keys($mj["plazo"] ?? []));
+    $porDificultad = ["pvp","facil","medio","dificil","muy_dificil","extremo"];
+    $faltan = array_diff($porDificultad, array_keys($mj["plazo"] ?? []));
     if ($faltan) { $ko("$clave: faltan plazos " . implode(",", $faltan)); continue; }
 
-    $ok(sprintf("%-20s ciclo cerrado sobre %s", $clave, $mj["oculto"]));
+    /* 9-10. La primitiva, y las dos reglas que solo aplican al medidor. */
+    /* El impacto y, si es "partido", su efecto. Un `partido` sin efecto sería
+       una decisión que promete arrastrar al resto del encuentro y no arrastra
+       nada — el "continuar disfrazado" que prohíbe §1.5 regla 2. */
+    $impacto = $mj["impacto"] ?? "jugada";
+    if (!in_array($impacto, ["ninguno", "jugada", "partido"], true)) {
+        $ko("$clave: impacto desconocido '$impacto'"); continue;
+    }
+    if ($impacto === "partido") {
+        $efectos = ["presupuesto_gol", "presupuesto_parada", "decision"];
+        $efecto = $mj["efecto"] ?? null;
+        if (!in_array($efecto, $efectos, true)) {
+            $ko("$clave: impacto \"partido\" exige `efecto` de " . implode("|", $efectos)
+                . " (trae '" . ($efecto ?? "ninguno") . "')");
+            continue;
+        }
+    } elseif (isset($mj["efecto"])) {
+        $ko("$clave: trae `efecto` sin ser de impacto \"partido\"; no lo leería nadie");
+        continue;
+    }
+
+    $primitiva = $mj["primitiva"] ?? "eleccion";
+    if (!in_array($primitiva, ["eleccion", "medidor", "zona", "arrastre"], true)) {
+        $ko("$clave: primitiva desconocida '$primitiva'"); continue;
+    }
+    if ($primitiva === "arrastre") {
+        /* Un sector por opción y sin repetir: el cliente resuelve el gesto
+           buscando el `sector` que casa con el ángulo, así que dos opciones en el
+           mismo sector dejarían una inalcanzable con el gesto (aunque siguiera
+           pulsable con el botón, que es su alternativa de SC 2.5.7). */
+        $sectores = ["izquierda", "centro", "derecha"];
+        $usadosSec = [];
+        $malSec = false;
+        foreach ($mj["opciones"] as $o) {
+            $s = $o["sector"] ?? null;
+            if (!in_array($s, $sectores, true)) {
+                $ko("$clave/{$o['clave']}: sector '" . ($s ?? "(ninguno)") . "' no es izquierda|centro|derecha");
+                $malSec = true; break;
+            }
+            if (isset($usadosSec[$s])) { $ko("$clave: dos opciones en el sector '$s'"); $malSec = true; break; }
+            $usadosSec[$s] = true;
+        }
+        if ($malSec) continue;
+    }
+    if ($primitiva === "zona") {
+        /* El lienzo y las zonas tienen que existir en Tcg::LIENZOS_ZONA, que es la
+           misma lista que usan las grid-template-areas de layout.css. Una zona que
+           el CSS no conozca se coloca automáticamente y descuadra el mapa SIN dar
+           ningún error, así que se comprueba aquí. */
+        $lienzo = $mj["lienzo"] ?? null;
+        if (!isset(Tcg::LIENZOS_ZONA[$lienzo])) {
+            $ko("$clave: lienzo desconocido '" . ($lienzo ?? "(ninguno)") . "'"); continue;
+        }
+        $huecos = Tcg::LIENZOS_ZONA[$lienzo];
+        $usadasZona = [];
+        $malZona = false;
+        foreach ($mj["opciones"] as $o) {
+            $z = $o["zona"] ?? null;
+            if (!in_array($z, $huecos, true)) {
+                $ko("$clave/{$o['clave']}: zona '" . ($z ?? "(ninguna)") . "' no existe en '$lienzo'");
+                $malZona = true; break;
+            }
+            if (isset($usadasZona[$z])) { $ko("$clave: dos opciones en la zona '$z'"); $malZona = true; break; }
+            $usadasZona[$z] = true;
+        }
+        if ($malZona) continue;
+    }
+    if ($primitiva === "medidor") {
+        $faltanVel = array_diff($porDificultad, array_keys($mj["velocidad"] ?? []));
+        if ($faltanVel) { $ko("$clave: faltan velocidades " . implode(",", $faltanVel)); continue; }
+
+        // La segura EN EL CENTRO: la aguja cruza esa zona dos veces por ciclo.
+        $iSegura = null;
+        foreach ($mj["opciones"] as $i => $o) { if (!empty($o["segura"])) $iSegura = $i; }
+        $centro = intdiv(count($mj["opciones"]), 2);
+        if ($iSegura !== $centro) {
+            $ko("$clave: la segura debe ir en el centro del medidor (está la $iSegura, toca la $centro)");
+            continue;
+        }
+    }
+
+    $ok(sprintf("%-20s %-8s ciclo cerrado sobre %s", $clave, $primitiva, $mj["oculto"]));
 }
 
 echo "\n=== 5-6. Reparto del dato oculto y uso de cada entrada ===\n";
@@ -131,8 +230,9 @@ foreach ($cat as $clave => $mj) {
 
 echo "\n=== 7. Determinismo ===\n";
 $estable = true;
-recorrer(60, function ($e, $mj, $cartas, $s) use (&$estable) {
-    $def = ($e["tipo"] === "gol");
+// El lado lo pasa recorrer(): deducirlo del tipo dejó de valer cuando defender
+// pasó a ser posible en jugadas que no son gol.
+recorrer(60, function ($e, $mj, $cartas, $s, $def) use (&$estable) {
     $a = Tcg::minijuegoDeEvento($e, $def, $s);
     $b = Tcg::minijuegoDeEvento($e, $def, $s);
     if (($a["clave"] ?? null) !== ($b["clave"] ?? null)) $estable = false;
@@ -148,6 +248,8 @@ $sugiere = function ($p) {
         "comerte el ángulo" => "achica", "no se define" => "espera",
         "aguanta la posición" => "aguanta", "rompen hacia el balón" => "sale",
         "no se casa" => "salta",
+        "lo alargan en el suelo" => "teatro", "ir a por el árbitro" => "protesta",
+        "no suele hacer aspavientos" => "sigue",
     ] as $frag => $v) if (str_contains($p, $frag)) return $v;
     return null;
 };

@@ -628,6 +628,50 @@ include __DIR__ . '/navbar.php';
           </div>
           <div class="sim-mj-opciones" id="simMjOpciones" role="group"
                aria-labelledby="simMjEnunciado"></div>
+          <!-- MEDIDOR (Biblia §2.1, segunda primitiva). La aguja recorre las
+               tres zonas en bucle y el jugador la detiene: la zona donde para
+               ES la opción elegida, así que viaja la misma clave por el mismo
+               endpoint que un botón. Se alterna con las opciones de arriba
+               desde JS, nunca se ven los dos.
+
+               Con "reducir movimiento" esto NO se usa: duelo.js pinta los
+               botones. La regla es la del §7 — se reduce el movimiento, nunca
+               el juego: quien tenga la preferencia puesta sigue decidiendo lo
+               mismo, solo con otro mando. -->
+          <div class="sim-mj-medidor" id="simMjMedidor" hidden>
+            <div class="sim-mj-pista" id="simMjPista">
+              <span class="sim-mj-aguja" id="simMjAguja" aria-hidden="true"></span>
+            </div>
+            <button type="button" class="sim-mj-parar" id="simMjParar">Parar</button>
+          </div>
+          <!-- CLIC-EN-ZONA (Biblia §2.1, primera primitiva). Las tres opciones
+               se colocan sobre un mapa —el marco de la portería, el área desde
+               arriba o el campo— en el sitio que les toca, y se pulsa la zona.
+               Son <button> de verdad, así que el teclado funciona sin nada
+               añadido y no hay movimiento que reducir. El mapa lo dice `lienzo`
+               y el sitio de cada opción su `zona`, que el JS pone tal cual como
+               grid-area (ver Tcg::LIENZOS_ZONA). -->
+          <div class="sim-mj-zonas" id="simMjZonas" hidden>
+            <div class="sim-mj-lienzo" id="simMjLienzo" role="group"
+                 aria-labelledby="simMjEnunciado"></div>
+          </div>
+          <!-- ARRASTRE (Biblia §2.2, Familia DS). Se arrastra desde el balón
+               hacia donde se quiere jugar; el ángulo cae en uno de tres sectores
+               y ese sector ES la opción.
+
+               ⚠️ Los botones de arriba SIGUEN VISIBLES con esta primitiva, y no
+               es redundancia: WCAG 2.2 SC 2.5.7 (Dragging Movements) exige que
+               toda función de arrastre tenga alternativa de un solo puntero. Sin
+               ellos, esta primitiva sería inoperable con teclado y quedaría
+               fuera del §7. -->
+          <div class="sim-mj-arrastre" id="simMjArrastre" hidden>
+            <div class="sim-mj-lona" id="simMjLona" aria-hidden="true">
+              <span class="sim-mj-balon" id="simMjBalon"></span>
+              <span class="sim-mj-guia" id="simMjGuia"></span>
+              <span class="sim-mj-sector-nombre" id="simMjSectorNombre"></span>
+            </div>
+            <p class="sim-mj-arrastre-ayuda">Arrastra desde el balón, o usa los botones.</p>
+          </div>
           <p class="sim-mj-resultado" id="simMjResultado" role="status" hidden></p>
         </div>
 

@@ -152,4 +152,38 @@ return [
     "reanuda"   => ["Se reanuda el juego para la segunda mitad."],
     "descuento" => ["El colegiado añade tiempo de descuento."],
     "final"     => ["El árbitro señala el final del encuentro."],
+
+    /* ------------------------------------------------------------------
+       PENALTI. El evento se emite con el tipo "gol" o "parada" de siempre
+       —así el marcador, el presupuesto y los minijuegos funcionan sin
+       cambiar nada—, y lo único propio es la FAMILIA (`penalti`) y estas
+       frases. Es el mismo truco que ya usaba `gol_asistido`: la clave de
+       la frase y el tipo del evento no tienen por qué coincidir.
+
+       Se señala aparte de la ejecución para que el relato tenga el latido
+       real de un penalti: primero la pena máxima, luego el disparo.
+       ------------------------------------------------------------------ */
+    "penalti_senalado" => [
+        "El árbitro señala el punto de penalti. Protesta la defensa, pero no hay discusión.",
+        "Falta dentro del área. Penalti, y {portero} se queda solo ante la pena máxima.",
+        "El colegiado no duda: penalti a favor y {jugador} coge el balón.",
+        "Mano en el área. Penalti, y el estadio se queda en silencio.",
+    ],
+    "penalti_gol" => [
+        "{jugador} engaña a {portero} desde los once metros. Dentro.",
+        "Penalti transformado. {jugador} la coloca donde {portero} no llega.",
+        "{jugador} no tiembla desde el punto de penalti y bate a {portero}.",
+        "Golpeo seco de {jugador} y la pena máxima acaba en gol.",
+    ],
+    "penalti_parado" => [
+        "¡{portero} adivina el lado y saca el penalti de {jugador}!",
+        "{jugador} la ajusta al palo y {portero} llega con una mano providencial.",
+        "Paradón de {portero} desde los once metros. Se salva el equipo.",
+        "{portero} aguanta hasta el final y le adivina la intención a {jugador}.",
+    ],
+    "penalti_fuera" => [
+        "{jugador} manda el penalti fuera. Ocasión perdida desde los once metros.",
+        "Se le va alto a {jugador}. El penalti acaba en la grada.",
+        "{jugador} estrella el penalti en el palo y el balón sale.",
+    ],
 ];

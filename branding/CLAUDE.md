@@ -121,6 +121,75 @@
 > **Ojo al leer:** `§16` es la sección del **importador**, mientras que `016` en
 > backticks es la **migración** del partido en vivo. Son numeraciones distintas
 > que por casualidad coinciden en el número.
+>
+> ---
+>
+> ## v7.3 — el catálogo de minijuegos pasa de 12 a 43, y ya no queda hueco sin cubrir
+>
+> Lo importante no son las 31 entradas nuevas sino **cuatro cosas que había
+> debajo y que el §15 daba por buenas sin serlo**:
+>
+> 1. **`impacto` estaba declarado en el catálogo pero el motor NO lo leía.** Las
+>    tres menciones en `db/consultas.php` eran comentarios. `resolverMinijuegoDuelo()`
+>    movía el marcador solo por `lado` + `acierto`, así que `impacto: "ninguno"`
+>    no existía de hecho y cualquier entrada disciplinaria o defensiva habría
+>    sumado un gol de la nada. Sin arreglar esto no se podía construir nada de
+>    lo demás.
+> 2. **El cliente no sabía traducir `colocacion_defensa`.** El mapa de motes de
+>    `duelo.js` solo tenía los seis valores de `remate` y `estilo_portero`, así
+>    que los cuatro minijuegos de balón parado de la v7.1 llevaban desde
+>    entonces cerrando con *"Salió salta y se la adivinaste"* — enseñando el
+>    valor crudo del servidor. Ahora cada valor declara su **grupo** y la frase
+>    de cierre se elige por grupo.
+> 3. **Las 4 entradas de `disparo` no tenían clave `tipos`**, así que se
+>    ofrecían igual en `parada`, `tiro_fuera` y `despeje`. Se leía mal: *"cómo la
+>    golpeas de lejos"* caía sobre un despeje de un central. Repartidas por tipo.
+> 4. **`defensa` y `balon_parado` defensivas no eran "baratas de empezar" ni
+>    simplemente inalcanzables: eran inalcanzables POR UNA LÍNEA.** El filtro
+>    `$tieneSentido` exigía `tipo === "gol"` para defender. Cambiado a "cualquier
+>    jugada del rival que traiga `familia_def`", aparecen tres huecos nuevos con
+>    3.174 apariciones medidas de cada 600 partidos.
+>
+> **Entró además la segunda primitiva de la Biblia, el `medidor`** (§2.1): una
+> aguja recorre las tres zonas en bucle y el jugador la detiene. La clave del
+> diseño es que **las zonas SON las opciones**, así que el ciclo cerrado, la
+> pista, la opción segura y el verificador siguen valiendo sin tocarse: cambia
+> cómo eliges, no qué se decide.
+>
+> **Los 10 huecos que el motor puede producir están cubiertos.** No queda
+> ninguno sin entradas, incluido el de `arbitro` que el §15.4 daba por
+> "inservible" (se arregla adjuntando al evento de tarjeta unos protagonistas
+> que el motor ya calculaba y tiraba).
+>
+> **Migración nueva, la `017`**, con un parámetro de balance que hizo falta y
+> está medido: sin él, **1 de cada 7 jugadores** (13,94 %) gastaba sus dos
+> decisiones en minijuegos incapaces de tocar el marcador. Ver §15.5.
+>
+> ### Y dos fallos que solo aparecieron AL JUGAR, no al medir el catálogo
+>
+> Alejandro reportó *"solo me están saliendo el mismo minijuego"* con las 43
+> entradas ya dentro. Eran dos causas encadenadas, las dos ya corregidas:
+>
+> 1. **`azarSembrado()` se estaba usando como función hash.** Sembrar con
+>    `semilla * K + id_evento * c` y coger el primer valor produce ciclos cortos,
+>    porque el primer valor de un LCG es casi lineal en su estado inicial. Con 5
+>    candidatas la colisión entre eventos consecutivos era del **0,0 %** —
+>    imposible, no improbable. Arreglado en `Tcg::azarDeJugada()`, que siembra una
+>    vez y **avanza** el generador. Afectaba a los cinco sitios que adivinan algo:
+>    qué minijuego sale y los cuatro datos ocultos. Nueva trampa en §8, con la
+>    métrica que hay que usar para detectarlo (repetición, no variedad).
+> 2. **Las decisiones se apelotonaban al principio del partido**, porque se
+>    cogían las primeras jugadas que valían y los huecos defensivos nuevos
+>    multiplicaron las tempranas. Minuto mediano 10', última decisión en el 17'.
+>    Arreglado en `Tcg::repartirDecisiones()`, que reparte por ventanas del
+>    encuentro y evita repetir minijuego: mediana 46', última 68', y la
+>    repetición dentro de un partido baja al 0,75 %. Ver §15.5.
+>
+> **Lección para la próxima:** el catálogo se puede verificar en frío —y el
+> verificador daba verde con las dos cosas mal—, pero *cuándo* y *con qué
+> variedad* aparecen las decisiones solo se ve jugando o midiendo el reparto
+> dentro de un mismo partido. Ninguna de las dos las habría cazado contando
+> entradas.
 
 ---
 
@@ -161,11 +230,14 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cadena_nodos;"  -- 18
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM plantillas_3d;" -- 0 si nadie ha subido arte aún
    C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM duelo_minijuegos;"          -- existe = 016 aplicada
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT clave,valor FROM configuracion WHERE clave LIKE 'partido%';"  -- 4 filas
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT clave,valor FROM configuracion WHERE clave LIKE 'partido%';"  -- 5 filas
    ```
    Si alguna de las tres primeras da 0 o la tabla no existe, aplica §5.2.
    Si `duelo_minijuegos` no existe, el partido en vivo (§15) no puede
    funcionar: aplica la `016`.
+   Si salen **4** filas `partido%` en vez de 5, falta la `017`: sin
+   `partido_minijuegos_sin_impacto_max` el código usa 1 por defecto y funciona
+   igual, pero Alejandro no puede calibrarlo sin la fila (§15.5).
 6. Auditar la codificación (§5.3), que ya ha mordido dos veces:
    `C:\xampp\php\php.exe db/migraciones/004_reparar_codificacion.php`
 
@@ -261,7 +333,13 @@ buscan por nombre.
 | **§15 — Motor de eventos narrado** | El partido se cuenta minuto a minuto (Biblia §1) | ✅ **Construido** |
 | **§15 — Marcador PvP desde la simulación** | Jubila la fórmula provisional `marcadorDuelo()` (Biblia §1.3) | ✅ **Construido** |
 | **§15 — Partido en vivo (PvP)** | Reloj en servidor, los dos jugadores a la vez, migración `016` | ✅ **Construido** |
-| **§15 — Minijuegos** | Catálogo + **12** entradas jugables de ~90 (Biblia §2). Las 3 combinaciones (familia, lado) alcanzables están cubiertas | 🟡 **En marcha** |
+| **§15 — Minijuegos** | Catálogo + **75** entradas jugables de ~100 (65 nombres de la Biblia) (Biblia §2). **Los 10 huecos alcanzables están cubiertos** y **las 4 primitivas construidas** | 🟡 **En marcha** (lo que falta necesita sistemas nuevos, no entradas) |
+| **§15 — Las 4 primitivas de interfaz** | `eleccion` 44 · `medidor` 6 · `zona` 7 · `arrastre` 5 (§15.4b). Las cuatro de la Biblia | ✅ **Construido** |
+| **§15 — `impacto: "partido"`** | 13 entradas que arrastran al resto del encuentro, sin mover la resolución del duelo (§15.4d) | ✅ **Construido** |
+| **§15 — Margen de los partidos** | El bucle del §1.3 aplanaba el 88,8 % de los duelos a un gol; ahora conserva la forma natural (§15.4e) | ✅ **Arreglado** |
+| **§15 — El penalti** | Familia propia, con el insignia del catálogo y su espejo defensivo. Migración `018` (§15.4c) | ✅ **Construido** |
+| **§15 — Familia Árbitro** | Decisiones disciplinarias sobre el evento de tarjeta, con un 4.º dato oculto | ✅ **Construido** |
+| **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
 | **§15 — Partido narrado en cadenas** | Las cadenas siguen con el modo clásico | ⬜ **Sin empezar, a propósito** |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
@@ -369,11 +447,16 @@ tcg_srf/
 │   │   ├── 005 a 012                       Misiones, formaciones, PvE (§11, §11b)
 │   │   ├── 013_plantillas_3d.sql           tabla plantillas_3d (§14)
 │   │   ├── 014_importador_origen.sql       origen_importacion en cromos (§16)
-│   │   └── 016_partido_en_vivo.sql         reloj de partido + duelo_minijuegos (§15)
-│   │       ↑ la 015 está libre: era la del rediseño de tarjeta retirado (v7.2)
+│   │   ├── 016_partido_en_vivo.sql         reloj de partido + duelo_minijuegos (§15)
+│   │   │   ↑ la 015 está libre: era la del rediseño de tarjeta retirado (v7.2)
+│   │   ├── 017_minijuegos_sin_impacto.sql  tope de decisiones que no mueven
+│   │   │                                   marcador (§15.5)
+│   │   └── 018_penalti.sql                 frecuencia del penalti (§15.4c)
 │   └── tcg.sql
 ├── branding/
 │   ├── CLAUDE.md         ← este documento
+│   ├── impacto-partido-analisis.md  ← análisis para decidir el bloque de 17
+│   │                        entradas que espera esa decisión (§12 punto 7)
 │   ├── Biblia/           ← 4 .md: la sesión de diseño de la que sale el §15
 │   └── Rangos_estadisticas_SRF.xlsx/.csv  ← rangos para crear cartas (§15.8)
 ├── panel/                ← admin, TODAVÍA CON EL SISTEMA VIEJO salvo
@@ -581,6 +664,14 @@ Es aditiva y re-ejecutable. **Ojo con sus valores de `configuracion`: entran con
 toca una base ya migrada — hay que hacer el `UPDATE` a mano. Es a propósito:
 si sobrescribiera, cada re-ejecución borraría el calibrado de Alejandro.
 
+**`017` añade un parámetro de balance** (`partido_minijuegos_sin_impacto_max`,
+§15.5). Mismo patrón `INSERT IGNORE`, así que la misma advertencia:
+```
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root tcg < db/migraciones/017_minijuegos_sin_impacto.sql
+```
+No es obligatoria para que los duelos funcionen —el código lee 1 por defecto—,
+pero sin ella el valor no se puede calibrar sin tocar código.
+
 ### 5.3 ⚠️ TRAMPA DE CODIFICACIÓN — léela antes de aplicar nada
 
 **El flag `--default-character-set=utf8mb4` NO es opcional.** Sin él, en Windows
@@ -623,6 +714,7 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `partido_espera_seg` | 15 | cuánto se espera a que aparezcan los dos antes de arrancar igual |
 | `partido_latido_max` | 12 | segundos sin latido para dar a alguien por ausente |
 | `partido_minijuegos_max` | 2 | decisiones por jugador y partido. **Cuidado al subirlo:** el reloj se para para los DOS en cada una, así que 3 son seis pausas y el partido se hace eterno (§15.5) |
+| `partido_minijuegos_sin_impacto_max` | 1 | cuántas de esas decisiones pueden ser de impacto `"ninguno"` (árbitro y defensivas sin gol que mover). **No sube el total ni las pausas**, solo acota cuántas pueden ser irrelevantes para el marcador. Migración `017`; sin él, el 13,94 % de los jugadores gastaba las dos en decisiones que no cambian nada (§15.5) |
 
 ---
 
@@ -778,6 +870,23 @@ puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
   exterior de golpe al primero interior. Por eso las cajas abribles en
   `sobres.php` son `<div role="button" tabindex="0">`, no `<button>`: su
   interior lleva hasta 50 `<button>` de sobre individual (§14).
+- **⚠️ Nada de `height` ni `aspect-ratio` fijos en un contenedor con texto de
+  opciones dentro.** Las pistas de los minijuegos son frases enteras y las
+  columnas miden un tercio del panel, así que el número de líneas cambia con el
+  ancho de la pantalla. Ya mordió dos veces el mismo día, en las dos primitivas
+  nuevas:
+  - `.sim-mj-pista` (medidor) tenía `height: 62px` **más `overflow: hidden`** —el
+    recorte hace falta para que la aguja no se salga— y cortaba la última línea
+    de cada zona. Medido: 63 px necesarios de 60, ya en escritorio; en móvil la
+    pista pasa a tres líneas y desaparece media frase. Lo reportó Alejandro
+    jugando. Arreglado con `min-height`.
+  - `.sim-mj-lienzo` (clic-en-zona) tenía `aspect-ratio`, que **calcula la altura
+    a partir del ancho**, así que a 375 px las celdas pedían 105 px y tenían 84.
+    Arreglado con `grid-template-rows: minmax(<mín>, auto)`, que conserva la forma
+    en pantalla ancha y crece cuando el texto lo pide.
+  - **Cómo comprobarlo sin jugar:** `elemento.scrollHeight > elemento.clientHeight`
+    a 375 px y en escritorio. Mirarlo a ojo en escritorio no basta: ahí sobraba
+    por 3 px y se veía casi bien.
 - **⚠️ Una regla de `display` propia le gana SIEMPRE al atributo `hidden`.**
   `[hidden]` es una regla del navegador, y cualquier `display: flex/grid/block`
   que escribas tiene más prioridad, sin importar la especificidad. El síntoma
@@ -793,6 +902,28 @@ puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
   desde una lectura contaminaría el sorteo de cualquier duelo o sobre que se
   resolviera después en la misma petición, y además hace falta que el servidor
   pueda **recalcular** el mismo resultado para validar lo que manda el cliente.
+- **⚠️ `azarSembrado()` es un generador, NO una función hash. No uses su primer
+  valor para "hashear" una semilla.** Es la trampa que más se ha notado jugando
+  de todo el §15, y el síntoma era claro: *"solo me sale el mismo minijuego"*.
+  El patrón culpable era sembrar con `semilla * K + id_evento * c` y coger el
+  primer valor. El primer valor de un LCG es **casi lineal** en su estado
+  inicial, así que con el sorteo del duelo fijo y el id avanzando a pasos
+  constantes, el valor avanzaba también a pasos constantes y el resultado caía
+  en **ciclos cortos**: en el duelo 1859 los eventos 5 y 17 daban 0.073069 y
+  0.074081 —semillas muy distintas, valor casi idéntico— y por tanto el mismo
+  minijuego dos veces.
+  - **La firma para reconocerlo:** con 5 candidatas, la colisión entre eventos
+    consecutivos era del **0,0 %**. No "poca": imposible. Un reparto sano da
+    1/n. Si mides una colisión de exactamente 0 %, tienes un patrón fijo, no
+    azar.
+  - **Ojo con la métrica equivocada**, que ya despistó una vez: contar *cuántos
+    valores distintos* salen en un partido daba 4 de 4 y parecía sano. Lo que
+    hay que medir es la **repetición**, no la variedad.
+  - Lo correcto está en `Tcg::azarDeJugada()`: sembrar una vez con el sorteo del
+    duelo y **avanzar el generador** hasta el turno de ese evento. Un LCG en
+    secuencia sí está bien distribuido (medido: 25,1 / 20,1 / 33,4 % para 4 / 5 /
+    3 candidatas). `generarEventosPartido()` no se tocó porque ya lo usaba bien:
+    saca muchos valores seguidos de una sola siembra.
 
 ---
 
@@ -1086,14 +1217,67 @@ ventaja de poder.
 
 **Pendientes que nacieron con el §15:**
 
-7. **Más minijuegos.** Van 12 del catálogo de la Biblia y el motor ya admite
-   varias entradas por combinación, así que crecer es solo escribir arrays y
-   pasar `db/verificar_minijuegos.php`. **Ojo con lo que decía la v7:** las
-   familias `balon_parado` y `defensa` NO estaban ambas libres —`defensa` es
-   inalcanzable y `balon_parado` ya está cubierta (§15.4, con la tabla de
-   huecos medidos)—. Hoy lo que queda es **añadir variantes a las tres
-   combinaciones que llegan**; abrir una cuarta exige tocar el filtro
-   `$tieneSentido` de `narracionDuelo()`, que es decisión de diseño.
+7. **Más minijuegos — pero ya no es trabajo de catálogo.** **65 de las 100
+   entradas con mecánica propia de la Biblia**, construidas con **75 entradas de
+   catálogo** (las otras 10 son variantes propias sin nombre en la Biblia: Mano
+   Cambiada, Lectura de Cadera, El Último Palmo, El Regate Previo, Desde la
+   Frontal, A Primer Toque, La Barrera, La Pizarra, El Córner, Segunda Jugada).
+   No confundas los dos números. Y
+   **los 11 huecos que el motor puede producir están cubiertos** (§15.4). Añadir
+   variantes a los que ya existen sigue siendo barato (escribir un array y pasar
+   el verificador), pero lo que queda de la Biblia **no está bloqueado por el
+   catálogo sino por sistemas que no existen**, y escribirlas como arrays no las
+   haría jugables:
+   - ~~Dos primitivas sin construir~~ — **las cuatro están hechas** (§15.4b).
+     Ya no queda nada bloqueado por falta de primitiva.
+   - ~~El penalti~~ — **hecho** (§15.4c), con El Momento de la Verdad y Leer la
+     Mente. Quedan como eventos sin emitir el **saque de banda**, el **saque de
+     puerta** y el **centro alto al área**, que valen 3 entradas de poco peso
+     (El Misil de Banda, El Centro Cargado, ¿Corto o al Bombardero?): son
+     jugadas de relleno y cada tipo nuevo diluye el relato, así que no compensan
+     salvo que Alejandro las quiera.
+   - ~~Tres que cabían sin nada nuevo~~ — **hechas**: El Pase de la Prudencia, El
+     Capricho del Árbitro y La Mano que Nadie Vio, que **solo cabía desde que
+     existe el penalti**: es el VAR invertido sobre una pena máxima en contra, y
+     un acierto ahí anula el gol, que es literalmente lo que la Biblia le pide a
+     Ojo de Halcón.
+   - **Supertécnicas como datos**: no existen. Bloquea Golpe de Autor y El Combo
+     Prohibido. *(El Momento de la Verdad y Leer la Mente ya están construidos
+     sin ellas — ver las desviaciones documentadas en sus entradas.)*
+   - **Sin banquillo, sustituciones, lesiones ni cansancio**: bloquea Emergencia
+     en la Enfermería, La Revolución del Banquillo, Exprimir al Límite, Cazar al
+     Cansado, El Novato Congelado…
+   - **Sin prórroga ni tanda de penaltis**: bloquea El Orden del Destino, Guerra
+     Psicológica, El Gol que lo Cambia Todo…
+   - **`impacto: "partido"` sigue sin decidir** (§15.4): 17 entradas, el bloque
+     más grande de lo que queda. Bloquea todo lo que arrastra a jugadas
+     siguientes — El Milagro Imposible, Dormir el Partido, El Grito de Guerra,
+     La Sincronía Perfecta, La Relajación Peligrosa…
+     **Hay análisis escrito: `branding/impacto-partido-analisis.md`**, con el
+     inventario de qué se rompe (con `fichero:línea`), cuatro caminos y una
+     recomendación. Dos cosas de ahí que conviene saber sin abrirlo:
+     - **`valor_sorteo` hace dos trabajos**: es el mismo número que se sortea en
+       `consultas.php:4904` para decidir el ganador (`$sorteo < $p`, `:4905`) y el
+       que después siembra toda la narración. Hoy eso garantiza gratis que relato y resultado no se
+       contradigan; moverlo obliga a separarlos en dos.
+     - **La parte difícil no es código, es diseño**: hoy irse del partido no
+       cuesta nada porque el duelo ya está resuelto y pagado (§15.3, "si no
+       estás atento, te lo pierdes"). Si el partido decidiera, abandonar pasaría
+       a ser una jugada, y hay que decidir qué ocurre entonces.
+     - **DECIDIDO Y CONSTRUIDO** (§15.4d): se acotó `partido` al presupuesto y al
+       ritmo, nunca al ganador. Van **13 entradas**. Las **4 que no caben** y por
+       qué, para no volver a intentarlo:
+       - *El Baile Provocador* y *La Fiesta Peligrosa* — sus dos ramas son "neutra
+         o peor", y `resolverMinijuego()` no castiga elegir mal a propósito. Toda
+         la familia de Decisiones Negativas choca con esa regla.
+       - *El Golpe de Timón* — cambiar de formación exige recalcular la fuerza a
+         mitad de partido.
+       - *Salir a Matar o Caminar* — necesita cansancio, que no existe.
+   - **Decisiones fuera del partido** (pre-partido o entre nodos de cadena):
+     El Informe Secreto, ¿Arriesgo o Protejo?, La Mirada Desafiante…
+   - **Un hueco más de partido**: dar `familia_def` al evento de `falta`
+     abriría defender un balón parado, donde encaja El Muro de Piedra. Es
+     decisión de diseño, no ampliación de catálogo.
 8. **El desequilibrio de compos** que §15.8 deja medido: hoy mezclar afinidades
    rinde más que enfocarlas, así que construir bien un equipo casi no importa.
    Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
@@ -1530,25 +1714,34 @@ victorias (nunca goles), y el `rango` se calcula únicamente en PvE. **En un due
 PvP el marcador no lo lee nadie más que la pantalla que lo pinta.** Si algún día
 pasa a valer para algo, hay que releer esto.
 
-Construidos **12** de ~90:
+Construidos **43** de ~90, repartidos por **hueco** —que es la unidad que de
+verdad importa: `(lado, familia, tipo de evento)`, no `(familia, lado)`—. Los
+diez huecos que el motor puede producir están cubiertos, ninguno vacío:
 
-| Clave | Familia · lado | Dato oculto | La pregunta |
+| Hueco | Apariciones / 600 partidos | Dato oculto | Entradas |
 |---|---|---|---|
-| `muralla_humana` | `porteria` · defiendes | remate | cómo sales |
-| `mano_cambiada` | `porteria` · defiendes | remate | con qué mano respondes |
-| `lectura_de_cadera` | `porteria` · defiendes | remate | **cuándo** te comprometes |
-| `el_ultimo_palmo` | `porteria` · defiendes | remate | qué palmo cubres |
-| `elige_tu_veneno` | `disparo` · atacas | estilo_portero | dónde la pones |
-| `el_regate_previo` | `disparo` · atacas | estilo_portero | tiras o le regateas |
-| `desde_la_frontal` | `disparo` · atacas | estilo_portero | cómo la golpeas de lejos |
-| `primer_toque` | `disparo` · atacas | estilo_portero | sin tiempo de controlar |
-| `la_barrera` | `balon_parado` · atacas (falta) | colocacion_defensa | por dónde pasas la barrera |
-| `la_pizarra` | `balon_parado` · atacas (falta) | colocacion_defensa | qué jugada ensayas |
-| `el_corner` | `balon_parado` · atacas (córner) | colocacion_defensa | dónde pones el saque |
-| `segunda_jugada` | `balon_parado` · atacas (córner) | colocacion_defensa | qué haces con el rechace |
+| defiendes · `porteria` · **gol** | 1527 | remate | `muralla_humana`, `mano_cambiada`, `lectura_de_cadera`, `el_ultimo_palmo`, `el_paso_adelante`※ |
+| defiendes · `porteria` · **parada** | 1488 | remate | `agarrar_o_golpear`, `el_farol`, `cerrar_el_angulo` |
+| atacas · `disparo` · **parada** | 1488 | estilo_portero | `elige_tu_veneno`, `el_regate_previo`, `cara_a_cara`, `salto_depredador`, `golpe_de_primeras`※ |
+| atacas · `disparo` · **tiro_fuera** | 1173 | estilo_portero | `desde_la_frontal`, `primer_toque`, `golpe_de_fe`, `efecto_imposible` |
+| atacas · `balon_parado` · **falta** | 1056 | colocacion_defensa | `la_barrera`, `la_pizarra`, `bombardeo_aereo`, `doble_engano`, `francotirador`※ |
+| defiendes · `defensa` · **despeje** | 983 | remate | `entrada_al_limite`, `susto_propia_puerta`※, `el_sacrificio_final`, `pedir_ayuda` |
+| atacas · `disparo` · **despeje** | 983 | colocacion_defensa | `cara_o_cruz`, `la_humillacion`, `dentro_o_fuera`, `control_magico`, `el_latigazo`※, `escudo_humano`※ |
+| defiendes · `balon_parado` · **corner** | 703 | remate | `hombre_o_zona`, `salir_o_quedarse`, `vigilancia_aerea` |
+| atacas · `balon_parado` · **corner** | 703 | colocacion_defensa | `el_corner`, `segunda_jugada`, `corner_de_bolsillo`, `jugada_laboratorio` |
+| atacas · `arbitro` · **tarjeta** | 304 | reaccion_rival | `perder_los_papeles`, `el_motin`, `el_ultimo_aviso`, `ojo_de_halcon` |
 
-Los de `porteria` y los de `disparo` son **espejo** unos de otros: sus opciones
-encajan una a una, así que lo que aprendes parando te sirve para rematar.
+※ = primitiva `medidor`. Las demás son `eleccion`.
+
+Los de `porteria` y los de `disparo` sobre el mismo dato oculto son **espejo**
+unos de otros: sus opciones encajan una a una, así que lo que aprendes parando
+te sirve para rematar.
+
+**Las entradas defensivas sobre `parada`, `despeje` y `corner`, y todas las de
+`arbitro`, son de impacto `"ninguno"`** y no por prudencia: esas jugadas ya
+acabaron sin gol, así que no hay ningún gol que quitar. Suman a la puntuación de
+actuación y ahí se quedan. Por eso existe `partido_minijuegos_sin_impacto_max`
+(§15.5).
 
 **Dos cosas del motor cambiaron para que esto quepa** (v7.1, 2026-08-07):
 
@@ -1569,26 +1762,43 @@ y `defensa`—, así que un minijuego de balón parado que leyera al portero
 devolvería siempre su valor por defecto y dejaría **una opción ganando el 100 %
 de las faltas**. El defensa sí está en las dos jugadas de la familia.
 
-> ⚠️ **Corrección a lo que decía la v7 sobre familias libres.** Decía que
-> `balon_parado` y `defensa` estaban sin usar y eran "baratas para empezar".
-> Medido sobre 400 partidos simulados, las combinaciones **(familia, lado) que
-> de verdad llegan** son solo tres, porque `narracionDuelo()` exige
-> `tipo === "gol"` para defender y `tipo !== "gol"` para atacar:
+**Cuarto dato oculto: `reaccion_rival`** (`{protesta, teatro, sigue}`), el que
+abre la familia `arbitro`. Se lee del **rival que sufre la falta**, que está en
+la alineación **contraria a la del evento** — y eso es lo que obligó a crear un
+dato nuevo en vez de reutilizar uno: en un evento de tarjeta el `lado` es el
+equipo **sancionado**, así que los tres datos anteriores (que leen a quien
+defiende la jugada) habrían buscado la carta en la alineación equivocada, no la
+habrían encontrado nunca y habrían dejado **una opción ganando el 100 % de las
+tarjetas**. Tampoco se lee tu propio amonestado a propósito: tu alineación la ves
+entera, así que adivinar algo de tus cartas no sería adivinar nada.
+
+> ⚠️ **Lo que decía la v7.1 sobre huecos inalcanzables ERA CIERTO, pero por una
+> sola línea de código — y en la v7.3 esa línea cambió.** El filtro
+> `$tieneSentido` de `narracionDuelo()` exigía `tipo === "gol"` para defender, y
+> como un gol siempre es `familia_def` `porteria`, las familias `defensa` y
+> `balon_parado` defensivas eran imposibles **por construcción**, no por falta de
+> contenido. Ahora defender solo exige que la jugada del rival traiga
+> `familia_def`:
 >
-> | combinación | huecos medidos | estado |
-> |---|---|---|
-> | `disparo` · ataco | 2453 | 4 entradas |
-> | `balon_parado` · ataco | 1101 | 4 entradas ← **era la que estaba libre** |
-> | `porteria` · defiendo | 1039 | 4 entradas |
-> | `defensa` · defiendo | **0** | **inalcanzable**: defender exige un gol, y un gol siempre es `familia_def` `porteria` |
-> | `balon_parado` · defiendo | **0** | mismo motivo |
-> | `arbitro` · ataco | 202 | alcanzable pero **inservible**: el evento de tarjeta no lleva `protagonistas`, así que el dato oculto caería siempre en su valor por defecto |
+> ```php
+> $tieneSentido = $defiendo ? !empty($e["familia_def"]) : ($e["tipo"] !== "gol");
+> ```
 >
-> **Antes de escribir una entrada para una familia nueva, comprueba que llega.**
-> Hoy las tres combinaciones útiles están cubiertas: seguir creciendo por aquí
-> es añadir variantes a las tres, no descubrir familias nuevas. Para abrir una
-> cuarta habría que tocar el filtro `$tieneSentido` de `narracionDuelo()`, y eso
-> es una decisión de diseño, no una ampliación de catálogo.
+> Eso abrió **tres huecos nuevos con 3.174 apariciones** de cada 600 partidos
+> (parada 1488, despeje 983, córner 703) y con ellos la familia `defensa`, que el
+> documento daba por inalcanzable. Los que siguen sin llegar se excluyen solos,
+> sin necesitar el filtro: `tiro_fuera` trae `familia_def` en `null` y `falta` no
+> la trae, así que `minijuegoDeEvento()` no encuentra familia y devuelve `null`.
+>
+> El de `arbitro` tampoco era inservible de raíz: el motor **ya calculaba**
+> `$jugador` y `$defensa` en la rama de la falta y los tiraba solo al emitir la
+> tarjeta. Adjuntarlos fue una línea.
+>
+> **Sigue valiendo la regla: antes de escribir una entrada para un hueco nuevo,
+> comprueba que llega.** Lo que ya no vale es la conclusión de que solo hay tres.
+> Para abrir un hueco más habría que dar `familia_def` a la falta (abriría
+> defender un balón parado, que es donde encaja *El Muro de Piedra* de la
+> Biblia), y eso sí es decisión de diseño.
 
 **Tres reglas que costaron sangre:**
 
@@ -1605,6 +1815,207 @@ de las faltas**. El defensa sí está en las dos jugadas de la familia.
    (+27 de balance), que es justo lo que prohíbe §1.5 regla 2. Centrado, las tres
    opciones quedan a ~33 % y solo leer la pista sube al 37 %.
 
+### 15.4e ⚠️ El bucle del §1.3 aplanaba TODOS los partidos
+
+Salió midiendo otra cosa, y afectaba a cada duelo que se jugara. El bucle que
+corrige el marcador para que no contradiga al ganador sorteado
+([consultas.php:3013](db/consultas.php:3013)) paraba **en cuanto el ganador se
+ponía por delante**, y el efecto medido era brutal:
+
+| margen final | natural de la simulación | tras el bucle (antes) | tras el arreglo |
+|---|---|---|---|
+| 0 | 36,0 % | — | — |
+| **1** | 44,8 % | **88,8 %** | **80,5 %** |
+| 2 | 15,1 % | 9,5 % | **15,0 %** |
+| 3 | 3,5 % | 1,2 % | **3,8 %** |
+| goles/partido | 1,53 | 2,47 | 2,46 |
+
+**El reparto natural de la simulación era sano** —tiene forma de fútbol— y el
+bucle se lo comía entero: casi ningún partido era una goleada ni un partido
+cómodo, todos se parecían. De paso **inflaba el marcador un 60 %** (1,53 → 2,47
+goles) ascendiendo ocasiones falladas hasta poner al ganador delante.
+
+**El arreglo:** el bucle ya no busca "que gane por uno" sino **que gane por el
+margen que tenía el partido natural**. Si la simulación iba a dar un 3-1, acaba
+3-1 aunque haya que dárselo al otro. Solo los empates naturales se rompen a
+margen 1, que es el mínimo destrozo de verdad.
+
+> **El 80,5 % restante es un suelo, no un fallo:** el 36 % de partidos que la
+> simulación deja empatados **tiene** que romperse, y siempre a margen 1. Bajar de
+> ahí exigiría o menos empates naturales (más goles) o dejar que el partido
+> decida, que está descartado (`branding/impacto-partido-analisis.md`).
+>
+> Y subir la conversión de gol **no lo arregla**: medido a `gol_base` 0,18 el
+> margen 1 seguía en el 84 %, porque el problema era dónde paraba el bucle.
+
+### 15.4d `impacto: "partido"` — lo que arrastra al resto del encuentro
+
+La tercera clase de impacto, y la que la Biblia pide para sus entradas de ritmo y
+moral. **Decisión de Alejandro tras medirlo** (todo el razonamiento y los números
+están en `branding/impacto-partido-analisis.md`): **el efecto NO mueve la
+resolución del duelo.** El ganador lo sigue decidiendo la curva Elo y
+`resolverDuelo()` no se ha tocado.
+
+Lo que hace un `partido` es **ampliar el presupuesto** con el que las jugadas
+siguientes pueden mover el marcador, o conceder una decisión más. Cada entrada
+declara `efecto`, y el verificador lo exige:
+
+| `efecto` | qué concede |
+|---|---|
+| `presupuesto_gol` | una ocasión propia más podrá acabar en gol |
+| `presupuesto_parada` | un gol del rival más podrá pararse |
+| `decision` | una decisión más en el partido (tope +1, por el coste de pausas) |
+
+**Es seguro por construcción, no por cuidado al escribirlo:** la condición del
+§1.3 vive **dentro del `UPDATE`** de `descontarGolRival()`
+([consultas.php:4417](db/consultas.php:4417)), así que el presupuesto es solo una
+**oferta** y la base de datos sigue siendo el juez. Un efecto de partido puede
+darte más oportunidades; no puede contradecir al ganador.
+
+El efecto **se reconstruye** de las filas de `duelo_minijuegos` en cada sondeo
+(`minijuegosResueltos()`), así que los dos jugadores ven lo mismo, sobrevive a
+recargar la página y no hace falta guardar estado nuevo en ninguna parte.
+
+> ⚠️ **Un `partido` solo puede CONCEDER, y no es una elección de diseño.**
+> `resolverMinijuego()` no castiga elegir mal a propósito: *"el minijuego solo
+> puede mejorar tu partido, nunca empeorarlo, así que ofrecerlo jamás es una
+> trampa"*. Por eso la **familia de Decisiones Negativas de la Biblia sigue siendo
+> inexpresable** —El Baile Provocador, La Fiesta Peligrosa, donde una rama "solo
+> puede salir peor"—. No es un olvido del catálogo: es esa regla, y cambiarla es
+> otra decisión.
+
+> **Lo que quedó en suspenso:** la **tanda de penaltis** se había decidido para
+> romper empates, pero con esta opción **no hay empates posibles** (el §1.3 fuerza
+> un ganador), así que no hay nada que romper. Sus 4 entradas siguen pendientes.
+
+### 15.4c El penalti (migración `018`)
+
+**No es un tipo de evento nuevo, y ahí está toda la gracia.** El motor coge una
+ocasión **ya resuelta** y le pone el traje de pena máxima: la emite con los tipos
+`gol` / `parada` / `tiro_fuera` de siempre y lo único propio es la **familia**
+(`penalti`) y las frases. Así el marcador sigue naciendo del sorteo, el
+presupuesto de §15.5 cuenta igual, `$tieneSentido` no se toca y los minijuegos se
+enganchan por familia como cualquier otro. Es el mismo truco que ya usaba
+`gol_asistido`: **la clave de la frase y el tipo del evento no tienen por qué
+coincidir.**
+
+Se señala en un evento aparte de la ejecución (`penalti_senalado`) para que el
+relato tenga el latido real: primero la pena máxima, luego el disparo.
+
+**Es el único hueco donde la misma jugada da decisión a los dos.** Si el penalti
+entra, quien defiende puede sacarlo (*Leer la Mente*); si se falla, quien ataca
+puede meterlo (*El Momento de la Verdad*, que la Biblia llama el minijuego
+insignia de todo el catálogo).
+
+> ⚠️ **El sesgo hacia las ocasiones que ya eran gol no es un detalle, y esconde un
+> trato que es de Alejandro.** Sin sesgo salía marcado solo el **29 %** de los
+> penaltis —en el fútbol real es el ~78 %— y la pena máxima se leía como una
+> moneda al aire que casi siempre falla. Pero un penalti marcado le da la decisión
+> al que DEFIENDE y uno fallado al que ATACA, así que **cuanto más realista es el
+> acierto, menos aparece el insignia.** De ahí que las dos probabilidades vivan en
+> `configuracion` (§5.4) y no en el código.
+>
+> Con los valores sembrados (`0.12` / `0.018`), medido sobre 600 partidos:
+>
+> | | valor |
+> |---|---|
+> | penaltis por partido | 0,47 *(fútbol real ~0,25)* |
+> | marcados | **76,1 %** *(fútbol real ~78 %)* |
+> | `leer_la_mente` se ofrece | 1 partido de cada 2,4 |
+> | el insignia se ofrece | 1 partido de cada 9 |
+>
+> Subir `prob_gol` da más penaltis y más realismo pero esconde el insignia; subir
+> `prob_fallo` hace lo contrario. Los dos llamantes de `generarEventosPartido()`
+> tienen que pasar **los mismos valores** (`opcionesPenalti()`): uno narra el
+> partido y el otro lo resuelve, y si difirieran el marcador guardado no cuadraría
+> con el relato.
+
+### 15.4b Las cuatro primitivas de interfaz (Biblia §2.1 y §2.2)
+
+**Las cuatro están construidas.** La clave que las hace baratas es la misma en
+todas: **las zonas, los sectores y los tramos del medidor SON las opciones**, así
+que el ciclo cerrado, la pista, la opción segura y el verificador siguen valiendo
+sin tocar nada del servidor. Cambia el mando, no la decisión — y una entrada pasa
+de una primitiva a otra cambiando una clave.
+
+| Primitiva | Entradas | Qué añade | Claves propias |
+|---|---|---|---|
+| `eleccion` | 44 | tres botones. La más usada del catálogo | — |
+| `medidor` | 6 | una capa de **ejecución**: hay que cazar la aguja | `velocidad` |
+| `zona` | 7 | **leer la posición** de un vistazo, sobre un mapa | `lienzo` + `zona` por opción |
+| `arrastre` | 5 | el **gesto** del control de DS (Biblia §2.2) | `sector` por opción |
+
+Ninguna toca el equilibrio: las tres zonas de un medidor son de ancho igual, los
+tres sectores de un arrastre son de 60°, y en `zona` no hay puntería que fallar.
+A ciegas siguen valiendo 1/3, que es lo que mide el verificador.
+
+**`zona` (clic-en-zona).** Las opciones van sobre un mapa —`porteria` (el marco
+de frente), `area` (el área desde arriba) o `campo` (el último tercio)— en el
+sitio que les toca. El vocabulario de huecos de cada lienzo vive en
+**`Tcg::LIENZOS_ZONA`**, y es fuente única de verdad para tres sitios que tienen
+que coincidir: el catálogo, el verificador y las `grid-template-areas` de
+`layout.css`. El cliente pone `grid-area` con el nombre tal cual, así que **un
+hueco que el CSS no conozca se auto-coloca y descuadra el mapa sin dar ningún
+error** — de ahí que el verificador lo compruebe. No necesita degradarse: son
+`<button>` de verdad y no hay nada animado.
+
+**`arrastre` (Familia DS).** Se arrastra desde el balón y el ángulo cae en uno de
+tres sectores de 60° (`izquierda` −90..−30, `centro` −30..+30, `derecha`
++30..+90, medidos desde la vertical). Dos detalles que no son opcionales:
+- **⚠️ Los botones siguen visibles con esta primitiva, por WCAG 2.2 SC 2.5.7
+  (Dragging Movements):** toda función de arrastre necesita alternativa de un
+  solo puntero. No son redundancia, son parte de la primitiva — sin ellos queda
+  inoperable con teclado y fuera del §7.
+- **Mínimo de 24 px de recorrido.** Sin él, un simple toque en la lona resolvía
+  la jugada con el ángulo que saliera: un accidente esperando a pasar.
+- La lona lleva `touch-action: none`, o el navegador se lleva el gesto al scroll.
+
+Lo que **no** se construyó de la Familia DS: *La Conducción Serpenteante* pide un
+trazo **prolongado** puntuado por fidelidad al camino, y eso no cabe en un
+contrato que resuelve una opción contra un dato oculto. Está como elección de
+ruta con el mismo gesto, y la desviación queda anotada en su entrada.
+
+#### El `medidor` en detalle (Biblia §2.1, segunda primitiva)
+
+Una aguja recorre las tres zonas en bucle y el jugador la detiene con un botón.
+**La decisión de diseño que lo hace baratísimo: las ZONAS son las opciones.** El
+ciclo cerrado, la pista, la opción segura y el verificador siguen valiendo sin
+tocar nada del servidor — cambia *cómo* eliges, no *qué* se decide. Una entrada
+puede pasar de `eleccion` a `medidor` cambiando una clave.
+
+Dos claves nuevas en el catálogo: `primitiva` (`"eleccion"` | `"medidor"`) y
+`velocidad`, en milisegundos de ida y vuelta de la aguja, con las mismas seis
+claves que `plazo`. La velocidad es su palanca de dificultad (§3.2).
+
+**Dos reglas propias, y las dos las comprueba el verificador:**
+
+1. **La opción `segura` va EN MEDIO del array `opciones`.** La aguja cruza la
+   zona central dos veces por ciclo, así que es la más fácil de acertar: fallar
+   el pulso tiene que dejarte en lo conservador y nunca en lo de más premio. Es
+   §1.5 regla 4 llevada de la decisión a la ejecución.
+2. **`velocidad` completa en las seis dificultades**, o el medidor caería a un
+   valor por defecto sin que nadie se enterase.
+
+**No toca el equilibrio.** Las tres zonas son de ancho igual, así que a ciegas
+siguen valiendo 1/3 cada una y el verificador mide exactamente lo mismo que
+antes. Lo que añade es una capa de **ejecución** encima de la de lectura.
+
+**Con movimiento reducido no se ofrece:** `duelo.js` cae a los tres botones de
+siempre. Cazar una aguja *es* movimiento, y sin ella no hay medidor que jugar —
+§7: se reduce el movimiento, nunca el juego.
+
+> ⚠️ **La aguja arranca en el centro de la zona segura, no en el extremo.** Esto
+> salió de una prueba real, no de la teoría: `requestAnimationFrame` se pausa en
+> una pestaña en segundo plano (§8), y con la aguja arrancando en 0 la posición
+> se quedaba ahí, así que pulsar "Parar" resolvía con la **primera** opción de la
+> lista — que no es la conservadora. Un fallo de fotogramas se convertía en una
+> decisión arriesgada tomada sin querer. Arrancando en la segura, lo peor que
+> puede pasar coincide con lo que ya hace el servidor al vencer el plazo.
+>
+> Por eso el payload del sondeo incluye `segura` en cada opción. **No filtra
+> nada**: dice cuál es la conservadora, no contra qué valor gana, y el jugador la
+> conoce igual porque es la que se aplica sola al agotarse el plazo.
+
 ### 15.5 Cuántas decisiones, y por qué tan pocas
 
 `partido_minijuegos_max` = **2 por jugador**. El número no vale por jugador sino
@@ -1619,6 +2030,67 @@ decisiones** — con margen mínimo no cabe mover nada sin contradecir el sorteo
 justo el partido en el que más quieres pelear era el que no te dejaba tocar nada.
 Cuando no cabe, la jugada sigue contando para la actuación (§4.6), así que nunca
 es un "continuar" disfrazado.
+
+#### Y CUÁNDO llegan: repartidas, no las primeras que valgan
+
+`Tcg::repartirDecisiones()`. Hasta la v7.3 se ofrecían las **primeras** jugadas
+que valían, y con los huecos defensivos abiertos eso se volvió un defecto
+medible: las candidatas tempranas se multiplicaron y el techo se gastaba
+enseguida, dejando el resto del partido plano y repitiendo siempre el tipo de
+jugada más frecuente al principio.
+
+| | antes | ahora |
+|---|---|---|
+| minuto mediano de una decisión | 10' | **46'** |
+| minuto de la última del partido | 17' | **68'** |
+| decisiones en los primeros 30' | 88 % | **33 %** |
+| **mismo minijuego dos veces en un partido** | frecuente | **0,75 %** |
+| decisiones por jugador | 2,00 | 1,99 |
+
+Cómo funciona: la lista de eventos ya está completa cuando se llega ahí, así que
+divide el partido en tantas ventanas iguales como decisiones quepan y coge una de
+cada ventana. Dentro de una ventana prefiere, por orden: (1) las que pueden mover
+el marcador, (2) las que **no repiten** un minijuego ya visto en ese partido. Las
+ventanas vacías se rellenan al final para no perder una decisión por un reparto
+desafortunado de los eventos.
+
+**Es determinista de principio a fin**, y no es opcional:
+`resolverMinijuegoDuelo()` vuelve a llamar a `narracionDuelo()` para recalcular
+qué se jugó, así que con azar real aquí el servidor podría elegir una jugada
+distinta de la que el jugador tenía delante.
+
+#### El tope de las decisiones que no mueven marcador (`017`, v7.3)
+
+`partido_minijuegos_sin_impacto_max` = **1**. Es el segundo techo, y hace falta
+porque al abrir los huecos defensivos y la familia árbitro las entradas de
+impacto `"ninguno"` pasaron a ser mayoría de las candidatas: los tres huecos
+defensivos nuevos juntos (3.174 apariciones) superan al del gol (1527).
+
+**Medido sobre 800 partidos, 1600 jugadores:**
+
+| | sin tope | con tope = 1 |
+|---|---|---|
+| decisiones por jugador | 2,00 | 1,99 |
+| de ellas sin impacto en el marcador | 35,3 % | 28,5 % |
+| **jugadores sin NINGUNA que mueva el marcador** | **13,94 %** | **0,81 %** |
+
+Sin el tope, **1 de cada 7 jugadores** gastaba sus dos decisiones en cosas
+incapaces de tocar el resultado: exactamente el mismo problema que este apartado
+arregló en su día por el otro lado, reintroducido por la puerta de atrás. Con el
+tope baja 17 veces y las decisiones por jugador **no bajan** (2,00 → 1,99), así
+que la variedad entra sin coste.
+
+**Ojo con lo que el tope NO hace:** no sube el número de pausas, que es el coste
+de ritmo real. El total sigue siendo `partido_minijuegos_max`; esto solo acota
+cuántas de ellas pueden ser irrelevantes para el marcador.
+
+**Y ojo con `impacto`, que hasta la v7.3 era decorativo:** la clave estaba
+declarada en el catálogo desde el principio pero **el motor no la leía en ningún
+sitio** —las tres menciones en `db/consultas.php` eran comentarios—, así que
+`resolverMinijuegoDuelo()` movía el marcador solo por `lado` + `acierto`. Una
+entrada con `impacto: "ninguno"` habría sumado un gol de la nada. Ahora la leen
+los dos sitios que importan: `resolverMinijuegoDuelo()` para aplicar el gol y
+`narracionDuelo()` para gastar presupuesto.
 
 Quien decide de verdad si el marcador se mueve es **la base de datos**: la
 condición de §1.3 va dentro del `UPDATE` de `descontarGolRival()` y
@@ -1721,7 +2193,20 @@ Además de §13:
   siempre que añadas una entrada a `db/minijuegos.php`.** Comprueba el ciclo
   cerrado, la opción segura única, que la clave de una opción no delate su
   valor, los plazos, el reparto del dato oculto, que ninguna entrada sea código
-  muerto, el determinismo y cuánto vale leer la pista.
+  muerto, el determinismo, cuánto vale leer la pista, que la primitiva sea
+  conocida y —si es `medidor`— que traiga `velocidad` completa y la opción
+  segura **en el centro** (§15.4b). Hoy: 43 entradas, 95 comprobaciones, 0 fallos.
+- **Su `recorrer()` tiene que replicar LITERALMENTE el `$tieneSentido` de
+  `narracionDuelo()`.** Si se queda con una condición vieja, las entradas de los
+  huecos nuevos salen marcadas como código muerto aunque en un partido real se
+  ofrezcan — pasó al relajar el filtro en la v7.3.
+- **El payload que viaja al navegador no puede llevar la clave `gana`** de
+  ninguna opción, ni `oculto`, ni las listas `remates`/`estilos` del catálogo.
+  Es el dato oculto: con verlo en la respuesta de red bastaría para acertar
+  siempre. `segura` sí puede viajar (§15.4b explica por qué no filtra nada).
+- **Ni el título ni el enunciado pueden llegar con marcadores `{}` sin
+  sustituir.** El título no pasaba por `strtr()` hasta la v7.3, así que una
+  entrada con un nombre ahí enseñaba `{defensa}` en pantalla.
 - Ninguna opción de un minijuego puede tener ventaja eligiéndola siempre a ciegas
   (las tres a ~33 %), y leer la pista debe quedar por encima **sin resolverlo
   sola**. Medido hoy: a ciegas 33,2-33,9 %; leyendo, 37,2 % (`estilo_portero`),
