@@ -4078,6 +4078,154 @@ class Tcg
 		")->execute([":d" => $id_duelo]);
 	}
 
+	/**
+	 * Cierra un partido que ha llegado al final: decide el ganador con el
+	 * marcador que ha quedado, rompe el empate en la tanda, entrega el bote y
+	 * pasa el duelo a `resuelto`.
+	 *
+	 * ⚠️ SE LLAMA DESDE UN SONDEO, así que la llaman LOS DOS JUGADORES a la vez y
+	 * muchas veces. Que el bote se entregue una sola vez no lo garantiza este
+	 * PHP: lo garantiza la condición `estado = 'en_juego'` dentro del UPDATE, que
+	 * es la misma técnica que usa descontarGolRival() y por el mismo motivo
+	 * (comprobar y luego actualizar deja una ventana por la que dos peticiones
+	 * simultáneas pagarían dos veces). Si el UPDATE no toca ninguna fila, otro ya
+	 * liquidó y aquí no se paga nada.
+	 *
+	 * El dinero YA está retenido desde que cada uno entró (crearDuelo y
+	 * aceptarDuelo), así que esto no cobra: solo entrega.
+	 *
+	 * @return array{ok:bool, id_ganador:?int, por_tanda:bool}
+	 */
+	public function liquidarPartido($id_duelo) {
+		try {
+			$this->pdo->beginTransaction();
+
+			$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d FOR UPDATE");
+			$stmt->execute([":d" => $id_duelo]);
+			$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
+
+			if (!$duelo || $duelo["estado"] !== "en_juego") {
+				$this->pdo->rollBack();
+				return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+			}
+
+			$idCreador = (int) $duelo["id_creador"];
+			$idRival   = (int) $duelo["id_rival"];
+			$golesC    = (int) $duelo["goles_creador"];
+			$golesR    = (int) $duelo["goles_rival"];
+
+			$porTanda = false;
+			if ($golesC > $golesR)      { $ganaLado = "local"; }
+			elseif ($golesR > $golesC)  { $ganaLado = "visitante"; }
+			else {
+				/* Empate: a la tanda. Con el partido decidiendo el resultado los
+				   empates son posibles por primera vez, y son justo lo que el §1.3
+				   hacía imposible cuando el ganador venía pre-sorteado. */
+				$porTanda = true;
+				$cartasC = $this->listarAlineacionDuelo($id_duelo, $idCreador);
+				$cartasR = $this->listarAlineacionDuelo($id_duelo, $idRival);
+				$fC = self::fuerzaAlineacion($cartasC, $duelo["formacion_creador"] ?? self::FORMACION_BASE);
+				$fR = self::fuerzaAlineacion($cartasR, $duelo["formacion_rival"] ?? self::FORMACION_BASE);
+				$ganaLado = self::tandaDePenaltis(
+					(float) $duelo["valor_sorteo"],
+					$fC["DC"] ?? 0, $fC["POR"] ?? 0,
+					$fR["DC"] ?? 0, $fR["POR"] ?? 0
+				);
+			}
+
+			$idGanador  = $ganaLado === "local" ? $idCreador : $idRival;
+			$idPerdedor = $ganaLado === "local" ? $idRival   : $idCreador;
+
+			// El cierre y la condición de carrera, en la misma sentencia.
+			$cerrar = $this->pdo->prepare("
+				UPDATE duelos
+				SET estado = 'resuelto', id_ganador = :g, resuelto_por_tanda = :t
+				WHERE id_duelo = :d AND estado = 'en_juego'
+			");
+			$cerrar->execute([":g" => $idGanador, ":t" => $porTanda ? 1 : 0, ":d" => $id_duelo]);
+			if ($cerrar->rowCount() === 0) {
+				// Otro sondeo se nos adelantó: no se paga dos veces.
+				$this->pdo->rollBack();
+				return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+			}
+
+			// --- entregar el bote (ya estaba retenido) ---
+			if ($duelo["tipo_apuesta"] === "monedas") {
+				$bote = ((int) $duelo["monedas"]) * 2;
+				$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :bote WHERE id_usuario = :id")
+					->execute([":bote" => $bote, ":id" => $idGanador]);
+			} else {
+				$stmtCarta = $this->pdo->prepare("
+					SELECT id_coleccion FROM duelo_apuestas
+					WHERE id_duelo = :id_duelo AND id_usuario = :id_usuario
+				");
+				$stmtCarta->execute([":id_duelo" => $id_duelo, ":id_usuario" => $idPerdedor]);
+				$copiaPerdida = $stmtCarta->fetchColumn();
+				if ($copiaPerdida) {
+					$this->pdo->prepare("
+						UPDATE coleccion SET id_usuario = :ganador, bloqueada = 0
+						WHERE id_coleccion = :id_coleccion
+					")->execute([":ganador" => $idGanador, ":id_coleccion" => $copiaPerdida]);
+				}
+			}
+
+			$this->pdo->commit();
+			return ["ok" => true, "id_ganador" => $idGanador, "por_tanda" => $porTanda];
+		} catch (Throwable $e) {
+			if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+			return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+		}
+	}
+
+	/**
+	 * Tanda de penaltis: rompe un empate y devuelve "local" o "visitante".
+	 *
+	 * Cinco lanzamientos por bando y muerte súbita si sigue igualado. Cada
+	 * penalti lo decide la línea de PORTERÍA del que para contra la de ATAQUE del
+	 * que tira, que es lo único que tiene sentido mirar en una tanda.
+	 *
+	 * DETERMINISTA desde el sorteo del duelo, como todo lo demás del partido: la
+	 * liquidación se evalúa de forma perezosa en cada sondeo (§8, no hay cron) y
+	 * los dos jugadores la piden a la vez, así que con azar real cada uno podría
+	 * calcular un ganador distinto.
+	 *
+	 * Por ahora se resuelve en servidor y no se juega. Las cuatro entradas de la
+	 * Biblia que la convierten en interactiva —El Orden del Destino, Guerra
+	 * Psicológica, Tiempo Extra y El Gol que lo Cambia Todo— siguen pendientes;
+	 * esto es lo que hace falta para que el bote pueda entregarse.
+	 */
+	public static function tandaDePenaltis($semilla, $ataqueLocal, $porteriaLocal,
+	                                        $ataqueVisitante, $porteriaVisitante) {
+		// Probabilidad de marcar de cada uno, acotada: ni un penalti es seguro ni
+		// es imposible, y en el fútbol real entra en torno al 75 %.
+		$prob = function ($ataque, $porteriaRival) {
+			$total = max(1.0, (float) $ataque + (float) $porteriaRival);
+			return max(0.55, min(0.90, 0.75 * (2 * (float) $ataque / $total)));
+		};
+		$pL = $prob($ataqueLocal, $porteriaVisitante);
+		$pV = $prob($ataqueVisitante, $porteriaLocal);
+
+		$golesL = 0; $golesV = 0;
+		for ($i = 0; $i < 5; $i++) {
+			if (self::azarDeJugada($semilla, 100 + $i, 9161) < $pL) $golesL++;
+			if (self::azarDeJugada($semilla, 200 + $i, 9161) < $pV) $golesV++;
+		}
+
+		/* Muerte súbita. El tope de 40 rondas no es decoración: sin él, dos
+		   porterías muy fuertes podrían no resolver nunca y el duelo se quedaría
+		   sin liquidar para siempre. Si se agota, decide el sorteo, que es lo
+		   único que queda y sigue siendo reproducible. */
+		$ronda = 0;
+		while ($golesL === $golesV && $ronda < 40) {
+			$l = self::azarDeJugada($semilla, 300 + $ronda, 9161) < $pL;
+			$v = self::azarDeJugada($semilla, 400 + $ronda, 9161) < $pV;
+			if ($l !== $v) { $golesL += $l ? 1 : 0; $golesV += $v ? 1 : 0; }
+			$ronda++;
+		}
+		if ($golesL === $golesV) return $semilla < 0.5 ? "local" : "visitante";
+		return $golesL > $golesV ? "local" : "visitante";
+	}
+
 	/** Los minijuegos ya resueltos de un duelo, indexados por evento+usuario. */
 	public function minijuegosResueltos($id_duelo) {
 		$stmt = $this->pdo->prepare("SELECT * FROM duelo_minijuegos WHERE id_duelo = :d");
