@@ -354,6 +354,27 @@ await fetch('/tcg_srf/login.php', {method:'POST',
 (`Tcg::USUARIO_BOT`). No lo borres ni le cambies el nombre — las Cadenas lo
 buscan por nombre.
 
+> ⚠️ **Y `CPU` NO tiene `dictador = 1`.** Así que un *"borro todos los usuarios
+> menos los admins"* **se lo lleva por delante**, y con él los 20 duelos de
+> cadena en los que es el rival (`duelos.id_rival` es CASCADE desde la `023`).
+> Cualquier limpieza de usuarios tiene que excluirlo a mano: `dictador` no basta
+> como filtro.
+
+### Limpieza previa a producción — el orden importa
+
+Plan de Alejandro: **se mantiene ESTA base de datos**, y antes de subir se borran
+las cartas de prueba, se testea el balance y se borran los usuarios menos los
+admins. Dos cosas que hay que saber antes de ejecutarlo:
+
+- **Los usuarios van primero, las cartas después.** Las claves ajenas de `cromos`
+  son **RESTRICT** en `coleccion` y `duelo_alineaciones`, así que borrar una carta
+  falla mientras alguien tenga una copia o mientras aparezca en la alineación de un
+  duelo pasado. Al revés no funciona.
+- **Borrar un usuario limpia lo suyo solo** (casi todo CASCADE: colección, mazos,
+  duelos, aumentos, progreso, misiones). Lo único que queda son filas de
+  `duelo_minijuegos`, que **no tiene ninguna clave ajena**: basura inofensiva,
+  porque los `id_duelo` no se reutilizan y nadie las consulta sin su duelo.
+
 ---
 
 ## 1. Estado del trabajo
@@ -726,6 +747,15 @@ no se pueden saltar:
 | `020_minijuego_prob_gol.sql` | `partido_minijuego_prob_gol` | no |
 | `021_resuelto_por_tanda.sql` | **columna `resuelto_por_tanda`** | **SÍ** — la escribe `liquidarPartido()` en cada cierre |
 | `022_presupuesto_marcador.sql` | presupuesto de marcador y plazo de abandono | no, pero sin ella no se calibran |
+| `023_duelos_rival_cascade.sql` | `duelos.id_rival` de SET NULL a **CASCADE** | no para jugar, **sí antes de limpiar usuarios** |
+
+**Sobre la `023`:** corrige una asimetría, no añade una pérdida. `id_creador` ya era
+CASCADE, así que al borrar una cuenta los duelos que esa cuenta CREÓ ya
+desaparecían del historial del rival, mientras que los duelos en los que fue RIVAL
+sobrevivían apuntando a nadie. Ahora se van los dos. **Ojo con `ADD CONSTRAINT IF
+NOT EXISTS`: no existe para claves ajenas en MariaDB 10.4** (error de sintaxis,
+comprobado). La re-ejecutabilidad sale del `DROP FOREIGN KEY IF EXISTS` que va
+delante.
 
 **La diferencia entre obligatoria y opcional es de qué cambian**, y conviene
 entenderla para clasificar bien las que vengan: las opcionales solo añaden filas a
