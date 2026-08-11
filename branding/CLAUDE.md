@@ -1606,8 +1606,12 @@ ventaja de poder.
 10. **El resto del escalado de dificultad** (Biblia §3). Hoy salen por
     dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
     acierto, la fiabilidad de la pista y el coste del fallo.
-11. **Calibrar `duelo_k`** con duelos reales — §15.8 sugiere que es la palanca
-    real del equilibrio, no los rangos de estadísticas.
+11. ~~Calibrar `duelo_k`~~ — **ya no sirve de nada: `duelo_k` no decide el duelo
+    desde el §15.10** (§15.8c, medido). Lo que sí queda pendiente es decidir si la
+    conversión de fuerza en goles debe poder calibrarse: hoy vive en constantes
+    dentro de `generarEventosPartido()`, y el suelo `pOcasion >= 0.14` es lo que
+    aplana los duelos. Sacarlas a `configuracion` es trabajo pequeño; cambiarlas
+    es una decisión de balance.
 12. **Resolver los hallazgos abiertos de §10.6** (relacionado con el 8).
 
 **Ya no están pendientes** (estaban en la v6):
@@ -2548,6 +2552,96 @@ Ensanchar los rangos de estadísticas casi no lo mueve (de ±7 a ±25 lleva al R
 del 11 % al 23 %, y con ±25 la rareza ya no significa nada). **La palanca es
 `duelo_k`**: subirla de 400 a 1000 lleva al Raro al 30 % y al Épico al 39 %.
 
+#### 15.8b Remedido el 2026-08-11 — y el diagnóstico de arriba hay que MATIZARLO
+
+Se volvió a medir sobre el catálogo actual (**44 cromos**, no los 38 de entonces),
+construyendo los onces a propósito: el **enfocado** coge todas las cartas de una
+afinidad que quepan; el **surtido** reparte; y el **bruto** coge sencillamente las
+más fuertes de cada puesto, que es lo que hace quien no quiere pensar. Se comparan
+por fuerza final, con compos y malus incluidos.
+
+> **Cómo NO medir esto, porque me pasó a mí las dos veces:**
+> 1. **No muestrees onces al azar para encontrar "el mejor enfocado":** de 6.000
+>    tiradas, solo 3 salen con 8 cartas de la misma afinidad, así que lo que
+>    encuentras no es el mejor enfocado sino uno cualquiera. Constrúyelo.
+> 2. **`rasgosCatalogo()` cachea en un `static`**, así que cambiar `rasgos`
+>    (umbrales o porcentajes) a mitad de proceso NO se ve: hay que lanzar **un
+>    proceso por escenario**. Con el mismo `mt_srand`, dos escenarios te dan cifras
+>    idénticas y parece un hallazgo cuando es un fallo de método.
+
+| once | todo el catálogo | rareza ≤ 3 |
+|---|---|---|
+| enfocado (el mejor de las 4 afinidades) | 1812 | **1637** |
+| surtido (reparte) | 1803 | 1597 |
+| **bruto (las cartas más fuertes, sin pensar)** | **1900** | 1649 |
+
+**1. Enfocarse SÍ gana a mezclar** (+9 y +40 de fuerza final). El §15.8 lo atribuía
+a que "el sistema premia mezclar"; con onces bien armados no es cierto. Lo que sí
+es cierto es su observación de partida: pensar aporta poco.
+
+**2. Lo que gana a todo es no pensar y coger las cartas más fuertes** (+88 sobre el
+mejor enfocado en el catálogo entero). **Ese es el problema real**, y es otro: no
+compiten enfocar y mezclar, compite la capa de compos entera contra la calidad de
+las cartas.
+
+**3. La capa de compos vale el 3,7-4,7 % de la fuerza final.** Ese es su techo
+completo, así que no puede tapar una diferencia de cartas del 12 %.
+
+**4. `line_cap` no muerde nunca.** Está en 20 y **la línea más cargada de cualquier
+once llega a 5,76**. Subirlo a 35 o quitarlo no cambia ni un decimal. El §10.3 lo
+describe como una restricción viva; hoy no lo es.
+
+**5. Barrido de parámetros, un proceso por escenario** (diferencia entre el mejor
+once enfocado y el bruto — negativo = pensar pierde):
+
+| escenario | todo el catálogo | rareza ≤ 3 |
+|---|---|---|
+| **hoy** | −88 | −11 |
+| umbrales 4/7/10 | −43 | −29 |
+| **porcentajes ×2** | −85 | **+2** |
+| **porcentajes ×3** | −109 | **+15** |
+| umbrales 4/7/10 + ×3 | −28 | −21 |
+
+**Dentro de una banda de rareza, doblar los porcentajes de `rasgos` ya hace que
+pensar gane.** Pero **entre bandas no lo arregla, y lo empeora**: los bonos son un
+porcentaje de TU PROPIA fuerza, así que agrandarlos le da más al que ya tiene
+mejores cartas. Esa es la razón estructural de que el objetivo del §15.8 —"un Raro
+bien pensado gana a un SRF"— **no se pueda alcanzar tocando compos**.
+
+#### 15.8c ⚠️ `duelo_k` YA NO HACE NADA. La recomendación del §15.8 está caducada
+
+El §15.8 dice que la palanca es `duelo_k` y que subirla de 400 a 1000 lleva al Raro
+del 11 % al 30 %. **Eso era verdad cuando la curva Elo decidía el duelo. Desde el
+§15.10 no decide nada.**
+
+`resolverDuelo()` calcula `$p` con `duelo_k`, lo **guarda** en
+`probabilidad_victoria_creador` y **nadie más lo lee**: el ganador sale del
+marcador, y el marcador sale de `generarEventosPartido()`, que recibe las fuerzas y
+el sorteo — no `$p` ni `$k`. Comprobado por dos caminos: leyendo los usos de `$p`, y
+midiendo **150 duelos con `duelo_k = 400` y otros 150 con `1000`**, que dieron el
+**mismo resultado hasta el decimal** (34,0 % para el mazo débil).
+
+Dos consecuencias que hay que tener presentes:
+
+- **La palanca real está en `generarEventosPartido()` y NO es configurable**: son
+  constantes en el código, sobre todo el acotado
+  `pOcasion = max(0.14, min(0.52, 0.10 + ratio * 0.62))`. Ese suelo de 0,14 es lo
+  que garantiza que el mazo flojo pise el área, y por tanto lo que aplana el duelo.
+  El método es `static` y no lee `configuracion` por su cuenta (lo dice su propio
+  comentario), así que calibrarlo hoy es tocar código.
+- **El "partías con un X %" de la pantalla de resultado ya no describe el duelo.**
+  Con `duelo_k = 400` sale aproximadamente calibrado por casualidad (32 % anunciado
+  contra 34 % medido); con cualquier otro valor, el número mentiría sin que nada
+  fallara.
+
+**Medido con duelos reales, jugados enteros:** el mejor once de rareza ≤ 3 gana el
+**34,0 %** al mejor once del catálogo entero (150 duelos, marcador medio 0,83-1,23,
+30 % decididos en la tanda). Está lejos del 11 % que registra el §15.8 — la
+comparación no es la misma y el catálogo ha crecido—, pero sigue sin ser el
+equilibrio que se buscaba.
+
+**Nada de esto se ha tocado: es balance, y el balance lo decide Alejandro.**
+
 Los rangos para crear cartas nuevas están en
 `branding/Rangos_estadisticas_SRF.xlsx` / `.csv`, ajustados por mínimos cuadrados
 sobre las 38 cartas reales (desviación máxima 5,6 puntos) y con solape
@@ -2746,8 +2840,13 @@ aviso es la del caso extremo sintético: con 240 contra 100,
 Está medido y **Alejandro lo aceptó a cambio de que los minijuegos cuenten**. No
 hay forma de tener a la vez el equilibrio de antes, marcadores con forma de fútbol
 y que el partido decida: aplanar la conversión de goles para que cuadre con el Elo
-da 52 % de empates y 0,84 goles por partido, que no es fútbol. **Las palancas para
-recalibrarlo son `duelo_k` y, ahora, `partido_presupuesto_marcador`.**
+da 52 % de empates y 0,84 goles por partido, que no es fútbol.
+
+> ⚠️ **Aquí ponía que las palancas eran `duelo_k` y `partido_presupuesto_marcador`.
+> `duelo_k` NO es una palanca: ya no decide nada** — se guarda y no se lee (§15.8c,
+> comprobado con 150 duelos a 400 y otros 150 a 1000, resultado idéntico). Quedan
+> `partido_presupuesto_marcador` y las constantes de `generarEventosPartido()`, que
+> hoy están en el código.
 
 #### El cliente tuvo que cambiar, y aquí está la trampa
 
