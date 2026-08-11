@@ -229,8 +229,17 @@ $db->cerrarPartidoSiToca($id) ? $ok("parado desde hace mucho se cierra") : $ko("
 ($monedas(9) - $antes9) + ($monedas(2) - $antes2) === 140 ? $ok("y el bote se entrega") : $ko("bote retenido");
 
 // 6c: la red del listado de duelos.
+/* ⚠️ EL MARCADOR SE FUERZA DECISIVO A PROPÓSITO, y no es por comodidad: esta
+   rama NO fuerza la tanda —el partido acaba de terminar, todavía no hay
+   abandono— así que con un empate `liquidarPartido()` se niega a cerrar y esto
+   contaba 0 partidos cerrados. Correcto en el motor, intermitente en la prueba:
+   fallaba en el 25 % de las ejecuciones, que es justo lo que empata. Lo que aquí
+   se quiere comprobar es que ABRIR LA LISTA cierra un partido terminado; el
+   empate por el listado ya lo cubren 6a y 6b, que sí fuerzan. */
 $id = montarDuelo($db, $p, 70);
 acabarReloj($p, $id);
+$p->prepare("UPDATE duelos SET goles_creador = 2, goles_rival = 0 WHERE id_duelo = :d")
+  ->execute([":d" => $id]);
 $antes9 = $monedas(9); $antes2 = $monedas(2);
 $db->cerrarPartidosPendientes(2) >= 1 ? $ok("abrir la lista de duelos cierra los partidos terminados") : $ko("la lista no cierra nada");
 ($monedas(9) - $antes9) + ($monedas(2) - $antes2) === 140 ? $ok("y entrega el bote") : $ko("bote sin entregar");

@@ -4528,6 +4528,8 @@ class Tcg
 		if ((int) $duelo["goles_creador"] !== (int) $duelo["goles_rival"]) return false;
 
 		$plazo = max(3, (int) $this->config("tanda_plazo_seg", 12));
+		$esPve = $duelo["dificultad"] !== null;
+		$idBot = $esPve ? $this->idBot() : 0;
 
 		// El bucle tiene tope: cada vuelta resuelve un tiro como mucho, y la
 		// tanda entera no puede pasar de TANDA_MAX_RONDAS por bando.
@@ -4545,34 +4547,39 @@ class Tcg
 			}
 
 			$tiro = $estado["abierto"];
+
+			/* ⚠️ EL CPU ELIGE AL INSTANTE, NO AL VENCER EL PLAZO (§15.12, pieza 5).
+			   Sin esto una tanda de cadena se juega igual —el plazo acaba eligiendo
+			   por él— pero con DOCE SEGUNDOS MUERTOS en cada tiro en los que el
+			   jugador mira una portería que no espera nada de él. Una tanda son diez
+			   tiros: dos minutos de reloj parado.
+
+			   Elegir antes no filtra nada: la elección del rival no viaja al cliente
+			   hasta que el tiro se resuelve (§15.11 y §6.3), y esa es la garantía que
+			   protege también el caso humano. Y sigue sin ser adivinable, porque sale
+			   de `valor_sorteo`, que no sale del servidor. */
+			if ($esPve) {
+				$quien = self::tandaProtagonistas($duelo, (int) $tiro["turno"]);
+				if ((int) $quien["tira"] === $idBot && $tiro["zona_tirador"] === null) {
+					$tiro["zona_tirador"] = $this->elegirZonaAutomatica($id_duelo, $duelo, $tiro, "tirador");
+				}
+				if ((int) $quien["para"] === $idBot && $tiro["zona_portero"] === null) {
+					$tiro["zona_portero"] = $this->elegirZonaAutomatica($id_duelo, $duelo, $tiro, "portero");
+				}
+			}
+
 			$faltaAlguna = $tiro["zona_tirador"] === null || $tiro["zona_portero"] === null;
 			$vencido = $forzar
 				|| (time() - strtotime($tiro["abierto"])) >= $plazo;
 
 			if ($faltaAlguna && !$vencido) return true;   // se está jugando; nada que hacer
 
-			/* Vencido el plazo, elige el sistema por quien no eligió. La zona sale
-			   del sorteo del duelo, no de `mt_rand()`: los dos jugadores sondean a
-			   la vez y con azar real cada uno calcularía una zona distinta. Y no es
-			   adivinable por el rival, porque `valor_sorteo` no sale del servidor. */
-			$clave = ((int) $tiro["ronda"]) * 4 + ((int) $tiro["turno"]);
+			// Vencido el plazo, elige el sistema por quien no eligió.
 			if ($tiro["zona_tirador"] === null) {
-				$z = self::ZONAS_PENALTI[(int) floor(self::azarDeJugada(
-					(float) $duelo["valor_sorteo"], $clave, 7717) * 4) % 4];
-				$this->pdo->prepare("
-					UPDATE duelo_penaltis SET zona_tirador = :z, auto_tirador = 1
-					WHERE id_duelo = :d AND ronda = :r AND turno = :t AND zona_tirador IS NULL
-				")->execute([":z" => $z, ":d" => $id_duelo,
-				             ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+				$this->elegirZonaAutomatica($id_duelo, $duelo, $tiro, "tirador");
 			}
 			if ($tiro["zona_portero"] === null) {
-				$z = self::ZONAS_PENALTI[(int) floor(self::azarDeJugada(
-					(float) $duelo["valor_sorteo"], $clave, 3331) * 4) % 4];
-				$this->pdo->prepare("
-					UPDATE duelo_penaltis SET zona_portero = :z, auto_portero = 1
-					WHERE id_duelo = :d AND ronda = :r AND turno = :t AND zona_portero IS NULL
-				")->execute([":z" => $z, ":d" => $id_duelo,
-				             ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+				$this->elegirZonaAutomatica($id_duelo, $duelo, $tiro, "portero");
 			}
 
 			if (!$this->resolverTiro($id_duelo, (int) $tiro["ronda"], (int) $tiro["turno"])) {
@@ -4580,6 +4587,36 @@ class Tcg
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Elige por quien no ha elegido —el CPU al instante, o quien dejó vencer su
+	 * plazo— y devuelve la zona escrita.
+	 *
+	 * La zona sale del SORTEO DEL DUELO, no de `mt_rand()`: los dos jugadores
+	 * sondean a la vez y con azar real cada uno calcularía una zona distinta para
+	 * el mismo tiro. Cada lado lleva su propia sal para que la del tirador y la
+	 * del portero no queden correlacionadas — si lo estuvieran, el porcentaje de
+	 * paradas dejaría de ser el 25 % que sale de la regla.
+	 *
+	 * `zona_X IS NULL` en el WHERE es lo que hace que esto no pueda pisar una
+	 * elección real que haya entrado un instante antes.
+	 */
+	private function elegirZonaAutomatica($id_duelo, array $duelo, array $tiro, $cual) {
+		$cual = $cual === "tirador" ? "tirador" : "portero";
+		$sal  = $cual === "tirador" ? 7717 : 3331;
+
+		$clave = ((int) $tiro["ronda"]) * 4 + ((int) $tiro["turno"]);
+		$zona  = self::ZONAS_PENALTI[(int) floor(self::azarDeJugada(
+			(float) $duelo["valor_sorteo"], $clave, $sal) * 4) % 4];
+
+		$this->pdo->prepare("
+			UPDATE duelo_penaltis SET zona_$cual = :z, auto_$cual = 1
+			WHERE id_duelo = :d AND ronda = :r AND turno = :t AND zona_$cual IS NULL
+		")->execute([":z" => $zona, ":d" => $id_duelo,
+		             ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+
+		return $zona;
 	}
 
 	/**
@@ -6763,6 +6800,79 @@ class Tcg
 		return $vecesPrevias;
 	}
 
+	/** Qué hace falta para el premio extra del cofre. Cambiarlo es cambiar estas
+	 *  dos líneas, que es justo lo que pidió Alejandro (§15.12, decisión 4). */
+	const CAMINO_PERFECTO_DIFICULTAD = "extremo";
+	const CAMINO_PERFECTO_RANGO      = "S";
+
+	/**
+	 * ¿EXISTE UN CAMINO de raíz a este cofre en el que todos los partidos estén
+	 * en rango S y en Extremo? (§15.12, decisión 4.)
+	 *
+	 * ⚠️ "EXISTE UN CAMINO" Y NO "TODOS LOS ANTERIORES", y la diferencia importa:
+	 * `mapaCadena()` da un nodo por disponible si CUALQUIERA de sus predecesores
+	 * está superado, o sea que una cadena se recorre ELIGIENDO camino. Exigir
+	 * todos los ancestros obligaría a jugarse las dos ramas de cada bifurcación,
+	 * que no es como se llega al cofre.
+	 *
+	 * ⚠️ Y TIENE QUE SER EN EXTREMO. `mejor_rango` se guarda por dificultad y las
+	 * cinco están siempre disponibles, así que con "cualquier dificultad" se podría
+	 * granjear la S entera en Fácil y reclamar el cofre con el premio bueno.
+	 *
+	 * Un cofre sin predecesores da `true` por vacuidad: no hay ningún partido
+	 * previo que pueda no estar en S.
+	 */
+	public function caminoPerfectoHastaCofre($id_nodo, $id_usuario) {
+		$nodo = $this->obtenerNodo($id_nodo);
+		if (!$nodo) return false;
+
+		$mapa = $this->mapaCadena((int) $nodo["id_cadena"], $id_usuario);
+		$nodos = $mapa["nodos"];
+
+		$entrantes = [];
+		foreach ($mapa["aristas"] as $a) {
+			$entrantes[(int) $a["id_destino"]][] = (int) $a["id_origen"];
+		}
+
+		// Memoria y marca de visita: la memoria evita recorrer dos veces las
+		// confluencias (las rutas alternativas vuelven a juntarse), y la marca
+		// evita quedarse dando vueltas si alguien llega a sembrar un ciclo.
+		$resuelto = [];
+		$visitando = [];
+
+		$perfecto = function ($id) use (&$perfecto, &$resuelto, &$visitando, $nodos, $entrantes) {
+			$id = (int) $id;
+			if (isset($resuelto[$id]))  return $resuelto[$id];
+			if (isset($visitando[$id])) return false;
+			$visitando[$id] = true;
+
+			$n = $nodos[$id] ?? null;
+			$vale = true;
+
+			if (!$n) {
+				$vale = false;
+			} elseif ($n["tipo"] === "partido") {
+				$prog = $n["progreso"][self::CAMINO_PERFECTO_DIFICULTAD] ?? null;
+				$vale = $prog && $prog["mejor_rango"] === self::CAMINO_PERFECTO_RANGO;
+			}
+
+			if ($vale) {
+				$previos = $entrantes[$id] ?? [];
+				if ($previos) {
+					$vale = false;
+					foreach ($previos as $p) {
+						if ($perfecto($p)) { $vale = true; break; }
+					}
+				}
+			}
+
+			unset($visitando[$id]);
+			return $resuelto[$id] = $vale;
+		};
+
+		return $perfecto($id_nodo);
+	}
+
 	/**
 	 * Abre un cofre alcanzado. Entrega la formación de la cadena si es el cofre
 	 * final, y la loot table del nodo (monedas, cartas, numeradas). Idempotente:
@@ -6798,13 +6908,23 @@ class Tcg
 				$this->registrarDrop($id_usuario, null, $id_nodo, "formacion", null, null, null, $formacion);
 			}
 
-			// Los cofres no puntúan: se reclaman, no se juegan. $rango = null
-			// hace que otorgarLootNodo() solo considere las filas sin rango
-			// mínimo, que es la única clase de loot que tiene sentido aquí.
-			$loot = $this->otorgarLootNodo($id_nodo, $id_usuario, null);
+			/* Los cofres no puntúan: se reclaman, no se juegan, así que su contenido
+			   es FIJO y sale de las filas SIN rango mínimo — decisión 3 de Alejandro,
+			   y es lo que hacía este `null` desde siempre.
+
+			   La única excepción es el PREMIO EXTRA POR CAMINO PERFECTO (decisión 4):
+			   si todos los partidos que llevan hasta aquí están en S y en Extremo, se
+			   pasa rango 'S' y entran además las filas con `rango_minimo = 'S'`. El
+			   premio se declara en `cadena_loot` como cualquier otro botín: aquí no
+			   hay ningún mecanismo nuevo, solo un parámetro distinto. */
+			$perfecto = $this->caminoPerfectoHastaCofre($id_nodo, $id_usuario);
+			$loot = $this->otorgarLootNodo(
+				$id_nodo, $id_usuario, $perfecto ? self::CAMINO_PERFECTO_RANGO : null
+			);
 
 			$this->pdo->commit();
-			return ["ok" => true, "error" => null, "formacion" => $formacion, "loot" => $loot];
+			return ["ok" => true, "error" => null, "formacion" => $formacion,
+			        "loot" => $loot, "camino_perfecto" => $perfecto];
 		} catch (Exception $e) {
 			$this->pdo->rollBack();
 			return ["ok" => false, "error" => "No se pudo abrir el cofre."];

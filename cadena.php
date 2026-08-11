@@ -48,6 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($res['ok']) {
             $partes = ['Cofre abierto.'];
+            // El premio extra por camino perfecto se DICE. Si no, el jugador no
+            // tiene forma de saber que existe ni de distinguirlo de una tirada
+            // de botín afortunada, y un premio que no se entiende no premia.
+            if (!empty($res['camino_perfecto'])) {
+                $partes[] = 'Camino perfecto: llegaste con todos los partidos en rango S en Extremo.';
+            }
             if (!empty($res['formacion']) && isset(Tcg::FORMACIONES[$res['formacion']])) {
                 $partes[] = 'Has desbloqueado la formación ' . Tcg::FORMACIONES[$res['formacion']]['nombre'] . '.';
             }

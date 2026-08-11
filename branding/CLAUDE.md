@@ -281,8 +281,12 @@
 > la victoria del jugador cae del 78 % en fácil al 48 % en extremo, 476 decisiones
 > jugadas de las que **83 movieron el marcador**, y **0 partidos colgados**.
 >
-> **Van 3 de las 5 piezas.** Quedan el **bonus del cofre** por camino perfecto (S en
-> Extremo) y el **auto-tiro inmediato del CPU** en la tanda.
+> **Las 5 piezas están.** Con ellas entraron el **bonus del cofre** por camino
+> perfecto —existe un camino a él con todos los partidos en **S en Extremo**— y el
+> **auto-tiro inmediato del CPU** en la tanda, que quita doce segundos muertos por
+> penalti. ⚠️ **Del bonus falta declarar el premio**: el mecanismo funciona, pero
+> ningún cofre tiene todavía una fila de `cadena_loot` con `rango_minimo = 'S'`, y
+> eso es contenido que decide Alejandro (§15.12).
 >
 > ⚠️ **El rango S ha quedado casi fuera de alcance** —1 sola S en 200 partidos— y
 > **es esperado, no un fallo**: era el aviso del §15.12 y calibrarlo es una decisión
@@ -343,10 +347,11 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > código 1 si algo falla. Hoy: 5 suites en verde. La grande, `probar_300.php`
 > (300 duelos de punta a punta, ~7 min), se lanza aparte.
 >
-> **5. De las cinco piezas de las CADENAS (§15.12) van tres.** Lo siguiente son la
-> **3** (bonus del cofre por camino perfecto) y la **5** (auto-tiro inmediato del CPU
-> en la tanda), con las decisiones de Alejandro textuales dentro. No hace falta
-> volver a preguntárselas.
+> **5. Las CADENAS (§15.12) están terminadas: las cinco piezas.** Lo que queda de
+> ahí son **dos decisiones de Alejandro, no trabajo de código**: declarar el premio
+> extra del cofre en `cadena_loot` (hoy el camino perfecto se reconoce pero no
+> entrega nada) y calibrar `pve_rango_s_goles`, que deja el rango S en 1 de cada 200
+> partidos. Los dos están medidos en el §15.12.
 >
 > **6. Los 16 PNG originales ya no existen y el borrado está commiteado**
 > (2026-08-11). Alejandro confirmó que los eliminó a propósito, así que la carpeta
@@ -406,16 +411,15 @@ bueno.** Es la forma de trabajar acordada: plan → aprobación → implementaci
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Si Alejandro no dice por dónde seguir, lo siguiente son las dos piezas que le
-faltan a las CADENAS (§15.12)**: el **bonus del cofre** por camino perfecto y el
-**auto-tiro inmediato del CPU** en la tanda. Las decisiones están textuales dentro
-— **no hace falta volver a preguntárselas**. Detrás de ellas viene **calibrar el
-rango**, que hoy deja la S en 1 de cada 200 partidos, pero eso Alejandro lo dejó
-dicho para cuando estén las cartas definitivas.
+**Las CADENAS (§15.12) están terminadas**, así que si Alejandro no dice por dónde
+seguir, los frentes abiertos son el **desequilibrio de compos** que el §15.8 deja
+medido —es lo que más afecta a la sensación de juego—, subir arte real a
+**panel/plantillas.php** (§14) o la **Fase 3** (§12).
 
-Si por lo que sea eso no toca, los otros frentes abiertos: **el desequilibrio de
-compos** que el §15.8 deja medido (es lo que más afecta a la sensación de juego),
-subir arte real a **panel/plantillas.php** (§14), o la **Fase 3** (§12).
+Y hay **dos cosas que solo puede decidir él** y dejan trabajo terminado a medias:
+declarar el premio extra del cofre en `cadena_loot` (el camino perfecto ya se
+reconoce, pero no entrega nada distinto) y **calibrar el rango**, que hoy deja la S
+en 1 de cada 200 partidos de cadena. Los dos están medidos en el §15.12.
 
 **Más minijuegos NO es un frente útil ya**: van 75 y **no queda ninguno que sea
 escribir una entrada más** — lo que falta está bloqueado por sistemas que no
@@ -536,7 +540,7 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
 | **§15 — EL PARTIDO DECIDE TAMBIÉN EN LAS CADENAS** | El partido de cadena se juega igual que un PvP: nace `en_juego`, los minijuegos mueven el marcador y `liquidarPartido()` escribe el rango y reparte monedas y botín. Se jubila `marcadorCadena()` y **se retira el modo `clasico`** de pantalla (§15.12) | ✅ **Construido (piezas 1, 2 y 4)** |
-| **§15 — Bonus del cofre y tanda contra el CPU** | Premio extra del cofre por camino perfecto (**S en Extremo**) y auto-tiro inmediato del CPU en la tanda. Piezas 3 y 5 del §15.12 | 🟡 **Pendiente** |
+| **§15 — Bonus del cofre y tanda contra el CPU** | Premio extra del cofre por camino perfecto (**S en Extremo**) y auto-tiro inmediato del CPU en la tanda. Piezas 3 y 5 del §15.12 | ✅ **Construido** — falta declarar el premio en `cadena_loot` |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
@@ -1585,14 +1589,13 @@ ventaja de poder.
    rinde más que enfocarlas, así que construir bien un equipo casi no importa.
    Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
    de balance, no de código.
-9. ~~Llevar el partido narrado a las cadenas~~ — **hecho en sus tres cuartas
-   partes (§15.12)**: el partido decide también en PvE, los minijuegos mueven el
-   marcador y el rango, y el botín se reparte al liquidar. **Quedan dos piezas**:
-   el **bonus del cofre** por camino perfecto (S en Extremo) y el **auto-tiro
-   inmediato del CPU** en la tanda —hoy sus penaltis se resuelven por plazo, así
-   que un empate contra la máquina se juega con 12 segundos muertos por tiro—.
-   Y queda lo que Alejandro dejó dicho que iba después: **calibrar el rango**, que
-   hoy deja la S en 1 de cada 200 partidos. Está medido en el §15.12.
+9. ~~Llevar el partido narrado a las cadenas~~ — **hecho, las cinco piezas
+   (§15.12)**: el partido decide también en PvE, los minijuegos mueven el marcador
+   y el rango, el botín se reparte al liquidar, el cofre premia el camino perfecto
+   y el CPU tira sus penaltis al instante. **Lo que queda de ahí son dos cosas de
+   Alejandro, no de código**: declarar el premio extra del cofre en `cadena_loot`
+   (hoy el bonus no entrega nada) y **calibrar el rango**, que deja la S en 1 de
+   cada 200 partidos. Los dos están medidos y explicados en el §15.12.
 10. **El resto del escalado de dificultad** (Biblia §3). Hoy salen por
     dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
     acierto, la fiabilidad de la pista y el coste del fallo.
@@ -2922,9 +2925,17 @@ Ni tabla nueva ni mecanismo nuevo. Una función y un parámetro.
 |---|---|---|
 | **1** | `resolverDuelo()` deja el PvE en `en_juego`, simulación **natural**, sin rango ni botín. Se jubila **`marcadorCadena()`** | ✅ hecho |
 | **2** | progreso de nodo, monedas y loot **del partido** se mueven a `liquidarPartido()` | ✅ hecho |
-| **3** | el bonus del cofre (arriba) | ⬜ pendiente |
+| **3** | el bonus del cofre (arriba) | ✅ hecho — **falta declarar el premio**, ver abajo |
 | **4** | `duelo.php` deja de tener dos modos: el partido de cadena se juega narrado | ✅ hecho, **y el modo `clasico` se retiró** |
-| **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | ⬜ pendiente |
+| **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | ✅ hecho |
+
+> ⚠️ **EL MECANISMO DEL BONUS ESTÁ, PERO NO HAY NINGÚN PREMIO DECLARADO.**
+> `caminoPerfectoHastaCofre()` decide y `reclamarCofre()` pasa rango `S`, pero hoy
+> **ninguna fila de `cadena_loot` de un cofre tiene `rango_minimo = 'S'`**, así que
+> el camino perfecto no entrega nada distinto. Es contenido, y el contenido lo pone
+> Alejandro: una fila por cofre, igual que las que ya existen (la del nodo 1 con
+> `rango_minimo = 'S'` sirve de ejemplo, aunque esa es de un partido). Hasta que se
+> declare, el bonus es un cartel: la pantalla dice *"Camino perfecto"* y no cae nada.
 
 #### Las tres trampas de la pieza 4, ya resueltas (mira aquí si algo se rompe)
 
@@ -3016,16 +3027,32 @@ y de `liquidarPartido()`, que son de los dos.
 una sola parada. Esa era la razón de jubilarla, y la medición de arriba confirma que
 el partido de cadena ya tiene forma de fútbol.
 
+#### La tanda contra el CPU (pieza 5): elegir al instante, no al vencer el plazo
+
+`tandaAvanzar()` rellena la zona del bot **en cuanto se abre el tiro**, en vez de
+esperar a que venza `tanda_plazo_seg`. Sin eso la tanda se jugaba igual —el plazo
+acababa eligiendo por él— pero con **doce segundos muertos en cada tiro** mirando
+una portería que no esperaba nada de ti; una tanda son diez tiros, o sea dos
+minutos de reloj parado. Medido en el navegador: **el tiro se cierra 509 ms después
+del clic**.
+
+Elegir antes no filtra nada: la elección del rival no viaja al cliente hasta que el
+tiro está resuelto (§15.11 y §6.3), que es la misma garantía que protege el caso
+humano, y sigue sin ser adivinable porque sale de `valor_sorteo`.
+
+> **El sesgo hacia donde tira el jugador NO se ha puesto.** El §15.12 lo apuntaba
+> como palanca de dificultad gratis (Biblia §3), pero es una decisión de balance que
+> Alejandro no ha tomado, y el sitio para meterla es `elegirZonaAutomatica()`. Hoy
+> el CPU elige con la misma regla ciega que un humano, así que **entra el 75 % de
+> los penaltis** también contra la máquina.
+
 #### Dos cosas que NO hacen falta, y conviene saberlo antes de presupuestar
 
 - **No hay que darle inteligencia al CPU para los minijuegos.** El dato oculto sale
   de las **CARTAS**, no de lo que elija el rival, así que el jugador lee el perfil
   del delantero del CPU igual que leería el de una persona.
-- **La tanda contra el CPU ya está construida**: es el auto-tiro por plazo de
-  §15.11, determinista desde `valor_sorteo` (que no sale del servidor, así que no se
-  puede adivinar). Aplicándolo al instante en vez de a los 12 s ya hay penaltis
-  contra la máquina — y sesgarlo hacia donde tira el jugador es una palanca de
-  dificultad gratis (Biblia §3).
+- ~~**La tanda contra el CPU ya está construida**~~ — **hecha**: era el auto-tiro por
+  plazo de §15.11 aplicado al instante. Ver el apartado de la pieza 5, arriba.
 
 #### Y una corrección a un supuesto de partida
 

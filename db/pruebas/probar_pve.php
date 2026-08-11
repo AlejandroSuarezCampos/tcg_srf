@@ -103,6 +103,15 @@ $nodo = (int) $p->query("
 ")->fetchColumn();
 if (!$nodo) { echo "No hay cadenas en la base; nada que probar.\n"; exit(0); }
 
+/* SE PARTE DE UNA CUENTA SIN HISTORIAL DE CADENAS, y no es cosmético: la copia
+   desechable sale de la base REAL, así que el jugador 9 llega con los nodos que
+   ya haya jugado Alejandro. Sin esto, "perder no abre el nodo" fallaba cuando la
+   copia traía una victoria vieja en OTRA dificultad — `superado` mira todas—, y
+   el fallo parecía del motor cuando era de la prueba. */
+$p->exec("DELETE FROM cadena_drops    WHERE id_usuario = 9");
+$p->exec("DELETE FROM cadena_cofres   WHERE id_usuario = 9");
+$p->exec("DELETE FROM cadena_progreso WHERE id_usuario = 9");
+
 echo "=== 1) Un partido de cadena YA NO se resuelve al montarlo ===\n";
 $antes = $monedas();
 $id = montarCadena($db, $nodo);
@@ -190,6 +199,117 @@ if ((int) $d["id_ganador"] === 9) {
     !empty($prog["mejor_rango"]) ? $ok("y el nodo queda superado") : $ko("nodo sin mejor_rango tras ganar la tanda");
 } else {
     $ok("las 12 tandas las gano el CPU (no se pudo probar el suelo B)");
+}
+
+echo "\n=== 7) La tanda contra el CPU: elige al instante, no al vencer el plazo ===\n";
+$id = montarCadena($db, $nodo, "medio");
+$p->prepare("UPDATE duelos SET goles_creador = 1, goles_rival = 1 WHERE id_duelo = :d")
+  ->execute([":d" => $id]);
+
+$db->tandaAvanzar($id);          // SIN forzar: es lo que hace el sondeo normal
+$d = $fila($id);
+$idBot = $db->idBot();
+$primero = ((float) $d["valor_sorteo"]) < 0.5 ? (int) $d["id_creador"] : (int) $d["id_rival"];
+// Ronda 1, turno 0: tira quien va primero y para el otro.
+$botTira = $primero === $idBot;
+
+$s = $p->prepare("SELECT * FROM duelo_penaltis WHERE id_duelo = :d AND ronda = 1 AND turno = 0");
+$s->execute([":d" => $id]);
+$tiro = $s->fetch(PDO::FETCH_ASSOC);
+
+$tiro ? $ok("el tiro se abre solo") : $ko("no se abrió ningún tiro");
+if ($tiro) {
+    $delBot = $botTira ? "zona_tirador" : "zona_portero";
+    $mia    = $botTira ? "zona_portero" : "zona_tirador";
+    $autoBot = $botTira ? "auto_tirador" : "auto_portero";
+
+    $tiro[$delBot] !== null
+        ? $ok("el CPU ya ha elegido (" . ($botTira ? "tira" : "para") . ") sin esperar los 12 s")
+        : $ko("el CPU no ha elegido: el jugador se comería el plazo entero en cada tiro");
+    (int) $tiro[$autoBot] === 1 ? $ok("y queda marcada como automática") : $ko("sin marcar como automática");
+    $tiro[$mia] === null ? $ok("la del jugador sigue vacía: le toca decidir") : $ko("eligió también por el jugador");
+    $tiro["gol"] === null ? $ok("y el tiro sigue abierto, no resuelto a medias") : $ko("resolvió el tiro sin el jugador");
+
+    // Y en cuanto el jugador elige, el tiro se cierra en el acto.
+    $r = $db->tirarPenalti($id, 9, Tcg::ZONAS_PENALTI[0]);
+    !empty($r["ok"]) ? $ok("el jugador puede lanzar") : $ko("no pudo lanzar: " . ($r["error"] ?? "?"));
+    $s->execute([":d" => $id]);
+    $tiro = $s->fetch(PDO::FETCH_ASSOC);
+    $tiro["gol"] !== null
+        ? $ok("y el tiro se resuelve en el acto (" . ((int) $tiro["gol"] === 1 ? "gol" : "parada") . ")")
+        : $ko("el tiro se queda esperando aunque ya están las dos elecciones");
+}
+
+echo "\n=== 8) El bonus del cofre por camino perfecto ===\n";
+/* Grafo de la cadena 1: 1 → 2 → [3] → {4,5}; 4 → 6 → [8]; 5 → 7 → [9]; {8,9} → [10]
+   (entre corchetes los cofres). Sirve para probar las dos propiedades que
+   importan: que basta UN camino, y que la S tiene que ser en Extremo. */
+$cofre = (int) $p->query("
+    SELECT n.id_nodo FROM cadena_nodos n
+    INNER JOIN cadena_aristas a ON a.id_destino = n.id_nodo
+    WHERE n.tipo = 'cofre' ORDER BY n.id_nodo LIMIT 1
+")->fetchColumn();
+
+if (!$cofre) {
+    echo "  (no hay cofres con predecesores en esta base; nada que probar)\n";
+} else {
+    $previos = $p->prepare("SELECT id_origen FROM cadena_aristas WHERE id_destino = :n");
+    $previos->execute([":n" => $cofre]);
+    $ruta = [];                       // los partidos que llevan hasta ese cofre
+    foreach ($previos->fetchAll(PDO::FETCH_COLUMN) as $ant) {
+        $ruta[] = (int) $ant;
+        $mas = $p->prepare("SELECT id_origen FROM cadena_aristas WHERE id_destino = :n");
+        $mas->execute([":n" => $ant]);
+        foreach ($mas->fetchAll(PDO::FETCH_COLUMN) as $ant2) { $ruta[] = (int) $ant2; }
+    }
+
+    $marcar = function ($nodos, $dificultad, $rango) use ($p) {
+        $p->prepare("DELETE FROM cadena_progreso WHERE id_usuario = 9")->execute();
+        foreach ($nodos as $n) {
+            $p->prepare("
+                INSERT INTO cadena_progreso (id_usuario, id_nodo, dificultad, veces, victorias, mejor_rango, primera_victoria)
+                VALUES (9, :n, :d, 1, 1, :r, NOW())
+            ")->execute([":n" => $n, ":d" => $dificultad, ":r" => $rango]);
+        }
+    };
+
+    $marcar($ruta, "extremo", "B");
+    !$db->caminoPerfectoHastaCofre($cofre, 9)
+        ? $ok("con los partidos en B no hay camino perfecto") : $ko("dio perfecto sin ninguna S");
+
+    $marcar($ruta, "facil", "S");
+    !$db->caminoPerfectoHastaCofre($cofre, 9)
+        ? $ok("con las S en Fácil TAMPOCO (si no, se granjearía ahí)")
+        : $ko("acepta la S en Fácil: el premio se granjea en la dificultad mínima");
+
+    $marcar($ruta, "extremo", "S");
+    $db->caminoPerfectoHastaCofre($cofre, 9)
+        ? $ok("con las S en Extremo, camino perfecto") : $ko("no lo reconoce");
+
+    // Y el premio extra entra por la loot table, como cualquier otro botín.
+    $p->prepare("
+        INSERT INTO cadena_loot (id_nodo, tipo, id_cromo, monedas, probabilidad, rango_minimo)
+        VALUES (:n, 'monedas', NULL, 777, 100, 'S')
+    ")->execute([":n" => $cofre]);
+
+    $antes = $monedas();
+    $r = $db->reclamarCofre($cofre, 9);
+    !empty($r["ok"]) ? $ok("el cofre se abre") : $ko("no se pudo abrir: " . ($r["error"] ?? "?"));
+    !empty($r["camino_perfecto"]) ? $ok("y lo reconoce como perfecto") : $ko("no lo marca como perfecto");
+
+    $extra = (int) $p->query("
+        SELECT COUNT(*) FROM cadena_drops WHERE id_usuario = 9 AND monedas = 777
+    ")->fetchColumn();
+    $extra === 1 ? $ok("el premio extra se entrega (las 777 monedas de prueba)") : $ko("premio extra sin entregar");
+    $monedas() >= $antes + 777 ? $ok("y el saldo lo refleja") : $ko("no cobró el extra");
+
+    // La otra mitad: sin camino perfecto, ese mismo premio NO cae.
+    $marcar($ruta, "extremo", "A");
+    $p->prepare("DELETE FROM cadena_cofres WHERE id_usuario = 9 AND id_nodo = :n")->execute([":n" => $cofre]);
+    $r = $db->reclamarCofre($cofre, 9);
+    empty($r["camino_perfecto"]) ? $ok("sin la S, el cofre se abre igual pero sin bonus") : $ko("lo dio por perfecto con rango A");
+    (int) $p->query("SELECT COUNT(*) FROM cadena_drops WHERE id_usuario = 9 AND monedas = 777")->fetchColumn() === 1
+        ? $ok("y el premio extra NO se repite") : $ko("entregó el extra sin camino perfecto");
 }
 
 echo "\n" . ($fallos ? "$fallos FALLO(S)\n" : "Todo correcto.\n");
