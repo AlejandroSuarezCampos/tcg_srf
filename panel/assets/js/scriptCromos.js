@@ -1,7 +1,11 @@
 /**
- * Lógica de panel/cromos.php: abrir/cerrar el modal de creación/edición,
- * rellenarlo con los datos del cromo al pulsar "Editar", y confirmar el
- * borrado antes de navegar a la eliminación real (cromos.php?eliminar=ID).
+ * Lógica de panel/cromos.php: rellenar el modal de creación/edición con los
+ * datos del cromo al pulsar "Editar", y pedir confirmación antes de navegar
+ * al borrado real (cromos.php?eliminar=ID).
+ *
+ * El modal en sí (abrir/cerrar, Esc, clic fuera, foco atrapado) lo lleva
+ * SRF.abrirModal()/cerrarModal() de assets/js/ui.js — igual que en el resto
+ * del sitio, no hay nada propio de este panel.
  *
  * Nota sobre imágenes: en la base de datos las rutas se guardan en formato
  * "./assets/img/..." (relativo a la raíz del proyecto). Como este panel
@@ -18,7 +22,6 @@ function rutaPreview(imagen) {
 }
 
 function abrirModalCromo(cromo) {
-  const modal = document.getElementById('modalCromo');
   const titulo = document.getElementById('modalCromoTitulo');
   const submitBtn = document.getElementById('f_submit');
 
@@ -43,11 +46,11 @@ function abrirModalCromo(cromo) {
     document.getElementById('f_preview').src = DEFAULT_PREVIEW;
   }
 
-  modal.classList.add('open');
+  SRF.abrirModal('modalCromo');
 }
 
 function cerrarModalCromo() {
-  document.getElementById('modalCromo').classList.remove('open');
+  SRF.cerrarModal('modalCromo');
 }
 
 // Actualiza la miniatura al escribir/pegar una ruta de imagen
@@ -55,13 +58,8 @@ document.getElementById('f_imagen')?.addEventListener('input', (e) => {
   document.getElementById('f_preview').src = rutaPreview(e.target.value);
 });
 
-// Cierra el modal al hacer clic fuera del cuadro
-document.getElementById('modalCromo')?.addEventListener('click', (e) => {
-  if (e.target.id === 'modalCromo') cerrarModalCromo();
-});
-
-function confirmarBorrado(nombre, id) {
-  if (confirm(`¿Seguro que quieres eliminar "${nombre}"? Esta acción no se puede deshacer.`)) {
+function pedirBorrado(nombre, id) {
+  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Esta acción no se puede deshacer.', function () {
     window.location.href = 'cromos.php?eliminar=' + encodeURIComponent(id);
-  }
+  });
 }

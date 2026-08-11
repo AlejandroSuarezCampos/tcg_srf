@@ -546,7 +546,7 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
-| **Fase 3 — Pulido y escala** | Panel admin, motion unificado, doc de expansiones | ⬜ Pendiente |
+| **Fase 3 — Pulido y escala** | Panel admin al sistema nuevo, motion unificado, doc de expansiones | 🟡 **Panel admin migrado (2026-08-11)**; quedan motion unificado y la doc de expansiones |
 
 > **El modelo de combate cambió en `93642b2`.** Cada línea ya no puntúa con una
 > sola estadística: pondera las tres (`Tcg::PESOS_LINEA`). Eso movió el peso de
@@ -689,8 +689,12 @@ tcg_srf/
 │   │                        entradas que espera esa decisión (§12 punto 7)
 │   ├── Biblia/           ← 4 .md: la sesión de diseño de la que sale el §15
 │   └── Rangos_estadisticas_SRF.xlsx/.csv  ← rangos para crear cartas (§15.8)
-├── panel/                ← admin, TODAVÍA CON EL SISTEMA VIEJO salvo
-│                            plantillas.php (Fase 3, ver §12)
+├── panel/                ← admin, migrado al sistema de diseño (Fase 3, §12.2)
+│   │                        head.php/footer.php + Phosphor + los componentes
+│   │                        reales (.tabla, .modal, .campo, .alerta).
+│   │                        panel/assets/css/admin.css sigue existiendo, pero
+│   │                        solo aporta el sidebar y lo que el panel tiene de
+│   │                        propio — mismo patrón que styleguide.css.
 │   ├── plantillas.php    ← sube/recorta/previsualiza el arte de cajas y
 │   │                        sobres (§14), con el motor 3D real
 │   └── importar.php      ← importador de datos oficiales (§16), con
@@ -1168,8 +1172,16 @@ puede alinear), id 8 `GonzaloEse`, id 7 `Prueba3` (sin cartas).
   cuenta distintas. No es un bug.
 - La ceremonia recibe la carta ya renderizada en servidor (`carta_html`). No la
   reimplementes en JS — sigue aplicando en §14.
-- `rareza-clases.php` solo lo usa `panel/cromos.php`. Se retira en Fase 3.
-- `panel/` es autónomo, con Bootstrap Icons y su propio `admin.css`. Fase 3.
+- ~~`rareza-clases.php` solo lo usa `panel/cromos.php`. Se retira en Fase 3.~~ —
+  **retirado** (2026-08-11): `panel/cromos.php` usa `render_rareza()` de
+  `components/carta.php`, el marcador real del sitio, en vez de un texto
+  coloreado aparte.
+- ~~`panel/` es autónomo, con Bootstrap Icons y su propio `admin.css`. Fase 3.~~ —
+  **migrado (2026-08-11), ver §12.2.** Ya usa `partials/head.php`/`footer.php`,
+  Phosphor Icons y los componentes reales (`.tabla`, `.modal`, `.campo`,
+  `.alerta`, `SRF.confirmar`). `panel/assets/css/admin.css` sigue existiendo
+  pero ya no duplica nada: solo el layout de sidebar y lo que el panel tiene
+  de propio (miniaturas, botones de icono, interruptores).
 - `body` usa `overflow-x: clip`, **no `hidden`** (rompería el `sticky` de la nav).
 - **`Tcg::HUECOS`** es `["POR","DF","DF","DF","DF","MC","MC","MC","MC","DC","DC"]`
   y el índice ES el número de hueco. El CSS `.hueco:nth-child` depende de ese
@@ -1523,10 +1535,61 @@ ventaja de poder.
    otros dos sobres del Base Set (`id_sobre` 1 "Sobre Doble" y 3 "sobre
    prueba") y cualquier expansión futura no tienen plantilla — mismo proceso,
    arte nuevo primero.
-2. **Fase 3** — panel de administración al sistema nuevo (hoy sigue con
-   Bootstrap Icons y su propio `admin.css`, salvo `plantillas.php` que ya usa
-   el sistema nuevo), motion unificado de las ceremonias, y documentar cómo
-   añadir una expansión de temporada.
+2. **Fase 3** — ~~panel de administración al sistema nuevo~~ **hecho
+   (2026-08-11)**, motion unificado de las ceremonias, y documentar cómo
+   añadir una expansión de temporada. Detalle del panel en el punto 2.2, aquí
+   debajo.
+
+   **2.2 — El panel de administración, migrado entero (7 páginas).** Antes
+   `panel/` duplicaba un sistema de diseño completo — sus propios tokens de
+   color (con la misma semántica que `tokens.css`, pero código aparte),
+   botones, alertas, tablas, modales, formularios, badges de rareza— con
+   Bootstrap Icons en vez de Phosphor. **La base era buena y reutilizable**:
+   se conservó toda la lógica PHP y JS de cada página (consultas, validación,
+   AJAX de importación) y solo se rehizo el marcado y el CSS.
+
+   - Las 7 páginas (`index`, `cromos`, `sobres`, `expansiones`, `usuarios`,
+     `importar`, `plantillas`) usan ya `partials/head.php`/`footer.php`, y con
+     ello Phosphor Icons, Geist, y el aviso legal que antes no llevaban (§0:
+     *"visible en todas las páginas"* — el panel se lo saltaba).
+   - Reutilizan los componentes reales en vez de reimplementarlos: `.tabla` en
+     vez de `.admin-table`, `.modal`/`SRF.abrirModal()` en vez de un
+     `.modal-backdrop` con `classList.add('open')` a mano, `.campo` en vez de
+     `.field`, `.alerta` en vez de `.alert`, `.barra-filtros` para los
+     buscadores, y `render_rareza()` de `components/carta.php` para la
+     rareza en vez de un texto coloreado aparte (`rareza-clases.php`,
+     retirado). El borrado pasa por `SRF.confirmar()` en vez de `confirm()`
+     del navegador, que el propio `partials/confirmar.php` prohíbe
+     explícitamente por no poderse estilar.
+   - `panel/assets/css/admin.css` **sigue existiendo pero es otra cosa**: de
+     394 líneas duplicando un sistema entero pasó a solo el layout de
+     sidebar y lo que el panel tiene de propio y el resto del sitio no
+     (miniatura+título en una celda, botones de icono, interruptor on/off,
+     formulario a dos columnas dentro de un modal). Es exactamente el mismo
+     patrón que `styleguide.css` para `styleguide.php`: una hoja `$cssExtra`
+     encima del sistema compartido, no un sistema aparte.
+   - `panel/plantillas.php` era ya híbrida (cargaba `tokens.css`/
+     `components.css` a mano para el motor 3D real) y ahora usa `head.php`
+     como el resto; su CSS propia (`.plantillas-*`) se movió del `<style>`
+     inline al `admin.css` compartido.
+   - **Una trampa nueva, para si tocas el sidebar en móvil:** el desplegable
+     NO se anima con `max-height`. `.admin-nav` lleva `flex:1` para el layout
+     de escritorio (empuja "Volver al sitio" al fondo), y esa propiedad
+     interfiere con el clamp de `max-height` en un ítem flex — probado y
+     confirmado: con la animación, el desplegable no llegaba a abrirse en
+     ningún navegador de prueba, ni siquiera fijando `max-height` **inline**
+     (que debería ganar a cualquier regla de hoja de estilos). Se resolvió con
+     `display: none` / `display: flex`, que no pelea con `flex:1`. Se pierde
+     la transición suave, pero ya se apaga con movimiento reducido en el
+     resto del sitio.
+   - El desplegable reutiliza el mecanismo de la nav del sitio
+     (`assets/js/ui.js` → `iniciarNav()`, selectores `.nav-burger` +
+     `#nav-menu` + `aria-expanded`) en vez de JS propio: sin querer, esto
+     también deja Esc-para-cerrar de regalo, que el panel no tenía antes.
+   - Un fallo de entorno **anterior a este trabajo y sin relación**, cazado
+     al probar `importar.php`: faltaba la migración `014_importador_origen.sql`
+     en esta copia (columna `origen_importacion` inexistente → error fatal).
+     Aplicada — es aditiva, como todas.
 3. **Panel para curar rasgos a mano** (§10.2). La tabla ya soporta `manual = 1`
    y la derivación nunca lo pisa; falta solo la UI. Va con la Fase 3.
 4. **Lo que queda del documento de balance** (§10.7): anti-tilt de sesión,

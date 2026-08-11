@@ -3,9 +3,10 @@
  * PANEL — PLANTILLAS 3D de cajas y sobres (prompt-claude-code-sobres-3d.md, Fase 5).
  * Descarga de la plantilla-guía (GD, coordenadas en Tcg::ZONAS_CAJA/ZONAS_SOBRE),
  * subida + recorte + vista previa con el MISMO componente que usa el juego real
- * (components/caja3d.php) — por eso esta página también carga tokens.css y
- * components.css del juego, antes de admin.css para que admin.css gane en las
- * clases que comparten nombre (.btn, etc.) y no se rompa el resto del panel.
+ * (components/caja3d.php). Ya no es una página híbrida (§12, Fase 3): usa
+ * partials/head.php como el resto del sitio, así que tokens/components/layout
+ * llegan por el camino normal y admin.css solo aporta lo que este panel tiene
+ * de propio.
  */
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
@@ -13,11 +14,11 @@ require_once __DIR__ . '/../components/caja3d.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
-        header("Location: ../landing.php");
+        header('Location: ../landing.php');
         exit;
     }
 } else {
-    header("Location: ../landing.php");
+    header('Location: ../landing.php');
     exit;
 }
 
@@ -75,37 +76,20 @@ $lienzoSobre = Tcg::LIENZO_SOBRE;
 function rutasPanel(array $rutas): array {
     return array_map(fn($r) => '.' . $r, $rutas);
 }
+
+$base         = '../';
+$paginaTitulo = 'Plantillas 3D — Panel';
+$paginaDesc   = 'Sube el arte de cajas y sobres, con vista previa del motor 3D real.';
+$cssExtra     = ['panel/assets/css/admin.css'];
+include __DIR__ . '/../partials/head.php';
+
+$activeAdmin = 'plantillas';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plantillas 3D — Panel de control</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="../assets/css/tokens.css?v=<?= @filemtime(__DIR__ . '/../assets/css/tokens.css') ?>">
-<link rel="stylesheet" href="../assets/css/components.css?v=<?= @filemtime(__DIR__ . '/../assets/css/components.css') ?>">
-<link rel="stylesheet" href="./assets/css/admin.css?v=<?= @filemtime(__DIR__ . '/assets/css/admin.css') ?>">
-<style>
-  /* layout propio de esta página, no un componente del sistema de diseño */
-  .plantillas-expansion { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; }
-  .plantillas-fila { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 16px; }
-  .plantillas-item { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: rgba(255,255,255,.02); min-width: 240px; }
-  .plantillas-item h4 { margin: 0; font-size: 14px; }
-  .plantillas-item .preview { display: flex; justify-content: center; padding: 12px 0; }
-  .plantillas-acciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .plantillas-acciones input[type="file"] { max-width: 190px; font-size: 12px; color: var(--frost-dim); }
-</style>
-</head>
-<body>
 
 <div class="admin-shell">
-  <?php $activeAdmin = 'plantillas'; include __DIR__ . '/navbar.php'; ?>
+  <?php include __DIR__ . '/navbar.php'; ?>
 
-  <main class="admin-main">
+  <main class="admin-main" id="contenido">
     <div class="admin-head">
       <div>
         <h1>Plantillas 3D</h1>
@@ -114,7 +98,10 @@ function rutasPanel(array $rutas): array {
     </div>
 
     <?php if ($mensaje): ?>
-    <div class="alert alert-<?= htmlspecialchars($mensajeTipo) ?>"><?= htmlspecialchars($mensaje) ?></div>
+    <div class="alerta alerta-<?= htmlspecialchars($mensajeTipo) ?>" role="<?= $mensajeTipo === 'danger' ? 'alert' : 'status' ?>" style="margin-bottom:var(--space-5);">
+      <i class="ph <?= $mensajeTipo === 'danger' ? 'ph-warning-circle' : 'ph-check-circle' ?>" aria-hidden="true"></i>
+      <span><?= htmlspecialchars($mensaje) ?></span>
+    </div>
     <?php endif; ?>
 
     <?php foreach ($expansiones as $ex): ?>
@@ -124,8 +111,8 @@ function rutasPanel(array $rutas): array {
       $tiposDeEsta  = $sobresPorExpansion[$idExp] ?? [];
     ?>
     <section class="plantillas-expansion">
-      <h2 style="margin:0;"><?= htmlspecialchars($ex['nombre']) ?></h2>
-      <p style="color:var(--frost-dim); font-size:13px; margin:4px 0 0;">
+      <h2 class="t-h3" style="margin:0;"><?= htmlspecialchars($ex['nombre']) ?></h2>
+      <p class="t-caption t-dim" style="margin:var(--space-1) 0 0;">
         Caja de la expansión (<?= $lienzoCaja['w'] ?>×<?= $lienzoCaja['h'] ?>px) y, por cada sobre, su caja pequeña
         y el propio sobre (<?= $lienzoSobre['w'] ?>×<?= $lienzoSobre['h'] ?>px).
       </p>
@@ -136,12 +123,12 @@ function rutasPanel(array $rutas): array {
           <div class="preview"><?= pack3d_caja_html(rutasPanel($rutasCajaExp), ['escala' => 'pequena']) ?></div>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=caja_expansion">
-              <i class="bi bi-download"></i> Guía
+              <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
-            <form method="POST" action="plantillas.php" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
+            <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="caja_expansion">
-              <input type="hidden" name="id_referencia" value="<?= $idExp ?>">
+              <input type="hidden" name="id_referencia" value="<?= (int) $idExp ?>">
               <input type="file" name="plantilla" accept="image/png" required>
               <button type="submit" class="btn btn-primary btn-sm">Subir</button>
             </form>
@@ -177,19 +164,19 @@ function rutasPanel(array $rutas): array {
                 <?= pack3d_caja_html(rutasPanel($rutasCajaTipo), ['escala' => 'pequena', 'interiorHtml' => $interiorPreview]) ?>
               </div>
               <button type="button" class="btn btn-ghost pack3d-portal-cerrar js-cerrar-blister">
-                <i class="bi bi-x-lg"></i> Cerrar
+                <i class="ph ph-x" aria-hidden="true"></i> Cerrar
               </button>
             </div>
           </div>
           <p class="t-caption t-dim" style="margin:0;">Clic en la caja para previsualizar la apertura con el motor real.</p>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=caja_sobre">
-              <i class="bi bi-download"></i> Guía
+              <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
-            <form method="POST" action="plantillas.php" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
+            <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="caja_sobre">
-              <input type="hidden" name="id_referencia" value="<?= $idSobre ?>">
+              <input type="hidden" name="id_referencia" value="<?= (int) $idSobre ?>">
               <input type="file" name="plantilla" accept="image/png" required>
               <button type="submit" class="btn btn-primary btn-sm">Subir</button>
             </form>
@@ -201,12 +188,12 @@ function rutasPanel(array $rutas): array {
           <div class="preview"><?= pack3d_sobre_html(rutasPanel($rutasSobre)) ?></div>
           <div class="plantillas-acciones">
             <a class="btn btn-ghost" href="plantillas.php?descargar=sobre">
-              <i class="bi bi-download"></i> Guía
+              <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
-            <form method="POST" action="plantillas.php" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center;">
+            <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="sobre">
-              <input type="hidden" name="id_referencia" value="<?= $idSobre ?>">
+              <input type="hidden" name="id_referencia" value="<?= (int) $idSobre ?>">
               <input type="file" name="plantilla" accept="image/png" required>
               <button type="submit" class="btn btn-primary btn-sm">Subir</button>
             </form>
@@ -215,25 +202,25 @@ function rutasPanel(array $rutas): array {
         <?php endforeach; ?>
 
         <?php if (empty($tiposDeEsta)): ?>
-        <p style="color:var(--frost-dim); font-size:13px;">Esta expansión todavía no tiene sobres.</p>
+        <p class="t-caption t-dim">Esta expansión todavía no tiene sobres.</p>
         <?php endif; ?>
       </div>
     </section>
     <?php endforeach; ?>
 
     <?php if (empty($expansiones)): ?>
-    <p style="color:var(--frost-dim);">Todavía no hay expansiones creadas.</p>
+    <p class="t-caption t-dim">Todavía no hay expansiones creadas.</p>
     <?php endif; ?>
   </main>
 </div>
 
-<script src="../assets/js/vendor/gsap/gsap.min.js"></script>
+<?php $pieCompleto = false; include __DIR__ . '/../partials/footer.php'; ?>
+<script src="<?= htmlspecialchars(assetUrl($base, 'assets/js/vendor/gsap/gsap.min.js')) ?>"></script>
 <!-- Fase 5, restricción explícita: "no reescribir el componente 3D del juego
      que ya funciona". La vista previa carga el MISMO sobres.js del juego: el
      tilt (initPackBox), el click de caja → apertura de tapa → stagger de
      sobres (onEnvelopeTypeSelected) y el cierre (js-cerrar-blister) quedan
      cableados solos, sin una sola línea de JS propia de este panel. -->
-<script src="../assets/js/sobres.js?v=<?= @filemtime(__DIR__ . '/../assets/js/sobres.js') ?>"></script>
-
+<script src="<?= htmlspecialchars(assetUrl($base, 'assets/js/sobres.js')) ?>"></script>
 </body>
 </html>

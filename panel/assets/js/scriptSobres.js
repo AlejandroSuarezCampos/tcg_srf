@@ -1,7 +1,10 @@
 /**
- * Lógica de panel/sobres.php: abrir/cerrar el modal de creación/edición,
- * rellenarlo con los datos del sobre al pulsar "Editar", y confirmar el
- * borrado antes de navegar a la eliminación real (sobres.php?eliminar=ID).
+ * Lógica de panel/sobres.php: rellenar el modal de creación/edición con los
+ * datos del sobre al pulsar "Editar", y pedir confirmación antes de navegar
+ * al borrado real (sobres.php?eliminar=ID).
+ *
+ * El modal en sí lo lleva SRF.abrirModal()/cerrarModal() de assets/js/ui.js,
+ * igual que en el resto del sitio.
  *
  * Misma convención de imágenes que en cromos: en la BD se guardan como
  * "./assets/img/..." (relativas a la raíz del proyecto), así que para
@@ -15,56 +18,45 @@ function rutaPreviewSobre(imagen) {
 }
 
 function abrirModalSobre(sobre) {
-  const modal = document.getElementById('modalSobre');
-  if (!modal) { console.error('No se encontró #modalSobre en la página'); return; }
-
   const titulo = document.getElementById('modalSobreTitulo');
   const submitBtn = document.getElementById('fs_submit');
   const form = document.getElementById('formSobre');
   const preview = document.getElementById('fs_preview');
 
   if (sobre) {
-    if (titulo) titulo.textContent = 'Editar sobre';
-    if (submitBtn) submitBtn.textContent = 'Guardar cambios';
-    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
+    titulo.textContent = 'Editar sobre';
+    submitBtn.textContent = 'Guardar cambios';
+    const setVal = (id, val) => { document.getElementById(id).value = val ?? ''; };
     setVal('fs_id_sobre', sobre.id_sobre);
     setVal('fs_nombre', sobre.nombre);
     setVal('fs_imagen', sobre.imagen);
-    if (preview) preview.src = rutaPreviewSobre(sobre.imagen);
+    preview.src = rutaPreviewSobre(sobre.imagen);
     setVal('fs_id_expansion', sobre.id_expansion);
     setVal('fs_cantidad', sobre.cantidad);
     setVal('fs_precio', sobre.precio);
-    const activoInput = document.getElementById('fs_activo');
-    if (activoInput) activoInput.checked = parseInt(sobre.activo) === 1;
+    document.getElementById('fs_activo').checked = parseInt(sobre.activo, 10) === 1;
   } else {
-    if (titulo) titulo.textContent = 'Nuevo sobre';
-    if (submitBtn) submitBtn.textContent = 'Crear sobre';
-    if (form) form.reset();
-    const idInput = document.getElementById('fs_id_sobre');
-    if (idInput) idInput.value = '';
-    if (preview) preview.src = DEFAULT_PREVIEW_SOBRE;
-    const activoInput = document.getElementById('fs_activo');
-    if (activoInput) activoInput.checked = true;
+    titulo.textContent = 'Nuevo sobre';
+    submitBtn.textContent = 'Crear sobre';
+    form.reset();
+    document.getElementById('fs_id_sobre').value = '';
+    preview.src = DEFAULT_PREVIEW_SOBRE;
+    document.getElementById('fs_activo').checked = true;
   }
 
-  modal.classList.add('open');
+  SRF.abrirModal('modalSobre');
 }
 
 function cerrarModalSobre() {
-  document.getElementById('modalSobre')?.classList.remove('open');
+  SRF.cerrarModal('modalSobre');
 }
 
 document.getElementById('fs_imagen')?.addEventListener('input', (e) => {
-  const preview = document.getElementById('fs_preview');
-  if (preview) preview.src = rutaPreviewSobre(e.target.value);
+  document.getElementById('fs_preview').src = rutaPreviewSobre(e.target.value);
 });
 
-document.getElementById('modalSobre')?.addEventListener('click', (e) => {
-  if (e.target.id === 'modalSobre') cerrarModalSobre();
-});
-
-function confirmarBorrado(nombre, id) {
-  if (confirm(`¿Seguro que quieres eliminar el sobre "${nombre}"? Esta acción no se puede deshacer.`)) {
+function pedirBorrado(nombre, id) {
+  SRF.confirmar('¿Seguro que quieres eliminar el sobre "' + nombre + '"? Esta acción no se puede deshacer.', function () {
     window.location.href = 'sobres.php?eliminar=' + encodeURIComponent(id);
-  }
+  });
 }

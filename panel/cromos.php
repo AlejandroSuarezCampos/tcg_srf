@@ -1,16 +1,16 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
-require_once __DIR__ . '/../rareza-clases.php';
+require_once __DIR__ . '/../components/carta.php';
 
-if(isset($_SESSION['dictador'])){
-  if($_SESSION['dictador']!=1){
-    header("Location: ../landing.php");
+if (isset($_SESSION['dictador'])) {
+    if ($_SESSION['dictador'] != 1) {
+        header('Location: ../landing.php');
+        exit;
+    }
+} else {
+    header('Location: ../landing.php');
     exit;
-  }
-}else{
-  header("Location: ../landing.php");
-  exit;
 }
 
 // ----- Borrado (?eliminar=ID) -----
@@ -53,7 +53,7 @@ $equipos     = $db->listarEquipos();
 $expansiones = $db->listarExpansiones();
 $rarezasDB   = $db->listarRarezas();
 $afinidades  = $db->listarAfinidades();
-$posiciones  = ['POR','DF','MC','DC','ENT','GER','ESCUDO','PRESIDENTE'];
+$posiciones  = ['POR', 'DF', 'MC', 'DC', 'ENT', 'GER', 'ESCUDO', 'PRESIDENTE'];
 
 $rarezas = [];
 foreach ($rarezasDB as $r) {
@@ -72,57 +72,65 @@ if ($filtroTexto !== '') {
 if ($filtroExpansion !== '') {
     $cromos = array_values(array_filter($cromos, fn($c) => (string) $c['id_expansion'] === (string) $filtroExpansion));
 }
+
+$base         = '../';
+$paginaTitulo = 'Cromos — Panel';
+$paginaDesc   = 'Crea, edita y elimina los cromos disponibles en el juego.';
+$cssExtra     = ['panel/assets/css/admin.css'];
+include __DIR__ . '/../partials/head.php';
+
+$activeAdmin = 'cromos';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestión de cromos — Panel de control</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="./assets/css/admin.css">
-<link rel="icon" type="image/png" href="../assets/img/iconos/favicon.ico">
-</head>
-<body>
 
 <div class="admin-shell">
-  <?php $activeAdmin = 'cromos'; include __DIR__ . '/navbar.php'; ?>
+  <?php include __DIR__ . '/navbar.php'; ?>
 
-  <main class="admin-main">
+  <main class="admin-main" id="contenido">
     <div class="admin-head">
       <div>
         <h1>Cromos</h1>
         <p>Crea, edita y elimina los cromos disponibles en el juego.</p>
       </div>
-      <button class="btn btn-primary" onclick="abrirModalCromo()">+ Nuevo cromo</button>
+      <button type="button" class="btn btn-primary" onclick="abrirModalCromo()">
+        <i class="ph ph-plus" aria-hidden="true"></i> Nuevo cromo
+      </button>
     </div>
 
-    <form method="GET" class="admin-toolbar">
-      <div class="admin-search">
-        🔍 <input type="text" name="q" value="<?= htmlspecialchars($filtroTexto) ?>" placeholder="Buscar cromo por nombre...">
+    <form method="GET" class="barra-filtros">
+      <div class="campo">
+        <label for="c-buscar">Buscar</label>
+        <input type="search" name="q" id="c-buscar" value="<?= htmlspecialchars($filtroTexto) ?>"
+               placeholder="Nombre del cromo">
       </div>
-      <select class="field-inline" name="id_expansion" style="width:200px;" onchange="this.form.submit()">
-        <option value="">Todas las expansiones</option>
-        <?php foreach ($expansiones as $ex): ?>
-        <option value="<?= $ex['id_expansion'] ?>" <?= (string) $filtroExpansion === (string) $ex['id_expansion'] ? 'selected' : '' ?>><?= htmlspecialchars($ex['nombre']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <button type="submit" class="btn btn-ghost btn-sm">Buscar</button>
+      <div class="campo">
+        <label for="c-expansion">Expansión</label>
+        <select name="id_expansion" id="c-expansion" onchange="this.form.submit()">
+          <option value="">Todas</option>
+          <?php foreach ($expansiones as $ex): ?>
+          <option value="<?= (int) $ex['id_expansion'] ?>" <?= (string) $filtroExpansion === (string) $ex['id_expansion'] ? 'selected' : '' ?>>
+            <?= htmlspecialchars($ex['nombre']) ?>
+          </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="barra-filtros-acciones">
+        <button type="submit" class="btn btn-ghost">Filtrar</button>
+        <?php if ($filtroTexto !== '' || $filtroExpansion !== ''): ?>
+        <a class="btn btn-plano" href="cromos.php">Quitar</a>
+        <?php endif; ?>
+      </div>
     </form>
 
-    <div class="admin-table-wrap">
-      <table class="admin-table">
+    <div class="tabla-wrap">
+      <table class="tabla">
         <thead>
           <tr>
-            <th>Cromo</th>
-            <th>Equipo</th>
-            <th>Expansión</th>
-            <th>Posición</th>
-            <th>Rareza</th>
-            <th style="text-align:right;">Acciones</th>
+            <th scope="col">Cromo</th>
+            <th scope="col">Equipo</th>
+            <th scope="col">Expansión</th>
+            <th scope="col">Posición</th>
+            <th scope="col">Rareza</th>
+            <th scope="col" style="text-align:right;">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -135,18 +143,24 @@ if ($filtroExpansion !== '') {
                 <img class="admin-thumb" src="<?= htmlspecialchars($imagenPanel) ?>" alt="">
                 <div>
                   <div class="admin-cell-title"><?= htmlspecialchars($c['nombre']) ?></div>
-                  <div class="admin-cell-sub">ID #<?= $c['id_cromo'] ?></div>
+                  <div class="admin-cell-sub">ID #<?= (int) $c['id_cromo'] ?></div>
                 </div>
               </div>
             </td>
             <td><?= htmlspecialchars($c['equipo']) ?></td>
             <td><?= htmlspecialchars($c['expansion']) ?></td>
             <td><?= htmlspecialchars($c['posicion']) ?></td>
-            <td><span class="rarity <?= $claseRarezaPorId[$c['id_rareza']] ?? 'r-comun' ?>"><?= htmlspecialchars($rarezas[$c['id_rareza']] ?? $c['rareza']) ?></span></td>
+            <td><?= render_rareza((int) $c['id_rareza'], $rarezas[$c['id_rareza']] ?? $c['rareza']) ?></td>
             <td>
               <div class="row-actions">
-                <button class="icon-btn" title="Editar" onclick='abrirModalCromo(<?= htmlspecialchars(json_encode($c), ENT_QUOTES) ?>)'><i class="bi bi-pencil-square"></i></button>
-                <button class="icon-btn danger" title="Eliminar" onclick="confirmarBorrado('<?= htmlspecialchars($c['nombre'], ENT_QUOTES) ?>', <?= $c['id_cromo'] ?>)"><i class="bi bi-trash"></i></button>
+                <button type="button" class="icon-btn" title="Editar"
+                        onclick='abrirModalCromo(<?= htmlspecialchars(json_encode($c), ENT_QUOTES) ?>)'>
+                  <i class="ph ph-pencil-simple" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="icon-btn es-peligro" title="Eliminar"
+                        onclick="pedirBorrado('<?= htmlspecialchars($c['nombre'], ENT_QUOTES) ?>', <?= (int) $c['id_cromo'] ?>)">
+                  <i class="ph ph-trash" aria-hidden="true"></i>
+                </button>
               </div>
             </td>
           </tr>
@@ -158,103 +172,103 @@ if ($filtroExpansion !== '') {
       </table>
     </div>
 
-    <div class="admin-pagination">
-      <span class="collection-count"><b><?= count($cromos) ?></b> cromos mostrados</span>
-    </div>
+    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($cromos) ?></b> cromos mostrados</p>
   </main>
 </div>
 
 <!-- Modal crear / editar cromo -->
-<div class="modal-backdrop" id="modalCromo">
-  <div class="modal-box">
-    <div class="modal-box-inner">
-      <div class="modal-head">
-        <h2 id="modalCromoTitulo">Nuevo cromo</h2>
-        <button class="modal-close" onclick="cerrarModalCromo()">✕</button>
+<div class="modal" id="modalCromo" role="dialog" aria-modal="true" aria-labelledby="modalCromoTitulo" aria-hidden="true">
+  <div class="modal-caja modal-caja--ancha">
+    <div class="modal-head">
+      <h2 id="modalCromoTitulo">Nuevo cromo</h2>
+      <button type="button" class="modal-cerrar" onclick="cerrarModalCromo()" aria-label="Cerrar">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="cromos.php" id="formCromo">
+      <input type="hidden" name="id_cromo" id="f_id_cromo">
+
+      <div class="form-grid">
+        <div class="campo campo-full">
+          <label for="f_nombre">Nombre del cromo</label>
+          <input type="text" name="nombre" id="f_nombre" placeholder="Ej. Mark Evans" required>
+        </div>
+
+        <div class="campo campo-full">
+          <label>Imagen</label>
+          <div class="thumb-upload">
+            <img class="admin-thumb" id="f_preview" src="../assets/img/perfil/apple-icon-120x120.png" alt="">
+            <div class="thumb-upload-text">
+              <b>Pega la ruta de la imagen</b>
+              <code>./assets/img/Cromos/...</code>
+            </div>
+          </div>
+          <input type="text" name="imagen" id="f_imagen" placeholder="./assets/img/Cromos/..." style="margin-top:var(--space-2);">
+        </div>
+
+        <div class="campo">
+          <label for="f_id_equipo">Equipo</label>
+          <select name="id_equipo" id="f_id_equipo">
+            <?php foreach ($equipos as $eq): ?>
+            <option value="<?= (int) $eq['id_equipo'] ?>"><?= htmlspecialchars($eq['nombre']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="f_id_expansion">Expansión</label>
+          <select name="id_expansion" id="f_id_expansion">
+            <?php foreach ($expansiones as $ex): ?>
+            <option value="<?= (int) $ex['id_expansion'] ?>"><?= htmlspecialchars($ex['nombre']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="f_posicion">Posición</label>
+          <select name="posicion" id="f_posicion">
+            <?php foreach ($posiciones as $p): ?>
+            <option value="<?= $p ?>"><?= $p ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="f_id_rareza">Rareza</label>
+          <select name="id_rareza" id="f_id_rareza">
+            <?php foreach ($rarezas as $id => $nombre): ?>
+            <option value="<?= (int) $id ?>"><?= htmlspecialchars($nombre) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="campo campo-full">
+          <label for="f_id_afinidad">Afinidad</label>
+          <select name="id_afinidad" id="f_id_afinidad">
+            <?php foreach ($afinidades as $af): ?>
+            <option value="<?= (int) $af['id'] ?>"><?= htmlspecialchars($af['nombre']) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div class="campo campo-full">
+          <label for="f_descripcion">Descripción</label>
+          <textarea name="descripcion" id="f_descripcion" placeholder="Breve descripción o lore del cromo..."></textarea>
+        </div>
       </div>
 
-      <form method="POST" action="cromos.php" id="formCromo">
-        <input type="hidden" name="id_cromo" id="f_id_cromo">
-
-        <div class="form-grid">
-          <div class="field field-full">
-            <label>Nombre del cromo</label>
-            <input type="text" name="nombre" id="f_nombre" placeholder="Ej. Mark Evans" required>
-          </div>
-
-          <div class="field field-full">
-            <label>Imagen</label>
-            <div class="thumb-upload">
-              <img class="admin-thumb" id="f_preview" src="../assets/img/perfil/apple-icon-120x120.png" alt="">
-              <div class="thumb-upload-text">
-                <b>Pega la ruta de la imagen</b>
-                <code>./assets/img/Cromos/...</code>
-              </div>
-            </div>
-            <input type="text" name="imagen" id="f_imagen" placeholder="./assets/img/Cromos/..." style="margin-top:10px;">
-          </div>
-
-          <div class="field">
-            <label>Equipo</label>
-            <select name="id_equipo" id="f_id_equipo">
-              <?php foreach ($equipos as $eq): ?>
-              <option value="<?= $eq['id_equipo'] ?>"><?= htmlspecialchars($eq['nombre']) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Expansión</label>
-            <select name="id_expansion" id="f_id_expansion">
-              <?php foreach ($expansiones as $ex): ?>
-              <option value="<?= $ex['id_expansion'] ?>"><?= htmlspecialchars($ex['nombre']) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Posición</label>
-            <select name="posicion" id="f_posicion">
-              <?php foreach ($posiciones as $p): ?>
-              <option value="<?= $p ?>"><?= $p ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Rareza</label>
-            <select name="id_rareza" id="f_id_rareza">
-              <?php foreach ($rarezas as $id => $nombre): ?>
-              <option value="<?= $id ?>"><?= htmlspecialchars($nombre) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="field field-full">
-            <label>Afinidad</label>
-            <select name="id_afinidad" id="f_id_afinidad">
-              <?php foreach ($afinidades as $af): ?>
-              <option value="<?= $af['id'] ?>"><?= htmlspecialchars($af['nombre']) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-
-          <div class="field field-full">
-            <label>Descripción</label>
-            <textarea name="descripcion" id="f_descripcion" placeholder="Breve descripción o lore del cromo..."></textarea>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onclick="cerrarModalCromo()">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="f_submit">Crear cromo</button>
-        </div>
-      </form>
-    </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-ghost" onclick="cerrarModalCromo()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="f_submit">Crear cromo</button>
+      </div>
+    </form>
   </div>
 </div>
 
-<script src="./assets/js/scriptCromos.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptCromos.js') ?>"></script>
+<?php include __DIR__ . '/../partials/confirmar.php'; ?>
 
+<?php $pieCompleto = false; include __DIR__ . '/../partials/footer.php'; ?>
+<script src="<?= htmlspecialchars(assetUrl($base, 'panel/assets/js/scriptCromos.js')) ?>"></script>
 </body>
 </html>

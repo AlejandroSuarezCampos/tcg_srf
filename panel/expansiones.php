@@ -2,14 +2,14 @@
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
 
-if(isset($_SESSION['dictador'])){
-  if($_SESSION['dictador']!=1){
-    header("Location: ../landing.php");
+if (isset($_SESSION['dictador'])) {
+    if ($_SESSION['dictador'] != 1) {
+        header('Location: ../landing.php');
+        exit;
+    }
+} else {
+    header('Location: ../landing.php');
     exit;
-  }
-}else{
-  header("Location: ../landing.php");
-  exit;
 }
 
 // ----- Borrado (?eliminar=ID) -----
@@ -42,54 +42,60 @@ $filtroTexto = trim($_GET['q'] ?? '');
 if ($filtroTexto !== '') {
     $expansiones = array_values(array_filter($expansiones, fn($e) => stripos($e['nombre'], $filtroTexto) !== false));
 }
+
+$base         = '../';
+$paginaTitulo = 'Expansiones — Panel';
+$paginaDesc   = 'Crea, edita y elimina las expansiones (sets) del juego.';
+$cssExtra     = ['panel/assets/css/admin.css'];
+include __DIR__ . '/../partials/head.php';
+
+$activeAdmin = 'expansiones';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestión de expansiones — Panel de control</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="./assets/css/admin.css">
-<link rel="icon" type="image/png" href="../assets/img/iconos/favicon.ico">
-</head>
-<body>
 
 <div class="admin-shell">
-  <?php $activeAdmin = 'expansiones'; include __DIR__ . '/navbar.php'; ?>
+  <?php include __DIR__ . '/navbar.php'; ?>
 
-  <main class="admin-main">
+  <main class="admin-main" id="contenido">
     <div class="admin-head">
       <div>
         <h1>Expansiones</h1>
         <p>Crea, edita y elimina las expansiones (sets) del juego.</p>
       </div>
-      <button class="btn btn-primary" onclick="abrirModalExpansion()">+ Nueva expansión</button>
+      <button type="button" class="btn btn-primary" onclick="abrirModalExpansion()">
+        <i class="ph ph-plus" aria-hidden="true"></i> Nueva expansión
+      </button>
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'cartas_en_uso'): ?>
-    <div class="alert alert-danger">No se puede eliminar esta expansión: todavía tiene cartas asociadas. Bórralas (o muévelas a otra expansión) primero.</div>
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+      <i class="ph ph-warning-circle" aria-hidden="true"></i>
+      <span>No se puede eliminar esta expansión: todavía tiene cartas asociadas. Bórralas (o muévelas a otra expansión) primero.</span>
+    </div>
     <?php endif; ?>
 
-    <form method="GET" class="admin-toolbar">
-      <div class="admin-search">
-        🔍 <input type="text" name="q" value="<?= htmlspecialchars($filtroTexto) ?>" placeholder="Buscar expansión por nombre...">
+    <form method="GET" class="barra-filtros">
+      <div class="campo">
+        <label for="e-buscar">Buscar</label>
+        <input type="search" name="q" id="e-buscar" value="<?= htmlspecialchars($filtroTexto) ?>"
+               placeholder="Nombre de la expansión">
       </div>
-      <button type="submit" class="btn btn-ghost btn-sm">Buscar</button>
+      <div class="barra-filtros-acciones">
+        <button type="submit" class="btn btn-ghost">Filtrar</button>
+        <?php if ($filtroTexto !== ''): ?>
+        <a class="btn btn-plano" href="expansiones.php">Quitar</a>
+        <?php endif; ?>
+      </div>
     </form>
 
-    <div class="admin-table-wrap">
-      <table class="admin-table">
+    <div class="tabla-wrap">
+      <table class="tabla">
         <thead>
           <tr>
-            <th>Expansión</th>
-            <th>Fecha de salida</th>
-            <th>Cromos incluidos</th>
-            <th>Estado</th>
-            <th style="text-align:right;">Acciones</th>
+            <th scope="col">Expansión</th>
+            <th scope="col">Fecha de salida</th>
+            <th scope="col">Cromos incluidos</th>
+            <th scope="col">Estado</th>
+            <th scope="col" style="text-align:right;">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -99,21 +105,27 @@ if ($filtroTexto !== '') {
           <tr>
             <td>
               <div class="admin-cell-title"><?= htmlspecialchars($ex['nombre']) ?></div>
-              <div class="admin-cell-sub">ID #<?= $ex['id_expansion'] ?></div>
+              <div class="admin-cell-sub">ID #<?= (int) $ex['id_expansion'] ?></div>
             </td>
-            <td><?= date('d/m/Y', strtotime($ex['fecha_salida'])) ?></td>
-            <td><?= $totalCromos ?> cromos</td>
+            <td class="mono"><?= date('d/m/Y', strtotime($ex['fecha_salida'])) ?></td>
+            <td class="mono"><?= $totalCromos ?> cromos</td>
             <td>
               <?php if ($ex['activo']): ?>
-              <span class="status-pill status-on">Activa</span>
+              <span class="status-pill esta-activo">Activa</span>
               <?php else: ?>
-              <span class="status-pill status-off">Inactiva</span>
+              <span class="status-pill esta-inactivo">Inactiva</span>
               <?php endif; ?>
             </td>
             <td>
               <div class="row-actions">
-                <button class="icon-btn" title="Editar" onclick='abrirModalExpansion(<?= htmlspecialchars(json_encode($ex), ENT_QUOTES) ?>)'><i class="bi bi-pencil-square"></i></button>
-                <button class="icon-btn danger" title="Eliminar" onclick="confirmarBorrado('<?= htmlspecialchars($ex['nombre'], ENT_QUOTES) ?>', <?= $ex['id_expansion'] ?>)"><i class="bi bi-trash"></i></button>
+                <button type="button" class="icon-btn" title="Editar"
+                        onclick='abrirModalExpansion(<?= htmlspecialchars(json_encode($ex), ENT_QUOTES) ?>)'>
+                  <i class="ph ph-pencil-simple" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="icon-btn es-peligro" title="Eliminar"
+                        onclick="pedirBorrado('<?= htmlspecialchars($ex['nombre'], ENT_QUOTES) ?>', <?= (int) $ex['id_expansion'] ?>)">
+                  <i class="ph ph-trash" aria-hidden="true"></i>
+                </button>
               </div>
             </td>
           </tr>
@@ -125,56 +137,56 @@ if ($filtroTexto !== '') {
       </table>
     </div>
 
-    <div class="admin-pagination">
-      <span class="collection-count"><b><?= count($expansiones) ?></b> expansiones mostradas</span>
-    </div>
+    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($expansiones) ?></b> expansiones mostradas</p>
   </main>
 </div>
 
 <!-- Modal crear / editar expansión -->
-<div class="modal-backdrop" id="modalExpansion">
-  <div class="modal-box">
-    <div class="modal-box-inner">
-      <div class="modal-head">
-        <h2 id="modalExpansionTitulo">Nueva expansión</h2>
-        <button class="modal-close" onclick="cerrarModalExpansion()">✕</button>
+<div class="modal" id="modalExpansion" role="dialog" aria-modal="true" aria-labelledby="modalExpansionTitulo" aria-hidden="true">
+  <div class="modal-caja">
+    <div class="modal-head">
+      <h2 id="modalExpansionTitulo">Nueva expansión</h2>
+      <button type="button" class="modal-cerrar" onclick="cerrarModalExpansion()" aria-label="Cerrar">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <form method="POST" action="expansiones.php" id="formExpansion">
+      <input type="hidden" name="id_expansion" id="fe_id_expansion">
+
+      <div class="form-grid">
+        <div class="campo campo-full">
+          <label for="fe_nombre">Nombre de la expansión</label>
+          <input type="text" name="nombre" id="fe_nombre" placeholder="Ej. Tormenta de Invierno" required>
+        </div>
+
+        <div class="campo campo-full">
+          <label for="fe_fecha_salida">Fecha de salida</label>
+          <input type="date" name="fecha_salida" id="fe_fecha_salida">
+        </div>
+
+        <div class="campo campo-full">
+          <div class="fila-interruptor">
+            <span>Expansión activa (visible en el sitio)</span>
+            <label class="interruptor">
+              <input type="checkbox" name="activo" id="fe_activo">
+              <span class="interruptor-riel"></span>
+            </label>
+          </div>
+        </div>
       </div>
 
-      <form method="POST" action="expansiones.php" id="formExpansion">
-        <input type="hidden" name="id_expansion" id="fe_id_expansion">
-
-        <div class="form-grid">
-          <div class="field field-full">
-            <label>Nombre de la expansión</label>
-            <input type="text" name="nombre" id="fe_nombre" placeholder="Ej. Tormenta de Invierno" required>
-          </div>
-
-          <div class="field field-full">
-            <label>Fecha de salida</label>
-            <input type="date" name="fecha_salida" id="fe_fecha_salida">
-          </div>
-
-          <div class="field field-full">
-            <div class="toggle-row">
-              <span>Expansión activa (visible en el sitio)</span>
-              <label class="switch">
-                <input type="checkbox" name="activo" id="fe_activo">
-                <span class="switch-track"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-ghost" onclick="cerrarModalExpansion()">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="fe_submit">Crear expansión</button>
-        </div>
-      </form>
-    </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-ghost" onclick="cerrarModalExpansion()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="fe_submit">Crear expansión</button>
+      </div>
+    </form>
   </div>
 </div>
 
-<script src="./assets/js/scriptExpansiones.js?v=<?= @filemtime(__DIR__ . '/assets/js/scriptExpansiones.js') ?>"></script>
+<?php include __DIR__ . '/../partials/confirmar.php'; ?>
 
+<?php $pieCompleto = false; include __DIR__ . '/../partials/footer.php'; ?>
+<script src="<?= htmlspecialchars(assetUrl($base, 'panel/assets/js/scriptExpansiones.js')) ?>"></script>
 </body>
 </html>

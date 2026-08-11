@@ -1,11 +1,12 @@
 /**
- * Lógica de panel/expansiones.php: abrir/cerrar el modal de creación/edición
- * y confirmar el borrado antes de navegar a la eliminación real
+ * Lógica de panel/expansiones.php: rellenar el modal de creación/edición y
+ * pedir confirmación antes de navegar al borrado real
  * (expansiones.php?eliminar=ID).
+ *
+ * El modal en sí lo lleva SRF.abrirModal()/cerrarModal() de assets/js/ui.js.
  */
 
 function abrirModalExpansion(expansion) {
-  const modal = document.getElementById('modalExpansion');
   const titulo = document.getElementById('modalExpansionTitulo');
   const submitBtn = document.getElementById('fe_submit');
 
@@ -16,7 +17,7 @@ function abrirModalExpansion(expansion) {
     document.getElementById('fe_nombre').value = expansion.nombre || '';
     // fecha_salida viene como "YYYY-MM-DD HH:MM:SS"; el <input type="date"> solo quiere "YYYY-MM-DD"
     document.getElementById('fe_fecha_salida').value = (expansion.fecha_salida || '').substring(0, 10);
-    document.getElementById('fe_activo').checked = parseInt(expansion.activo) === 1;
+    document.getElementById('fe_activo').checked = parseInt(expansion.activo, 10) === 1;
   } else {
     titulo.textContent = 'Nueva expansión';
     submitBtn.textContent = 'Crear expansión';
@@ -25,19 +26,15 @@ function abrirModalExpansion(expansion) {
     document.getElementById('fe_activo').checked = true;
   }
 
-  modal.classList.add('open');
+  SRF.abrirModal('modalExpansion');
 }
 
 function cerrarModalExpansion() {
-  document.getElementById('modalExpansion').classList.remove('open');
+  SRF.cerrarModal('modalExpansion');
 }
 
-document.getElementById('modalExpansion')?.addEventListener('click', (e) => {
-  if (e.target.id === 'modalExpansion') cerrarModalExpansion();
-});
-
-function confirmarBorrado(nombre, id) {
-  if (confirm(`¿Seguro que quieres eliminar "${nombre}"? Se perderá también la relación con sus cromos.`)) {
+function pedirBorrado(nombre, id) {
+  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Se perderá también la relación con sus cromos.', function () {
     window.location.href = 'expansiones.php?eliminar=' + encodeURIComponent(id);
-  }
+  });
 }

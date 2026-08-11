@@ -3,9 +3,9 @@ session_start();
 require_once __DIR__ . '/../db/conexion.php';
 
 if (isset($_SESSION['dictador'])) {
-    if ($_SESSION['dictador'] != 1) { header("Location: ../landing.php"); exit; }
+    if ($_SESSION['dictador'] != 1) { header('Location: ../landing.php'); exit; }
 } else {
-    header("Location: ../landing.php"); exit;
+    header('Location: ../landing.php'); exit;
 }
 
 // ----- Borrado de cartas importadas (?borrar_importadas=1) -----
@@ -38,26 +38,20 @@ $previsualizacion = isset($_SESSION['import_datos'])
 
 $expansiones = $db->listarExpansiones();
 $expansionesImportadas = $db->listarExpansionesConCartasImportadas();
+
+$base         = '../';
+$paginaTitulo = 'Importar datos oficiales — Panel';
+$paginaDesc   = 'Crea cartas de jugadores, escudos, entrenadores y gerentes a partir del datos_oficiales.json.';
+$cssExtra     = ['panel/assets/css/admin.css'];
+include __DIR__ . '/../partials/head.php';
+
+$activeAdmin = 'importar';
 ?>
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Importar datos oficiales — Panel de control</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="./assets/css/admin.css">
-<link rel="icon" type="image/png" href="../assets/img/iconos/favicon.ico">
-</head>
-<body>
 
 <div class="admin-shell">
-  <?php $activeAdmin = 'importar'; include __DIR__ . '/navbar.php'; ?>
+  <?php include __DIR__ . '/navbar.php'; ?>
 
-  <main class="admin-main">
+  <main class="admin-main" id="contenido">
     <div class="admin-head">
       <div>
         <h1>Importar datos oficiales</h1>
@@ -66,23 +60,29 @@ $expansionesImportadas = $db->listarExpansionesConCartasImportadas();
     </div>
 
     <?php if ($error): ?>
-      <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+      <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+        <i class="ph ph-warning-circle" aria-hidden="true"></i>
+        <span><?= htmlspecialchars($error) ?></span>
+      </div>
     <?php endif; ?>
 
     <?php if (isset($_GET['importados_borrados'])): ?>
       <?php $nBorradas = (int) ($_GET['n'] ?? 0); $nRetenidas = (int) ($_GET['retenidas'] ?? 0); ?>
-      <div class="alert <?= $nRetenidas > 0 ? 'alert-warning' : 'alert-success' ?>">
-        <?= $nBorradas ?> cartas importadas borradas.
-        <?php if ($nRetenidas > 0): ?>
-          <?= $nRetenidas ?> se conservaron por estar en uso (en una colección o en un duelo).
-        <?php endif; ?>
+      <div class="alerta <?= $nRetenidas > 0 ? 'alerta-warning' : 'alerta-success' ?>" role="status" style="margin-bottom:var(--space-5);">
+        <i class="ph <?= $nRetenidas > 0 ? 'ph-warning' : 'ph-check-circle' ?>" aria-hidden="true"></i>
+        <span>
+          <?= $nBorradas ?> cartas importadas borradas.
+          <?php if ($nRetenidas > 0): ?>
+            <?= $nRetenidas ?> se conservaron por estar en uso (en una colección o en un duelo).
+          <?php endif; ?>
+        </span>
       </div>
     <?php endif; ?>
 
     <?php if ($previsualizacion): ?>
       <form method="POST" id="formPrevisualizacion">
-        <h2>Previsualización</h2>
-        <ul>
+        <h2 class="t-h3">Previsualización</h2>
+        <ul class="t-body-sm" style="margin:var(--space-3) 0 var(--space-5); padding-left:1.2em;">
           <li><?= $previsualizacion['jugadores_a_crear'] ?> jugadores a crear</li>
           <li><?= $previsualizacion['jugadores_omitidos'] ?> jugadores omitidos (ya existen en esta expansión)</li>
           <li><?= $previsualizacion['equipos_exactos'] ?> equipos ya reconocidos</li>
@@ -95,20 +95,26 @@ $expansionesImportadas = $db->listarExpansionesConCartasImportadas();
         </ul>
 
         <?php if (!empty($previsualizacion['equipos_ambiguos'])): ?>
-        <h3>Confirma el nombre correcto de estos equipos</h3>
-        <p>Los datos oficiales traen el nombre de este equipo escrito de forma distinta a como ya está en el catálogo — probablemente una errata en uno de los dos sitios. ¿Cuál es el nombre correcto?</p>
-        <div class="admin-table-wrap">
-          <table class="admin-table">
-            <thead><tr><th>Equipo</th><th>¿Cuál es el nombre correcto?</th></tr></thead>
+        <h3 class="t-h3" style="margin-bottom:var(--space-2);">Confirma el nombre correcto de estos equipos</h3>
+        <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+          Los datos oficiales traen el nombre de este equipo escrito de forma distinta a como ya está en el catálogo
+          — probablemente una errata en uno de los dos sitios. ¿Cuál es el nombre correcto?
+        </p>
+        <div class="tabla-wrap" style="margin-bottom:var(--space-5);">
+          <table class="tabla">
+            <thead><tr><th scope="col">Equipo</th><th scope="col">¿Cuál es el nombre correcto?</th></tr></thead>
             <tbody>
             <?php foreach ($previsualizacion['equipos_ambiguos'] as $amb): ?>
             <tr>
-              <td><?= htmlspecialchars($amb['nombre_json']) ?> <small>(<?= $amb['porcentaje'] ?>% parecido a "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>")</small></td>
               <td>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="db" checked> "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>" (como está en el catálogo)</label><br>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="json"> "<?= htmlspecialchars($amb['nombre_json']) ?>" (como viene en los datos oficiales)</label><br>
-                <label><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="otro"> Ninguno de los dos, es:
-                  <input type="text" name="equipo_texto[<?= htmlspecialchars($amb['id']) ?>]" placeholder="Nombre correcto"></label>
+                <?= htmlspecialchars($amb['nombre_json']) ?>
+                <span class="t-caption-sm t-dim">(<?= $amb['porcentaje'] ?>% parecido a "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>")</span>
+              </td>
+              <td>
+                <label class="casilla"><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="db" checked> "<?= htmlspecialchars($amb['candidato_db']['nombre']) ?>" (como está en el catálogo)</label><br>
+                <label class="casilla"><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="json"> "<?= htmlspecialchars($amb['nombre_json']) ?>" (como viene en los datos oficiales)</label><br>
+                <label class="casilla"><input type="radio" name="equipo_eleccion[<?= htmlspecialchars($amb['id']) ?>]" value="otro"> Ninguno de los dos, es:
+                  <input type="text" name="equipo_texto[<?= htmlspecialchars($amb['id']) ?>]" placeholder="Nombre correcto" style="width:auto;"></label>
               </td>
             </tr>
             <?php endforeach; ?>
@@ -117,50 +123,55 @@ $expansionesImportadas = $db->listarExpansionesConCartasImportadas();
         </div>
         <?php endif; ?>
 
-        <div class="modal-footer">
+        <div style="display:flex; gap:var(--space-3); justify-content:flex-end;">
           <button type="submit" name="cancelar" value="1" class="btn btn-ghost">Cancelar</button>
           <button type="button" id="btnConfirmarImportacion" class="btn btn-primary">Crear cartas</button>
         </div>
       </form>
 
-      <div id="importacionProgreso" class="field-full" style="display:none">
-        <p><progress id="importacionProgresoBarra" value="0" max="1" style="width:100%"></progress></p>
-        <p id="importacionProgresoTexto">Importando…</p>
+      <div id="importacionProgreso" style="display:none; margin-top:var(--space-5);">
+        <progress id="importacionProgresoBarra" value="0" max="1" style="width:100%"></progress>
+        <p id="importacionProgresoTexto" class="t-caption t-dim" style="margin-top:var(--space-2);">Importando…</p>
       </div>
 
-      <div id="importacionResultado" class="field-full" style="display:none"></div>
+      <div id="importacionResultado" style="display:none; margin-top:var(--space-5);"></div>
 
     <?php else: ?>
       <form method="POST" enctype="multipart/form-data">
-        <div class="field field-full">
-          <label>Archivo datos_oficiales.json</label>
-          <input type="file" name="json_datos" accept=".json,application/json" required>
+        <div class="campo campo-full">
+          <label for="i-json">Archivo datos_oficiales.json</label>
+          <input type="file" name="json_datos" id="i-json" accept=".json,application/json" required>
         </div>
-        <div class="field field-full">
-          <label>Expansión destino</label>
-          <select name="id_expansion" required>
+        <div class="campo campo-full">
+          <label for="i-expansion">Expansión destino</label>
+          <select name="id_expansion" id="i-expansion" required>
             <?php foreach ($expansiones as $ex): ?>
-            <option value="<?= $ex['id_expansion'] ?>"><?= htmlspecialchars($ex['nombre']) ?></option>
+            <option value="<?= (int) $ex['id_expansion'] ?>"><?= htmlspecialchars($ex['nombre']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="modal-footer">
+        <div style="display:flex; justify-content:flex-end;">
           <button type="submit" class="btn btn-primary">Previsualizar</button>
         </div>
       </form>
 
       <?php if (!empty($expansionesImportadas)): ?>
-      <div class="field-full">
-        <h3>Cartas importadas por expansión</h3>
-        <div class="admin-table-wrap">
-          <table class="admin-table">
-            <thead><tr><th>Expansión</th><th>Cartas importadas</th><th></th></tr></thead>
+      <div class="admin-section-gap">
+        <h3 class="t-h3" style="margin-bottom:var(--space-4);">Cartas importadas por expansión</h3>
+        <div class="tabla-wrap">
+          <table class="tabla">
+            <thead><tr><th scope="col">Expansión</th><th scope="col" class="num">Cartas importadas</th><th scope="col"></th></tr></thead>
             <tbody>
             <?php foreach ($expansionesImportadas as $exImp): ?>
             <tr>
               <td><?= htmlspecialchars($exImp['nombre']) ?></td>
-              <td><?= (int) $exImp['total'] ?></td>
-              <td><button type="button" class="btn btn-ghost" onclick="if(confirm('¿Borrar las <?= htmlspecialchars((string) $exImp['total']) ?> cartas importadas de \'<?= htmlspecialchars(addslashes($exImp['nombre'])) ?>\'? Esta acción no se puede deshacer.')) window.location.href='importar.php?borrar_importadas=1&id_expansion=<?= (int) $exImp['id_expansion'] ?>'">Borrar</button></td>
+              <td class="num mono"><?= (int) $exImp['total'] ?></td>
+              <td style="text-align:right;">
+                <button type="button" class="btn btn-ghost btn-sm"
+                        onclick="pedirBorradoImportados(<?= (int) $exImp['id_expansion'] ?>, '<?= htmlspecialchars(addslashes($exImp['nombre'])) ?>', <?= (int) $exImp['total'] ?>)">
+                  Borrar
+                </button>
+              </td>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -172,6 +183,9 @@ $expansionesImportadas = $db->listarExpansionesConCartasImportadas();
   </main>
 </div>
 
-<script src="./assets/js/scriptImportar.js"></script>
+<?php include __DIR__ . '/../partials/confirmar.php'; ?>
+
+<?php $pieCompleto = false; include __DIR__ . '/../partials/footer.php'; ?>
+<script src="<?= htmlspecialchars(assetUrl($base, 'panel/assets/js/scriptImportar.js')) ?>"></script>
 </body>
 </html>
