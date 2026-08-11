@@ -300,11 +300,13 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 
 > ## ⚠️ ESTADO EXACTO AL CERRAR LA SESIÓN DEL 2026-08-11 — LEE ESTO PRIMERO
 >
-> **1. Hay un INTERRUPTOR DE PRUEBAS PUESTO en la base real.**
-> `depuracion_forzar_empate = 1`, así que **todo partido PvP acaba 1-1** y se va a
-> la tanda. Es a propósito, para que Alejandro pudiera probar los penaltis a mano.
-> **Si ves todos los duelos empatados, esto es lo primero que hay que mirar** — no
-> está roto:
+> **1. El interruptor de pruebas ya está QUITADO** (`depuracion_forzar_empate = 0`
+> desde el 2026-08-11, por decisión de Alejandro). Los partidos PvP vuelven a
+> decidirse por el marcador y solo van a la tanda los que acaban empatados de
+> verdad (~27,7 %, §15.10). El interruptor **sigue existiendo** y es la forma de
+> probar los penaltis a mano: ponlo a `1` para que todo partido acabe 1-1, y
+> **acuérdate de devolverlo a `0`** al terminar. Si algún día ves todos los duelos
+> empatados, esto es lo primero que hay que mirar — no está roto:
 > ```
 > C:\xampp\mysql\bin\mysql.exe -u root -e "UPDATE tcg.configuracion SET valor='0' WHERE clave='depuracion_forzar_empate';"
 > ```
@@ -331,9 +333,12 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > piezas, con las decisiones de Alejandro textuales. No hace falta volver a
 > preguntárselas.
 >
-> **6. Los 16 PNG borrados** de `assets/img/_originales_sin_optimizar/` siguen
-> **fuera de todos los commits**, deliberadamente, desde antes de esta sesión.
-> Alejandro nunca ha dicho qué hacer con ellos. No los commitees sin preguntar.
+> **6. Los 16 PNG originales ya no existen y el borrado está commiteado**
+> (2026-08-11). Alejandro confirmó que los eliminó a propósito, así que la carpeta
+> `assets/img/_originales_sin_optimizar/` **ha desaparecido entera** del proyecto y
+> del árbol del §2. Ningún fichero de código la referenciaba — se comprobó antes de
+> registrar el borrado. El arte servido es el WebP optimizado de
+> `assets/img/Cromos/`, que no se ha tocado.
 
 **Lo primero que tienes que hacer, en este orden:**
 
@@ -598,9 +603,10 @@ tcg_srf/
 │   │                       duelo_minijuego.php (resuelve una jugada, §15.4)
 │   └── img/
 │       ├── Cromos/...    ← arte optimizado a WebP
-│       ├── plantillas/   ← creada al vuelo por subirPlantilla(); vacía si
-│       │                    nadie ha subido arte de caja/sobre todavía
-│       └── _originales_sin_optimizar/  ← PNG originales, no borrados
+│       └── plantillas/   ← creada al vuelo por subirPlantilla(); vacía si
+│                            nadie ha subido arte de caja/sobre todavía
+│       (_originales_sin_optimizar/ se borró el 2026-08-11: PNG sin optimizar
+│        que no leía ningún fichero de código)
 ├── db/
 │   ├── conexion.php      ← instancia $db (sin tocar)
 │   ├── consultas.php     ← clase Tcg, ~4600 líneas. TODA la lógica vive aquí.
