@@ -413,15 +413,15 @@ bueno.** Es la forma de trabajar acordada: plan → aprobación → implementaci
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Las CADENAS (§15.12) están terminadas**, así que si Alejandro no dice por dónde
-seguir, los frentes abiertos son el **desequilibrio de compos** que el §15.8 deja
-medido —es lo que más afecta a la sensación de juego—, subir arte real a
-**panel/plantillas.php** (§14) o la **Fase 3** (§12).
+**Las CADENAS (§15.12) están terminadas y la conversión de fuerza en goles ya es
+calibrable (`027`, §15.8c/§5.4).** Si Alejandro no dice por dónde seguir, los
+frentes abiertos son **calibrar el equilibrio de duelos** con las palancas nuevas
+(`partido_ocasion_min`/`_max`, §5.4 — es lo que más afecta a la sensación de
+juego), subir arte real a **panel/plantillas.php** (§14) o la **Fase 3** (§12).
 
-Y hay **dos cosas que solo puede decidir él** y dejan trabajo terminado a medias:
-declarar el premio extra del cofre en `cadena_loot` (el camino perfecto ya se
-reconoce, pero no entrega nada distinto) y **calibrar el rango**, que hoy deja la S
-en 1 de cada 200 partidos de cadena. Los dos están medidos en el §15.12.
+Y queda **una cosa que solo puede decidir Alejandro**: **calibrar el rango de
+cadena**, que hoy deja la S en 0,0 % de 300 partidos (§15.12) — decidió aplazarlo a
+propósito, así que no vuelvas a proponerlo sin que él lo pida.
 
 **Más minijuegos NO es un frente útil ya**: van 75 y **no queda ninguno que sea
 escribir una entrada más** — lo que falta está bloqueado por sistemas que no
@@ -679,7 +679,9 @@ tcg_srf/
 │   │   ├── 018_penalti.sql                 frecuencia del penalti (§15.4c)
 │   │   ├── 019 a 025                       el partido decide el duelo y la
 │   │   │                                   tanda jugable (§15.10, §15.11)
-│   │   └── 026_bonus_camino_perfecto.sql   el premio del camino perfecto (§15.12)
+│   │   ├── 026_bonus_camino_perfecto.sql   el premio del camino perfecto (§15.12)
+│   │   └── 027_calibrar_conversion_goles.sql  conecta gol_base/gol_sens y
+│   │                                       expone ocasion_* (§15.8c)
 │   └── tcg.sql
 ├── branding/
 │   ├── CLAUDE.md         ← este documento
@@ -915,6 +917,7 @@ no se pueden saltar:
 | `024_tanda_jugable.sql` | tabla **`duelo_penaltis`** + `tanda_plazo_seg` | **SÍ** — sin ella ningún duelo empatado se puede cerrar (§15.11) |
 | `025_depuracion_forzar_empate.sql` | el interruptor de pruebas que fuerza el 1-1 | no, vale 0 por defecto |
 | `026_bonus_camino_perfecto.sql` | el **premio del camino perfecto** en los cofres finales (§15.12) | no para jugar — sin ella el bonus se reconoce pero no entrega nada |
+| `027_calibrar_conversion_goles.sql` | conecta de verdad `gol_base`/`gol_sens` y expone `ocasion_*` (§15.8c) | no, los 6 valores son los que el motor ya tenía escritos a fuego |
 
 **Sobre la `023`:** corrige una asimetría, no añade una pérdida. `id_creador` ya era
 CASCADE, así que al borrar una cuenta los duelos que esa cuenta CREÓ ya
@@ -993,6 +996,15 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `partido_presupuesto_marcador` | 1 | goles que puede mover cada jugador con sus minijuegos en un partido. **Sustituyó a la §1.3 como límite** y ya no es una restricción de coherencia sino un tope de diseño: subirlo hace que pesen más los minijuegos y menos la fuerza del mazo, bajarlo a 0 los deja en pura actuación. Migración `022` (§15.10) |
 | `partido_abandono_seg` | 3600 | tras esto, un partido `en_juego` que no arranca o que se quedó parado se cierra solo. **No es un adorno:** hasta que alguien liquide, el dinero de los dos está retenido. Holgado a propósito, para que quien llegue tarde pueda jugar su partido entero. Migración `022` (§15.10) |
 | `tanda_plazo_seg` | 12 | segundos para elegir hueco en un penalti antes de que decida el sistema. Más largo que el plazo de un minijuego (9 s) a propósito: aquí no lees una jugada, intentas adivinar a una persona. Migración `024` (§15.11) |
+| `partido_ocasion_base` / `_factor` | 0.10 / 0.62 | probabilidad de que un tramo del partido acabe en ocasión = base + ratio_de_fuerza × factor, antes de acotar. Migración `027` |
+| `partido_ocasion_min` / `_max` | 0.14 / 0.52 | el acotado de arriba. **Es la palanca real del equilibrio de duelos** —no `duelo_k`, que desde el §15.10 no tiene lectores (§15.8c)—: el suelo garantiza que el mazo flojo pise el área, el techo que el fuerte no domine cada tramo. Migración `027` |
+| `partido_gol_base` / `_sens` | 0.06 / 0.30 | probabilidad de que una ocasión sea gol = base + peligro × sens, antes de acotar a [0.05, 0.45]. `sens` es el dial de cuánto pesa la CALIDAD de la ocasión: medido sin tocarlo, un 240 contra 100 pasaba del 69,1 % al 91,0 % de victorias del favorito. Migración `027`, aunque el código ya hablaba de este dial desde el §15.10 — **no tenía ningún lector hasta la `027`**, ver §15.8c |
+
+**`gol_base`/`gol_sens`/`ocasion_*` los inyecta `Tcg::opcionesSimulacion()`**
+(antes `opcionesPenalti()`, que solo llevaba las dos claves del penalti). Los dos
+llamantes de `generarEventosPartido()` —`narracionDuelo()` y `resolverDuelo()`—
+tienen que seguir pasando exactamente lo mismo: uno narra el partido y el otro lo
+resuelve, y si difirieran el marcador guardado dejaría de cuadrar con el relato.
 
 ---
 
@@ -1592,10 +1604,14 @@ ventaja de poder.
    - **Un hueco más de partido**: dar `familia_def` al evento de `falta`
      abriría defender un balón parado, donde encaja El Muro de Piedra. Es
      decisión de diseño, no ampliación de catálogo.
-8. **El desequilibrio de compos** que §15.8 deja medido: hoy mezclar afinidades
-   rinde más que enfocarlas, así que construir bien un equipo casi no importa.
-   Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
-   de balance, no de código.
+8. **El desequilibrio real** que §15.8/§15.8b/§15.8c dejan medido, remedido y con
+   la palanca ya conectada (`027`, punto 11 más abajo): **no es que mezclar rinda
+   más que enfocar** —eso se creía y ya no es cierto, enfocar gana—, es que la
+   capa de compos entera (3,7-4,7 % de la fuerza final) casi no puede tapar una
+   diferencia de cartas. El mejor mazo de rareza libre gana **34,0 %** de los
+   duelos reales al mejor de rareza ≤ 3. Es lo que más afecta a la sensación de
+   juego de todo lo pendiente. Decisión de balance, no de código — el código para
+   tocarlo ya existe.
 9. ~~Llevar el partido narrado a las cadenas~~ — **hecho, las cinco piezas
    (§15.12)**: el partido decide también en PvE, los minijuegos mueven el marcador
    y el rango, el botín se reparte al liquidar, el cofre premia el camino perfecto
@@ -1607,11 +1623,12 @@ ventaja de poder.
     dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
     acierto, la fiabilidad de la pista y el coste del fallo.
 11. ~~Calibrar `duelo_k`~~ — **ya no sirve de nada: `duelo_k` no decide el duelo
-    desde el §15.10** (§15.8c, medido). Lo que sí queda pendiente es decidir si la
-    conversión de fuerza en goles debe poder calibrarse: hoy vive en constantes
-    dentro de `generarEventosPartido()`, y el suelo `pOcasion >= 0.14` es lo que
-    aplana los duelos. Sacarlas a `configuracion` es trabajo pequeño; cambiarlas
-    es una decisión de balance.
+    desde el §15.10** (§15.8c, medido). ~~Sacar la conversión de fuerza en goles a
+    `configuracion`~~ — **hecho** (migración `027`, §5.4): `partido_ocasion_*` y
+    `partido_gol_*` ya se pueden tocar sin desplegar. **Lo que queda es la decisión
+    de balance en sí** — a qué valores mover el suelo `partido_ocasion_min` (hoy
+    0.14) para que un mazo pensado gane de verdad más a menudo — y esa sigue siendo
+    de Alejandro.
 12. **Resolver los hallazgos abiertos de §10.6** (relacionado con el 8).
 
 **Ya no están pendientes** (estaban en la v6):
@@ -2623,24 +2640,33 @@ midiendo **150 duelos con `duelo_k = 400` y otros 150 con `1000`**, que dieron e
 
 Dos consecuencias que hay que tener presentes:
 
-- **La palanca real está en `generarEventosPartido()` y NO es configurable**: son
-  constantes en el código, sobre todo el acotado
-  `pOcasion = max(0.14, min(0.52, 0.10 + ratio * 0.62))`. Ese suelo de 0,14 es lo
-  que garantiza que el mazo flojo pise el área, y por tanto lo que aplana el duelo.
-  El método es `static` y no lee `configuracion` por su cuenta (lo dice su propio
-  comentario), así que calibrarlo hoy es tocar código.
-- **El "partías con un X %" de la pantalla de resultado ya no describe el duelo.**
-  Con `duelo_k = 400` sale aproximadamente calibrado por casualidad (32 % anunciado
-  contra 34 % medido); con cualquier otro valor, el número mentiría sin que nada
-  fallara.
+- ~~La palanca real está en `generarEventosPartido()` y NO es configurable~~ —
+  **ya lo es (migración `027`, 2026-08-11)**: `pOcasion` y `pGol` se calculaban con
+  constantes escritas a fuego (el método es `static` y no puede leer
+  `configuracion` por su cuenta) y ahora las inyecta `Tcg::opcionesSimulacion()`
+  con exactamente esos mismos valores por defecto — aplicar la `027` no cambia ni
+  un partido, solo lo hace calibrable. Ver §5.4.
+  > ⚠️ **`gol_base`/`gol_sens` tenían un caso propio, más grave que "sin migrar":**
+  > el comentario del código decía literalmente *"sale a `configuracion`"* desde
+  > el §15.10, pero **ningún llamante los pasaba nunca** — los dos sitios mandaban
+  > el método con otro nombre, `opcionesPenalti()`, que no incluía esas dos claves.
+  > El dial existía en el comentario y no en la práctica. Si vuelves a leer este
+  > documento en una copia antigua y ves esa frase, ya no es cierta: ahora sí sale,
+  > de verdad, por `opcionesSimulacion()`.
+- **El "partías con un X %" de la pantalla de resultado sigue sin describir el
+  duelo**, y **eso la `027` no lo arregla**: `duelo_k` no tiene ni tendrá lectores
+  mientras el ganador salga del marcador. Con `duelo_k = 400` sale aproximadamente
+  calibrado por casualidad (32 % anunciado contra 34 % medido); con cualquier otro
+  valor, el número mentiría sin que nada fallara. Arreglarlo de verdad es dejar de
+  mostrar esa cifra, o recalcularla a partir de las mismas fuerzas con las que
+  `generarEventosPartido()` decide — no está hecho.
 
 **Medido con duelos reales, jugados enteros:** el mejor once de rareza ≤ 3 gana el
 **34,0 %** al mejor once del catálogo entero (150 duelos, marcador medio 0,83-1,23,
 30 % decididos en la tanda). Está lejos del 11 % que registra el §15.8 — la
 comparación no es la misma y el catálogo ha crecido—, pero sigue sin ser el
-equilibrio que se buscaba.
-
-**Nada de esto se ha tocado: es balance, y el balance lo decide Alejandro.**
+equilibrio que se buscaba. **Sigue sin tocarse: ahora hay con qué, pero calibrarlo
+es decisión de Alejandro.**
 
 Los rangos para crear cartas nuevas están en
 `branding/Rangos_estadisticas_SRF.xlsx` / `.csv`, ajustados por mínimos cuadrados

@@ -2893,16 +2893,32 @@ class Tcg
 	 * única restricción dura que §1.3 mantiene del sistema anterior.
 	 */
 	/**
-	 * Las dos probabilidades del penalti, leídas de `configuracion` (migración
-	 * `018`). Están aparte porque `generarEventosPartido()` es estático y no
-	 * puede leerlas, así que los dos llamantes las inyectan por $opciones — y
-	 * los dos tienen que pasar lo MISMO: uno narra el partido y el otro lo
-	 * resuelve, y si difirieran el marcador guardado no cuadraría con el relato.
+	 * Todo lo que `generarEventosPartido()` necesita leer de `configuracion`
+	 * (migración `027`, penaltis desde la `018`). Está aparte porque el método
+	 * es estático y no puede leer la tabla por su cuenta, así que los DOS
+	 * llamantes lo inyectan por $opciones — y los dos tienen que pasar lo
+	 * MISMO: uno narra el partido y el otro lo resuelve, y si difirieran el
+	 * marcador guardado no cuadraría con el relato.
+	 *
+	 * `gol_base`/`gol_sens` estaban documentados dentro del método como "el
+	 * dial del equilibrio" desde el §15.10, pero nadie los pasaba nunca: los
+	 * dos llamantes solo mandaban esto mismo método con OTRO nombre
+	 * (`opcionesPenalti`) y esas dos claves no estaban. El dial existía en el
+	 * código y no en la práctica. La `027` lo conecta de verdad.
+	 *
+	 * Los valores por defecto son los que el motor tenía escritos a fuego, así
+	 * que una base sin la `027` sigue jugando exactamente igual.
 	 */
-	private function opcionesPenalti() {
+	private function opcionesSimulacion() {
 		return [
 			"penalti_prob_gol"   => (float) $this->config("partido_penalti_prob_gol", 0.12),
 			"penalti_prob_fallo" => (float) $this->config("partido_penalti_prob_fallo", 0.018),
+			"gol_base"           => (float) $this->config("partido_gol_base", 0.06),
+			"gol_sens"           => (float) $this->config("partido_gol_sens", 0.30),
+			"ocasion_base"       => (float) $this->config("partido_ocasion_base", 0.10),
+			"ocasion_factor"     => (float) $this->config("partido_ocasion_factor", 0.62),
+			"ocasion_min"        => (float) $this->config("partido_ocasion_min", 0.14),
+			"ocasion_max"        => (float) $this->config("partido_ocasion_max", 0.52),
 		];
 	}
 
@@ -2935,6 +2951,19 @@ class Tcg
 		   resultado (ver abajo, donde se usa). */
 		$golBase = (float) ($opciones["gol_base"] ?? 0.06);
 		$golSens = (float) ($opciones["gol_sens"] ?? 0.30);
+
+		/* Probabilidad de que un TRAMO acabe en ocasión (§15.8c). Es la palanca
+		   que de verdad aplana o abre el duelo, más que `duelo_k` —que desde el
+		   §15.10 se calcula, se guarda y no decide nada—: el suelo es lo que
+		   garantiza que el mazo más flojo pise el área igual, y el techo es lo
+		   que impide que el más fuerte convierta cada tramo en ocasión. Medido:
+		   con los valores de hoy, el mejor mazo de rareza libre gana el 34,0 %
+		   de los duelos reales contra el mejor SRF. Los valores por defecto son
+		   los que el motor tenía escritos a fuego. */
+		$ocasionBase   = (float) ($opciones["ocasion_base"]   ?? 0.10);
+		$ocasionFactor = (float) ($opciones["ocasion_factor"] ?? 0.62);
+		$ocasionMin    = (float) ($opciones["ocasion_min"]    ?? 0.14);
+		$ocasionMax    = (float) ($opciones["ocasion_max"]    ?? 0.52);
 
 		$bandos = ["local" => $local, "visitante" => $visitante];
 		$porLinea = [];
@@ -2971,7 +3000,7 @@ class Tcg
 			// Probabilidad de que el tramo acabe en ocasión. Acotada por arriba
 			// y por abajo: ni el mazo más flojo se queda sin pisar el área, ni
 			// el más fuerte convierte cada tramo en una ocasión.
-			$pOcasion = max(0.14, min(0.52, 0.10 + $ratio * 0.62));
+			$pOcasion = max($ocasionMin, min($ocasionMax, $ocasionBase + $ratio * $ocasionFactor));
 
 			$tramos[] = [
 				"minuto"  => $minuto,
@@ -3012,11 +3041,20 @@ class Tcg
 				   provisional.
 
 				   `sens` (cuánto pesa el peligro de la ocasión) es EL DIAL DEL
-				   EQUILIBRIO cuando el resultado lo decide el partido, y por eso
-				   sale a `configuracion`: cuanto más alto, más manda la fuerza del
-				   mazo y menos opciones tiene el débil. Medido sin tocarlo, un
-				   240 contra 100 pasaba del 69,1 % de la curva Elo al 91,0 %.
-				   Ver branding/impacto-partido-analisis.md. */
+				   EQUILIBRIO cuando el resultado lo decide el partido: cuanto más
+				   alto, más manda la fuerza del mazo y menos opciones tiene el
+				   débil. Medido sin tocarlo, un 240 contra 100 pasaba del 69,1 % de
+				   la curva Elo al 91,0 %. Ver branding/impacto-partido-analisis.md.
+
+				   ⚠️ Hasta la migración `027` este comentario decía "sale a
+				   `configuracion`" y era falso: los dos llamantes pasaban
+				   `opcionesPenalti()`, que no incluía `gol_sens` ni `gol_base`, así
+				   que el valor real SIEMPRE era el de arriba (0.06/0.30) y no había
+				   forma de tocarlo sin desplegar. Ahora sí sale, en
+				   `opcionesSimulacion()`. El OTRO dial —el suelo/techo de
+				   `pOcasion`, arriba— resultó ser el que de verdad decide (§15.8c:
+				   `duelo_k` no pinta nada desde que el partido decide), y sale por
+				   el mismo sitio. */
 				$pGol = max(0.05, min(0.45, $golBase + $t["peligro"] * $golSens));
 				$tramos[$i]["gol"] = $azar() < $pGol;
 			}
@@ -5376,7 +5414,7 @@ class Tcg
 			["nombre" => $duelo["rival"], "fuerza" => self::fuerzaAlineacion($cartasR, $formR),
 			 "cartas" => $cartasR, "formacion" => $formR, "goles" => (int) $duelo["goles_rival"]],
 			(float) $duelo["valor_sorteo"],
-			["dificultad" => $duelo["dificultad"]] + $this->opcionesPenalti()
+			["dificultad" => $duelo["dificultad"]] + $this->opcionesSimulacion()
 		);
 
 		/* Las jugadas paradas dejan de ser gol y el marcador que arrastra cada
@@ -5899,7 +5937,7 @@ class Tcg
 					"formacion" => $formRival,
 				],
 				$sorteo,
-				$this->opcionesPenalti()
+				$this->opcionesSimulacion()
 			);
 			[$golesCreador, $golesRival] = $sim["goles"];
 
