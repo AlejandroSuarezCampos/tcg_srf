@@ -333,7 +333,7 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > `github.com/AlejandroSuarezCampos/tcg_srf`, empujada y al día (10 commits sobre
 > `bb27722`). La nota antigua de "hay `.git` pero sin remoto" **ya no vale**.
 >
-> **3. Migraciones hasta la `025`. Tres son OBLIGATORIAS**, y es la primera vez que
+> **3. Migraciones hasta la `026`. Tres son OBLIGATORIAS**, y es la primera vez que
 > hay migraciones que no se pueden saltar: la `019` (añade `en_juego` al enum), la
 > `021` (columna `resuelto_por_tanda`) y la `024` (tabla `duelo_penaltis`). Sin
 > ellas los duelos PvP no se montan o no se pueden cerrar. Ver §5.2.
@@ -347,11 +347,13 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > código 1 si algo falla. Hoy: 5 suites en verde. La grande, `probar_300.php`
 > (300 duelos de punta a punta, ~7 min), se lanza aparte.
 >
-> **5. Las CADENAS (§15.12) están terminadas: las cinco piezas.** Lo que queda de
-> ahí son **dos decisiones de Alejandro, no trabajo de código**: declarar el premio
-> extra del cofre en `cadena_loot` (hoy el camino perfecto se reconoce pero no
-> entrega nada) y calibrar `pve_rango_s_goles`, que deja el rango S en 1 de cada 200
-> partidos. Los dos están medidos en el §15.12.
+> **5. Las CADENAS (§15.12) están terminadas**, con el premio del camino perfecto ya
+> declarado (migración `026`, carta provisional). **Lo único que queda ahí es
+> calibrar el rango, y Alejandro ha decidido NO hacerlo todavía**: con
+> `pve_rango_s_goles = 5` la S sale el **0,0 %** de las veces (medido sobre 300
+> partidos), así que hoy todo el mundo saca B y **el premio del cofre no se puede
+> conseguir**. Es deliberado —se calibra con las cartas definitivas— y está todo
+> medido en el §15.12. Si alguien reporta que "el rango no sube nunca", es esto.
 >
 > **6. Los 16 PNG originales ya no existen y el borrado está commiteado**
 > (2026-08-11). Alejandro confirmó que los eliminó a propósito, así que la carpeta
@@ -540,7 +542,7 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
 | **§15 — EL PARTIDO DECIDE TAMBIÉN EN LAS CADENAS** | El partido de cadena se juega igual que un PvP: nace `en_juego`, los minijuegos mueven el marcador y `liquidarPartido()` escribe el rango y reparte monedas y botín. Se jubila `marcadorCadena()` y **se retira el modo `clasico`** de pantalla (§15.12) | ✅ **Construido (piezas 1, 2 y 4)** |
-| **§15 — Bonus del cofre y tanda contra el CPU** | Premio extra del cofre por camino perfecto (**S en Extremo**) y auto-tiro inmediato del CPU en la tanda. Piezas 3 y 5 del §15.12 | ✅ **Construido** — falta declarar el premio en `cadena_loot` |
+| **§15 — Bonus del cofre y tanda contra el CPU** | Premio extra del cofre por camino perfecto (**S en Extremo**) y auto-tiro inmediato del CPU en la tanda. Piezas 3 y 5 del §15.12, premio declarado en la `026` | ✅ **Construido** — el premio existe pero **hoy es inalcanzable**: la S sale 0,0 % y calibrarla está aplazado |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
@@ -674,7 +676,10 @@ tcg_srf/
 │   │   │   ↑ la 015 está libre: era la del rediseño de tarjeta retirado (v7.2)
 │   │   ├── 017_minijuegos_sin_impacto.sql  tope de decisiones que no mueven
 │   │   │                                   marcador (§15.5)
-│   │   └── 018_penalti.sql                 frecuencia del penalti (§15.4c)
+│   │   ├── 018_penalti.sql                 frecuencia del penalti (§15.4c)
+│   │   ├── 019 a 025                       el partido decide el duelo y la
+│   │   │                                   tanda jugable (§15.10, §15.11)
+│   │   └── 026_bonus_camino_perfecto.sql   el premio del camino perfecto (§15.12)
 │   └── tcg.sql
 ├── branding/
 │   ├── CLAUDE.md         ← este documento
@@ -908,6 +913,8 @@ no se pueden saltar:
 | `022_presupuesto_marcador.sql` | presupuesto de marcador y plazo de abandono | no, pero sin ella no se calibran |
 | `023_duelos_rival_cascade.sql` | `duelos.id_rival` de SET NULL a **CASCADE** | no para jugar, **sí antes de limpiar usuarios** |
 | `024_tanda_jugable.sql` | tabla **`duelo_penaltis`** + `tanda_plazo_seg` | **SÍ** — sin ella ningún duelo empatado se puede cerrar (§15.11) |
+| `025_depuracion_forzar_empate.sql` | el interruptor de pruebas que fuerza el 1-1 | no, vale 0 por defecto |
+| `026_bonus_camino_perfecto.sql` | el **premio del camino perfecto** en los cofres finales (§15.12) | no para jugar — sin ella el bonus se reconoce pero no entrega nada |
 
 **Sobre la `023`:** corrige una asimetría, no añade una pérdida. `id_creador` ya era
 CASCADE, así que al borrar una cuenta los duelos que esa cuenta CREÓ ya
@@ -2929,13 +2936,24 @@ Ni tabla nueva ni mecanismo nuevo. Una función y un parámetro.
 | **4** | `duelo.php` deja de tener dos modos: el partido de cadena se juega narrado | ✅ hecho, **y el modo `clasico` se retiró** |
 | **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | ✅ hecho |
 
-> ⚠️ **EL MECANISMO DEL BONUS ESTÁ, PERO NO HAY NINGÚN PREMIO DECLARADO.**
-> `caminoPerfectoHastaCofre()` decide y `reclamarCofre()` pasa rango `S`, pero hoy
-> **ninguna fila de `cadena_loot` de un cofre tiene `rango_minimo = 'S'`**, así que
-> el camino perfecto no entrega nada distinto. Es contenido, y el contenido lo pone
-> Alejandro: una fila por cofre, igual que las que ya existen (la del nodo 1 con
-> `rango_minimo = 'S'` sirve de ejemplo, aunque esa es de un partido). Hasta que se
-> declare, el bonus es un cartel: la pantalla dice *"Camino perfecto"* y no cae nada.
+**El premio ya está declarado** (migración `026`): un **cromo limitado numerado**
+en el **cofre final de cada cadena** (nodos 10 y 18), al 100 % y con
+`rango_minimo = 'S'`. Va en los `es_final` y no en los alijos intermedios porque el
+camino perfecto es el logro de recorrer la cadena entera.
+
+> ⚠️ **LA CARTA ES UN MARCADOR DE POSICIÓN.** Alejandro pidió "un cromo limitado
+> numerado" y dejó cuál para más adelante; hoy es **Shawn Froste** (id 4, cupo 10).
+> Cambiarla es mover el id en la `026` y quitarle el cupo a la anterior. No se
+> reutilizó `Bala Gasgula` (id 43, la limitada del nodo 1) porque **sus 5 copias ya
+> están emitidas**: colgarla ahí no entregaría nada.
+>
+> `cupo_numerado` **solo** lo lee el botín de cadenas y las pantallas que enseñan el
+> número de serie. Marcar una carta como numerada no la toca en sobres ni en mercado.
+>
+> ⚠️ **Y la `026` contradice a propósito un comentario de la `011`**, que decía que
+> un `rango_minimo` colgado de un cofre lo dejaría inalcanzable para siempre. Era
+> cierto cuando `reclamarCofre()` pasaba `null` siempre; desde el §15.12 un cofre sí
+> puede traer rango.
 
 #### Las tres trampas de la pieza 4, ya resueltas (mira aquí si algo se rompe)
 
@@ -3003,17 +3021,41 @@ partido y el 51,7 % de los duelos acabando con un marcador distinto al simulado�
 Era la comprobación obligada, porque el cambio pasa por dentro de `resolverDuelo()`
 y de `liquidarPartido()`, que son de los dos.
 
-> ⚠️ **EL RANGO S HA QUEDADO PRÁCTICAMENTE FUERA DE ALCANCE, Y ESTO SE SABÍA.**
-> En 200 partidos salió **1 sola S** (en fácil), contra 12 A y 120 B. Con
-> `pve_rango_s_goles = 5` hace falta marcar cinco, y ahora se marcan 1,55 en fácil y
-> 0,72 en extremo. **No está roto: está sin calibrar**, y calibrarlo es la decisión 5
-> de Alejandro (con las cartas definitivas). El bonus del cofre, cuando se construya,
-> heredará el problema: exige S en todos los partidos previos.
+> ⚠️ **EL RANGO S ESTÁ FUERA DE ALCANCE, Y ALEJANDRO HA DECIDIDO DEJARLO ASÍ.**
+> Se midió aparte, sobre **300 partidos más** (60 por dificultad), recalculando el
+> rango con distintos umbrales sobre los mismos marcadores —el rango solo depende
+> del marcador final, así que no hace falta rejugar nada—:
 >
-> **Y el dial correcto es `pve_rango_s_goles`, no la portería a cero.** La medición
-> lo separa: dejar la portería a cero sigue pasando entre el 40 % y el 62 % de las
-> veces, así que esa mitad de la condición se cumple sola. Lo que se ha vuelto
-> imposible es la otra.
+> | umbral | S | A | B |
+> |---|---|---|---|
+> | **5 goles / margen 3 — el de hoy** | **0,0 %** | 4,3 % | 54,7 % |
+> | 4 / 3 | 0,7 % | 3,7 % | 54,7 % |
+> | 3 / 2 | 3,7 % | 10,7 % | 44,7 % |
+> | 2 / 2 | 13,0 % | 1,3 % | 44,7 % |
+>
+> **Ni una S en 300 partidos**, y la A sale un 4,3 %: hoy el rango dice "B" siempre y
+> no comunica nada. Se le presentó a Alejandro con estos números y **decidió no
+> calibrarlo todavía**, en coherencia con la decisión 5: los umbrales se tocan cuando
+> estén las cartas definitivas y se pueda probar cadena a cadena. Los diales son
+> `pve_rango_s_goles` y `pve_rango_a_margen`.
+>
+> **El dial correcto es el de los goles, no la portería a cero.** La medición lo
+> separa: dejar la portería a cero pasa entre el 40 % y el 62 % de las veces, así que
+> esa mitad de la condición se cumple sola. Lo imposible es marcar cinco cuando se
+> marcan 1,55 en fácil y 0,72 en extremo.
+>
+> ⚠️ **CONSECUENCIA PARA EL BONUS DEL COFRE, que también decidió mantener:** exige S
+> en Extremo en todos los partidos del camino, y la S en Extremo sale **0,0 %**. O
+> sea que **el premio del camino perfecto existe y hoy no se puede conseguir**. No es
+> un fallo: es lo mismo sin calibrar. Para dimensionarlo cuando se calibre, y porque
+> **rejugar un nodo es gratis y `mejor_rango` nunca empeora** —así que la S no es una
+> barrera sino un precio en partidos—:
+>
+> | `pve_rango_s_goles` | S en Extremo | partidos por nodo | camino de 4 nodos |
+> |---|---|---|---|
+> | 5 (hoy) | 0,0 % | nunca | nunca |
+> | 3 | 1,7 % | 60 | ~240 partidos |
+> | 2 | 3,3 % | 30 | ~120 partidos |
 
 #### Lo que había antes, para poder comparar
 
