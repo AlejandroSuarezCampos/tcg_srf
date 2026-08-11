@@ -298,6 +298,43 @@ ni lo revises salvo que Alejandro lo pida.
 **Si vas a tocar duelos, lee el §15 antes que nada.** Es lo más nuevo, lo que
 más se ha movido, y tiene reglas propias que no se deducen del resto.
 
+> ## ⚠️ ESTADO EXACTO AL CERRAR LA SESIÓN DEL 2026-08-11 — LEE ESTO PRIMERO
+>
+> **1. Hay un INTERRUPTOR DE PRUEBAS PUESTO en la base real.**
+> `depuracion_forzar_empate = 1`, así que **todo partido PvP acaba 1-1** y se va a
+> la tanda. Es a propósito, para que Alejandro pudiera probar los penaltis a mano.
+> **Si ves todos los duelos empatados, esto es lo primero que hay que mirar** — no
+> está roto:
+> ```
+> C:\xampp\mysql\bin\mysql.exe -u root -e "UPDATE tcg.configuracion SET valor='0' WHERE clave='depuracion_forzar_empate';"
+> ```
+>
+> **2. La rama es `minijuegos-x75` y SÍ hay remoto.** Está en
+> `github.com/AlejandroSuarezCampos/tcg_srf`, empujada y al día (10 commits sobre
+> `bb27722`). La nota antigua de "hay `.git` pero sin remoto" **ya no vale**.
+>
+> **3. Migraciones hasta la `025`. Tres son OBLIGATORIAS**, y es la primera vez que
+> hay migraciones que no se pueden saltar: la `019` (añade `en_juego` al enum), la
+> `021` (columna `resuelto_por_tanda`) y la `024` (tabla `duelo_penaltis`). Sin
+> ellas los duelos PvP no se montan o no se pueden cerrar. Ver §5.2.
+>
+> **4. Hay una suite de pruebas EN EL REPO. Ejecútala antes y después de tocar el
+> partido:**
+> ```
+> C:\xampp\php\php.exe db/pruebas/correr_todas.php
+> ```
+> Monta y borra `tcg_prueba` ella sola, **nunca toca la base real**, y sale con
+> código 1 si algo falla. Hoy: 5 suites en verde. La grande, `probar_300.php`
+> (300 duelos de punta a punta, ~7 min), se lanza aparte.
+>
+> **5. Lo siguiente que toca está decidido y medido: las CADENAS, §15.12.** Cinco
+> piezas, con las decisiones de Alejandro textuales. No hace falta volver a
+> preguntárselas.
+>
+> **6. Los 16 PNG borrados** de `assets/img/_originales_sin_optimizar/` siguen
+> **fuera de todos los commits**, deliberadamente, desde antes de esta sesión.
+> Alejandro nunca ha dicho qué hacer con ellos. No los commitees sin preguntar.
+
 **Lo primero que tienes que hacer, en este orden:**
 
 1. Leer este documento entero.
@@ -308,29 +345,40 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
    ```
    for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done
    ```
-4. **Ya hay `.git`** (se inicializó como red de seguridad antes de reescribir
-   §14 — ver la nota de "Control de versiones" más abajo), pero **sin
-   remoto**: `git log` no cuenta la historia completa del proyecto, solo lo
-   que ha pasado desde ese checkpoint. Si en tu copia NO hay `.git` (por
-   ejemplo, si Alejandro volvió a descomprimir un ZIP), sigue aplicando el
-   aviso antiguo: no asumas commits/ramas/remoto, y considera `git init` antes
-   de cambios grandes, avisando primero.
-5. Comprobar que la BD está al día (todas las migraciones hasta la `016`):
+4. **Hay `.git` Y hay remoto**, en la rama `minijuegos-x75`:
    ```
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM rasgos;"        -- 9
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cromo_rasgos;"  -- 38
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM cadena_nodos;"  -- 18
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM plantillas_3d;" -- 0 si nadie ha subido arte aún
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT COUNT(*) FROM duelo_minijuegos;"          -- existe = 016 aplicada
-   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT clave,valor FROM configuracion WHERE clave LIKE 'partido%';"  -- 5 filas
+   git remote -v      # github.com/AlejandroSuarezCampos/tcg_srf
+   git status -sb     # debe estar a la par con origin/minijuegos-x75
    ```
-   Si alguna de las tres primeras da 0 o la tabla no existe, aplica §5.2.
-   Si `duelo_minijuegos` no existe, el partido en vivo (§15) no puede
-   funcionar: aplica la `016`.
-   Si salen **4** filas `partido%` en vez de 5, falta la `017`: sin
-   `partido_minijuegos_sin_impacto_max` el código usa 1 por defecto y funciona
-   igual, pero Alejandro no puede calibrarlo sin la fila (§15.5).
-6. Auditar la codificación (§5.3), que ya ha mordido dos veces:
+   *(La nota antigua decía "sin remoto". Se configuró el 2026-08-11.)*
+   Si en tu copia NO hay `.git` porque Alejandro volvió a descomprimir un ZIP,
+   entonces sí aplica el aviso viejo: no asumas commits ni ramas, y considera
+   `git init` antes de cambios grandes, avisando primero.
+5. **Comprobar que la BD está al día. Una sola consulta lo dice todo:**
+   ```
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SELECT (SELECT COUNT(*) FROM rasgos) rasgos, (SELECT COUNT(*) FROM cromo_rasgos) compos, (SELECT COUNT(*) FROM cadena_nodos) nodos, (SELECT COUNT(*) FROM duelo_minijuegos) mj, (SELECT COUNT(*) FROM duelo_penaltis) pen, (SELECT COUNT(*) FROM configuracion WHERE clave LIKE 'partido%' OR clave LIKE 'tanda%' OR clave LIKE 'depuracion%') params;"
+   ```
+   Esperado: `rasgos` 9, `compos` 38, `nodos` 18, y **`params` 12**. Si una tabla
+   no existe, el error te dice cuál falta:
+   - `duelo_minijuegos` → falta la `016`, el partido en vivo no funciona.
+   - `duelo_penaltis` → falta la **`024`**, ningún duelo empatado se puede cerrar.
+   - `params` por debajo de 12 → falta algún parámetro de calibrado (§5.2 dice
+     cuál trae cada migración). El código tiene valores por defecto, así que
+     funciona igual, pero Alejandro no puede calibrar sin las filas.
+
+   Y el enum, que es el que rompe en silencio (ver la primera trampa del §8):
+   ```
+   C:\xampp\mysql\bin\mysql.exe -u root tcg -e "SHOW COLUMNS FROM duelos LIKE 'estado';"
+   ```
+   **Tiene que aparecer `en_juego`.** Si no, falta la `019` y `resolverDuelo()` se
+   negará a montar partidos — con un error que nombra la migración, porque hay una
+   red puesta para eso.
+6. **Correr la suite del partido**, que es más fiable que mirar tablas:
+   ```
+   C:\xampp\php\php.exe db/pruebas/correr_todas.php
+   C:\xampp\php\php.exe db/verificar_minijuegos.php
+   ```
+7. Auditar la codificación (§5.3), que ya ha mordido dos veces:
    `C:\xampp\php\php.exe db/migraciones/004_reparar_codificacion.php`
 
 **Antes de escribir código nuevo, presenta un plan corto y espera el visto
@@ -338,12 +386,20 @@ bueno.** Es la forma de trabajar acordada: plan → aprobación → implementaci
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Si Alejandro no dice por dónde seguir**, pregunta entre: **más minijuegos**
-del catálogo de la Biblia (§15.4 explica el contrato y qué familias están sin
-usar), **llevar el partido narrado a las cadenas** (§15.7, hoy siguen con el
-modo clásico), **el desequilibrio de compos** que el §15.8 deja medido, subir
-arte real a **panel/plantillas.php** (§14), o la **Fase 3** (§12). Son trabajos
-independientes entre sí.
+**Si Alejandro no dice por dónde seguir, lo siguiente que toca son las CADENAS
+(§15.12).** Está diseñado, decidido y medido; solo falta escribirlo, y son cinco
+piezas con las decisiones textuales dentro — **no hace falta volver a
+preguntárselas**. Empieza por la 1 y la 2, que van juntas.
+
+Si por lo que sea eso no toca, los otros frentes abiertos: **el desequilibrio de
+compos** que el §15.8 deja medido (es lo que más afecta a la sensación de juego),
+subir arte real a **panel/plantillas.php** (§14), o la **Fase 3** (§12).
+
+**Más minijuegos NO es un frente útil ya**: van 75 y **no queda ninguno que sea
+escribir una entrada más** — lo que falta está bloqueado por sistemas que no
+existen (banquillo, cansancio, supertécnicas como dato) o excluido a propósito por
+la regla de que un minijuego nunca castiga. El detalle, con el inventario de qué
+bloquea qué, está en el punto 7 del §12.
 
 ---
 
@@ -360,14 +416,15 @@ entrenadores y escudos reales de una comunidad activa, no personajes de ficción
   `C:\xampp\htdocs\tcg_srf-master`; el resto del documento usa `tcg_srf` como
   nombre corto porque así se sirve normalmente: `http://localhost/tcg_srf/`
   o `http://localhost/tcg_srf-master/` según cómo esté montada la copia local).
-- **Control de versiones:** **ahora sí hay `.git`** — se creó como red de
-  seguridad antes de una reescritura destructiva del sistema de cajas/sobres
-  (§14). Es un repo **local, sin remoto configurado** (no
-  `github.com/AlejandroSuarezCampos/tcg_srf` ni ningún otro); si retomas ese
-  remoto, añádelo explícitamente, nunca asumas que ya existe. El primer commit
-  (`"Checkpoint antes de reescribir..."`) es el estado previo a esa
-  reescritura — útil si algo hay que revertir. Nunca `--force`, nunca
-  reescribir historial sin que lo pida explícitamente Alejandro.
+- **Control de versiones:** hay `.git` **y hay remoto** —
+  `github.com/AlejandroSuarezCampos/tcg_srf`, configurado el 2026-08-11. La rama
+  de trabajo es **`minijuegos-x75`**, empujada y a la par con `origin`.
+  *(Este punto decía "repo local, sin remoto configurado". Ya no es cierto.)*
+  El `.git` se creó como red de seguridad antes de una reescritura destructiva del
+  sistema de cajas/sobres (§14), y el primer commit
+  (`"Checkpoint antes de reescribir..."`) es el estado previo a ella — útil si algo
+  hay que revertir. **Nunca `--force`, nunca reescribir historial** sin que lo pida
+  explícitamente Alejandro. Commitea y sube **solo cuando él lo pida**.
 - **Ejecutado por una sola persona** (Alejandro), sin fecha de lanzamiento fija.
 - **Gratuito**, sin monetización, exclusivo para participantes de la liga.
 - **Legal:** proyecto fan-made sin ánimo de lucro. Inazuma Eleven es propiedad
@@ -555,6 +612,27 @@ tcg_srf/
 │   ├── verificar_minijuegos.php  ← comprueba las invariantes del catálogo
 │   │                        (ciclo cerrado, sin opción dominante, determinismo,
 │   │                        valor de la pista). Solo CLI. Pásalo al añadir uno.
+│   ├── pruebas/          ← SUITES DEL PARTIDO. Solo CLI, y **nunca tocan la base
+│   │   │                    real**: montan y borran `tcg_prueba` (§8). Han cazado
+│   │   │                    cinco bugs que el razonamiento no cazó, tres con
+│   │   │                    dinero de por medio.
+│   │   ├── correr_todas.php   ← el lanzador. Un comando, cinco suites, código 1
+│   │   │                        si algo falla. Es el que hay que ejecutar.
+│   │   ├── probar_tope.php    ← el tope de goles que puede mover un jugador
+│   │   ├── probar_tanda.php   ← la tanda jugable, incluido que la elección del
+│   │   │                        rival NO viaje al cliente (§15.11)
+│   │   ├── probar_paso3.php   ← el partido decide el duelo, de punta a punta
+│   │   ├── probar_pve.php     ← que las cadenas siguen intactas
+│   │   ├── probar_liquidar.php ← liquidación e idempotencia del bote
+│   │   ├── probar_300.php     ← LA GRANDE: 300 duelos jugados enteros, 25 con
+│   │   │                        carta. ~7 min, se lanza aparte y hay que montar
+│   │   │                        `tcg_prueba` antes. Comprueba la contabilidad:
+│   │   │                        que el total de monedas y de copias no cambie.
+│   │   ├── probar_sin_migracion.php ← qué pasa sin la `019` (§8, trampa 1)
+│   │   ├── probar_cascade.php  ← el CASCADE de `duelos.id_rival` (`023`)
+│   │   └── tanda_rival_cpu.php ← herramienta, no prueba: hace de segundo jugador
+│   │                             en la tanda para poder verla con un solo
+│   │                             navegador. Apunta a la base REAL a propósito.
 │   ├── migraciones/
 │   │   ├── 002_duelos_misiones_mazos.sql   Fase 2
 │   │   ├── 003_capa2_compos.sql            Capa 2
@@ -1506,10 +1584,28 @@ ventaja de poder.
 ## 13. Comprobaciones antes de dar algo por terminado
 
 ```bash
-for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do
+for f in *.php partials/*.php components/*.php db/*.php db/pruebas/*.php assets/ajax/*.php panel/*.php; do
   C:/xampp/php/php.exe -l "$f"
 done
 ```
+
+**Y si has tocado el partido, los duelos o los minijuegos, esto no es opcional:**
+
+```
+C:\xampp\php\php.exe db/pruebas/correr_todas.php
+C:\xampp\php\php.exe db/verificar_minijuegos.php
+```
+
+`correr_todas.php` monta y borra `tcg_prueba` él solo, **nunca toca la base real**
+(§8), y sale con código 1 si algo falla. Las cinco suites que lanza y qué cubre
+cada una están en su cabecera. La grande, `db/pruebas/probar_300.php` (300 duelos
+de punta a punta, ~7 min, hay que montar `tcg_prueba` antes), se lanza aparte
+cuando el cambio toca el motor.
+
+> **Estas suites han cazado cinco bugs que el razonamiento no cazó**, tres de
+> ellos con dinero de por medio. No las trates como decoración: si añades una fase
+> al partido, **añádela también al guion**, o los duelos que pasen por ella
+> aparecerán como colgados y parecerá un fallo del motor (pasó tres veces).
 
 En navegador, a 375×812 y en escritorio:
 
@@ -2442,7 +2538,7 @@ Además de §13:
   valor, los plazos, el reparto del dato oculto, que ninguna entrada sea código
   muerto, el determinismo, cuánto vale leer la pista, que la primitiva sea
   conocida y —si es `medidor`— que traiga `velocidad` completa y la opción
-  segura **en el centro** (§15.4b). Hoy: 43 entradas, 95 comprobaciones, 0 fallos.
+  segura **en el centro** (§15.4b). Hoy: **75 entradas, 159 comprobaciones, 0 fallos**.
 - **Su `recorrer()` tiene que replicar LITERALMENTE el `$tieneSentido` de
   `narracionDuelo()`.** Si se queda con una condición vieja, las entradas de los
   huecos nuevos salen marcadas como código muerto aunque en un partido real se
@@ -2486,7 +2582,7 @@ gg"*.
 | La simulación recibía `gana` y tenía prohibido contradecir el sorteo | **Modo natural**: el marcador sale como salga, empates incluidos |
 | Un empate era imposible | **32 % de los partidos entre iguales** acaban empatados |
 | El minijuego movía el marcador dentro del margen que dejaba el ganador | El minijuego mueve el marcador, y **el marcador es el resultado** |
-| — | Un empate se rompe en **`tandaDePenaltis()`** |
+| — | Un empate se rompe en la **tanda de penaltis**, que se JUEGA (§15.11) |
 | — | **`liquidarPartido()`** escribe el ganador y entrega el bote al terminar |
 
 El pago **no cambió, y esto sorprendió al investigarlo**: ya funcionaba como hacía
