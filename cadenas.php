@@ -8,6 +8,11 @@ if (empty($_SESSION['id_usuario'])) {
 }
 $id_usuario = (int) $_SESSION['id_usuario'];
 
+// Misma red perezosa que en cadena.php y duelos.php: un partido de cadena a
+// medias se cierra al volver, y aquí se vuelve tanto como al mapa. Va antes de
+// leer el progreso para que el recuento de nodos ya lo incluya.
+$db->cerrarPartidosPendientes($id_usuario);
+
 $titular = $db->obtenerMazoTitular($id_usuario);
 $cadenas = $db->listarCadenas();
 

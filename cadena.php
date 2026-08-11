@@ -83,6 +83,17 @@ if (!empty($_SESSION['cadena_error'])) {
     unset($_SESSION['cadena_ok']);
 }
 
+/* Cierra los partidos de cadena que quedaron a medias, ANTES de leer el mapa
+   para que el nodo recién liquidado ya aparezca superado.
+
+   Es la misma red perezosa que duelos.php pone para el PvP (§8: no hay cron),
+   y hace falta desde que el partido decide también en PvE (§15.12): antes un
+   partido de cadena nacía `resuelto` y no había nada que cerrar. Ahora nace
+   `en_juego`, y quien se va a mitad vuelve POR AQUÍ, no por duelos.php — sin
+   este enganche su nodo no constaría jugado nunca, ni ganado ni perdido, y el
+   duelo se quedaría colgado para siempre. */
+$db->cerrarPartidosPendientes($id_usuario);
+
 $mapa  = $db->mapaCadena($id_cadena, $id_usuario);
 $nodos = $mapa['nodos'];
 

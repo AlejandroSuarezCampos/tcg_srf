@@ -20,7 +20,7 @@ $SUITES = [
     "probar_tope"     => "el tope de goles que puede mover un jugador (§15.10)",
     "probar_tanda"    => "la tanda de penaltis jugable (§15.11)",
     "probar_paso3"    => "el partido decide el duelo, de punta a punta (§15.10)",
-    "probar_pve"      => "que las cadenas siguen intactas",
+    "probar_pve"      => "el partido decide también en las cadenas (§15.12)",
     "probar_liquidar" => "la liquidación y la idempotencia del bote",
 ];
 

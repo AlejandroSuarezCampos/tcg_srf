@@ -159,8 +159,11 @@ $suAfinDom = $jugado ? ($soyCreador ? $duelo['afinidad_dom_rival'] : $duelo['afi
 $catalogoRasgos = $db->rasgosCatalogo();
 
 // Recompensas de cadena (bloque D): solo tiene sentido pedirlas si se ganó,
-// que es la única vez que resolverDuelo() reparte algo. $gane se calcula más
-// abajo; aquí se repite la misma condición porque todavía no existe.
+// que es la única vez que se reparte algo. Las reparte liquidarPartido() al
+// terminar el partido, no resolverDuelo() al montarlo (§15.12), así que
+// exigir $resuelto no es cosmética: mientras el duelo está `en_juego` todavía
+// no hay botín que listar. $gane se calcula más abajo; aquí se repite la misma
+// condición porque todavía no existe.
 $drops = ($esCadena && $resuelto && (int) $duelo['id_ganador'] === $id_usuario)
     ? $db->listarDropsDuelo($id_duelo) : [];
 
@@ -590,29 +593,25 @@ include __DIR__ . '/navbar.php';
 <?php if ($jugado && $ceremonia): ?>
 <!-- ==========================================================================
      SIMULACIÓN DEL PARTIDO
-     En PvP esto NO es una puesta en escena: es el partido. El duelo está en
+     Esto NO es una puesta en escena: es el partido. El duelo está en
      `en_juego` y sin ganador, el minuto lo manda el servidor y las decisiones
      que se toman aquí mueven el marcador de verdad. Cuando el reloj llega al
      final se liquida el duelo y esta pantalla va a buscar el resultado.
-     En cadenas (PvE) sí es ceremonia: ahí el resultado ya está decidido y
-     renderizado debajo, cubierto por este modal.
 
-     Sin JavaScript este modal nunca se abre. En cadenas eso significa ver el
-     resultado directamente; en PvP, que el partido se juega igual —lo lleva el
-     servidor— y que las decisiones se resuelven solas con la opción segura.
+     Sin JavaScript este modal nunca se abre; el partido se juega igual —lo
+     lleva el servidor— y las decisiones se resuelven solas con la opción
+     segura, así que el duelo acaba cerrándose y pagando.
 
-     DOS MODOS, a propósito:
-       · narrado (DUELOS PvP)  — el motor de eventos de la Biblia §1: relato
-         minuto a minuto, momentum y estadísticas en vivo.
-       · clasico (CADENAS PvE) — reloj + insignia de gol, tal y como estaba.
-         Las cadenas se dejan intactas hasta que se trabajen aparte; su
-         marcador (marcadorCadena) da resultados como 4-8 que el modo narrado
-         deja en evidencia, y eso es una decisión de balance, no de pantalla.
+     YA NO HAY DOS MODOS. Hasta el §15.12 las cadenas usaban uno propio
+     ('clasico': reloj local y una insignia de gol suelta) porque su resultado
+     venía decidido de antes y el modal era decoración. Desde que el partido
+     decide también en PvE eso dejó de ser cierto, así que el modo clásico se
+     RETIRÓ en vez de dejarlo apagado: un `data-modo="clasico"` olvidado en
+     cualquier sitio dejaría el duelo en `en_juego` para siempre, porque nadie
+     jugaría el partido que tiene que liquidarlo.
      ========================================================================== -->
-<?php $modoSimulacion = $esCadena ? 'clasico' : 'narrado'; ?>
 <div class="modal simulacion" id="simulacionPartido" role="dialog" aria-modal="true"
      aria-labelledby="simulacionTitulo" aria-hidden="true"
-     data-modo="<?= $modoSimulacion ?>"
      data-id-duelo="<?= (int) $duelo['id_duelo'] ?>"
      <?php /* Si el duelo YA está decidido, la pantalla de resultado que hay
               debajo es correcta y cerrar el modal basta para destaparla. Si no
@@ -623,12 +622,13 @@ include __DIR__ . '/navbar.php';
   <div class="modal-caja modal-caja--ancha">
     <div class="modal-head">
       <h2 id="simulacionTitulo">Partido en juego</h2>
-      <?php /* En cadenas el aspa lleva al resultado, que ya está decidido. En
-               un duelo PvP no: el partido sigue para el rival aunque tú
-               cierres, así que prometer "ver resultado" sería mentir — lo que
-               verías es el marcador de este instante, no el final. */ ?>
+      <?php /* El aspa dice "Salir del partido" y no "Ver resultado", porque lo
+               segundo sería mentir: el partido no ha terminado. En PvP sigue
+               para el rival aunque tú cierres; en una cadena, salirte deja el
+               marcador donde esté y el duelo lo cierra el plazo de abandono.
+               Lo que verías es el marcador de este instante, no el final. */ ?>
       <button type="button" class="modal-cerrar" data-saltar-simulacion
-              aria-label="<?= $modoSimulacion === 'clasico' ? 'Ver resultado' : 'Salir del partido' ?>">
+              aria-label="Salir del partido">
         <i class="ph ph-x" aria-hidden="true"></i>
       </button>
     </div>
@@ -654,135 +654,125 @@ include __DIR__ . '/navbar.php';
         <div class="progreso-riel"><div class="progreso-relleno" id="simBarra" style="width:0%"></div></div>
       </div>
 
-      <?php if ($modoSimulacion === 'narrado'): ?>
-        <!-- MOMENTUM (Biblia §1.4): media móvil de quién genera las ocasiones
-             más recientes. Es un indicador de lectura, no toca ningún cálculo.
-             El centro es el empate; la aguja se va hacia el lado que manda. -->
-        <div class="sim-momentum" id="simMomentum" aria-hidden="true">
-          <span class="sim-momentum-riel"><span class="sim-momentum-aguja" id="simMomentumAguja"></span></span>
-          <span class="sim-momentum-etiqueta">Momentum</span>
-        </div>
+      <!-- MOMENTUM (Biblia §1.4): media móvil de quién genera las ocasiones
+           más recientes. Es un indicador de lectura, no toca ningún cálculo.
+           El centro es el empate; la aguja se va hacia el lado que manda. -->
+      <div class="sim-momentum" id="simMomentum" aria-hidden="true">
+        <span class="sim-momentum-riel"><span class="sim-momentum-aguja" id="simMomentumAguja"></span></span>
+        <span class="sim-momentum-etiqueta">Momentum</span>
+      </div>
 
-        <!-- El relato. aria-live="polite" y no "assertive": son decenas de
-             eventos seguidos y un lector de pantalla interrumpiría sin parar.
-             El veredicto final sí se anuncia aparte, en la pantalla de debajo. -->
-        <div class="sim-relato" id="simRelato" aria-live="polite" aria-atomic="false"></div>
+      <!-- El relato. aria-live="polite" y no "assertive": son decenas de
+           eventos seguidos y un lector de pantalla interrumpiría sin parar.
+           El veredicto final sí se anuncia aparte, en la pantalla de debajo. -->
+      <div class="sim-relato" id="simRelato" aria-live="polite" aria-atomic="false"></div>
 
-        <!-- MINIJUEGO (Biblia §2). El partido se detiene aquí y espera una
-             decisión real. El plazo lo fija el catálogo; si se agota, se
-             aplica la opción SEGURA, nunca la de más premio (§1.5 regla 4). -->
-        <div class="sim-minijuego" id="simMinijuego" hidden>
-          <p class="sim-mj-titulo" id="simMjTitulo"></p>
-          <p class="sim-mj-enunciado" id="simMjEnunciado"></p>
-          <!-- Reloj de decisión. La barra comunica la urgencia de un vistazo
-               (§3.4), pero con "reducir movimiento" no se anima, así que el
-               número de al lado es el que lleva de verdad la cuenta: sin él,
-               esa preferencia te dejaría decidiendo a ciegas. -->
-          <div class="sim-mj-tiempo">
-            <div class="sim-mj-reloj" aria-hidden="true">
-              <span class="sim-mj-reloj-relleno" id="simMjBarra"></span>
-            </div>
-            <span class="sim-mj-segundos mono" id="simMjSegundos" role="timer" aria-live="off"></span>
+      <!-- MINIJUEGO (Biblia §2). El partido se detiene aquí y espera una
+           decisión real. El plazo lo fija el catálogo; si se agota, se
+           aplica la opción SEGURA, nunca la de más premio (§1.5 regla 4). -->
+      <div class="sim-minijuego" id="simMinijuego" hidden>
+        <p class="sim-mj-titulo" id="simMjTitulo"></p>
+        <p class="sim-mj-enunciado" id="simMjEnunciado"></p>
+        <!-- Reloj de decisión. La barra comunica la urgencia de un vistazo
+             (§3.4), pero con "reducir movimiento" no se anima, así que el
+             número de al lado es el que lleva de verdad la cuenta: sin él,
+             esa preferencia te dejaría decidiendo a ciegas. -->
+        <div class="sim-mj-tiempo">
+          <div class="sim-mj-reloj" aria-hidden="true">
+            <span class="sim-mj-reloj-relleno" id="simMjBarra"></span>
           </div>
-          <div class="sim-mj-opciones" id="simMjOpciones" role="group"
+          <span class="sim-mj-segundos mono" id="simMjSegundos" role="timer" aria-live="off"></span>
+        </div>
+        <div class="sim-mj-opciones" id="simMjOpciones" role="group"
+             aria-labelledby="simMjEnunciado"></div>
+        <!-- MEDIDOR (Biblia §2.1, segunda primitiva). La aguja recorre las
+             tres zonas en bucle y el jugador la detiene: la zona donde para
+             ES la opción elegida, así que viaja la misma clave por el mismo
+             endpoint que un botón. Se alterna con las opciones de arriba
+             desde JS, nunca se ven los dos.
+
+             Con "reducir movimiento" esto NO se usa: duelo.js pinta los
+             botones. La regla es la del §7 — se reduce el movimiento, nunca
+             el juego: quien tenga la preferencia puesta sigue decidiendo lo
+             mismo, solo con otro mando. -->
+        <div class="sim-mj-medidor" id="simMjMedidor" hidden>
+          <div class="sim-mj-pista" id="simMjPista">
+            <span class="sim-mj-aguja" id="simMjAguja" aria-hidden="true"></span>
+          </div>
+          <button type="button" class="sim-mj-parar" id="simMjParar">Parar</button>
+        </div>
+        <!-- CLIC-EN-ZONA (Biblia §2.1, primera primitiva). Las tres opciones
+             se colocan sobre un mapa —el marco de la portería, el área desde
+             arriba o el campo— en el sitio que les toca, y se pulsa la zona.
+             Son <button> de verdad, así que el teclado funciona sin nada
+             añadido y no hay movimiento que reducir. El mapa lo dice `lienzo`
+             y el sitio de cada opción su `zona`, que el JS pone tal cual como
+             grid-area (ver Tcg::LIENZOS_ZONA). -->
+        <div class="sim-mj-zonas" id="simMjZonas" hidden>
+          <div class="sim-mj-lienzo" id="simMjLienzo" role="group"
                aria-labelledby="simMjEnunciado"></div>
-          <!-- MEDIDOR (Biblia §2.1, segunda primitiva). La aguja recorre las
-               tres zonas en bucle y el jugador la detiene: la zona donde para
-               ES la opción elegida, así que viaja la misma clave por el mismo
-               endpoint que un botón. Se alterna con las opciones de arriba
-               desde JS, nunca se ven los dos.
-
-               Con "reducir movimiento" esto NO se usa: duelo.js pinta los
-               botones. La regla es la del §7 — se reduce el movimiento, nunca
-               el juego: quien tenga la preferencia puesta sigue decidiendo lo
-               mismo, solo con otro mando. -->
-          <div class="sim-mj-medidor" id="simMjMedidor" hidden>
-            <div class="sim-mj-pista" id="simMjPista">
-              <span class="sim-mj-aguja" id="simMjAguja" aria-hidden="true"></span>
-            </div>
-            <button type="button" class="sim-mj-parar" id="simMjParar">Parar</button>
-          </div>
-          <!-- CLIC-EN-ZONA (Biblia §2.1, primera primitiva). Las tres opciones
-               se colocan sobre un mapa —el marco de la portería, el área desde
-               arriba o el campo— en el sitio que les toca, y se pulsa la zona.
-               Son <button> de verdad, así que el teclado funciona sin nada
-               añadido y no hay movimiento que reducir. El mapa lo dice `lienzo`
-               y el sitio de cada opción su `zona`, que el JS pone tal cual como
-               grid-area (ver Tcg::LIENZOS_ZONA). -->
-          <div class="sim-mj-zonas" id="simMjZonas" hidden>
-            <div class="sim-mj-lienzo" id="simMjLienzo" role="group"
-                 aria-labelledby="simMjEnunciado"></div>
-          </div>
-          <!-- ARRASTRE (Biblia §2.2, Familia DS). Se arrastra desde el balón
-               hacia donde se quiere jugar; el ángulo cae en uno de tres sectores
-               y ese sector ES la opción.
-
-               ⚠️ Los botones de arriba SIGUEN VISIBLES con esta primitiva, y no
-               es redundancia: WCAG 2.2 SC 2.5.7 (Dragging Movements) exige que
-               toda función de arrastre tenga alternativa de un solo puntero. Sin
-               ellos, esta primitiva sería inoperable con teclado y quedaría
-               fuera del §7. -->
-          <div class="sim-mj-arrastre" id="simMjArrastre" hidden>
-            <div class="sim-mj-lona" id="simMjLona" aria-hidden="true">
-              <span class="sim-mj-balon" id="simMjBalon"></span>
-              <span class="sim-mj-guia" id="simMjGuia"></span>
-              <span class="sim-mj-sector-nombre" id="simMjSectorNombre"></span>
-            </div>
-            <p class="sim-mj-arrastre-ayuda">Arrastra desde el balón, o usa los botones.</p>
-          </div>
-          <p class="sim-mj-resultado" id="simMjResultado" role="status" hidden></p>
         </div>
+        <!-- ARRASTRE (Biblia §2.2, Familia DS). Se arrastra desde el balón
+             hacia donde se quiere jugar; el ángulo cae en uno de tres sectores
+             y ese sector ES la opción.
 
-        <!-- ==================================================================
-             LA TANDA DE PENALTIS (§15.11)
-             Cuatro huecos. Tiras o paras, y si los dos elegís el mismo, parada.
-
-             ⚠️ Es la ÚNICA pantalla del juego donde los dos jugadores deciden a
-             la vez y uno contra otro. Por eso el panel no dice nunca qué ha
-             elegido el rival hasta que el tiro está resuelto: el servidor no lo
-             manda (ver Tcg::tandaParaCliente).
-
-             Son <button> de verdad dentro de un grid 2x2, así que el teclado
-             funciona sin nada añadido y no hay movimiento que reducir.
-             ================================================================== -->
-        <div class="sim-tanda" id="simTanda" hidden>
-          <p class="sim-tanda-cab">
-            <span id="simTandaRonda"></span>
-            <b class="mono" id="simTandaMarcador">0 – 0</b>
-          </p>
-          <p class="sim-tanda-orden" id="simTandaOrden" role="status" aria-live="polite"></p>
-
-          <div class="sim-mj-lienzo es-porteria4" id="simTandaPorteria" role="group"
-               aria-labelledby="simTandaOrden"></div>
-
-          <p class="sim-tanda-reloj mono" id="simTandaReloj" role="timer" aria-live="off"></p>
-          <ol class="sim-tanda-historial" id="simTandaHistorial"></ol>
+             ⚠️ Los botones de arriba SIGUEN VISIBLES con esta primitiva, y no
+             es redundancia: WCAG 2.2 SC 2.5.7 (Dragging Movements) exige que
+             toda función de arrastre tenga alternativa de un solo puntero. Sin
+             ellos, esta primitiva sería inoperable con teclado y quedaría
+             fuera del §7. -->
+        <div class="sim-mj-arrastre" id="simMjArrastre" hidden>
+          <div class="sim-mj-lona" id="simMjLona" aria-hidden="true">
+            <span class="sim-mj-balon" id="simMjBalon"></span>
+            <span class="sim-mj-guia" id="simMjGuia"></span>
+            <span class="sim-mj-sector-nombre" id="simMjSectorNombre"></span>
+          </div>
+          <p class="sim-mj-arrastre-ayuda">Arrastra desde el balón, o usa los botones.</p>
         </div>
+        <p class="sim-mj-resultado" id="simMjResultado" role="status" hidden></p>
+      </div>
 
-        <?php /* Las estadísticas en vivo (posesión, tiros, paradas) se quitaron
-                 de aquí por decisión de Alejandro: durante el partido distraen
-                 de lo que de verdad se está mirando, que es el relato y el
-                 momentum. La §1.4 de la Biblia las pedía en pantalla; siguen
-                 calculándose en el motor y el sondeo las sigue enviando, así
-                 que reaparecen en cuanto haya dónde ponerlas sin estorbar. */ ?>
-      <?php else: ?>
-        <!-- Cadenas: la insignia de gol suelta de siempre. -->
-        <div class="simulacion-eventos" id="simEventos" aria-hidden="true"></div>
-      <?php endif; ?>
+      <!-- ==================================================================
+           LA TANDA DE PENALTIS (§15.11)
+           Cuatro huecos. Tiras o paras, y si los dos elegís el mismo, parada.
+
+           ⚠️ Es la ÚNICA pantalla del juego donde los dos jugadores deciden a
+           la vez y uno contra otro. Por eso el panel no dice nunca qué ha
+           elegido el rival hasta que el tiro está resuelto: el servidor no lo
+           manda (ver Tcg::tandaParaCliente).
+
+           Son <button> de verdad dentro de un grid 2x2, así que el teclado
+           funciona sin nada añadido y no hay movimiento que reducir.
+           ================================================================== -->
+      <div class="sim-tanda" id="simTanda" hidden>
+        <p class="sim-tanda-cab">
+          <span id="simTandaRonda"></span>
+          <b class="mono" id="simTandaMarcador">0 – 0</b>
+        </p>
+        <p class="sim-tanda-orden" id="simTandaOrden" role="status" aria-live="polite"></p>
+
+        <div class="sim-mj-lienzo es-porteria4" id="simTandaPorteria" role="group"
+             aria-labelledby="simTandaOrden"></div>
+
+        <p class="sim-tanda-reloj mono" id="simTandaReloj" role="timer" aria-live="off"></p>
+        <ol class="sim-tanda-historial" id="simTandaHistorial"></ol>
+      </div>
+
+      <?php /* Las estadísticas en vivo (posesión, tiros, paradas) se quitaron
+               de aquí por decisión de Alejandro: durante el partido distraen
+               de lo que de verdad se está mirando, que es el relato y el
+               momentum. La §1.4 de la Biblia las pedía en pantalla; siguen
+               calculándose en el motor y el sondeo las sigue enviando, así
+               que reaparecen en cuanto haya dónde ponerlas sin estorbar. */ ?>
     </div>
 
-    <?php if ($modoSimulacion === 'clasico'): ?>
-      <div class="modal-pie">
-        <!-- Solo en CADENAS. Ahí el partido lo ves tú solo y el resultado ya
-             está decidido, así que saltarlo es legítimo (§4.3: el juego tiene
-             que caber en una sesión de cinco minutos). -->
-        <button type="button" class="btn btn-ghost" data-saltar-simulacion>Ver resultado</button>
-      </div>
-    <?php endif; ?>
-    <?php /* En DUELOS PvP no hay botón de saltar. El partido es compartido:
-             saltártelo no detiene al rival, que puede seguir parando goles y
-             moviendo el marcador después de que tú hayas salido. Con el botón,
-             una cuenta terminaba viendo 4-2 y la otra 4-3. Cerrar sigue siendo
+    <?php /* NO HAY BOTÓN DE SALTAR, tampoco en cadenas desde el §15.12. En PvP
+             el partido es compartido: saltártelo no detiene al rival, que puede
+             seguir parando goles y moviendo el marcador después de que tú hayas
+             salido. Con el botón, una cuenta terminaba viendo 4-2 y la otra 4-3.
+             Y en una cadena saltarlo dejaría de tener sentido por otro motivo:
+             el resultado ya no está decidido de antes, así que el botón te
+             ofrecería un resultado que todavía no existe. Cerrar sigue siendo
              posible con Esc o con el aspa —un modal tiene que poder cerrarse
              (§13)—, pero deja de ser lo que la pantalla te invita a hacer. */ ?>
   </div>

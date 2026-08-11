@@ -156,21 +156,17 @@
 
 /* --------------------------------------------------------------------------
    PANTALLA DE PARTIDO
-   El resultado ya venía decidido del servidor; todo esto es solo la ceremonia
-   de enseñarlo. Con "reducir movimiento" activo no hay simulación ni cuenta
-   atrás: se pinta el marcador directamente, como antes.
+   El partido lo manda el SERVIDOR minuto a minuto
+   (assets/ajax/duelo_narracion.php) y aquí solo se reproduce. No es una
+   ceremonia: mientras esto corre, el duelo está sin decidir y las decisiones
+   que se toman aquí mueven el marcador de verdad. Cerrar el modal revela el
+   resultado.
 
-   DOS MODOS, los elige duelo.php con data-modo (ver el comentario de allí):
-
-     · 'narrado'  DUELOS PvP. El servidor manda el partido entero minuto a
-       minuto (assets/ajax/duelo_narracion.php) y aquí solo se reproduce.
-
-     · 'clasico'  CADENAS PvE. El comportamiento de siempre: reloj y goles
-       apareciendo hasta llegar al marcador real, que ya está renderizado
-       (oculto) debajo. Los números salen de ese marcador, nunca se calculan
-       aquí. Se mantiene tal cual mientras las cadenas no se trabajen aparte.
-
-   Los dos acaban igual: cerrar el modal revela el resultado.
+   UN SOLO MODO. Había otro, 'clasico', para las CADENAS: reloj local y goles
+   apareciendo hasta llegar a un marcador que el servidor ya había escrito.
+   Se retiró en el §15.12, cuando el partido pasó a decidir también en PvE —
+   allí ya no hay marcador que reproducir, hay uno que construir—. Si ves
+   `data-modo` en algún sitio, es un resto: ya no se lee.
    -------------------------------------------------------------------------- */
 (function () {
   'use strict';
@@ -224,46 +220,26 @@
     return;
   }
 
-  var esNarrado = simulacion.dataset.modo !== 'clasico';
-
   /* MOVIMIENTO REDUCIDO — reduce el MOVIMIENTO, nunca el juego.
-     Hasta ahora esta preferencia se saltaba el partido entero, y desde que el
-     partido tiene minijuegos eso dejó de ser una decisión estética: quien la
-     tenía puesta no veía el encuentro, no jugaba ninguna de sus decisiones, no
-     podía parar un gol ni marcar uno, y encima su rival se comía la espera de
-     alguien que nunca iba a aparecer. Una desventaja competitiva atada a un
-     ajuste de accesibilidad, que además crecía con cada minijuego nuevo.
+     Esta preferencia se saltaba el partido entero, y desde que el partido tiene
+     minijuegos eso dejó de ser una decisión estética: quien la tenía puesta no
+     veía el encuentro, no jugaba ninguna de sus decisiones, no podía parar un
+     gol ni marcar uno, y encima su rival se comía la espera de alguien que
+     nunca iba a aparecer. Una desventaja competitiva atada a un ajuste de
+     accesibilidad, que además crecía con cada minijuego nuevo.
 
-     · CLÁSICO (cadenas) — sigue saltándose. Ahí el partido es pura decoración:
-       el marcador ya está decidido y no hay ninguna decisión que tomar, así que
-       saltarlo no quita nada.
-     · NARRADO (duelos PvP) — no se salta NUNCA. Se ve entero y se juega entero;
-       lo que se apaga son las animaciones, que ya tienen sus reglas escritas en
-       layout.css colgando de :root[data-motion="reduce"]. */
-  if (reducido && !esNarrado) {
-    revelarResultado();
-    return;
-  }
-
-  /* --------------------------------------------------------------------
-     Común a los dos modos.
-     -------------------------------------------------------------------- */
+     Así que NO SE SALTA NUNCA, tampoco en cadenas desde el §15.12: allí
+     saltarlo dejaría además el duelo en `en_juego` sin nadie que lo liquide,
+     porque el partido es lo que ahora lo decide. Se ve entero y se juega
+     entero; lo que se apaga son las animaciones, que ya tienen sus reglas
+     escritas en layout.css colgando de :root[data-motion="reduce"]. */
   var reloj       = document.getElementById('simReloj');
   var barra       = document.getElementById('simBarra');
   var golesYoEl   = document.getElementById('simGolesYo');
   var golesOtroEl = document.getElementById('simGolesOtro');
   var relato      = document.getElementById('simRelato');
   var aguja       = document.getElementById('simMomentumAguja');
-  var zonaEventos = document.getElementById('simEventos');   // solo modo clásico
 
-  var nombreYo   = partido.querySelector('.partido-lado .partido-nombre').textContent.trim();
-  var nombreOtro = partido.querySelectorAll('.partido-lado .partido-nombre')[1].textContent.trim();
-
-  // El partido narrado pide más aire que la insignia de gol suelta del clásico.
-  var DURACION_MS = esNarrado ? 16000 : 7000;
-  var minutoMax   = esNarrado ? 94 : 93;
-  var eventos     = [];
-  var raf = null;
   var terminado = false;
 
   /* Las estadísticas en vivo ya no se pintan durante el partido (decisión de
@@ -279,19 +255,6 @@
   function mostrarEvento(e) {
     golesYoEl.textContent   = e.marcador[0];
     golesOtroEl.textContent = e.marcador[1];
-
-    if (!esNarrado) {
-      // CLÁSICO (cadenas): una insignia de gol que aparece y se va sola.
-      var pill = document.createElement('span');
-      pill.className = 'simulacion-evento';
-      pill.textContent = 'Gol de ' + (e.mio ? nombreYo : nombreOtro);
-      zonaEventos.innerHTML = '';
-      zonaEventos.appendChild(pill);
-      pill.addEventListener('animationend', function () {
-        if (pill.parentNode) pill.remove();
-      });
-      return;
-    }
 
     if (aguja) {
       // momentum llega en -100..100 ya desde MI punto de vista
@@ -315,32 +278,6 @@
 
     relato.appendChild(linea);
     while (relato.children.length > MAX_LINEAS) relato.removeChild(relato.firstChild);
-  }
-
-  /* Reloj local — SOLO modo clásico (cadenas). En el modo narrado el minuto lo
-     manda el servidor y esta función no se usa: ver sondear(), más abajo. */
-  function paso(marcaTiempo) {
-    if (!paso.inicio) paso.inicio = marcaTiempo;
-
-    var t = Math.min(1, (marcaTiempo - paso.inicio) / DURACION_MS);
-    var minutoActual = t * minutoMax;
-
-    reloj.textContent = Math.floor(minutoActual) + "'";
-    barra.style.width = (t * 100) + '%';
-
-    for (var i = 0; i < eventos.length; i++) {
-      if (!eventos[i].mostrado && minutoActual >= eventos[i].minuto) {
-        eventos[i].mostrado = true;
-        mostrarEvento(eventos[i]);
-      }
-    }
-
-    if (t < 1) {
-      raf = window.requestAnimationFrame(paso);
-    } else {
-      reloj.textContent = 'Final';
-      window.setTimeout(terminar, 900);
-    }
   }
 
   /* ======================================================================
@@ -1083,7 +1020,6 @@
   function terminar() {
     if (terminado) return;
     terminado = true;
-    if (raf) window.cancelAnimationFrame(raf);
     if (sondeo) window.clearTimeout(sondeo);
     SRF.cerrarModal('simulacionPartido');
   }
@@ -1094,15 +1030,14 @@
      replace() y no href: el partido no es un paso al que volver con Atrás. */
   function irAlResultado() {
     terminado = true;
-    if (raf) window.cancelAnimationFrame(raf);
     if (sondeo) window.clearTimeout(sondeo);
     window.location.replace('duelo.php?id='
       + encodeURIComponent(simulacion.dataset.idDuelo) + '&revelar=1');
   }
 
-  /* único punto de salida: da igual si se llega por el reloj, por "Ver
-     resultado", por el aspa o por Esc (el modal genérico ya lo cierra) —
-     en cuanto el modal deja de estar abierto, se revela el resultado. */
+  /* único punto de salida: da igual si se llega por el final del partido, por
+     el aspa o por Esc (el modal genérico ya lo cierra) — en cuanto el modal
+     deja de estar abierto, se revela el resultado. */
   var observador = new MutationObserver(function () {
     if (!simulacion.classList.contains('is-abierto')) {
       terminar();
@@ -1117,42 +1052,7 @@
     function (btn) { btn.addEventListener('click', terminar); }
   );
 
-  /* ---- CLÁSICO (cadenas): conserva su reloj local, intacto --------------
-     Los goles se leen del marcador YA renderizado (oculto detrás del modal),
-     nunca se recalculan aquí. Se reparten en franjas para que no se agrupen
-     todos al principio o al final. */
-  if (!esNarrado) {
-    var goles = partido.querySelectorAll('.partido-goles');
-    var misGolesFinal = parseInt(goles[0].textContent, 10) || 0;
-    var susGolesFinal = parseInt(goles[1].textContent, 10) || 0;
-
-    var brutos = [], i, j, tmp;
-    for (i = 0; i < misGolesFinal; i++) brutos.push({ mio: true });
-    for (i = 0; i < susGolesFinal; i++) brutos.push({ mio: false });
-
-    for (i = brutos.length - 1; i > 0; i--) {
-      j = Math.floor(Math.random() * (i + 1));
-      tmp = brutos[i]; brutos[i] = brutos[j]; brutos[j] = tmp;
-    }
-    for (i = 0; i < brutos.length; i++) {
-      var ini = Math.floor((i / brutos.length) * 88) + 1;
-      var fin = Math.floor(((i + 1) / brutos.length) * 88) + 1;
-      brutos[i].minuto = ini + Math.floor(Math.random() * Math.max(1, fin - ini));
-    }
-    brutos.sort(function (a, b) { return a.minuto - b.minuto; });
-
-    var accMio = 0, accSuyo = 0;
-    eventos = brutos.map(function (e) {
-      if (e.mio) accMio++; else accSuyo++;
-      return { minuto: e.minuto, mio: e.mio, tipo: 'gol', marcador: [accMio, accSuyo] };
-    });
-
-    SRF.abrirModal('simulacionPartido');
-    raf = window.requestAnimationFrame(paso);
-    return;
-  }
-
-  /* ---- NARRADO (duelos PvP): lo lleva el servidor ---------------------- */
+  /* El partido lo lleva el servidor, en duelos y en cadenas. */
   SRF.abrirModal('simulacionPartido');
   sondear();
 })();

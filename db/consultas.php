@@ -4047,7 +4047,16 @@ class Tcg
 		$maxLatido = (int) $this->config("partido_latido_max", 12);
 
 		$presente = fn($latido) => $latido && (time() - strtotime($latido)) <= $maxLatido;
-		$ambos = $presente($duelo["latido_creador"]) && $presente($duelo["latido_rival"]);
+
+		/* ⚠️ EN UNA CADENA SOLO HAY UN JUGADOR PRESENTE. El CPU no tiene pantalla
+		   y por tanto NO LATE NUNCA, así que exigir los dos latidos dejaría todos
+		   los partidos de cadena arrancando por el otro camino: el de la espera
+		   máxima, o sea 15 segundos de reloj parado antes de cada partido. Aquí
+		   "están los dos" significa "está el que juega". */
+		$esPve = $duelo["dificultad"] !== null;
+		$ambos = $esPve
+			? ($presente($duelo["latido_creador"]) || $presente($duelo["latido_rival"]))
+			: ($presente($duelo["latido_creador"]) && $presente($duelo["latido_rival"]));
 		$seAcaboLaEspera = $duelo["resuelto"] && (time() - strtotime($duelo["resuelto"])) >= $espera;
 
 		if (!$ambos && !$seAcaboLaEspera) return $duelo;
@@ -4218,7 +4227,13 @@ class Tcg
 	 * El dinero YA está retenido desde que cada uno entró (crearDuelo y
 	 * aceptarDuelo), así que esto no cobra: solo entrega.
 	 *
-	 * @return array{ok:bool, id_ganador:?int, por_tanda:bool}
+	 * EN CADENAS (§15.12) cierra además el nodo: calcula el rango con el marcador
+	 * final, lo guarda, registra el progreso y reparte monedas y botín. Todo eso
+	 * estaba en resolverDuelo() hasta que el partido pasó a decidir también en
+	 * PvE. El "bote" de una cadena es de 0 monedas —no se apuesta nada—, así que
+	 * la entrega de arriba no hace nada ahí: lo que importa es el botín.
+	 *
+	 * @return array{ok:bool, id_ganador:?int, por_tanda:bool, rango:?string}
 	 */
 	public function liquidarPartido($id_duelo) {
 		try {
@@ -4230,13 +4245,14 @@ class Tcg
 
 			if (!$duelo || $duelo["estado"] !== "en_juego") {
 				$this->pdo->rollBack();
-				return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+				return ["ok" => false, "id_ganador" => null, "por_tanda" => false, "rango" => null];
 			}
 
 			$idCreador = (int) $duelo["id_creador"];
 			$idRival   = (int) $duelo["id_rival"];
 			$golesC    = (int) $duelo["goles_creador"];
 			$golesR    = (int) $duelo["goles_rival"];
+			$esPve     = $duelo["dificultad"] !== null;
 
 			$porTanda = false;
 			if ($golesC > $golesR)      { $ganaLado = "local"; }
@@ -4251,7 +4267,7 @@ class Tcg
 
 				if ($tanda["gana"] === null) {
 					$this->pdo->rollBack();
-					return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+					return ["ok" => false, "id_ganador" => null, "por_tanda" => false, "rango" => null];
 				}
 				$ganaLado = $tanda["gana"];
 			}
@@ -4259,17 +4275,35 @@ class Tcg
 			$idGanador  = $ganaLado === "local" ? $idCreador : $idRival;
 			$idPerdedor = $ganaLado === "local" ? $idRival   : $idCreador;
 
+			/* EL RANGO DE CADENA SE CALCULA AQUÍ (§15.12), porque hasta ahora no
+			   había marcador final. En una cadena el jugador es siempre el creador.
+
+			   ⚠️ El `?? "B"` no es un adorno. Cuando el partido acaba empatado y lo
+			   decide la tanda, rangoPartido() devuelve null —nadie ganó EN EL
+			   CAMPO—, y dejarlo en null tendría un efecto que desde aquí no se ve:
+			   mapaCadena() da un nodo por superado si tiene `mejor_rango`, así que
+			   una victoria en los penaltis no abriría el nodo siguiente y la cadena
+			   se quedaría cortada. Ganar es ganar; el suelo es B, que es justo lo
+			   que significa la B ("B = ganar"). */
+			$rango = null;
+			if ($esPve) {
+				$rango = $idGanador === $idCreador
+					? ($this->rangoPartido($golesC, $golesR) ?? "B")
+					: null;
+			}
+
 			// El cierre y la condición de carrera, en la misma sentencia.
 			$cerrar = $this->pdo->prepare("
 				UPDATE duelos
-				SET estado = 'resuelto', id_ganador = :g, resuelto_por_tanda = :t
+				SET estado = 'resuelto', id_ganador = :g, resuelto_por_tanda = :t, rango = :r
 				WHERE id_duelo = :d AND estado = 'en_juego'
 			");
-			$cerrar->execute([":g" => $idGanador, ":t" => $porTanda ? 1 : 0, ":d" => $id_duelo]);
+			$cerrar->execute([":g" => $idGanador, ":t" => $porTanda ? 1 : 0,
+			                  ":r" => $rango, ":d" => $id_duelo]);
 			if ($cerrar->rowCount() === 0) {
 				// Otro sondeo se nos adelantó: no se paga dos veces.
 				$this->pdo->rollBack();
-				return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+				return ["ok" => false, "id_ganador" => null, "por_tanda" => false, "rango" => null];
 			}
 
 			// --- entregar el bote (ya estaba retenido) ---
@@ -4292,11 +4326,42 @@ class Tcg
 				}
 			}
 
+			/* --- CADENAS: progreso del nodo y botín DEL PARTIDO (§15.12) ---
+			   Estaba en resolverDuelo(), y se mudó aquí cuando el partido pasó a
+			   decidir también en PvE: allí ya no hay marcador final, y del marcador
+			   final salen el rango y la recompensa. Esto es, literalmente, lo que
+			   hace que los minijuegos cuenten en una cadena.
+
+			   ⚠️ VA DESPUÉS DEL UPDATE DE ARRIBA, Y NO ES CASUAL. Ese UPDATE con
+			   `estado = 'en_juego'` en el WHERE es lo único que garantiza que una
+			   sola llamada liquide, y las dos pantallas sondean a la vez. Poniendo
+			   el reparto antes, dos sondeos simultáneos entregarían el botín dos
+			   veces; poniéndolo aquí hereda esa protección sin añadir nada. */
+			if ($esPve && $duelo["id_nodo"]) {
+				$gano = $idGanador === $idCreador;   // en una cadena el jugador es siempre el creador
+				$vecesPrevias = $this->registrarProgresoNodo(
+					$idCreador,
+					(int) $duelo["id_nodo"],
+					$duelo["dificultad"],
+					$gano,
+					$rango
+				);
+
+				if ($gano) {
+					$monedas = $this->calcularRecompensaMonedas($duelo["dificultad"], $rango, $vecesPrevias);
+					$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :u")
+						->execute([":m" => $monedas, ":u" => $idCreador]);
+					$this->registrarDrop($idCreador, $id_duelo, (int) $duelo["id_nodo"], "monedas", null, null, $monedas, null);
+
+					$this->otorgarLootNodo((int) $duelo["id_nodo"], $idCreador, $rango, $id_duelo);
+				}
+			}
+
 			$this->pdo->commit();
-			return ["ok" => true, "id_ganador" => $idGanador, "por_tanda" => $porTanda];
+			return ["ok" => true, "id_ganador" => $idGanador, "por_tanda" => $porTanda, "rango" => $rango];
 		} catch (Throwable $e) {
 			if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-			return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+			return ["ok" => false, "id_ganador" => null, "por_tanda" => false, "rango" => null];
 		}
 	}
 
@@ -4671,7 +4736,16 @@ class Tcg
 	 */
 	private function duenosDeMinijuego($id_duelo, $idCreador, $idRival) {
 		$duenos = [];
+		$idBot = $this->idBot();
 		foreach ([$idCreador, $idRival] as $quien) {
+			/* ⚠️ EL CPU NO JUEGA MINIJUEGOS, y esto no es un detalle de comodidad.
+			   Un minijuego con dueño detiene el partido hasta que lo resuelven o
+			   vence el plazo, así que darle decisiones al bot —que no tiene
+			   pantalla— pausaría TU partido de cadena nueve segundos por cada una,
+			   varias veces, y el jugador solo vería el reloj parado sin nada que
+			   hacer. Sus jugadas se narran igual; lo que no pasa es que esperen. */
+			if ((int) $quien === $idBot) continue;
+
 			$n = $this->narracionDuelo($id_duelo, $quien);
 			if (empty($n["ok"])) continue;
 			foreach ($n["eventos"] as $e) {
@@ -5629,18 +5703,18 @@ class Tcg
 	   cuántos goles caían en un PvP a partir del valor de sorteo. La sustituye
 	   el modo natural de generarEventosPartido() (§1.3): el marcador ya no se
 	   calcula aparte, es el número de ocasiones de la simulación que acabaron
-	   dentro. Las CADENAS siguen con marcadorCadena(), intacto. */
+	   dentro. Y desde el §15.12 tampoco queda la de las CADENAS: marcadorCadena()
+	   se retiró por el mismo motivo y con el mismo sustituto. */
 
 	/**
 	 * MONTA el partido de un duelo aceptado: congela fuerzas, compos y aumentos,
 	 * aplica la curva Elo, siembra el sorteo, simula el encuentro para saber
 	 * cuántos goles caen y guarda toda la trazabilidad.
 	 *
-	 * OJO CON EL NOMBRE: en PvP esto ya NO resuelve nada. Deja el duelo en
-	 * `en_juego`, sin ganador y sin haber entregado el bote. Lo que decide es el
-	 * partido, y quien lo cierra es liquidarPartido() al llegar al minuto final.
-	 * En PvE (cadenas) sí resuelve de una vez, como siempre: no hay minijuegos
-	 * que puedan mover nada, así que no habría nada que esperar.
+	 * OJO CON EL NOMBRE: esto ya NO resuelve nada, ni en PvP ni en PvE. Deja el
+	 * duelo en `en_juego`, sin ganador, sin bote entregado y —en cadenas— sin
+	 * rango ni botín. Lo que decide es el partido, y quien lo cierra es
+	 * liquidarPartido() al llegar al minuto final.
 	 *
 	 * Se conserva el nombre a propósito: es el paso del ciclo de vida que los
 	 * demás sitios conocen (duelo.php y duelo_estado.php lo llaman al cerrarse
@@ -5747,89 +5821,79 @@ class Tcg
 			$p = max($pMin, min($pMax, $p));
 
 			$sorteo = mt_rand() / (mt_getrandmax() + 1);   // [0,1)
-			$ganaCreador = $sorteo < $p;
 
-			/* EN PvP EL SORTEO YA NO DECIDE QUIÉN GANA.
+			/* EL SORTEO YA NO DECIDE QUIÉN GANA. NI EN PvP NI EN PvE.
 			   Decide el partido: el marcador se acumula durante el encuentro y el
 			   ganador se escribe al final, en liquidarPartido(). $sorteo conserva
 			   sus otros dos trabajos —sembrar toda la narración (valor_sorteo,
 			   §15.1) y dejar constancia del "partías con un X %"—, así que sigue
 			   guardándose igual.
-			   En PvE sí decide: las cadenas no tienen minijuegos, su marcador lo
-			   pone marcadorCadena() y su rango y su botín cuelgan de él. Se dejan
-			   exactamente como estaban hasta que se trabajen aparte. */
-			$idGanador  = $esPve ? ($ganaCreador ? $idCreador : $idRival) : null;
-			$idPerdedor = $esPve ? ($ganaCreador ? $idRival : $idCreador) : null;
 
-			if ($esPve) {
-				// Las cadenas conservan su marcador propio, que sí puede dejar la
-				// portería a cero y por tanto permite el rango S. Se dejan como
-				// estaban hasta que se trabajen aparte.
-				[$golesGanador, $golesPerdedor] = $this->marcadorCadena(
-					$ganaCreador ? $fuerzaCreador : $fuerzaRival,
-					$ganaCreador ? $fuerzaRival : $fuerzaCreador,
-					$ganaCreador ? $formCreador : $formRival,
-					$ganaCreador ? $formRival : $formCreador
-				);
-				$golesCreador = $ganaCreador ? $golesGanador : $golesPerdedor;
-				$golesRival   = $ganaCreador ? $golesPerdedor : $golesGanador;
-			} else {
-				/* PvP — el marcador NACE de la simulación, y ahora también manda.
-				   Se juega el partido minuto a minuto y el marcador es,
-				   literalmente, el número de ocasiones que acabaron dentro.
+			   Las CADENAS entraron aquí en el §15.12, y por el mismo motivo que el
+			   PvP: su rango y su botín cuelgan del marcador, así que con el ganador
+			   sorteado antes del minuto 1 la recompensa venía dada y los minijuegos
+			   no podían tocarla. Ahora el partido de cadena también se juega. */
+			$idGanador  = null;
+			$idPerdedor = null;
 
-				   MODO NATURAL: ya no se pasa `gana`. Esa clave existía para que
-				   la simulación no pudiera contradecir al ganador pre-sorteado
-				   (§1.3), y hacía dos cosas de las que ahora hay que
-				   desprenderse: forzaba un margen a favor de ese ganador e
-				   IMPEDÍA EL EMPATE. Sin ella el marcador sale como salga —
-				   empates incluidos, que es justo lo que hace falta para que la
-				   tanda de penaltis tenga sentido. */
-				$sim = self::generarEventosPartido(
-					[
-						"nombre" => "local", "fuerza" => $fuerzaCreador, "goles" => null,
-						"cartas" => $this->listarAlineacionDuelo($id_duelo, $idCreador),
-						"formacion" => $formCreador,
-					],
-					[
-						"nombre" => "visitante", "fuerza" => $fuerzaRival, "goles" => null,
-						"cartas" => $this->listarAlineacionDuelo($id_duelo, $idRival),
-						"formacion" => $formRival,
-					],
-					$sorteo,
-					$this->opcionesPenalti()
-				);
-				[$golesCreador, $golesRival] = $sim["goles"];
+			/* El marcador NACE de la simulación, y manda. Se juega el partido
+			   minuto a minuto y el marcador es, literalmente, el número de
+			   ocasiones que acabaron dentro.
 
-				/* ⚠️ INTERRUPTOR DE PRUEBAS — `depuracion_forzar_empate`
-				   Con esto a 1, TODO partido PvP acaba 1-1 y por tanto se va a la
-				   tanda. Existe porque probar los penaltis a mano es imposible de
-				   otro modo: solo empata el 27,7 % de los duelos, así que habría
-				   que jugar cuatro partidos enteros para ver una tanda.
+			   MODO NATURAL: no se pasa `gana`. Esa clave existía para que la
+			   simulación no pudiera contradecir al ganador pre-sorteado (§1.3), y
+			   hacía dos cosas de las que hay que desprenderse: forzaba un margen a
+			   favor de ese ganador e IMPEDÍA EL EMPATE. Sin ella el marcador sale
+			   como salga — empates incluidos, que es justo lo que hace falta para
+			   que la tanda de penaltis tenga sentido.
 
-				   Vale 0 por defecto y por defecto la fila ni existe. Si te
-				   encuentras todos los duelos empatados, esto es lo primero que hay
-				   que mirar:
-				     UPDATE configuracion SET valor='0'
-				      WHERE clave='depuracion_forzar_empate';
+			   En PvE la fuerza del rival YA viene multiplicada por la dificultad
+			   (arriba), así que el escalado de las cadenas entra en la simulación
+			   solo: un Extremo no marca menos goles, marca contra un muro mejor. */
+			$sim = self::generarEventosPartido(
+				[
+					"nombre" => "local", "fuerza" => $fuerzaCreador, "goles" => null,
+					"cartas" => $this->listarAlineacionDuelo($id_duelo, $idCreador),
+					"formacion" => $formCreador,
+				],
+				[
+					"nombre" => "visitante", "fuerza" => $fuerzaRival, "goles" => null,
+					"cartas" => $this->listarAlineacionDuelo($id_duelo, $idRival),
+					"formacion" => $formRival,
+				],
+				$sorteo,
+				$this->opcionesPenalti()
+			);
+			[$golesCreador, $golesRival] = $sim["goles"];
 
-				   Va en configuracion y no en el código a propósito: un interruptor
-				   de pruebas escondido en un `if` es un interruptor que se queda
-				   puesto. Así se ve en el panel y se apaga sin desplegar nada. */
-				if ((int) $this->config("depuracion_forzar_empate", 0) === 1) {
-					$golesCreador = 1;
-					$golesRival   = 1;
-				}
+			/* ⚠️ INTERRUPTOR DE PRUEBAS — `depuracion_forzar_empate`
+			   Con esto a 1, TODO partido acaba 1-1 y por tanto se va a la tanda.
+			   Existe porque probar los penaltis a mano es imposible de otro modo:
+			   solo empata el 27,7 % de los duelos, así que habría que jugar cuatro
+			   partidos enteros para ver una tanda.
+
+			   Vale 0 por defecto y por defecto la fila ni existe. Si te encuentras
+			   todos los duelos empatados, esto es lo primero que hay que mirar:
+			     UPDATE configuracion SET valor='0'
+			      WHERE clave='depuracion_forzar_empate';
+
+			   Va en configuracion y no en el código a propósito: un interruptor de
+			   pruebas escondido en un `if` es un interruptor que se queda puesto.
+			   Así se ve en el panel y se apaga sin desplegar nada. */
+			if ((int) $this->config("depuracion_forzar_empate", 0) === 1) {
+				$golesCreador = 1;
+				$golesRival   = 1;
 			}
-			$rango = $esPve ? $this->rangoPartido($golesCreador, $golesRival) : null;
 
-			/* --- mover las apuestas: SOLO EN PvE ---
-			   En PvP el bote se entrega al terminar el partido (liquidarPartido),
-			   porque hasta entonces no hay ganador a quien entregárselo. Aplazarlo
-			   no deja nada a medias: lo apostado está RETENIDO de los dos desde que
+			/* --- las apuestas ya no se mueven aquí, ni en PvP ni en PvE ---
+			   El bote se entrega al terminar el partido (liquidarPartido), porque
+			   hasta entonces no hay ganador a quien entregárselo. Aplazarlo no deja
+			   nada a medias: lo apostado está RETENIDO de los dos desde que
 			   entraron —las monedas se descuentan en crearDuelo() y aceptarDuelo()—
 			   así que el modelo de pago no cambia. Lo único que se mueve es el
-			   momento de la entrega.
+			   momento de la entrega. En cadenas la apuesta es de 0 monedas, así que
+			   ahí no hay bote que entregar: lo que se aplaza es el BOTÍN, y eso se
+			   hace en el mismo sitio.
 
 			   OJO CON LA CARTA, que no funciona como parece: NO se marca
 			   `bloqueada` (esa columna es el candado manual del jugador contra la
@@ -5839,34 +5903,18 @@ class Tcg
 			   ('resuelto','cancelado')`. Que sea un NOT IN es lo que hace que
 			   `en_juego` quede retenido sin tocar nada — si fuera una lista
 			   positiva, la carta se habría liberado a mitad de partido. */
-			if ($esPve) {
-				if ($duelo["tipo_apuesta"] === "monedas") {
-					// El bote son las dos apuestas, ya retenidas al entrar.
-					$bote = ((int) $duelo["monedas"]) * 2;
-					$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :bote WHERE id_usuario = :id")
-						->execute([":bote" => $bote, ":id" => $idGanador]);
-				} else {
-					$stmtCarta = $this->pdo->prepare("
-						SELECT id_coleccion FROM duelo_apuestas
-						WHERE id_duelo = :id_duelo AND id_usuario = :id_usuario
-					");
-					$stmtCarta->execute([":id_duelo" => $id_duelo, ":id_usuario" => $idPerdedor]);
-					$copiaPerdida = $stmtCarta->fetchColumn();
-					if ($copiaPerdida) {
-						$this->pdo->prepare("
-							UPDATE coleccion SET id_usuario = :ganador, bloqueada = 0
-							WHERE id_coleccion = :id_coleccion
-						")->execute([":ganador" => $idGanador, ":id_coleccion" => $copiaPerdida]);
-					}
-				}
-			}
 
-			$estadoNuevo = $esPve ? "resuelto" : "en_juego";
+			$estadoNuevo = "en_juego";
 
-			/* `resuelto = NOW()` se sigue escribiendo aquí aunque en PvP el duelo
-			   no quede resuelto todavía: es la hora de referencia con la que
+			/* `resuelto = NOW()` se sigue escribiendo aquí aunque el duelo no quede
+			   resuelto todavía: es la hora de referencia con la que
 			   arrancarPartidoSiToca() cuenta partido_espera_seg. Lo que marca es
-			   "el partido ya está montado", que es exactamente cuando toca. */
+			   "el partido ya está montado", que es exactamente cuando toca.
+
+			   `rango` NO se escribe aquí: sale del marcador final, así que lo pone
+			   liquidarPartido() en el mismo UPDATE que el ganador. Hasta entonces
+			   se queda en NULL, que es lo que las pantallas ya leen como "todavía
+			   no hay rango". */
 			$this->pdo->prepare("
 				UPDATE duelos SET
 					estado = :estado,
@@ -5882,11 +5930,9 @@ class Tcg
 					ciclo_bonus_creador = :cbc, ciclo_bonus_rival = :cbr,
 					malus_coh_creador = :mcc, malus_coh_rival = :mcr,
 					tension_creador = :tc, tension_rival = :tr,
-					rango = :rango,
 					resuelto = NOW()
 				WHERE id_duelo = :id_duelo
 			")->execute([
-				":rango" => $rango,
 				":afc" => $composCreador["afinidad_dom"], ":afr" => $composRival["afinidad_dom"],
 				":cbc" => $cicloCreador,                  ":cbr" => $cicloRival,
 				":mcc" => $composCreador["malus"],        ":mcr" => $composRival["malus"],
@@ -5928,28 +5974,11 @@ class Tcg
 					. "Falta aplicar db/migraciones/019_partido_decide.sql."];
 			}
 
-			// Progreso y recompensas de cadena: dentro de la misma transacción
-			// que el resultado, para que no pueda quedar un duelo resuelto
-			// cuyo nodo no conste como jugado o cuyas monedas no se cobraran.
-			if ($esPve && $duelo["id_nodo"]) {
-				$gano = $idGanador === $idCreador;
-				$vecesPrevias = $this->registrarProgresoNodo(
-					$idCreador,                    // en una cadena el jugador es siempre el creador
-					(int) $duelo["id_nodo"],
-					$duelo["dificultad"],
-					$gano,
-					$rango
-				);
-
-				if ($gano) {
-					$monedas = $this->calcularRecompensaMonedas($duelo["dificultad"], $rango, $vecesPrevias);
-					$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :u")
-						->execute([":m" => $monedas, ":u" => $idCreador]);
-					$this->registrarDrop($idCreador, $id_duelo, (int) $duelo["id_nodo"], "monedas", null, null, $monedas, null);
-
-					$this->otorgarLootNodo((int) $duelo["id_nodo"], $idCreador, $rango, $id_duelo);
-				}
-			}
+			/* El progreso de nodo y el botín se REPARTEN EN liquidarPartido(), no
+			   aquí. Aquí todavía no hay marcador final —los minijuegos están por
+			   jugarse— así que no hay rango, y sin rango no hay recompensa que
+			   calcular. Es justo el cambio que pedía el §15.12: que los minijuegos
+			   influyan en las recompensas de ese partido. */
 
 			$this->pdo->commit();
 			return ["ok" => true, "error" => null, "id_ganador" => $idGanador];

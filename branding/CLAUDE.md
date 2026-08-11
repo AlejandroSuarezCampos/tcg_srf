@@ -267,14 +267,28 @@
 >
 > ---
 >
-> ## Lo siguiente: llevar todo esto a las CADENAS (§15.12)
+> ## v7.6 — EL PARTIDO DECIDE TAMBIÉN EN LAS CADENAS (§15.12)
 >
-> **Diseñado, decidido y medido el 2026-08-11; sin escribir.** El partido decidirá
-> también en PvE y los minijuegos influirán en las recompensas **de ese partido**.
-> Los cofres mantienen su contenido fijo —ya lo mantienen— y dan **premio extra si
-> todos los partidos previos al cofre están en S en Extremo**. El plan son cinco
-> piezas y está entero en el §15.12, con las tres trampas de la parte de cliente y
-> el aviso de que el rango S quedará inalcanzable hasta que se calibre.
+> Lo que el §15.10 hizo con el PvP, hecho ahora en PvE: un partido de cadena nace
+> **`en_juego`**, se juega minuto a minuto con sus minijuegos, y `liquidarPartido()`
+> escribe el rango y reparte monedas y botín **al terminar**. Antes el ganador, el
+> rango y la recompensa se sorteaban al montar el partido, así que los minijuegos no
+> podían tocarlos. Con ello se jubiló **`marcadorCadena()`** (5,65 goles por partido,
+> innarrable) y se **retiró el modo `clasico`** de pantalla: ya no hay dos modos de
+> partido, hay uno.
+>
+> **Medido sobre 200 partidos de cadena jugados enteros**: 1,77 goles por partido,
+> la victoria del jugador cae del 78 % en fácil al 48 % en extremo, 476 decisiones
+> jugadas de las que **83 movieron el marcador**, y **0 partidos colgados**.
+>
+> **Van 3 de las 5 piezas.** Quedan el **bonus del cofre** por camino perfecto (S en
+> Extremo) y el **auto-tiro inmediato del CPU** en la tanda.
+>
+> ⚠️ **El rango S ha quedado casi fuera de alcance** —1 sola S en 200 partidos— y
+> **es esperado, no un fallo**: era el aviso del §15.12 y calibrarlo es una decisión
+> que Alejandro dejó para cuando estén las cartas definitivas. El dial es
+> `pve_rango_s_goles`; la portería a cero no es el problema (se consigue entre el
+> 40 % y el 62 % de las veces).
 >
 > **Verificado sobre 300 duelos jugados enteros por el camino real** (25 con carta),
 > más uno a mano en el navegador entre dos cuentas que acabó 2-2 y lo decidió la
@@ -329,9 +343,10 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > código 1 si algo falla. Hoy: 5 suites en verde. La grande, `probar_300.php`
 > (300 duelos de punta a punta, ~7 min), se lanza aparte.
 >
-> **5. Lo siguiente que toca está decidido y medido: las CADENAS, §15.12.** Cinco
-> piezas, con las decisiones de Alejandro textuales. No hace falta volver a
-> preguntárselas.
+> **5. De las cinco piezas de las CADENAS (§15.12) van tres.** Lo siguiente son la
+> **3** (bonus del cofre por camino perfecto) y la **5** (auto-tiro inmediato del CPU
+> en la tanda), con las decisiones de Alejandro textuales dentro. No hace falta
+> volver a preguntárselas.
 >
 > **6. Los 16 PNG originales ya no existen y el borrado está commiteado**
 > (2026-08-11). Alejandro confirmó que los eliminó a propósito, así que la carpeta
@@ -391,10 +406,12 @@ bueno.** Es la forma de trabajar acordada: plan → aprobación → implementaci
 resumen de cierre. Si algo tiene dos lecturas razonables que llevarían a trabajo
 distinto, pregúntalo con opciones concretas en vez de decidir por tu cuenta.
 
-**Si Alejandro no dice por dónde seguir, lo siguiente que toca son las CADENAS
-(§15.12).** Está diseñado, decidido y medido; solo falta escribirlo, y son cinco
-piezas con las decisiones textuales dentro — **no hace falta volver a
-preguntárselas**. Empieza por la 1 y la 2, que van juntas.
+**Si Alejandro no dice por dónde seguir, lo siguiente son las dos piezas que le
+faltan a las CADENAS (§15.12)**: el **bonus del cofre** por camino perfecto y el
+**auto-tiro inmediato del CPU** en la tanda. Las decisiones están textuales dentro
+— **no hace falta volver a preguntárselas**. Detrás de ellas viene **calibrar el
+rango**, que hoy deja la S en 1 de cada 200 partidos, pero eso Alejandro lo dejó
+dicho para cuando estén las cartas definitivas.
 
 Si por lo que sea eso no toca, los otros frentes abiertos: **el desequilibrio de
 compos** que el §15.8 deja medido (es lo que más afecta a la sensación de juego),
@@ -518,7 +535,8 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§15 — Familia Árbitro** | Decisiones disciplinarias sobre el evento de tarjeta, con un 4.º dato oculto | ✅ **Construido** |
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
-| **§15 — Partido narrado en cadenas** | **Diseñado, decidido y medido; sin escribir.** El partido decide también en PvE, los minijuegos influyen en las recompensas DEL PARTIDO, el cofre mantiene su contenido fijo y da premio extra si todos los partidos previos están en **S en Extremo**. Plan de 5 piezas en §15.12 | 🟡 **Listo para construir** |
+| **§15 — EL PARTIDO DECIDE TAMBIÉN EN LAS CADENAS** | El partido de cadena se juega igual que un PvP: nace `en_juego`, los minijuegos mueven el marcador y `liquidarPartido()` escribe el rango y reparte monedas y botín. Se jubila `marcadorCadena()` y **se retira el modo `clasico`** de pantalla (§15.12) | ✅ **Construido (piezas 1, 2 y 4)** |
+| **§15 — Bonus del cofre y tanda contra el CPU** | Premio extra del cofre por camino perfecto (**S en Extremo**) y auto-tiro inmediato del CPU en la tanda. Piezas 3 y 5 del §15.12 | 🟡 **Pendiente** |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
@@ -628,7 +646,9 @@ tcg_srf/
 │   │   ├── probar_tanda.php   ← la tanda jugable, incluido que la elección del
 │   │   │                        rival NO viaje al cliente (§15.11)
 │   │   ├── probar_paso3.php   ← el partido decide el duelo, de punta a punta
-│   │   ├── probar_pve.php     ← que las cadenas siguen intactas
+│   │   ├── probar_pve.php     ← el partido decide también en cadenas (§15.12):
+│   │   │                        nace en_juego, el CPU no recibe decisiones y el
+│   │   │                        botín se reparte al liquidar
 │   │   ├── probar_liquidar.php ← liquidación e idempotencia del bote
 │   │   ├── probar_300.php     ← LA GRANDE: 300 duelos jugados enteros, 25 con
 │   │   │                        carta. ~7 min, se lanza aparte y hay que montar
@@ -1565,14 +1585,14 @@ ventaja de poder.
    rinde más que enfocarlas, así que construir bien un equipo casi no importa.
    Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
    de balance, no de código.
-9. **Llevar el partido narrado a las cadenas** — **es lo siguiente que toca, y ya
-   está todo decidido: §15.12.** Cinco piezas, con las cuatro decisiones de
-   Alejandro dentro (el partido decide en PvE, los minijuegos influyen en las
-   recompensas del partido, el cofre mantiene contenido fijo, y premio extra si
-   todos los partidos previos están en **S en Extremo**). Se jubila
-   `marcadorCadena()`, que da 5,65 goles por partido y no se puede narrar. **Ojo:
-   el rango S quedará inalcanzable hasta que Alejandro calibre, y eso es esperado,
-   no un fallo** — el bonus del cofre también.
+9. ~~Llevar el partido narrado a las cadenas~~ — **hecho en sus tres cuartas
+   partes (§15.12)**: el partido decide también en PvE, los minijuegos mueven el
+   marcador y el rango, y el botín se reparte al liquidar. **Quedan dos piezas**:
+   el **bonus del cofre** por camino perfecto (S en Extremo) y el **auto-tiro
+   inmediato del CPU** en la tanda —hoy sus penaltis se resuelven por plazo, así
+   que un empate contra la máquina se juega con 12 segundos muertos por tiro—.
+   Y queda lo que Alejandro dejó dicho que iba después: **calibrar el rango**, que
+   hoy deja la S en 1 de cada 200 partidos. Está medido en el §15.12.
 10. **El resto del escalado de dificultad** (Biblia §3). Hoy salen por
     dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
     acierto, la fiabilidad de la pista y el coste del fallo.
@@ -2459,21 +2479,29 @@ Verificado martilleando 25 peticiones seguidas: solo se aplica una.
   el sitio va por `http`; por eso el método viejo con textarea no es el respaldo
   para `http` sino el respaldo para cuando la API moderna dice que no.
 
-### 15.7 Duelos y cadenas están SEPARADOS a propósito
+### 15.7 Duelos y cadenas ya NO están separados (lo estuvieron hasta el §15.12)
 
-`duelo.php` decide el modo con `$esCadena ? 'clasico' : 'narrado'` y lo publica en
-`data-modo`. `duelo.js` se ramifica ahí.
+**Esta sección decía lo contrario y hay que leerla al revés que antes.** Había
+dos modos de partido y `duelo.php` elegía con `$esCadena ? 'clasico' :
+'narrado'`. **El modo `clasico` se retiró**: hoy el partido es el mismo en los dos
+sitios y `data-modo` ya no existe. Si lo ves en algún sitio, es un resto.
 
 | | Duelos PvP | Cadenas PvE |
 |---|---|---|
-| Modo | `narrado` | `clasico` — **intacto** |
-| Reloj | servidor | local (rAF) |
-| Minijuegos | sí | no |
-| Marcador | nace de la simulación, **y decide** (§15.10) | `marcadorCadena()`, sin tocar |
-| Estado tras montarse | `en_juego`, sin ganador | `resuelto` de una vez |
-| Cuándo se paga | al terminar el partido | en el acto |
-| Botón "Ver resultado" | **no** | sí |
-| Movimiento reducido | se juega igual, sin animación | se salta |
+| Modo | el partido narrado | **el mismo** |
+| Reloj | servidor | servidor |
+| Minijuegos | sí | **sí** (el CPU no juega ninguno) |
+| Marcador | nace de la simulación, **y decide** (§15.10) | **igual** (§15.12) |
+| Estado tras montarse | `en_juego`, sin ganador | **`en_juego`, sin ganador ni rango** |
+| Cuándo se paga | al terminar el partido | **al terminar: rango, monedas y botín** |
+| Botón "Ver resultado" | no | **no** (se quitó) |
+| Movimiento reducido | se juega igual, sin animación | **se juega igual** |
+| Quién cierra un partido a medias | sondeo · `duelo.php` · `duelos.php` | + **`cadena.php` y `cadenas.php`** |
+
+**Lo único que sigue siendo distinto** es quién hay al otro lado: el CPU no late
+y no decide, y eso obliga a dos excepciones en el servidor —`duenosDeMinijuego()`
+lo salta y `arrancarPartidoSiToca()` no espera su latido—. Están comentadas en su
+sitio y las cubre `db/pruebas/probar_pve.php`.
 
 **El botón de saltar se quitó del PvP** porque saltártelo no detiene al rival,
 que puede seguir parando goles después de que hayas salido: una cuenta acababa
@@ -2828,10 +2856,17 @@ vuelve a nadie.
 > comprueba que el guion cubre TODAS las fases**: una fase nueva sin cubrir se ve
 > como duelos colgados, no como un error.
 
-### 15.12 LLEVAR EL PARTIDO A LAS CADENAS — diseñado y decidido, SIN CONSTRUIR
+### 15.12 EL PARTIDO DECIDE TAMBIÉN EN LAS CADENAS
 
-Decisiones de Alejandro del **2026-08-11**. Está todo decidido y medido; lo que
-falta es escribirlo. **Léelo entero antes de tocar cadenas.**
+**Construido el 2026-08-11: piezas 1, 2 y 4. Quedan la 3 (bonus del cofre) y la
+5 (tanda contra el CPU).** Decisiones de Alejandro del mismo día.
+**Léelo entero antes de tocar cadenas.**
+
+Un partido de cadena ya no se resuelve al montarlo: nace `en_juego`, se juega
+minuto a minuto con sus minijuegos, y `liquidarPartido()` escribe el rango y
+reparte monedas y botín al terminar. Con ello **se jubiló `marcadorCadena()`**
+(y con ella `mediaLinea()` y `poisson()`, que solo usaba ella) y **se retiró el
+modo `clasico`** de pantalla: ver §15.7, que decía justo lo contrario.
 
 #### Las cuatro decisiones
 
@@ -2881,44 +2916,105 @@ Ni tabla nueva ni mecanismo nuevo. Una función y un parámetro.
 > premio bueno. Decisión de Alejandro: `extremo`. Déjalo en una función suya para
 > que cambiarlo siga siendo una línea.
 
-#### Lo que hay que construir, en orden
+#### Las cinco piezas, y cómo quedaron
 
-| | qué | por qué |
+| | qué | estado |
 |---|---|---|
-| **1** | `resolverDuelo()` deja el PvE en `en_juego`, simulación **natural**, sin rango ni botín. Se jubila **`marcadorCadena()`** | el rango tiene que salir del partido jugado |
-| **2** | progreso de nodo, monedas y loot **del partido** se mueven a `liquidarPartido()` | es lo que hace que los minijuegos cuenten |
-| **3** | el bonus del cofre (arriba) | decisión 4 |
-| **4** | `duelo.php` pasa de `'clasico'` a `'narrado'` en cadenas | ver los tres avisos de abajo |
-| **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | decisión 1 aplicada al empate |
+| **1** | `resolverDuelo()` deja el PvE en `en_juego`, simulación **natural**, sin rango ni botín. Se jubila **`marcadorCadena()`** | ✅ hecho |
+| **2** | progreso de nodo, monedas y loot **del partido** se mueven a `liquidarPartido()` | ✅ hecho |
+| **3** | el bonus del cofre (arriba) | ⬜ pendiente |
+| **4** | `duelo.php` deja de tener dos modos: el partido de cadena se juega narrado | ✅ hecho, **y el modo `clasico` se retiró** |
+| **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | ⬜ pendiente |
 
-#### Tres cosas que muerden en la pieza 4, y no son obvias
+#### Las tres trampas de la pieza 4, ya resueltas (mira aquí si algo se rompe)
 
-- **El CPU no debe recibir decisiones.** `duenosDeMinijuego()` mira el duelo desde
-  los DOS lados. En PvE eso le daría minijuegos al bot que nadie va a jugar, y cada
-  uno **pausaría tu partido 9 segundos** hasta que venciera el plazo.
-- **El reloj no arrancaría.** `arrancarPartidoSiToca()` espera a que **los dos** hayan
-  latido, y **el CPU no late nunca**, así que solo arrancaría por `partido_espera_seg`
-  — 15 segundos de espera antes de cada partido de cadena.
-- **El botón "Ver resultado"** existe en PvE porque ahí el resultado ya estaba
-  decidido. Si el partido decide, saltarlo deja de tener sentido, igual que pasó en
-  PvP (§15.7).
+- **El CPU no debe recibir decisiones.** `duenosDeMinijuego()` miraba el duelo desde
+  los DOS lados. En PvE eso le daba minijuegos al bot que nadie iba a jugar, y cada
+  uno **habría pausado tu partido 9 segundos** hasta vencer el plazo. Ahora salta al
+  bot con un `continue`, y la prueba cuenta cuántas veces el partido se queda
+  esperándole: tiene que ser **cero**.
+- **El reloj no arrancaba.** `arrancarPartidoSiToca()` espera a que **los dos** hayan
+  latido, y **el CPU no late nunca**, así que habría arrancado siempre por
+  `partido_espera_seg` — 15 segundos parado antes de CADA partido de cadena. En PvE
+  "están los dos" pasó a significar "está el que juega".
+- **El botón "Ver resultado"** existía en PvE porque ahí el resultado ya estaba
+  decidido. Se quitó: ahora ofrecería un resultado que todavía no existe.
 
-#### Medido antes de empezar, para no suponerlo
+#### Dos cosas que el plan no tenía y hacían falta
 
-| | cadenas hoy | duelos PvP |
-|---|---|---|
-| goles por partido | **5,65** | 2,10 |
-| portería a cero | 17,2 % | — |
-| marcadores típicos | 4-3, 5-3, 5-4 | 1-0, 2-1 |
+1. **El suelo de rango B al ganar en los penaltis.** Un empate roto en la tanda deja
+   `rangoPartido()` devolviendo `null` —nadie ganó en el campo—, y eso tiene un
+   efecto que no se ve desde `liquidarPartido()`: **`mapaCadena()` da un nodo por
+   superado si tiene `mejor_rango`**, así que una victoria en la tanda no habría
+   abierto el nodo siguiente y la cadena se habría quedado cortada. Con un 22-32 %
+   de partidos empatados (medido abajo) no es un caso raro, es uno de cada cuatro.
+   Ganar es ganar: el suelo es **B**.
+2. **El cierre perezoso no llegaba a las cadenas.** `cerrarPartidoSiToca()` se llama
+   desde el sondeo, `duelo.php` y `duelos.php` — pero de una cadena se vuelve por
+   `cadena.php`, que no lo llamaba. Un partido de cadena abandonado se habría
+   quedado en `en_juego` para siempre y **el nodo no habría constado jugado nunca**.
+   Ahora `cadena.php` y `cadenas.php` llaman a `cerrarPartidosPendientes()` antes de
+   leer el progreso, para que el nodo recién liquidado ya aparezca superado.
 
-`marcadorCadena()` **no se puede narrar**: un 5-4 minuto a minuto son nueve goles sin
-una sola parada.
+#### Medido sobre 200 partidos de cadena jugados enteros
 
-> ⚠️ **CONSECUENCIA QUE HAY QUE SABER ANTES DE PROBARLO.** Con `pve_rango_s_goles = 5`
-> y `pve_rango_a_margen = 3`, al bajar de 5,65 a ~2,1 goles **el rango S deja de ser
-> alcanzable en la práctica**. Y como el bonus del cofre exige S en todos los
-> partidos, **el bonus también será inalcanzable hasta que se calibre**. No está
-> roto: está sin calibrar, y calibrarlo es la decisión 5.
+40 por dificultad, por el camino real (crear → aumento → sondear → decidir →
+liquidar), contestando **a ciegas** y rotando opción, igual que en los 300 PvP.
+
+| dificultad | goles/partido | a favor | en contra | gana el jugador | tanda | portería a cero |
+|---|---|---|---|---|---|---|
+| fácil | 2,00 | 1,55 | 0,45 | **78 %** | 28 % | 62 % |
+| medio | 1,77 | 1,30 | 0,47 | 80 % | 22 % | 60 % |
+| difícil | 1,82 | 1,12 | 0,70 | 65 % | 30 % | 48 % |
+| muy difícil | 1,68 | 1,00 | 0,68 | 62 % | 30 % | 50 % |
+| extremo | 1,60 | 0,72 | 0,88 | **48 %** | 32 % | 40 % |
+
+**Lo que hay que mirar de esa tabla:**
+
+- **1,77 goles por partido de media, contra los 5,65 de `marcadorCadena()`.** Ya se
+  puede narrar: un 5-4 eran nueve goles sin una sola parada.
+- **La dificultad se nota en la victoria, no en el marcador**: del 78 % al 48 %.
+- **476 decisiones jugadas (2,38 por partido), 35,0 % de aciertos, y 83 movieron el
+  marcador.** Eso es lo que se vino a construir: en una cadena los minijuegos ya
+  cambian el resultado y con él el rango y el botín.
+- **200 de 200 liquidados, 0 colgados en `en_juego`.**
+
+**Y uno a mano en el navegador, con la cuenta `Claude`**, para ver que la pantalla
+hace lo suyo: partido narrado minuto a minuto en una cadena, **dos minijuegos y los
+dos del jugador** (ninguno del CPU), un acierto que movió el marcador —`aplicado =
+1` en `duelo_minijuegos`—, 1-0, rango B escrito, **+80 monedas entregadas** y el mapa
+enseñando el nodo como *superado* con el siguiente ya abierto. Ese partido está en
+la base real: nodo 1 de "Ruta de ascenso" en Fácil, duelo 1870.
+
+**El PvP no se movió**: `probar_300.php` vuelve a pasar entero después del cambio
+—300/300 liquidados, el total de monedas y de copias sin cambiar, 2,09 goles por
+partido y el 51,7 % de los duelos acabando con un marcador distinto al simulado—.
+Era la comprobación obligada, porque el cambio pasa por dentro de `resolverDuelo()`
+y de `liquidarPartido()`, que son de los dos.
+
+> ⚠️ **EL RANGO S HA QUEDADO PRÁCTICAMENTE FUERA DE ALCANCE, Y ESTO SE SABÍA.**
+> En 200 partidos salió **1 sola S** (en fácil), contra 12 A y 120 B. Con
+> `pve_rango_s_goles = 5` hace falta marcar cinco, y ahora se marcan 1,55 en fácil y
+> 0,72 en extremo. **No está roto: está sin calibrar**, y calibrarlo es la decisión 5
+> de Alejandro (con las cartas definitivas). El bonus del cofre, cuando se construya,
+> heredará el problema: exige S en todos los partidos previos.
+>
+> **Y el dial correcto es `pve_rango_s_goles`, no la portería a cero.** La medición
+> lo separa: dejar la portería a cero sigue pasando entre el 40 % y el 62 % de las
+> veces, así que esa mitad de la condición se cumple sola. Lo que se ha vuelto
+> imposible es la otra.
+
+#### Lo que había antes, para poder comparar
+
+| | cadenas **antes** | cadenas **ahora** | duelos PvP |
+|---|---|---|---|
+| goles por partido | **5,65** | **1,77** | 2,42 |
+| portería a cero | 17,2 % | 40-62 % | — |
+| marcadores típicos | 4-3, 5-3, 5-4 | 1-0, 2-1, 0-0 | 1-0, 2-1 |
+
+`marcadorCadena()` **no se podía narrar**: un 5-4 minuto a minuto son nueve goles sin
+una sola parada. Esa era la razón de jubilarla, y la medición de arriba confirma que
+el partido de cadena ya tiene forma de fútbol.
 
 #### Dos cosas que NO hacen falta, y conviene saberlo antes de presupuestar
 

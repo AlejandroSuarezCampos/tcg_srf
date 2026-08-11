@@ -1468,57 +1468,13 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
 
 .simulacion-barra { position: relative; z-index: 1; width: 100%; max-width: 360px; }
 
-/* ==========================================================================
-   MODO CLÁSICO — el que usan las CADENAS (PvE).
-   Reloj + una insignia de gol que aparece y se va. No narra el partido: solo
-   dramatiza el camino hasta un marcador que el servidor ya decidió.
-   Los duelos PvP usan el modo narrado, más abajo. Se mantienen los dos a
-   propósito mientras las cadenas se quedan como estaban.
-   ========================================================================== */
-
-/* espacio reservado para el evento de gol: fijo, para que aparecer y
-   desaparecer no haga saltar el resto del modal */
-.simulacion-eventos {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* dentro de .simulacion-cuerpo (columna centrada), un hijo flex no hereda
-     el ancho del padre por defecto: sin esto crecía tanto como su contenido
-     y se salía, aunque la propia insignia ya llevara su límite */
-  width: 100%;
-  min-height: 40px;
-}
-.simulacion-evento {
-  max-width: min(90%, 320px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 6px var(--space-4);
-  border: 1px solid var(--amber-line);
-  border-radius: var(--radius-pill);
-  background: var(--amber-soft);
-  color: var(--amber-light);
-  font-size: var(--fs-caption);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
-  text-transform: uppercase;
-  animation: simulacionEvento 1.5s var(--ease) forwards;
-}
-@keyframes simulacionEvento {
-  0%   { opacity: 0; transform: translateY(6px) scale(.94); }
-  15%  { opacity: 1; transform: none; }
-  80%  { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(-6px) scale(.98); }
-}
-/* red de seguridad: este modal no debería llegar a abrirse con movimiento
-   reducido (el JS lo evita), pero si algo falla, el evento se queda fijo
-   en vez de animarse */
-:root[data-motion="reduce"] .simulacion-evento { animation: none; }
+/* El MODO CLÁSICO vivía aquí: reloj y una insignia de gol que aparecía y se
+   iba, para las cadenas. Se retiró con él en el §15.12 —.simulacion-eventos,
+   .simulacion-evento y su @keyframes— cuando el partido pasó a decidir también
+   en PvE y dejó de haber un marcador previo que dramatizar. */
 
 /* ==========================================================================
-   MODO NARRADO — el que usan los DUELOS PvP (Biblia §1).
+   MODO NARRADO — el del PARTIDO, en duelos PvP y en cadenas (Biblia §1).
    ========================================================================== */
 
 /* --- MOMENTUM (Biblia §1.4) ---
