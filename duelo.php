@@ -733,6 +733,32 @@ include __DIR__ . '/navbar.php';
           <p class="sim-mj-resultado" id="simMjResultado" role="status" hidden></p>
         </div>
 
+        <!-- ==================================================================
+             LA TANDA DE PENALTIS (§15.11)
+             Cuatro huecos. Tiras o paras, y si los dos elegís el mismo, parada.
+
+             ⚠️ Es la ÚNICA pantalla del juego donde los dos jugadores deciden a
+             la vez y uno contra otro. Por eso el panel no dice nunca qué ha
+             elegido el rival hasta que el tiro está resuelto: el servidor no lo
+             manda (ver Tcg::tandaParaCliente).
+
+             Son <button> de verdad dentro de un grid 2x2, así que el teclado
+             funciona sin nada añadido y no hay movimiento que reducir.
+             ================================================================== -->
+        <div class="sim-tanda" id="simTanda" hidden>
+          <p class="sim-tanda-cab">
+            <span id="simTandaRonda"></span>
+            <b class="mono" id="simTandaMarcador">0 – 0</b>
+          </p>
+          <p class="sim-tanda-orden" id="simTandaOrden" role="status" aria-live="polite"></p>
+
+          <div class="sim-mj-lienzo es-porteria4" id="simTandaPorteria" role="group"
+               aria-labelledby="simTandaOrden"></div>
+
+          <p class="sim-tanda-reloj mono" id="simTandaReloj" role="timer" aria-live="off"></p>
+          <ol class="sim-tanda-historial" id="simTandaHistorial"></ol>
+        </div>
+
         <?php /* Las estadísticas en vivo (posesión, tiros, paradas) se quitaron
                  de aquí por decisión de Alejandro: durante el partido distraen
                  de lo que de verdad se está mirando, que es el relato y el

@@ -1879,6 +1879,78 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
 .sim-mj-zona-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .sim-mj-zona-btn:disabled { opacity: .45; cursor: default; }
 
+/* --- LA TANDA DE PENALTIS (§15.11) ---
+   La portería partida en cuatro. Reutiliza .sim-mj-zona-btn a propósito: es el
+   mismo gesto que el clic-en-zona de los minijuegos y aprendido una vez vale
+   para los dos.
+
+   `repeat(2, minmax(...))` y NUNCA aspect-ratio ni height fija: es la trampa del
+   §8 que ya recortó el texto del medidor una vez. */
+.sim-mj-lienzo.es-porteria4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(84px, auto));
+  border: 3px solid var(--frost-dim);
+  border-bottom-width: 1px;              /* la línea de gol se insinúa */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    repeating-linear-gradient(0deg,  transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    var(--void-2);
+  grid-template-areas:
+    "arriba_izq arriba_der"
+    "abajo_izq  abajo_der";
+  margin: 0 auto var(--space-3);
+}
+
+/* Un display normal ganaría a [hidden]; de ahí el :not(). Misma trampa del §8. */
+.sim-tanda:not([hidden]) {
+  display: block;
+  text-align: center;
+}
+.sim-tanda-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.sim-tanda-cab b { font-size: var(--fs-h3); color: var(--frost); }
+.sim-tanda-orden {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--frost);
+}
+.sim-tanda-reloj {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+/* El historial: un punto por tiro, para leer la tanda de un vistazo. */
+.sim-tanda-historial {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sim-tanda-historial li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--void-2);
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.sim-tanda-historial li.es-gol   { color: var(--success); }
+.sim-tanda-historial li.es-parada { color: var(--frost-dim); }
+.sim-tanda-historial li.es-mio   { border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+
 /* --- ARRASTRE (Biblia §2.2, Familia DS) ---
    Se arrastra desde el balón; el ángulo cae en uno de tres sectores. Los botones
    de opción siguen visibles a la vez, por WCAG 2.2 SC 2.5.7. */

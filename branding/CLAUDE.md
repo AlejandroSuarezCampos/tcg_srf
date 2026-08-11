@@ -1,6 +1,6 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión 7.4 (2026-08-10).
+> Documento de traspaso, versión 7.5 (2026-08-11).
 > Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
 > misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
 > fichero es todo el contexto necesario: no hace falta la conversación anterior.
@@ -229,6 +229,38 @@
 > **Las cadenas (PvE) están intactas** y tienen prueba propia que lo demuestra,
 > porque el cambio pasa justo por dentro de `resolverDuelo()`.
 >
+> ---
+>
+> ## v7.5 — la tanda de penaltis se JUEGA (§15.11)
+>
+> El §15.10 dejó un número incómodo: **el 27,7 % de los duelos acaba empatado**, o
+> sea que más de uno de cada cuatro se decidía en una tanda que el jugador no veía.
+> Ya se juega, con la regla que pidió Alejandro: **cuatro huecos; si tirador y
+> portero eligen el mismo, parada; si no, gol.** Ni Ataque ni Portería cuentan.
+>
+> **Es la primera interacción simultánea del juego**, y eso importa más que la
+> pantalla: en todos los minijuegos el dato oculto sale de las cartas y el servidor
+> lo recalcula cuando quiere, y por eso la narración entera es función de
+> `valor_sorteo` sin guardar nada. Aquí el dato oculto es **lo que el otro está
+> eligiendo ahora**, que no se deriva de nada — de ahí la tabla `duelo_penaltis`.
+>
+> Lo que hay que saber antes de tocarla:
+> 1. **La migración `024` es OBLIGATORIA**: sin la tabla, ningún duelo empatado se
+>    puede cerrar y el bote se queda retenido.
+> 2. **La elección del rival no puede viajar al cliente**, ni en el sondeo ni en la
+>    respuesta del endpoint. Es la única protección que tiene el juego; hay prueba
+>    específica de que no se filtra.
+> 3. **Hay una tercera rama de abandono**: partido empatado + tanda a medias + nadie
+>    que vuelva. La cubre `cerrarConTandaSiHace()`.
+> 4. `tandaDePenaltis()` (la automática) **se borró**, mismo criterio que
+>    `cabeCambioMarcador()`: dejarla invitaría a decidir el duelo sin que el jugador
+>    tocase nada.
+>
+> Dos propiedades que salen gratis de la regla: con los dos eligiendo a ciegas
+> **entra el 75 % de los penaltis**, casi exactamente el porcentaje del fútbol real
+> sin haber ajustado ningún número; y es **el único sitio donde el mazo no importa**,
+> así que un mazo flojo que llega al empate tiene la tanda al 50 %.
+>
 > **Verificado sobre 300 duelos jugados enteros por el camino real** (25 con carta),
 > más uno a mano en el navegador entre dos cuentas que acabó 2-2 y lo decidió la
 > tanda. Las cifras que importan: **300/300 liquidados, 0 colgados, el total de
@@ -404,6 +436,7 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§15 — `impacto: "partido"`** | 13 entradas que arrastran al resto del encuentro ampliando el presupuesto de marcador (§15.4d) | ✅ **Construido** |
 | **§15 — Margen de los partidos** | El bucle del §1.3 aplanaba el 88,8 % de los duelos a un gol; ahora conserva la forma natural (§15.4e) | ✅ **Arreglado** |
 | **§15 — EL PARTIDO DECIDE EL DUELO** | Se acabó el ganador pre-sorteado: el duelo queda `en_juego`, el marcador manda, el empate va a **la tanda de penaltis** y el bote se entrega al terminar. Migraciones `019`–`022` (§15.10) | ✅ **Construido** |
+| **§15 — La tanda de penaltis SE JUEGA** | Portería de 4 huecos: si tirador y portero coinciden, parada; si no, gol. **La primera interacción simultánea del juego.** Migración `024` (§15.11) | ✅ **Construido** |
 | **§15 — El penalti** | Familia propia, con el insignia del catálogo y su espejo defensivo. Migración `018` (§15.4c) | ✅ **Construido** |
 | **§15 — Familia Árbitro** | Decisiones disciplinarias sobre el evento de tarjeta, con un 4.º dato oculto | ✅ **Construido** |
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
@@ -751,6 +784,7 @@ no se pueden saltar:
 | `021_resuelto_por_tanda.sql` | **columna `resuelto_por_tanda`** | **SÍ** — la escribe `liquidarPartido()` en cada cierre |
 | `022_presupuesto_marcador.sql` | presupuesto de marcador y plazo de abandono | no, pero sin ella no se calibran |
 | `023_duelos_rival_cascade.sql` | `duelos.id_rival` de SET NULL a **CASCADE** | no para jugar, **sí antes de limpiar usuarios** |
+| `024_tanda_jugable.sql` | tabla **`duelo_penaltis`** + `tanda_plazo_seg` | **SÍ** — sin ella ningún duelo empatado se puede cerrar (§15.11) |
 
 **Sobre la `023`:** corrige una asimetría, no añade una pérdida. `id_creador` ya era
 CASCADE, así que al borrar una cuenta los duelos que esa cuenta CREÓ ya
@@ -828,6 +862,7 @@ Todo número de balance vive aquí, nunca como constante en el código. Se lee c
 | `partido_minijuego_prob_gol` | 0.70 | probabilidad de que un ACIERTO acabe moviendo el marcador. Antes era siempre 1: leer bien la jugada equivalia a marcar. Fallar sigue sin castigar. Migracion `020` (§15.4f) |
 | `partido_presupuesto_marcador` | 1 | goles que puede mover cada jugador con sus minijuegos en un partido. **Sustituyó a la §1.3 como límite** y ya no es una restricción de coherencia sino un tope de diseño: subirlo hace que pesen más los minijuegos y menos la fuerza del mazo, bajarlo a 0 los deja en pura actuación. Migración `022` (§15.10) |
 | `partido_abandono_seg` | 3600 | tras esto, un partido `en_juego` que no arranca o que se quedó parado se cierra solo. **No es un adorno:** hasta que alguien liquide, el dinero de los dos está retenido. Holgado a propósito, para que quien llegue tarde pueda jugar su partido entero. Migración `022` (§15.10) |
+| `tanda_plazo_seg` | 12 | segundos para elegir hueco en un penalti antes de que decida el sistema. Más largo que el plazo de un minijuego (9 s) a propósito: aquí no lees una jugada, intentas adivinar a una persona. Migración `024` (§15.11) |
 
 ---
 
@@ -1390,15 +1425,16 @@ ventaja de poder.
    - **Sin banquillo, sustituciones, lesiones ni cansancio**: bloquea Emergencia
      en la Enfermería, La Revolución del Banquillo, Exprimir al Límite, Cazar al
      Cansado, El Novato Congelado…
-   - ~~Sin prórroga ni tanda de penaltis~~ — **la tanda existe** (§15.10), pero se
-     resuelve en servidor y **no se juega**. El Orden del Destino, Guerra
-     Psicológica, Tiempo Extra y El Gol que lo Cambia Todo siguen bloqueadas por
-     eso: lo que falta ya no es la tanda, es hacerla interactiva. Es el bloque
-     desbloqueable más barato que queda.
-   - **`impacto: "partido"` sigue sin decidir** (§15.4): 17 entradas, el bloque
-     más grande de lo que queda. Bloquea todo lo que arrastra a jugadas
-     siguientes — El Milagro Imposible, Dormir el Partido, El Grito de Guerra,
-     La Sincronía Perfecta, La Relajación Peligrosa…
+   - ~~Sin prórroga ni tanda de penaltis~~ — **la tanda existe y SE JUEGA**
+     (§15.11): portería de cuatro huecos, coincidís y es parada. Lo que queda de
+     ese bloque de la Biblia es **decorarla**, no construirla: El Orden del Destino
+     (elegir el orden de los lanzadores) y Guerra Psicológica (intentar leer al
+     rival) piden datos de plantilla que hoy no existen; El Gol que lo Cambia Todo
+     ya está, de hecho, en cada tiro. **Tiempo Extra** (prórroga antes de la tanda)
+     sigue sin construir y es lo único de ahí que necesitaría motor nuevo.
+   - ~~`impacto: "partido"` sigue sin decidir~~ — **decidido y construido**
+     (§15.4d): 13 de las 17 entradas están dentro. Las 4 que no caben, y por qué,
+     al final de este apartado.
      **Hay análisis escrito: `branding/impacto-partido-analisis.md`**, con el
      inventario de qué se rompe (con `fichero:línea`), cuatro caminos y una
      recomendación. Dos cosas de ahí que conviene saber sin abrirlo, **las dos ya
@@ -2329,11 +2365,50 @@ informaba del marcador **original** en vez del actual (la reconstrucción que ha
 `narracionDuelo()` para generar el relato sobrescribía los goles del duelo). Si
 vuelve a bailar un marcador, mira esos dos sitios.
 
-**Llevar el partido narrado a las cadenas está sin hacer, a propósito.** Ahí vive
-el problema original de la Biblia (§0.2, *"simular hasta ganar"*), así que es
-donde más valdría — pero antes hay que arreglar `marcadorCadena()`, que da
-resultados como 4-8 y 9-5. Narrados, se leen como un partido roto: doce goles
-seguidos sin una sola parada.
+**Llevar el partido narrado a las cadenas está sin hacer** — pero ya está
+DECIDIDO que se hace, con las dos respuestas de Alejandro del 2026-08-11:
+
+1. **El partido decide también en PvE, y los minijuegos influyen en las
+   recompensas.** Es el objetivo, no un efecto colateral: ahí vive el problema
+   original de la Biblia (§0.2, *"simular hasta ganar"*).
+2. **El rango NO se recalibra ahora.** *"Cuando se tengan las cartas definitivas y
+   se creen las cadenas, se testeará que sea posible manualmente partido a partido
+   y que sea balanceado."* Así que se construye el mecanismo, se dejan los diales
+   (`pve_rango_s_goles`, `pve_rango_a_margen`) y se reporta la distribución
+   medida. **No inventar una fórmula de rango nueva.**
+
+Lo que hay que saber antes de empezar, medido:
+
+| | cadenas hoy | duelos PvP |
+|---|---|---|
+| goles por partido | **5,65** | 2,42 |
+| portería a cero | 17,2 % | — |
+| marcadores típicos | 4-3, 5-3, 5-4 | 1-0, 2-1 |
+
+`marcadorCadena()` no se puede narrar: un 5-4 minuto a minuto son nueve goles sin
+una sola parada. Y el problema no es estético — **el rango sale del marcador y el
+botín sale del rango** (`rangoPartido()`: S con 5+ goles y portería a cero, A con
+3 de margen), así que con la escala nueva el rango S se vuelve casi inalcanzable.
+Es exactamente lo que Alejandro calibrará a mano después.
+
+> **Dos cosas que NO hacen falta, y conviene saberlo antes de presupuestar:**
+> · **No hay que darle inteligencia al CPU para los minijuegos.** El dato oculto
+>   sale de las CARTAS, no de lo que elija el rival, así que el jugador lee el
+>   perfil del delantero del CPU igual que leería el de una persona.
+> · **La tanda contra el CPU ya está construida**: es el auto-tiro por plazo de
+>   §15.11, determinista desde `valor_sorteo` (que no sale del servidor, así que no
+>   se puede adivinar). Aplicándolo al instante en vez de a los 12 s, ya hay
+>   penaltis contra la máquina — y sesgarlo hacia donde tira el jugador es una
+>   palanca de dificultad gratis (Biblia §3).
+>
+> **Y una corrección a un supuesto:** hoy el CPU **no tiene cartas imposibles**.
+> Sus 132 huecos apuntan a 38 cromos normales del catálogo; lo que tiene son
+> MULTIPLICADORES (`pve_mult_*`, `pve_compos_mult_*`: en Extremo ×1,063 a la fuerza
+> y ×1,339 a las compos). Alejandro quiere darle rasgos que un jugador no podría
+> tener (*"tierra y montaña al 3"*), y eso hay que MEDIRLO al hacerlo: los
+> minijuegos leen el perfil RELATIVO de la carta, así que con cartas muy extremas
+> la pista puede pasar a resolver el minijuego sola. El verificador ya mide ese
+> número (hoy: a ciegas 33 %, leyendo 44 %).
 
 ### 15.8 ⚠️ El equilibrio está medido y NO cumple lo que se buscaba
 
@@ -2373,8 +2448,12 @@ Además de §13:
   que hay que comprobar en su lugar es que el `id_ganador` de un duelo `resuelto`
   cuadre con su marcador, o que `resuelto_por_tanda` explique por qué no.
 - **Un duelo no puede quedarse en `en_juego` para siempre**: ahí el dinero de los
-  dos está retenido. Las dos ramas de abandono de `cerrarPartidoSiToca()` son lo
-  que lo garantiza, y las dos tienen prueba.
+  dos está retenido. Lo garantizan las **tres** ramas de abandono de
+  `cerrarPartidoSiToca()` —partido que no arranca, partido parado en una decisión y
+  **tanda a medias** (§15.11)—, y las tres tienen prueba.
+- **Si añades una FASE al partido, el guion de prueba tiene que jugarla.** Una fase
+  nueva sin cubrir no se ve como un error: se ve como **duelos colgados**, y hay que
+  saber distinguir eso de un fallo del motor. Pasó al añadir la tanda: 73 de 300.
 - **Pasa el verificador**, que cubre esto y seis cosas más de una vez:
   ```
   C:\xampp\php\php.exe db/verificar_minijuegos.php
@@ -2463,12 +2542,9 @@ también lo que cierra la pregunta del abandono sin inventar ninguna regla nueva
   > `rollBack()` y no se paga. Comprobar y luego pagar deja una ventana por la que
   > dos sondeos simultáneos pagarían dos veces. Probado con cinco llamadas
   > seguidas: **una liquida, el bote se entrega una vez.**
-- **`tandaDePenaltis()`** — 5 lanzamientos y muerte súbita, cada penalti de Ataque
-  contra Portería rival, acotado al 55-90 %. **Determinista** desde `valor_sorteo`
-  (sal 9161): los dos jugadores la piden a la vez y con azar real cada uno
-  calcularía un ganador distinto. El tope de 40 rondas no es decoración — sin él
-  dos porterías fuertes podrían no resolver nunca y el duelo se quedaría sin
-  liquidar. Por ahora **se resuelve en servidor y no se juega**.
+- **La tanda** — se construyó primero automática (5 tiros de Ataque contra Portería,
+  deterministas desde `valor_sorteo`) y **se retiró al hacerla jugable**: ver §15.11.
+  Si buscas `tandaDePenaltis()`, ya no existe.
 - **`cerrarPartidoSiToca()`** — el enganche perezoso (§8, no hay cron). Lo llaman
   el sondeo, `duelo.php` y `duelos.php`.
 
@@ -2539,11 +2615,9 @@ referencia si vuelves a tocar el partido.
 resultado venía dado. La distribución de márgenes también es sana —compárala con el
 **88,8 % en margen 1** que el bucle del §1.3 producía (§15.4e)—.
 
-> ⚠️ **El 27,7 % de tandas es alto y conviene tenerlo en el radar.** Es realista
-> para una liga, pero en un duelo suelto significa que **más de uno de cada cuatro
-> se decide en los penaltis**, que hoy no se juegan: se resuelven en servidor. Es el
-> argumento más fuerte para hacer la tanda interactiva. No hay dial que lo baje: sale
-> de la simulación natural.
+> **El 27,7 % de tandas** significa que más de uno de cada cuatro duelos se decide
+> en los penaltis. Cuando esto se midió la tanda todavía no se jugaba, y fue el
+> argumento que llevó a hacerla interactiva: **ya se juega** (§15.11).
 
 #### El coste aceptado, con número
 
@@ -2588,9 +2662,91 @@ porque el cambio pasa justo por dentro de `resolverDuelo()`: no tienen minijuego
 así que no hay nada que esperar y se siguen resolviendo de una vez, con su rango y
 su botín en el acto.
 
----
+### 15.11 LA TANDA DE PENALTIS SE JUEGA (migración `024`)
 
-## 16. Importador de datos oficiales (diseño aprobado, sin construir)
+**La regla entera, tal como la pidió Alejandro:** la portería se divide en **cuatro
+huecos**, tirador y portero eligen uno cada uno, y **si coinciden es parada; si no,
+gol**. Ni Ataque ni Portería entran en la cuenta.
+
+Vino de un número: el §15.10 midió que **el 27,7 % de los duelos acaba empatado**,
+o sea que más de uno de cada cuatro se decidía en algo que el jugador no llegaba a
+ver. Era el agujero más grande que quedaba en el partido.
+
+Dos propiedades bonitas que salen gratis de esa regla:
+
+- **Con los dos eligiendo a ciegas, entra el 75 % de los penaltis** (1 de cada 4
+  coincide). Es casi exactamente el porcentaje del fútbol real, sin haber ajustado
+  ningún número.
+- **Es el único sitio del juego donde el mazo no importa.** Un mazo flojo que
+  empata tiene la tanda al 50 %, así que compensa en parte el 91 % del favorito que
+  el §15.10 dejó como coste aceptado.
+
+#### ⚠️ ES LA PRIMERA INTERACCIÓN SIMULTÁNEA DEL JUEGO
+
+Y eso rompe el supuesto sobre el que está construido todo lo demás. En un minijuego
+el dato oculto **sale de las cartas**: el servidor lo recalcula cuando quiere, y por
+eso la narración entera es función de `valor_sorteo` y no hace falta guardar nada.
+
+Aquí el dato oculto es **lo que el otro jugador está eligiendo en este momento**, que
+no se deriva de nada. De ahí la tabla `duelo_penaltis`: hay que guardarlo porque no
+se puede reconstruir. Si añades algo parecido, esa es la pregunta que decide si
+necesitas tabla o no.
+
+Tres reglas que hay que respetar al tocar esto:
+
+| | |
+|---|---|
+| **La elección del rival NO viaja al cliente** hasta que el tiro se resuelve (§6.3) | Del tiro en curso, `tandaParaCliente()` solo dice si **yo** ya elegí. Verla sería ganar siempre. Hay prueba específica de que no se filtra, ni en el payload ni en el sondeo |
+| **La idempotencia va en el SQL, no en PHP** | La PK `(id_duelo, ronda, turno)` y el `zona_X IS NULL` dentro del UPDATE. Los dos jugadores sondean a la vez |
+| **El plazo tiene que resolver solo** | Si alguien se va a mitad de tanda, el bote de los dos está retenido. `tanda_plazo_seg` (12 s) y auto-tiro determinista |
+
+> ⚠️ **El endpoint tampoco puede contestar con la zona del rival**, ni cuando el
+> tiro se resuelve en esa misma petición. Si lo hiciera, el que eligiera SEGUNDO se
+> enteraría antes que el otro — y en una tanda simultánea eso es toda la ventaja del
+> mundo. El resultado se lee del sondeo, igual para los dos.
+
+#### Cómo está montado
+
+- **`tandaEstado()`** — deriva TODO de las filas guardadas: marcador, de quién es el
+  turno, si ya hay ganador. No guarda marcador propio, así que dos sondeos
+  simultáneos no pueden discrepar y recargar la página no pierde nada.
+- **`tandaAvanzar($id, $forzar)`** — el motor perezoso: abre el tiro que toca, aplica
+  el plazo y resuelve. Con `$forzar` decide la tanda entera sin esperar, que es lo
+  que usa el cierre por abandono.
+- **`tirarPenalti()`** — registra una elección. `resolverTiro()` cierra el tiro con
+  la regla dentro del UPDATE: `gol = IF(zona_tirador = zona_portero, 0, 1)`.
+- **`tandaParaCliente()`** — el payload, con el filtro de §6.3.
+- **Quién tira primero sale del sorteo**, no es siempre el creador: tirar primero es
+  una ventaja real en una tanda.
+- **Corte anticipado**: en cuanto uno no puede alcanzar al otro ni marcando todo lo
+  que le queda, se acabó. Sin eso un 3-0 seguiría lanzando hasta el quinto.
+- **Muerte súbita** desde el tiro 6, y solo decide con la ronda **completa**.
+- **Tope de 25 rondas** por bando: sin él una muerte súbita podría no acabar nunca y
+  el duelo se quedaría con el bote dentro.
+
+#### Lo que se retiró
+
+**`tandaDePenaltis()` (la automática) se borró**, mismo criterio que
+`cabeCambioMarcador()`: si siguiera ahí, alguien volvería a llamarla y el duelo se
+decidiría sin que el jugador tocase nada, que es exactamente lo que este trabajo vino
+a quitar. Su papel de red lo hace ahora el auto-tiro por plazo, que es **una sola
+mecánica** en vez de dos que pueden discrepar.
+
+#### La forma nueva de dejar un duelo colgado
+
+Al hacer la tanda jugable apareció una: **partido empatado + tanda a medias + nadie
+que vuelva**. La cubre `cerrarConTandaSiHace()`, que fuerza la tanda antes de
+liquidar. Es la tercera rama de abandono, y por el mismo motivo que las dos del
+§15.10: con el duelo decidiéndose en el campo, un partido a medias es un bote que no
+vuelve a nadie.
+
+> **Esto lo cazó la prueba, no el razonamiento.** Al añadir la tanda, los 300 duelos
+> pasaron a dejar **73 colgados** — exactamente los que acababan en empate— porque el
+> guion de prueba no sabía jugar la tanda. La cuenta cuadró al céntimo (69 duelos de
+> monedas × 20 = 1.380 retenidos), y eso confirmó que el motor hacía lo correcto y
+> que era la prueba la que se había quedado corta. **Si vuelves a tocar el partido,
+> comprueba que el guion cubre TODAS las fases**: una fase nueva sin cubrir se ve
+> como duelos colgados, no como un error.
 
 > Fase 3, trabajo independiente y en paralelo a lo que se construye en otras
 > sesiones — no lo toca. Diseño y plan aprobados por Alejandro el 2026-08-07.

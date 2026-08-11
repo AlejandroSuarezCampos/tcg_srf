@@ -4120,11 +4120,15 @@ class Tcg
 		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
 		$abandono = max($duracion, (int) $this->config("partido_abandono_seg", 3600));
 
-		// Nadie ha llegado a ver este partido, y ya no va a venir.
+		/* Nadie ha llegado a ver este partido, y ya no va a venir.
+		   ⚠️ También pasa por la tanda: si el marcador quedó empatado, liquidar a
+		   secas no escribe ganador y el duelo se queda colgado con el bote dentro
+		   PARA SIEMPRE. Esta rama se me quedó sin la tanda al hacerla jugable y lo
+		   cazó la prueba del Paso 3, no el razonamiento. */
 		if (!$duelo["partido_inicio"]) {
 			$montado = $duelo["resuelto"] ? time() - strtotime($duelo["resuelto"]) : 0;
 			if ($montado < $abandono) return false;
-			return (bool) $this->liquidarPartido($id_duelo)["ok"];
+			return $this->cerrarConTandaSiHace($id_duelo, $duelo, true);
 		}
 
 		/* Parado en una decisión que nadie va a tomar: este partido está
@@ -4143,11 +4147,32 @@ class Tcg
 		   marcador. El resultado es el que la simulación dejó escrito. */
 		if ($duelo["partido_pausado_en"]) {
 			if (time() - strtotime($duelo["partido_pausado_en"]) < $abandono) return false;
-			return (bool) $this->liquidarPartido($id_duelo)["ok"];
+			// Abandonado: se fuerza también la tanda, si la hubiera.
+			return $this->cerrarConTandaSiHace($id_duelo, $duelo, true);
 		}
 
 		if (self::segundosDePartido($duelo) < $duracion) return false;
 
+		/* ¿Cuánto lleva terminado el partido? Pasado el plazo de abandono ya no
+		   queda nadie a quien esperar y la tanda se decide sola. */
+		$abandonada = self::segundosDePartido($duelo) >= $duracion + $abandono;
+		return $this->cerrarConTandaSiHace($id_duelo, $duelo, $abandonada);
+	}
+
+	/**
+	 * Si el partido acabó EMPATADO, empuja la tanda antes de liquidar; luego
+	 * liquida. Si la tanda todavía no tiene ganador, liquidarPartido() no hace
+	 * nada y el duelo espera al siguiente sondeo.
+	 *
+	 * ⚠️ Existe porque, al hacer jugable la tanda, apareció una forma nueva de
+	 * dejar un duelo colgado con el dinero de los dos dentro: partido empatado +
+	 * tanda a medias + nadie que vuelva. Con `$forzar` la tanda se decide entera
+	 * sin esperar plazos, que es lo que hace que esa situación no exista.
+	 */
+	private function cerrarConTandaSiHace($id_duelo, array $duelo, $forzar) {
+		if ((int) $duelo["goles_creador"] === (int) $duelo["goles_rival"]) {
+			$this->tandaAvanzar($id_duelo, $forzar);
+		}
 		return (bool) $this->liquidarPartido($id_duelo)["ok"];
 	}
 
@@ -4217,19 +4242,18 @@ class Tcg
 			if ($golesC > $golesR)      { $ganaLado = "local"; }
 			elseif ($golesR > $golesC)  { $ganaLado = "visitante"; }
 			else {
-				/* Empate: a la tanda. Con el partido decidiendo el resultado los
-				   empates son posibles por primera vez, y son justo lo que el §1.3
-				   hacía imposible cuando el ganador venía pre-sorteado. */
+				/* Empate: lo decide la TANDA, que se juega (§15.11). Aquí solo se
+				   LEE su resultado; jugarla es cosa del sondeo. Si todavía no hay
+				   ganador, no se liquida nada: el duelo se queda en `en_juego` con
+				   la tanda abierta y volverá por aquí cuando termine. */
 				$porTanda = true;
-				$cartasC = $this->listarAlineacionDuelo($id_duelo, $idCreador);
-				$cartasR = $this->listarAlineacionDuelo($id_duelo, $idRival);
-				$fC = self::fuerzaAlineacion($cartasC, $duelo["formacion_creador"] ?? self::FORMACION_BASE);
-				$fR = self::fuerzaAlineacion($cartasR, $duelo["formacion_rival"] ?? self::FORMACION_BASE);
-				$ganaLado = self::tandaDePenaltis(
-					(float) $duelo["valor_sorteo"],
-					$fC["DC"] ?? 0, $fC["POR"] ?? 0,
-					$fR["DC"] ?? 0, $fR["POR"] ?? 0
-				);
+				$tanda = $this->tandaEstado($id_duelo);
+
+				if ($tanda["gana"] === null) {
+					$this->pdo->rollBack();
+					return ["ok" => false, "id_ganador" => null, "por_tanda" => false];
+				}
+				$ganaLado = $tanda["gana"];
 			}
 
 			$idGanador  = $ganaLado === "local" ? $idCreador : $idRival;
@@ -4276,53 +4300,352 @@ class Tcg
 		}
 	}
 
+	/* ======================================================================
+	   LA TANDA DE PENALTIS, JUGADA  (migración 024, §15.11)
+	   ----------------------------------------------------------------------
+	   La regla entera cabe en una línea: la portería tiene CUATRO huecos,
+	   tirador y portero eligen uno cada uno, y si coinciden es parada; si no,
+	   gol. Ni Ataque ni Portería entran en la cuenta — es un pulso de
+	   intenciones, no de estadísticas.
+
+	   ⚠️ ES LA PRIMERA INTERACCIÓN SIMULTÁNEA DEL JUEGO, y eso rompe el
+	   supuesto sobre el que está construido todo lo demás. En un minijuego el
+	   dato oculto sale de las cartas: el servidor lo puede recalcular cuando
+	   quiera y por eso la narración entera es función de `valor_sorteo`. Aquí
+	   el dato oculto es **lo que el otro jugador está eligiendo ahora mismo**,
+	   que no se deriva de nada. De ahí la tabla `duelo_penaltis`: hay que
+	   guardarlo porque no se puede reconstruir.
+
+	   Tres consecuencias que hay que respetar al tocar esto:
+
+	   · La elección del rival NO puede viajar al cliente antes de resolverse
+	     el tiro (§6.3). Verla sería ganar siempre.
+	   · La idempotencia sale de la clave primaria (duelo, ronda, turno) y de
+	     `zona_X IS NULL` dentro del UPDATE, no de comprobar antes en PHP:
+	     los dos jugadores sondean a la vez.
+	   · El plazo tiene que resolver solo, porque si alguien se va a mitad de
+	     tanda el bote se queda retenido para siempre. Ese es el mismo motivo
+	     que obliga a las dos ramas de abandono del partido.
+
+	   La sustituye a la tanda automática anterior, que se ha RETIRADO en vez
+	   de dejarla muerta: si siguiera ahí, alguien volvería a llamarla y el
+	   duelo se decidiría sin que el jugador tocase nada, que es exactamente
+	   lo que este trabajo vino a quitar.
+	   ====================================================================== */
+
+	/** Los cuatro huecos. El orden es el de lectura: arriba-izq → abajo-der. */
+	const ZONAS_PENALTI = ["arriba_izq", "arriba_der", "abajo_izq", "abajo_der"];
+
+	/** Tiros reglamentarios por bando antes de la muerte súbita. */
+	const TANDA_TIROS_BASE = 5;
+
+	/** Tope de rondas. No es decoración: sin él una muerte súbita podría no
+	 *  acabar nunca y el duelo se quedaría sin liquidar, con el bote retenido. */
+	const TANDA_MAX_RONDAS = 25;
+
 	/**
-	 * Tanda de penaltis: rompe un empate y devuelve "local" o "visitante".
+	 * Quién tira en el turno 0 de cada ronda.
 	 *
-	 * Cinco lanzamientos por bando y muerte súbita si sigue igualado. Cada
-	 * penalti lo decide la línea de PORTERÍA del que para contra la de ATAQUE del
-	 * que tira, que es lo único que tiene sentido mirar en una tanda.
-	 *
-	 * DETERMINISTA desde el sorteo del duelo, como todo lo demás del partido: la
-	 * liquidación se evalúa de forma perezosa en cada sondeo (§8, no hay cron) y
-	 * los dos jugadores la piden a la vez, así que con azar real cada uno podría
-	 * calcular un ganador distinto.
-	 *
-	 * Por ahora se resuelve en servidor y no se juega. Las cuatro entradas de la
-	 * Biblia que la convierten en interactiva —El Orden del Destino, Guerra
-	 * Psicológica, Tiempo Extra y El Gol que lo Cambia Todo— siguen pendientes;
-	 * esto es lo que hace falta para que el bote pueda entregarse.
+	 * Sale del sorteo del duelo y no de "siempre el creador", porque tirar
+	 * primero es una ventaja real en una tanda: el que va detrás lanza siempre
+	 * bajo la presión de tener que igualar. Determinista, como todo aquí.
 	 */
-	public static function tandaDePenaltis($semilla, $ataqueLocal, $porteriaLocal,
-	                                        $ataqueVisitante, $porteriaVisitante) {
-		// Probabilidad de marcar de cada uno, acotada: ni un penalti es seguro ni
-		// es imposible, y en el fútbol real entra en torno al 75 %.
-		$prob = function ($ataque, $porteriaRival) {
-			$total = max(1.0, (float) $ataque + (float) $porteriaRival);
-			return max(0.55, min(0.90, 0.75 * (2 * (float) $ataque / $total)));
+	private static function tandaTiraPrimero(array $duelo) {
+		return ((float) $duelo["valor_sorteo"]) < 0.5
+			? (int) $duelo["id_creador"] : (int) $duelo["id_rival"];
+	}
+
+	/**
+	 * El estado completo de la tanda, DERIVADO de los tiros guardados.
+	 *
+	 * No guarda marcador propio ni "de quién es el turno": se recalcula todo de
+	 * las filas, así que dos sondeos simultáneos no pueden discrepar y recargar
+	 * la página no pierde nada.
+	 *
+	 * @return array{goles:array,tiros:array,ronda:int,turno:int,gana:?string,abierto:?array}
+	 */
+	public function tandaEstado($id_duelo) {
+		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$stmt->execute([":d" => $id_duelo]);
+		$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo) return ["goles" => [0, 0], "tiros" => [], "ronda" => 1,
+		                     "turno" => 0, "gana" => null, "abierto" => null];
+
+		$stmt = $this->pdo->prepare("
+			SELECT * FROM duelo_penaltis WHERE id_duelo = :d ORDER BY ronda, turno
+		");
+		$stmt->execute([":d" => $id_duelo]);
+		$tiros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		$goles = [0, 0];      // [turno 0, turno 1]
+		$hechos = [0, 0];
+		$abierto = null;
+		foreach ($tiros as $t) {
+			$i = (int) $t["turno"];
+			if ($t["gol"] === null) { $abierto = $t; continue; }
+			$hechos[$i]++;
+			if ((int) $t["gol"] === 1) $goles[$i]++;
+		}
+
+		$base = self::TANDA_TIROS_BASE;
+		$gana = null;
+
+		/* Corte anticipado, que es lo que hace que una tanda se sienta como una
+		   tanda: en cuanto uno no puede alcanzar al otro ni marcando todo lo que
+		   le queda, se acabó. Sin esto un 3-0 seguiría lanzando hasta el quinto. */
+		if ($hechos[0] <= $base && $hechos[1] <= $base) {
+			$quedan = [$base - $hechos[0], $base - $hechos[1]];
+			if ($goles[0] > $goles[1] + $quedan[1])      $gana = 0;
+			elseif ($goles[1] > $goles[0] + $quedan[0])  $gana = 1;
+			elseif ($hechos[0] === $base && $hechos[1] === $base && $goles[0] !== $goles[1])
+				$gana = $goles[0] > $goles[1] ? 0 : 1;
+		}
+
+		// Muerte súbita: solo decide con la ronda COMPLETA, nunca a medias.
+		if ($gana === null && $hechos[0] >= $base && $hechos[1] >= $base
+		    && $hechos[0] === $hechos[1] && $goles[0] !== $goles[1]) {
+			$gana = $goles[0] > $goles[1] ? 0 : 1;
+		}
+
+		// Y el tope, para que esto no pueda quedarse colgado nunca.
+		if ($gana === null && $hechos[0] >= self::TANDA_MAX_RONDAS) {
+			$gana = ((float) $duelo["valor_sorteo"]) < 0.5 ? 0 : 1;
+		}
+
+		// Cuál es el tiro que toca ahora (si la tanda sigue viva).
+		$ronda = (int) floor(max($hechos[0], $hechos[1]));
+		$turno = $hechos[0] > $hechos[1] ? 1 : 0;
+		if ($turno === 0) $ronda++;
+		if ($abierto) { $ronda = (int) $abierto["ronda"]; $turno = (int) $abierto["turno"]; }
+
+		$primero  = self::tandaTiraPrimero($duelo);
+		$esCreador = $primero === (int) $duelo["id_creador"];
+		$ladoDe = function ($turnoIdx) use ($esCreador) {
+			$creador = ($turnoIdx === 0) === $esCreador;
+			return $creador ? "local" : "visitante";
 		};
-		$pL = $prob($ataqueLocal, $porteriaVisitante);
-		$pV = $prob($ataqueVisitante, $porteriaLocal);
 
-		$golesL = 0; $golesV = 0;
-		for ($i = 0; $i < 5; $i++) {
-			if (self::azarDeJugada($semilla, 100 + $i, 9161) < $pL) $golesL++;
-			if (self::azarDeJugada($semilla, 200 + $i, 9161) < $pV) $golesV++;
+		return [
+			"goles"   => $goles,
+			"hechos"  => $hechos,
+			"tiros"   => $tiros,
+			"ronda"   => $ronda,
+			"turno"   => $turno,
+			"gana"    => $gana === null ? null : $ladoDe($gana),
+			"abierto" => $abierto,
+			"primero" => $primero,
+		];
+	}
+
+	/** Quién tira y quién para en un turno dado. */
+	private static function tandaProtagonistas(array $duelo, $turno) {
+		$primero = self::tandaTiraPrimero($duelo);
+		$otro = $primero === (int) $duelo["id_creador"]
+			? (int) $duelo["id_rival"] : (int) $duelo["id_creador"];
+		return $turno === 0 ? ["tira" => $primero, "para" => $otro]
+		                    : ["tira" => $otro,    "para" => $primero];
+	}
+
+	/**
+	 * Empuja la tanda tan lejos como pueda: abre el tiro que toque, aplica el
+	 * plazo a quien no haya elegido y resuelve los tiros que ya tengan las dos
+	 * elecciones. Perezoso, como todo (§8): lo llama el sondeo.
+	 *
+	 * Con $forzar = true no espera al plazo y decide por los dos. Es lo que usa
+	 * el cierre por abandono: si nadie va a volver, la tanda tiene que terminar
+	 * igualmente o el bote se queda retenido para siempre.
+	 */
+	public function tandaAvanzar($id_duelo, $forzar = false) {
+		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$stmt->execute([":d" => $id_duelo]);
+		$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
+		if ((int) $duelo["goles_creador"] !== (int) $duelo["goles_rival"]) return false;
+
+		$plazo = max(3, (int) $this->config("tanda_plazo_seg", 12));
+
+		// El bucle tiene tope: cada vuelta resuelve un tiro como mucho, y la
+		// tanda entera no puede pasar de TANDA_MAX_RONDAS por bando.
+		for ($vuelta = 0; $vuelta < self::TANDA_MAX_RONDAS * 2 + 4; $vuelta++) {
+			$estado = $this->tandaEstado($id_duelo);
+			if ($estado["gana"] !== null) return true;
+
+			// ¿Hay tiro abierto? Si no, se abre el que toca.
+			if (!$estado["abierto"]) {
+				$this->pdo->prepare("
+					INSERT IGNORE INTO duelo_penaltis (id_duelo, ronda, turno, abierto)
+					VALUES (:d, :r, :t, NOW())
+				")->execute([":d" => $id_duelo, ":r" => $estado["ronda"], ":t" => $estado["turno"]]);
+				continue;
+			}
+
+			$tiro = $estado["abierto"];
+			$faltaAlguna = $tiro["zona_tirador"] === null || $tiro["zona_portero"] === null;
+			$vencido = $forzar
+				|| (time() - strtotime($tiro["abierto"])) >= $plazo;
+
+			if ($faltaAlguna && !$vencido) return true;   // se está jugando; nada que hacer
+
+			/* Vencido el plazo, elige el sistema por quien no eligió. La zona sale
+			   del sorteo del duelo, no de `mt_rand()`: los dos jugadores sondean a
+			   la vez y con azar real cada uno calcularía una zona distinta. Y no es
+			   adivinable por el rival, porque `valor_sorteo` no sale del servidor. */
+			$clave = ((int) $tiro["ronda"]) * 4 + ((int) $tiro["turno"]);
+			if ($tiro["zona_tirador"] === null) {
+				$z = self::ZONAS_PENALTI[(int) floor(self::azarDeJugada(
+					(float) $duelo["valor_sorteo"], $clave, 7717) * 4) % 4];
+				$this->pdo->prepare("
+					UPDATE duelo_penaltis SET zona_tirador = :z, auto_tirador = 1
+					WHERE id_duelo = :d AND ronda = :r AND turno = :t AND zona_tirador IS NULL
+				")->execute([":z" => $z, ":d" => $id_duelo,
+				             ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+			}
+			if ($tiro["zona_portero"] === null) {
+				$z = self::ZONAS_PENALTI[(int) floor(self::azarDeJugada(
+					(float) $duelo["valor_sorteo"], $clave, 3331) * 4) % 4];
+				$this->pdo->prepare("
+					UPDATE duelo_penaltis SET zona_portero = :z, auto_portero = 1
+					WHERE id_duelo = :d AND ronda = :r AND turno = :t AND zona_portero IS NULL
+				")->execute([":z" => $z, ":d" => $id_duelo,
+				             ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+			}
+
+			if (!$this->resolverTiro($id_duelo, (int) $tiro["ronda"], (int) $tiro["turno"])) {
+				return true;   // no se pudo cerrar; se reintentará en el siguiente sondeo
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Cierra un tiro que ya tiene las dos elecciones. LA REGLA ENTERA ESTÁ AQUÍ:
+	 * misma zona, parada; distinta, gol.
+	 *
+	 * La condición va DENTRO del UPDATE (`gol IS NULL` y las dos zonas puestas),
+	 * así que dos sondeos simultáneos no pueden resolverlo dos veces ni con
+	 * resultados distintos.
+	 */
+	private function resolverTiro($id_duelo, $ronda, $turno) {
+		$stmt = $this->pdo->prepare("
+			UPDATE duelo_penaltis
+			SET gol = IF(zona_tirador = zona_portero, 0, 1), resuelto = NOW()
+			WHERE id_duelo = :d AND ronda = :r AND turno = :t
+			  AND gol IS NULL AND zona_tirador IS NOT NULL AND zona_portero IS NOT NULL
+		");
+		$stmt->execute([":d" => $id_duelo, ":r" => $ronda, ":t" => $turno]);
+		if ($stmt->rowCount() > 0) return true;
+
+		// O ya estaba resuelto (otro sondeo se adelantó), o falta una elección.
+		$comprobar = $this->pdo->prepare("
+			SELECT gol FROM duelo_penaltis WHERE id_duelo = :d AND ronda = :r AND turno = :t
+		");
+		$comprobar->execute([":d" => $id_duelo, ":r" => $ronda, ":t" => $turno]);
+		return $comprobar->fetchColumn() !== null;
+	}
+
+	/**
+	 * Registra la zona que ha elegido un jugador en el tiro abierto.
+	 *
+	 * `zona_X IS NULL` dentro del UPDATE es lo que impide cambiar de opinión y,
+	 * sobre todo, lo que impide elegir DESPUÉS de que el tiro se resolviera.
+	 */
+	public function tirarPenalti($id_duelo, $id_usuario, $zona) {
+		if (!in_array($zona, self::ZONAS_PENALTI, true)) {
+			return ["ok" => false, "error" => "Ese hueco no existe."];
 		}
 
-		/* Muerte súbita. El tope de 40 rondas no es decoración: sin él, dos
-		   porterías muy fuertes podrían no resolver nunca y el duelo se quedaría
-		   sin liquidar para siempre. Si se agota, decide el sorteo, que es lo
-		   único que queda y sigue siendo reproducible. */
-		$ronda = 0;
-		while ($golesL === $golesV && $ronda < 40) {
-			$l = self::azarDeJugada($semilla, 300 + $ronda, 9161) < $pL;
-			$v = self::azarDeJugada($semilla, 400 + $ronda, 9161) < $pV;
-			if ($l !== $v) { $golesL += $l ? 1 : 0; $golesV += $v ? 1 : 0; }
-			$ronda++;
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		if (!$duelo || $duelo["estado"] !== "en_juego") {
+			return ["ok" => false, "error" => "Este duelo ya no admite penaltis."];
 		}
-		if ($golesL === $golesV) return $semilla < 0.5 ? "local" : "visitante";
-		return $golesL > $golesV ? "local" : "visitante";
+
+		$this->tandaAvanzar($id_duelo);           // abre el tiro si hacía falta
+		$estado = $this->tandaEstado($id_duelo);
+		if (!$estado["abierto"] || $estado["gana"] !== null) {
+			return ["ok" => false, "error" => "Ahora mismo no hay ningún penalti que lanzar."];
+		}
+
+		$tiro  = $estado["abierto"];
+		$quien = self::tandaProtagonistas($duelo, (int) $tiro["turno"]);
+		$campo = (int) $id_usuario === $quien["tira"] ? "zona_tirador"
+		       : ((int) $id_usuario === $quien["para"] ? "zona_portero" : null);
+		if ($campo === null) return ["ok" => false, "error" => "Este penalti no es tuyo."];
+
+		$stmt = $this->pdo->prepare("
+			UPDATE duelo_penaltis SET $campo = :z
+			WHERE id_duelo = :d AND ronda = :r AND turno = :t AND $campo IS NULL AND gol IS NULL
+		");
+		$stmt->execute([":z" => $zona, ":d" => $id_duelo,
+		                ":r" => $tiro["ronda"], ":t" => $tiro["turno"]]);
+		if ($stmt->rowCount() === 0) {
+			return ["ok" => false, "error" => "Ya habías elegido en este penalti."];
+		}
+
+		$this->resolverTiro($id_duelo, (int) $tiro["ronda"], (int) $tiro["turno"]);
+		return ["ok" => true, "tiraba" => $campo === "zona_tirador"];
+	}
+
+	/**
+	 * La tanda vista por UN jugador, lista para pintar.
+	 *
+	 * ⚠️ EL FILTRO DE §6.3 ESTÁ AQUÍ. Del tiro en curso solo se dice si YO ya
+	 * elegí; la zona del rival no viaja jamás, ni siquiera la mía de vuelta hace
+	 * falta. Del historial sí van las dos zonas, porque esos tiros ya están
+	 * resueltos y enseñarlos es justo la gracia: aprender a leer al otro.
+	 */
+	public function tandaParaCliente($id_duelo, $id_usuario) {
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		if (!$duelo) return null;
+
+		$estado = $this->tandaEstado($id_duelo);
+		$soyCreador = (int) $duelo["id_creador"] === (int) $id_usuario;
+
+		// El marcador de la tanda, desde mi lado.
+		$primero = $estado["primero"];
+		$mioEsTurno0 = $primero === (int) $id_usuario;
+		$mios  = $mioEsTurno0 ? $estado["goles"][0] : $estado["goles"][1];
+		$suyos = $mioEsTurno0 ? $estado["goles"][1] : $estado["goles"][0];
+
+		$historial = [];
+		foreach ($estado["tiros"] as $t) {
+			if ($t["gol"] === null) continue;
+			$quien = self::tandaProtagonistas($duelo, (int) $t["turno"]);
+			$historial[] = [
+				"ronda"  => (int) $t["ronda"],
+				"mio"    => $quien["tira"] === (int) $id_usuario,   // ¿tiraba yo?
+				"gol"    => (int) $t["gol"] === 1,
+				"tirador" => $t["zona_tirador"],
+				"portero" => $t["zona_portero"],
+				"auto"   => (bool) ($quien["tira"] === (int) $id_usuario
+					? $t["auto_tirador"] : $t["auto_portero"]),
+			];
+		}
+
+		$abierto = $estado["abierto"];
+		$tiro = null;
+		if ($abierto && $estado["gana"] === null) {
+			$quien = self::tandaProtagonistas($duelo, (int) $abierto["turno"]);
+			$tiroYo = $quien["tira"] === (int) $id_usuario;
+			$campoMio = $tiroYo ? "zona_tirador" : "zona_portero";
+			$plazo = max(3, (int) $this->config("tanda_plazo_seg", 12));
+			$tiro = [
+				"ronda"     => (int) $abierto["ronda"],
+				"tiro_yo"   => $tiroYo,
+				// Solo si YO ya elegí. La del rival no sale de aquí.
+				"ya_elegi"  => $abierto[$campoMio] !== null,
+				"restante"  => max(0, $plazo - (time() - strtotime($abierto["abierto"]))),
+			];
+		}
+
+		return [
+			"zonas"     => self::ZONAS_PENALTI,
+			"marcador"  => [$mios, $suyos],
+			"historial" => $historial,
+			"tiro"      => $tiro,
+			"muerte_subita" => $estado["hechos"][0] >= self::TANDA_TIROS_BASE
+			                && $estado["hechos"][1] >= self::TANDA_TIROS_BASE,
+			"acabada"   => $estado["gana"] !== null,
+		];
 	}
 
 	/** Los minijuegos ya resueltos de un duelo, indexados por evento+usuario. */
@@ -4435,12 +4758,31 @@ class Tcg
 		/* FINAL DEL PARTIDO — aquí se decide el duelo.
 		   El marcador que hay guardado en este momento ES el resultado: lo puso
 		   la simulación y lo movieron las decisiones de los dos jugadores. Se
-		   determina el ganador, se rompe el empate en la tanda si hace falta y se
-		   entrega el bote. Lo piden los DOS jugadores en cada sondeo; que se
-		   pague una sola vez lo garantiza el WHERE de liquidarPartido(). */
-		if ($avance >= 1) {
+		   determina el ganador y se entrega el bote. Lo piden los DOS jugadores
+		   en cada sondeo; que se pague una sola vez lo garantiza el WHERE de
+		   liquidarPartido().
+
+		   Si el partido acabó EMPATADO no se liquida todavía: la tanda se juega
+		   (§15.11), así que el duelo se queda en `en_juego` con la tanda abierta y
+		   liquidarPartido() no encuentra ganador hasta que termine. */
+		/* ⚠️ `!$pendiente` NO ES OPCIONAL: las fases tienen que ser excluyentes.
+		   Sin esa condición el sondeo podía anunciar la tanda Y una decisión
+		   pendiente a la vez, y eso es un estado del que no se sale: la decisión
+		   pausa el partido, `cerrarPartidoSiToca()` se niega a cerrar mientras
+		   está pausado, y el duelo se queda con el bote dentro mientras el cliente
+		   pinta penaltis. Lo cazó la prueba de 300 duelos, con 74 colgados.
+
+		   Y el orden correcto es este: una decisión pendiente todavía puede mover
+		   el marcador y deshacer el empate, así que hasta que no se resuelva no se
+		   sabe siquiera si hay tanda que jugar. */
+		$tanda = null;
+		if ($avance >= 1 && !$pendiente) {
+			$empatado = (int) $duelo["goles_creador"] === (int) $duelo["goles_rival"];
+			// cerrarPartidoSiToca() ya empuja la tanda cuando hay empate, así que
+			// no hace falta llamarla aquí aparte: solo leer cómo quedó.
 			$this->cerrarPartidoSiToca($id_duelo);
 			$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+			if ($empatado) $tanda = $this->tandaParaCliente($id_duelo, $id_usuario);
 		}
 
 		$hasta = [];
@@ -4452,9 +4794,17 @@ class Tcg
 
 		$mio = $pendiente && (int) $duenos[$pendiente["id"]] === (int) $id_usuario;
 
+		/* La TANDA es una fase propia entre el final del partido y el resultado.
+		   No es "final": el duelo todavía no está decidido y el cliente no debe
+		   irse a buscar la pantalla de resultado, que aún no existe. */
+		$enTanda = $tanda !== null && empty($tanda["acabada"]);
+
 		return [
 			"ok"        => true,
-			"fase"      => $pendiente ? "minijuego" : ($avance >= 1 ? "final" : "jugando"),
+			"fase"      => $pendiente ? "minijuego"
+			             : ($enTanda ? "tanda"
+			             : ($avance >= 1 ? "final" : "jugando")),
+			"tanda"     => $tanda,
 			"minuto"    => (int) floor($minutoActual),
 			"minutos"   => $minutos,
 			"avance"    => round($avance, 4),
@@ -4712,10 +5062,13 @@ class Tcg
 			$probGol = (float) $this->config("partido_minijuego_prob_gol", 0.70);
 			$entra = self::azarDeJugada((float) $duelo["valor_sorteo"], (int) $id_evento, 8663) < $probGol;
 
-			// Defendiendo se le quita un gol al rival; atacando me sumo uno.
+			/* Defendiendo se le quita un gol al rival; atacando me sumo uno. El
+			   TOPE va como parámetro y lo aplica el SQL: sin él, el presupuesto no
+			   lo hacía cumplir nadie desde que se retiró la §1.3. */
+			$tope = (int) ($narracion["tope_marcador"] ?? 0);
 			$parado = $entra && (($minijuego["lado"] ?? "defiendo") === "defiendo"
-				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario))
-				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario)));
+				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario, $tope))
+				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario, $tope)));
 			if ($parado) {
 				$this->pdo->prepare("
 					UPDATE duelo_minijuegos SET aplicado = 1
@@ -4760,7 +5113,7 @@ class Tcg
 	 *
 	 * Devuelve true solo si de verdad se descontó.
 	 */
-	public function descontarGolRival($id_duelo, $id_usuario) {
+	public function descontarGolRival($id_duelo, $id_usuario, $tope = null) {
 		$stmt = $this->pdo->prepare("
 			UPDATE duelos SET
 				goles_creador = goles_creador - IF(id_creador = :u1, 0, 1),
@@ -4770,13 +5123,45 @@ class Tcg
 			  AND (id_creador = :u3 OR id_rival = :u4)
 			  /* nada baja de cero */
 			  AND IF(id_creador = :u5, goles_rival, goles_creador) > 0
+			  " . self::sqlTopeMarcador($tope) . "
 		");
-		$stmt->execute(array_fill_keys(
+		$parametros = array_fill_keys(
 			[":u1", ":u2", ":u3", ":u4", ":u5"],
 			(int) $id_usuario
-		) + [":d" => (int) $id_duelo]);
+		) + [":d" => (int) $id_duelo];
+		if ($tope !== null) {
+			$parametros[":tu"] = (int) $id_usuario;
+			$parametros[":td"] = (int) $id_duelo;
+			$parametros[":tope"] = (int) $tope;
+		}
+		$stmt->execute($parametros);
 
 		return $stmt->rowCount() > 0;
+	}
+
+	/**
+	 * El trozo de WHERE que hace cumplir `partido_presupuesto_marcador`.
+	 *
+	 * ⚠️ ESTE ES EL JUEZ DEL PRESUPUESTO, y no está en PHP a propósito. Ocupa el
+	 * sitio que dejó libre la condición de §1.3 al retirarse en el Paso 3, y su
+	 * ausencia durante ese rato dejó el presupuesto DECORATIVO: el PHP contaba
+	 * pero nadie impedía el gol de más. Lo destapó una prueba a mano de la tanda,
+	 * en la que un acierto rompió un 1-1 con el presupuesto puesto a 0.
+	 *
+	 * Cuenta los minijuegos de ESE jugador en ESE duelo que ya movieron el
+	 * marcador (`aplicado = 1`). Va dentro del UPDATE porque contar antes y
+	 * actualizar después deja una ventana por la que dos peticiones simultáneas
+	 * moverían dos goles con presupuesto para uno.
+	 *
+	 * Con $tope null no añade nada: hay llamadas legítimas sin tope (pruebas y
+	 * herramientas), y quien decide el número es narracionDuelo().
+	 */
+	private static function sqlTopeMarcador($tope) {
+		if ($tope === null) return "";
+		return "AND (
+			  SELECT COUNT(*) FROM duelo_minijuegos dm
+			  WHERE dm.id_duelo = :td AND dm.id_usuario = :tu AND dm.aplicado = 1
+			) < :tope";
 	}
 
 	/**
@@ -4788,7 +5173,7 @@ class Tcg
 	 * liquidarPartido() pasa el duelo a `resuelto`, un minijuego que llegue
 	 * tarde ya no puede cambiar un resultado que se acaba de pagar.
 	 */
-	public function sumarGolPropio($id_duelo, $id_usuario) {
+	public function sumarGolPropio($id_duelo, $id_usuario, $tope = null) {
 		$stmt = $this->pdo->prepare("
 			UPDATE duelos SET
 				goles_creador = goles_creador + IF(id_creador = :u1, 1, 0),
@@ -4796,10 +5181,17 @@ class Tcg
 			WHERE id_duelo = :d
 			  AND estado = 'en_juego'
 			  AND (id_creador = :u3 OR id_rival = :u4)
+			  " . self::sqlTopeMarcador($tope) . "
 		");
-		$stmt->execute(array_fill_keys(
+		$parametros = array_fill_keys(
 			[":u1", ":u2", ":u3", ":u4"], (int) $id_usuario
-		) + [":d" => (int) $id_duelo]);
+		) + [":d" => (int) $id_duelo];
+		if ($tope !== null) {
+			$parametros[":tu"] = (int) $id_usuario;
+			$parametros[":td"] = (int) $id_duelo;
+			$parametros[":tope"] = (int) $tope;
+		}
+		$stmt->execute($parametros);
 
 		return $stmt->rowCount() > 0;
 	}
@@ -4934,8 +5326,31 @@ class Tcg
 		   Nunca al revés: prometer un efecto y luego no aplicarlo sería peor
 		   que no ofrecerlo. */
 		$presupuesto = max(0, (int) $this->config("partido_presupuesto_marcador", 1));
+
+		/* Con el interruptor de pruebas puesto, el presupuesto es 0: si no, un
+		   minijuego acertado rompería el 1-1 forzado y el partido no llegaría a la
+		   tanda, que es justo lo que se está intentando probar. Las decisiones se
+		   siguen ofreciendo y siguen contando para la actuación. */
+		if ((int) $this->config("depuracion_forzar_empate", 0) === 1) $presupuesto = 0;
+
 		$paradasLibres = $presupuesto;   // ocasiones del rival que puedo sacar
 		$golesLibres   = $presupuesto;   // ocasiones mías falladas que puedo meter
+
+		/* ⚠️ EL TOPE QUE DE VERDAD SE APLICA, y por qué hace falta devolverlo.
+		   $paradasLibres y $golesLibres solo deciden cómo se ETIQUETA cada
+		   decisión al ofrecerla. Quien tiene que impedir el gol de más es la base
+		   de datos, dentro del UPDATE de descontarGolRival() / sumarGolPropio().
+
+		   Hasta el Paso 3 ese papel lo hacía la condición de §1.3, que estaba en
+		   el SQL y coincidía con el presupuesto por construcción (los dos salían
+		   de cabeCambioMarcador). Al quitar la §1.3 se quedó sin juez, y el
+		   presupuesto pasó a ser decorativo: lo destapó una prueba a mano de la
+		   tanda, donde un acierto rompió un 1-1 con el presupuesto a 0.
+
+		   Se devuelve el tope INICIAL —con los efectos de `impacto: partido` ya
+		   sumados, ver abajo— para que resolverMinijuegoDuelo() se lo pase al SQL
+		   y haya UN SOLO sitio que lo calcula. */
+		$topeMarcador = 0;   // se fija más abajo, tras los efectos de partido
 
 		/* Techo de decisiones por partido, sumando ataque y defensa. §1.5 regla 3
 		   lo pide explícitamente, pero el motivo de fondo es de ritmo: el reloj
@@ -5002,6 +5417,13 @@ class Tcg
 		// el reloj de los DOS, y §15.5 midió que seis pausas hacen el partido
 		// eterno. Una más como mucho.
 		$MAX_OFRECIDOS += min(1, $decisionesExtra);
+
+		/* Ya están sumados los efectos de partido, así que este es el tope real de
+		   goles que este jugador puede mover en este encuentro. Se cuenta sobre el
+		   MAYOR de los dos presupuestos y no sobre la suma: el parámetro se llama
+		   "goles que puede mover cada jugador", en singular, y separar parada de
+		   gol dentro del SQL exigiría consultar el catálogo desde la consulta. */
+		$topeMarcador = max($paradasLibres, $golesLibres);
 
 		/* ---------------------------------------------------------------
 		   QUÉ JUGADAS LLEVAN DECISIÓN — se reparten por el partido
@@ -5193,6 +5615,9 @@ class Tcg
 			"descuento" => $sim["descuento"],
 			"marcador"  => [$mios, $suyos],
 			"gano_yo"   => $ganoYo,
+			// Cuántos goles puede mover ESTE jugador en este partido. Lo aplica el
+			// SQL, no el PHP: ver el aviso donde se calcula.
+			"tope_marcador" => $topeMarcador,
 			"nombres"   => [
 				"mio"  => $soyCreador ? $duelo["creador"] : $duelo["rival"],
 				"suyo" => $soyCreador ? $duelo["rival"]   : $duelo["creador"],
@@ -5375,6 +5800,26 @@ class Tcg
 					$this->opcionesPenalti()
 				);
 				[$golesCreador, $golesRival] = $sim["goles"];
+
+				/* ⚠️ INTERRUPTOR DE PRUEBAS — `depuracion_forzar_empate`
+				   Con esto a 1, TODO partido PvP acaba 1-1 y por tanto se va a la
+				   tanda. Existe porque probar los penaltis a mano es imposible de
+				   otro modo: solo empata el 27,7 % de los duelos, así que habría
+				   que jugar cuatro partidos enteros para ver una tanda.
+
+				   Vale 0 por defecto y por defecto la fila ni existe. Si te
+				   encuentras todos los duelos empatados, esto es lo primero que hay
+				   que mirar:
+				     UPDATE configuracion SET valor='0'
+				      WHERE clave='depuracion_forzar_empate';
+
+				   Va en configuracion y no en el código a propósito: un interruptor
+				   de pruebas escondido en un `if` es un interruptor que se queda
+				   puesto. Así se ve en el panel y se apaga sin desplegar nada. */
+				if ((int) $this->config("depuracion_forzar_empate", 0) === 1) {
+					$golesCreador = 1;
+					$golesRival   = 1;
+				}
 			}
 			$rango = $esPve ? $this->rangoPartido($golesCreador, $golesRival) : null;
 

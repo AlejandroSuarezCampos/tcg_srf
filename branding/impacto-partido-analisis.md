@@ -38,7 +38,20 @@
 > prueba propia.
 >
 > **El coste sigue siendo el que este documento midió y Alejandro aceptó: el
-> favorito pasa del 69,1 % al 91,0 %.**
+> favorito pasa del 69,1 % al 91,0 %** en el caso extremo sintético. Con mazos
+> reales, medido sobre 300 duelos jugados enteros, el reparto fue **72 / 28**.
+>
+> ### Y una cosa más, posterior: LA TANDA SE JUEGA
+>
+> Este documento decía que la tanda "no hay nada que romper" porque el §1.3 no
+> permitía empates, y luego que se resolvería en servidor. **Las dos cosas están
+> superadas**: los empates existen (27,7 %) y la tanda es **jugable** — portería de
+> cuatro huecos, y si tirador y portero eligen el mismo, parada.
+>
+> Es la **primera interacción simultánea** del juego, y eso rompe el supuesto que
+> recorre este documento entero: aquí el dato oculto no sale de las cartas, sale de
+> la cabeza del otro jugador, así que **no se puede reconstruir desde
+> `valor_sorteo`** y hay tabla propia (`duelo_penaltis`). Ver §15.11 del CLAUDE.md.
 
  ## 🔄 DECISIÓN POSTERIOR (2026-08-10, misma sesión) — el partido SÍ decide
 >

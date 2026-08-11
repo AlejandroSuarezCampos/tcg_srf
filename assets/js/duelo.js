@@ -829,6 +829,120 @@
   }
 
   /* ======================================================================
+     LA TANDA DE PENALTIS (§15.11)
+
+     Cuatro huecos: eliges uno, el rival elige otro, y si coincidís es parada.
+     Es la ÚNICA pantalla donde los dos decidís A LA VEZ y uno contra otro, así
+     que aquí el "dato oculto" no es una carta: es la cabeza del otro.
+
+     El servidor NUNCA manda lo que ha elegido el rival hasta que el tiro está
+     resuelto (Tcg::tandaParaCliente), así que este código no puede filtrarlo ni
+     queriendo: no lo tiene. Lo único que sabe es si YO ya elegí.
+     ====================================================================== */
+  var tandaCaja  = document.getElementById('simTanda');
+  var tandaRonda = document.getElementById('simTandaRonda');
+  var tandaMarc  = document.getElementById('simTandaMarcador');
+  var tandaOrden = document.getElementById('simTandaOrden');
+  var tandaPort  = document.getElementById('simTandaPorteria');
+  var tandaReloj = document.getElementById('simTandaReloj');
+  var tandaHist  = document.getElementById('simTandaHistorial');
+
+  var NOMBRE_HUECO = {
+    arriba_izq: 'Arriba a la izquierda',
+    arriba_der: 'Arriba a la derecha',
+    abajo_izq:  'Abajo a la izquierda',
+    abajo_der:  'Abajo a la derecha'
+  };
+
+  // Qué tiro hay pintado y si ya mandé mi elección, para no repintar en cada
+  // sondeo (repintar robaría el foco del teclado a media decisión).
+  var tandaPuesta = null;
+  var tandaEnviando = false;
+
+  function elegirHueco(zona) {
+    if (tandaEnviando) return;
+    tandaEnviando = true;
+    Array.prototype.forEach.call(tandaPort.children, function (b) { b.disabled = true; });
+    tandaOrden.textContent = 'Elegido. Esperando al rival…';
+
+    var cuerpo = new FormData();
+    cuerpo.append('id_duelo', simulacion.dataset.idDuelo);
+    cuerpo.append('zona', zona);
+    fetch('assets/ajax/duelo_penalti.php', { method: 'POST', body: cuerpo })
+      .then(function (r) { return r.json(); })
+      .catch(function () { /* el sondeo se encarga: el plazo decide solo */ })
+      .then(function () { tandaEnviando = false; });
+  }
+
+  function pintarTanda(t) {
+    if (!tandaCaja) return;
+    panel.hidden = true;          // la tanda ocupa el sitio del panel de decisión
+    panelPuesto = null;
+    tandaCaja.hidden = false;
+
+    tandaMarc.textContent = t.marcador[0] + ' – ' + t.marcador[1];
+
+    // Historial: un punto por tiro ya resuelto. Aquí SÍ van las dos zonas,
+    // porque ese tiro ya está cerrado y leerlas es toda la gracia del juego.
+    var firma = t.historial.length + ':' + (t.tiro ? t.tiro.ronda + ':' + t.tiro.tiro_yo + ':' + t.tiro.ya_elegi : 'fin');
+    if (firma !== tandaPuesta) {
+      tandaHist.innerHTML = '';
+      t.historial.forEach(function (h) {
+        var li = document.createElement('li');
+        li.className = (h.gol ? 'es-gol' : 'es-parada') + (h.mio ? ' es-mio' : '');
+        li.textContent = (h.mio ? 'Tú' : 'Él') + ' · ' + (h.gol ? 'gol' : 'parada');
+        li.title = 'Tiro a ' + (NOMBRE_HUECO[h.tirador] || '?')
+                 + ', portero a ' + (NOMBRE_HUECO[h.portero] || '?')
+                 + (h.auto ? ' (automático)' : '');
+        tandaHist.appendChild(li);
+      });
+    }
+
+    if (!t.tiro) {
+      tandaRonda.textContent = 'Tanda terminada';
+      tandaOrden.textContent = '';
+      tandaReloj.textContent = '';
+      tandaPort.innerHTML = '';
+      tandaPuesta = firma;
+      return;
+    }
+
+    tandaRonda.textContent = (t.muerte_subita ? 'Muerte súbita · tiro ' : 'Penalti ') + t.tiro.ronda;
+    tandaReloj.textContent = t.tiro.restante + ' s';
+
+    if (firma === tandaPuesta) return;   // mismo tiro y mismo estado: no repintar
+    tandaPuesta = firma;
+
+    if (t.tiro.ya_elegi) {
+      tandaOrden.textContent = 'Elegido. Esperando al rival…';
+      Array.prototype.forEach.call(tandaPort.children, function (b) { b.disabled = true; });
+      return;
+    }
+
+    tandaOrden.textContent = t.tiro.tiro_yo
+      ? 'Tiras tú: elige dónde la pones'
+      : 'Paras tú: elige dónde te lanzas';
+
+    tandaPort.innerHTML = '';
+    t.zonas.forEach(function (z) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sim-mj-zona-btn';
+      b.style.gridArea = z;
+      b.innerHTML = '<b></b>';
+      b.querySelector('b').textContent = NOMBRE_HUECO[z] || z;
+      b.addEventListener('click', function () { elegirHueco(z); });
+      tandaPort.appendChild(b);
+    });
+  }
+
+  function ocultarTanda() {
+    if (!tandaCaja || tandaCaja.hidden) return;
+    tandaCaja.hidden = true;
+    tandaPuesta = null;
+  }
+
+  /* ======================================================================
      SONDEO DEL PARTIDO (modo narrado)
      El navegador no lleva el partido: pregunta en qué minuto va. Mismo patrón
      sin websockets que ya usa la sala de espera.
@@ -870,7 +984,7 @@
     /* Al acabar se enseña la puntuación de actuación (§4.6): es lo que hace
        que las decisiones importen aunque el marcador no se haya podido mover,
        y lo único que le queda por optimizar a quien pierde. */
-    if (d.fase === 'final' && d.actuacion && d.actuacion.jugados) {
+    if (d.fase === 'final' && !d.tanda && d.actuacion && d.actuacion.jugados) {
       if (panelPuesto !== 'actuacion') {
         panelPuesto = 'actuacion';
         avisoEnPanel('Tu actuación',
@@ -878,8 +992,27 @@
       }
     }
 
-    reloj.textContent = d.fase === 'final' ? 'Final' : d.minuto + "'";
-    barra.style.width = ((d.avance || 0) * 100) + '%';
+    /* LA TANDA. Sustituye al panel de decisión y al reloj: el partido ya
+       terminó y lo que queda no se mide en minutos.
+
+       Cuando ACABA no se corta aquí, se sigue: es el sondeo el que tiene que
+       llegar a `fase: final` para ir a buscar el resultado. Cortar también en
+       ese caso dejaba la pantalla congelada en la tanda para siempre. */
+    if (d.tanda) {
+      pintarTanda(d.tanda);
+      reloj.textContent = 'Penaltis';
+      barra.style.width = '100%';
+      if (d.marcador) {
+        golesYoEl.textContent   = d.marcador[0];
+        golesOtroEl.textContent = d.marcador[1];
+        marcadorFinal = d.marcador;
+      }
+      if (!d.tanda.acabada) return;
+    } else {
+      ocultarTanda();
+      reloj.textContent = d.fase === 'final' ? 'Final' : d.minuto + "'";
+      barra.style.width = ((d.avance || 0) * 100) + '%';
+    }
 
     (d.eventos || []).forEach(function (e) {
       if (vistos[e.id]) return;
@@ -934,7 +1067,11 @@
              la liquidación no llegó a completarse: sin ganador escrito, mejor
              quedarse aquí que recargar en redondo. */
           var hayQueRecargar = simulacion.dataset.decidido === '0' && d.decidido;
-          window.setTimeout(hayQueRecargar ? irAlResultado : terminar, 1500);
+          /* Un duelo decidido en los penaltis se queda un momento más antes de
+             irse: el último tiro es el desenlace y merece verse, no aparecer y
+             desaparecer. */
+          var espera = d.tanda ? 2800 : 1500;
+          window.setTimeout(hayQueRecargar ? irAlResultado : terminar, espera);
           return;
         }
         sondeo = window.setTimeout(sondear, 1000);
