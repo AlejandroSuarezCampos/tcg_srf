@@ -261,6 +261,21 @@
 > sin haber ajustado ningún número; y es **el único sitio donde el mazo no importa**,
 > así que un mazo flojo que llega al empate tiene la tanda al 50 %.
 >
+> Medido sobre 300 duelos jugados enteros: **92 tandas, 932 tiros, 26,1 % de
+> paradas** contra el 25 % teórico. Esa cifra es la comprobación de que la regla se
+> aplica tal cual.
+>
+> ---
+>
+> ## Lo siguiente: llevar todo esto a las CADENAS (§15.12)
+>
+> **Diseñado, decidido y medido el 2026-08-11; sin escribir.** El partido decidirá
+> también en PvE y los minijuegos influirán en las recompensas **de ese partido**.
+> Los cofres mantienen su contenido fijo —ya lo mantienen— y dan **premio extra si
+> todos los partidos previos al cofre están en S en Extremo**. El plan son cinco
+> piezas y está entero en el §15.12, con las tres trampas de la parte de cliente y
+> el aviso de que el rango S quedará inalcanzable hasta que se calibre.
+>
 > **Verificado sobre 300 duelos jugados enteros por el camino real** (25 con carta),
 > más uno a mano en el navegador entre dos cuentas que acabó 2-2 y lo decidió la
 > tanda. Las cifras que importan: **300/300 liquidados, 0 colgados, el total de
@@ -441,7 +456,7 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§15 — Familia Árbitro** | Decisiones disciplinarias sobre el evento de tarjeta, con un 4.º dato oculto | ✅ **Construido** |
 | **§15 — Minijuegos defensivos** | Defender ya no exige un gol: parada, despeje y córner en contra. Abre la familia `defensa` | ✅ **Construido** |
 | **§15 — Veredicto y actuación** | Dato memorable por partido + puntuación (Biblia §1.5 r7, §4.6) | ✅ **Construido** |
-| **§15 — Partido narrado en cadenas** | Las cadenas siguen con el modo clásico | ⬜ **Sin empezar, a propósito** |
+| **§15 — Partido narrado en cadenas** | **Diseñado, decidido y medido; sin escribir.** El partido decide también en PvE, los minijuegos influyen en las recompensas DEL PARTIDO, el cofre mantiene su contenido fijo y da premio extra si todos los partidos previos están en **S en Extremo**. Plan de 5 piezas en §15.12 | 🟡 **Listo para construir** |
 | **Escalado de dificultad de minijuegos** | Plazo y ritmo ya salen por dificultad; faltan las otras palancas (Biblia §3) | 🟡 Parcial |
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
@@ -1466,9 +1481,14 @@ ventaja de poder.
    rinde más que enfocarlas, así que construir bien un equipo casi no importa.
    Es lo que más afecta a la sensación de juego de todo lo pendiente. Decisión
    de balance, no de código.
-9. **Llevar el partido narrado a las cadenas** (§15.7). Antes hay que arreglar
-   `marcadorCadena()`: da 4-8 y 9-5, y narrados se leen como un partido roto.
-   Ahí vive el problema original de la Biblia (*"simular hasta ganar"*).
+9. **Llevar el partido narrado a las cadenas** — **es lo siguiente que toca, y ya
+   está todo decidido: §15.12.** Cinco piezas, con las cuatro decisiones de
+   Alejandro dentro (el partido decide en PvE, los minijuegos influyen en las
+   recompensas del partido, el cofre mantiene contenido fijo, y premio extra si
+   todos los partidos previos están en **S en Extremo**). Se jubila
+   `marcadorCadena()`, que da 5,65 goles por partido y no se puede narrar. **Ojo:
+   el rango S quedará inalcanzable hasta que Alejandro calibre, y eso es esperado,
+   no un fallo** — el bonus del cofre también.
 10. **El resto del escalado de dificultad** (Biblia §3). Hoy salen por
     dificultad el plazo y el ritmo de aparición; faltan el tamaño de la zona de
     acierto, la fiabilidad de la pista y el coste del fallo.
@@ -2365,50 +2385,8 @@ informaba del marcador **original** en vez del actual (la reconstrucción que ha
 `narracionDuelo()` para generar el relato sobrescribía los goles del duelo). Si
 vuelve a bailar un marcador, mira esos dos sitios.
 
-**Llevar el partido narrado a las cadenas está sin hacer** — pero ya está
-DECIDIDO que se hace, con las dos respuestas de Alejandro del 2026-08-11:
-
-1. **El partido decide también en PvE, y los minijuegos influyen en las
-   recompensas.** Es el objetivo, no un efecto colateral: ahí vive el problema
-   original de la Biblia (§0.2, *"simular hasta ganar"*).
-2. **El rango NO se recalibra ahora.** *"Cuando se tengan las cartas definitivas y
-   se creen las cadenas, se testeará que sea posible manualmente partido a partido
-   y que sea balanceado."* Así que se construye el mecanismo, se dejan los diales
-   (`pve_rango_s_goles`, `pve_rango_a_margen`) y se reporta la distribución
-   medida. **No inventar una fórmula de rango nueva.**
-
-Lo que hay que saber antes de empezar, medido:
-
-| | cadenas hoy | duelos PvP |
-|---|---|---|
-| goles por partido | **5,65** | 2,42 |
-| portería a cero | 17,2 % | — |
-| marcadores típicos | 4-3, 5-3, 5-4 | 1-0, 2-1 |
-
-`marcadorCadena()` no se puede narrar: un 5-4 minuto a minuto son nueve goles sin
-una sola parada. Y el problema no es estético — **el rango sale del marcador y el
-botín sale del rango** (`rangoPartido()`: S con 5+ goles y portería a cero, A con
-3 de margen), así que con la escala nueva el rango S se vuelve casi inalcanzable.
-Es exactamente lo que Alejandro calibrará a mano después.
-
-> **Dos cosas que NO hacen falta, y conviene saberlo antes de presupuestar:**
-> · **No hay que darle inteligencia al CPU para los minijuegos.** El dato oculto
->   sale de las CARTAS, no de lo que elija el rival, así que el jugador lee el
->   perfil del delantero del CPU igual que leería el de una persona.
-> · **La tanda contra el CPU ya está construida**: es el auto-tiro por plazo de
->   §15.11, determinista desde `valor_sorteo` (que no sale del servidor, así que no
->   se puede adivinar). Aplicándolo al instante en vez de a los 12 s, ya hay
->   penaltis contra la máquina — y sesgarlo hacia donde tira el jugador es una
->   palanca de dificultad gratis (Biblia §3).
->
-> **Y una corrección a un supuesto:** hoy el CPU **no tiene cartas imposibles**.
-> Sus 132 huecos apuntan a 38 cromos normales del catálogo; lo que tiene son
-> MULTIPLICADORES (`pve_mult_*`, `pve_compos_mult_*`: en Extremo ×1,063 a la fuerza
-> y ×1,339 a las compos). Alejandro quiere darle rasgos que un jugador no podría
-> tener (*"tierra y montaña al 3"*), y eso hay que MEDIRLO al hacerlo: los
-> minijuegos leen el perfil RELATIVO de la carta, así que con cartas muy extremas
-> la pista puede pasar a resolver el minijuego sola. El verificador ya mide ese
-> número (hoy: a ciegas 33 %, leyendo 44 %).
+**Llevar el partido narrado a las cadenas está sin hacer, pero ya está DISEÑADO y
+DECIDIDO** — plan completo, decisiones y medidas en **§15.12**.
 
 ### 15.8 ⚠️ El equilibrio está medido y NO cumple lo que se buscaba
 
@@ -2747,6 +2725,125 @@ vuelve a nadie.
 > que era la prueba la que se había quedado corta. **Si vuelves a tocar el partido,
 > comprueba que el guion cubre TODAS las fases**: una fase nueva sin cubrir se ve
 > como duelos colgados, no como un error.
+
+### 15.12 LLEVAR EL PARTIDO A LAS CADENAS — diseñado y decidido, SIN CONSTRUIR
+
+Decisiones de Alejandro del **2026-08-11**. Está todo decidido y medido; lo que
+falta es escribirlo. **Léelo entero antes de tocar cadenas.**
+
+#### Las cuatro decisiones
+
+1. **El partido decide también en PvE, y los minijuegos influyen en las
+   recompensas.** Es el objetivo, no un efecto colateral: ahí vive el problema
+   original de la Biblia (§0.2, *"simular hasta ganar"*).
+2. **Solo en las recompensas DE ESE PARTIDO.** Textual: *"quiero que influya solo a
+   las recompensas de ese partido, no del cofre"*.
+3. **El contenido de los cofres es FIJO.** *"Los cofres vendrán marcados el
+   contenido que tiene."* Esto **ya es verdad y no hay que tocar nada**:
+   `reclamarCofre()` llama a `otorgarLootNodo()` con `$rango = null`, así que solo
+   entran las filas de `cadena_loot` **sin** `rango_minimo`. Los cofres nunca han
+   puntuado.
+4. **Bonus del cofre por camino perfecto:** *"si tienes todos los partidos previos
+   al cofre en S, una mejor recompensa"*, y la S tiene que ser **en la dificultad
+   más alta**, o sea **`extremo`**.
+5. **El rango NO se recalibra ahora.** *"Cuando se tengan las cartas definitivas y
+   se creen las cadenas, se testeará que sea posible manualmente partido a partido
+   y que sea balanceado."* Se construye el mecanismo, se dejan los diales
+   (`pve_rango_s_goles`, `pve_rango_a_margen`) y se reporta la distribución medida.
+   **No inventar una fórmula de rango nueva.**
+
+#### El bonus del cofre sale sin tocar el esquema, y esto es lo bonito
+
+`cadena_progreso.mejor_rango` ya se guarda **por (usuario, nodo, dificultad)**, y
+`cadena_loot` ya tiene `rango_minimo`. Así que:
+
+- se calcula si **existe un camino** de raíz al cofre en el que todos los nodos
+  `partido` tienen `mejor_rango = 'S'` **en `extremo`** para ese usuario;
+- si lo hay, `reclamarCofre()` pasa `$rango = 'S'` en vez de `null`;
+- el premio extra se declara en `cadena_loot` con `rango_minimo = 'S'`, **como
+  cualquier otro loot**.
+
+Ni tabla nueva ni mecanismo nuevo. Una función y un parámetro.
+
+> **Por qué "existe un camino" y no "todos los nodos anteriores":** `mapaCadena()`
+> da un nodo por disponible si **CUALQUIERA** de sus predecesores está superado
+> (`break` en el primero, [consultas.php:6654](db/consultas.php:6654)). O sea que las
+> cadenas se recorren **eligiendo camino**, no completándolo todo. Exigir todos los
+> ancestros obligaría a jugar las dos ramas de una bifurcación, que no es cómo se
+> llega al cofre.
+
+> ⚠️ **Por qué la S tiene que ser en `extremo`, y no "en cualquier dificultad".**
+> `mejor_rango` es por dificultad y **las cinco dificultades están siempre
+> disponibles** (`cadena.php` las ofrece todas, sin desbloqueo). Con "cualquier
+> dificultad" se podría **granjear la S entera en Fácil** y reclamar el cofre con el
+> premio bueno. Decisión de Alejandro: `extremo`. Déjalo en una función suya para
+> que cambiarlo siga siendo una línea.
+
+#### Lo que hay que construir, en orden
+
+| | qué | por qué |
+|---|---|---|
+| **1** | `resolverDuelo()` deja el PvE en `en_juego`, simulación **natural**, sin rango ni botín. Se jubila **`marcadorCadena()`** | el rango tiene que salir del partido jugado |
+| **2** | progreso de nodo, monedas y loot **del partido** se mueven a `liquidarPartido()` | es lo que hace que los minijuegos cuenten |
+| **3** | el bonus del cofre (arriba) | decisión 4 |
+| **4** | `duelo.php` pasa de `'clasico'` a `'narrado'` en cadenas | ver los tres avisos de abajo |
+| **5** | la tanda contra el CPU: auto-tiro **inmediato** en vez de a los 12 s | decisión 1 aplicada al empate |
+
+#### Tres cosas que muerden en la pieza 4, y no son obvias
+
+- **El CPU no debe recibir decisiones.** `duenosDeMinijuego()` mira el duelo desde
+  los DOS lados. En PvE eso le daría minijuegos al bot que nadie va a jugar, y cada
+  uno **pausaría tu partido 9 segundos** hasta que venciera el plazo.
+- **El reloj no arrancaría.** `arrancarPartidoSiToca()` espera a que **los dos** hayan
+  latido, y **el CPU no late nunca**, así que solo arrancaría por `partido_espera_seg`
+  — 15 segundos de espera antes de cada partido de cadena.
+- **El botón "Ver resultado"** existe en PvE porque ahí el resultado ya estaba
+  decidido. Si el partido decide, saltarlo deja de tener sentido, igual que pasó en
+  PvP (§15.7).
+
+#### Medido antes de empezar, para no suponerlo
+
+| | cadenas hoy | duelos PvP |
+|---|---|---|
+| goles por partido | **5,65** | 2,10 |
+| portería a cero | 17,2 % | — |
+| marcadores típicos | 4-3, 5-3, 5-4 | 1-0, 2-1 |
+
+`marcadorCadena()` **no se puede narrar**: un 5-4 minuto a minuto son nueve goles sin
+una sola parada.
+
+> ⚠️ **CONSECUENCIA QUE HAY QUE SABER ANTES DE PROBARLO.** Con `pve_rango_s_goles = 5`
+> y `pve_rango_a_margen = 3`, al bajar de 5,65 a ~2,1 goles **el rango S deja de ser
+> alcanzable en la práctica**. Y como el bonus del cofre exige S en todos los
+> partidos, **el bonus también será inalcanzable hasta que se calibre**. No está
+> roto: está sin calibrar, y calibrarlo es la decisión 5.
+
+#### Dos cosas que NO hacen falta, y conviene saberlo antes de presupuestar
+
+- **No hay que darle inteligencia al CPU para los minijuegos.** El dato oculto sale
+  de las **CARTAS**, no de lo que elija el rival, así que el jugador lee el perfil
+  del delantero del CPU igual que leería el de una persona.
+- **La tanda contra el CPU ya está construida**: es el auto-tiro por plazo de
+  §15.11, determinista desde `valor_sorteo` (que no sale del servidor, así que no se
+  puede adivinar). Aplicándolo al instante en vez de a los 12 s ya hay penaltis
+  contra la máquina — y sesgarlo hacia donde tira el jugador es una palanca de
+  dificultad gratis (Biblia §3).
+
+#### Y una corrección a un supuesto de partida
+
+Hoy el CPU **no tiene cartas imposibles**. Sus 132 huecos apuntan a **38 cromos
+normales** del catálogo; lo que tiene son **multiplicadores** (`pve_mult_*`,
+`pve_compos_mult_*`: en Extremo ×1,063 a la fuerza y ×1,339 a las compos).
+
+Alejandro quiere darle rasgos que un jugador no podría tener (*"tierra y montaña al
+3"*), y eso hay que **MEDIRLO** al hacerlo: los minijuegos leen el perfil
+**RELATIVO** de la carta para elegir el dato oculto, así que con cartas muy extremas
+la pista puede pasar a resolver el minijuego sola. El verificador ya mide ese número
+(hoy: a ciegas 33 %, leyendo 44 %) — **ejecútalo después de meter esas cartas.**
+
+---
+
+## 16. Importador de datos oficiales (diseño aprobado, sin construir)
 
 > Fase 3, trabajo independiente y en paralelo a lo que se construye en otras
 > sesiones — no lo toca. Diseño y plan aprobados por Alejandro el 2026-08-07.
