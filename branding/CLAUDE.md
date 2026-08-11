@@ -650,7 +650,8 @@ tcg_srf/
 │   │   │                        si algo falla. Es el que hay que ejecutar.
 │   │   ├── probar_tope.php    ← el tope de goles que puede mover un jugador
 │   │   ├── probar_tanda.php   ← la tanda jugable, incluido que la elección del
-│   │   │                        rival NO viaje al cliente (§15.11)
+│   │   │                        rival NO viaje al cliente y el peor caso de
+│   │   │                        muerte súbita (49 tiros, §15.11)
 │   │   ├── probar_paso3.php   ← el partido decide el duelo, de punta a punta
 │   │   ├── probar_pve.php     ← el partido decide también en cadenas (§15.12):
 │   │   │                        nace en_juego, el CPU no recibe decisiones y el
@@ -3029,6 +3030,43 @@ Tres reglas que hay que respetar al tocar esto:
 - **Muerte súbita** desde el tiro 6, y solo decide con la ronda **completa**.
 - **Tope de 25 rondas** por bando: sin él una muerte súbita podría no acabar nunca y
   el duelo se quedaría con el bote dentro.
+
+#### ⚠️ El tope de 25 rondas existía, pero `tandaAvanzar()` no le daba tiempo de llegar (arreglado 2026-08-11)
+
+**Fallo intermitente, 1 de cada 4 ejecuciones de la suite**, sin ningún cambio de
+código entre medias — así se cazó, no razonando sobre el código. El bucle de
+`tandaAvanzar()` NO resuelve un tiro por vuelta: **abrirlo** (`INSERT` + `continue`)
+y **resolverlo** son dos vueltas separadas, así que cada tiro cuesta 2. Y el tope de
+25 rondas solo mira `hechos[0]` — el turno que tira primero en cada ronda—, así que en
+el peor caso hacen falta **2·25−1 = 49 tiros** (98 vueltas) antes de que el tope
+decida, más una vuelta final para leerlo: **99 en total**.
+
+El bucle tenía un límite de `TANDA_MAX_RONDAS*2+4` = **54**. Con un `valor_sorteo`
+que alargara la muerte súbita lo suficiente, la función se quedaba a medio camino
+—27 de 49 tiros en el caso confirmado— y **devolvía sin haber decidido nada**:
+`liquidarPartido()` no tenía ganador que escribir, y el duelo se quedaba `en_juego`
+con el bote retenido. `cerrarConTandaSiHace()` llama a `tandaAvanzar()` **una sola
+vez**, así que no había una segunda oportunidad dentro de la misma petición.
+
+**Cómo se confirmó, sin dejarlo en "parece que era esto":**
+1. Se replicó `azarDeJugada()`/`elegirZonaAutomatica()` en un script aparte y se
+   buscó, **exhaustivamente sobre los 9999 valores posibles** de `valor_sorteo` con
+   su precisión real en la BD (`DECIMAL(12,4)`, no la precisión completa de PHP —
+   la primera búsqueda usó precisión completa y el ejemplo se deshacía al guardarse,
+   truncado por la columna), el peor caso: **`0.1250` necesita exactamente 49 tiros**.
+2. Se forzó ese `valor_sorteo` en un duelo empatado real y se llamó a
+   `tandaAvanzar($id, true)` una vez: con el tope viejo, paraba en el tiro 27 sin
+   decidir; con el tope corregido (`TANDA_MAX_RONDAS*4` = 100), resuelve los 49 y
+   decide en la misma llamada.
+3. Ese caso exacto (`valor_sorteo = 0.1250`) quedó como prueba permanente en
+   `probar_tanda.php`, caso 7: si el tope de vueltas vuelve a quedarse corto, esta
+   prueba lo dice sin depender de que salga una mala racha al azar.
+
+**Lección para la próxima**, la misma que ya dejó §15.10 con los 73 colgados: un tope
+declarado en una constante no basta si la función que tiene que alcanzarlo no le da
+las vueltas suficientes. Si tocas `TANDA_MAX_RONDAS`, el tope de vueltas de
+`tandaAvanzar()` tiene que recalcularse con la misma cuenta (2 vueltas por tiro,
+2·`TANDA_MAX_RONDAS`−1 tiros en el peor caso).
 
 #### Lo que se retiró
 

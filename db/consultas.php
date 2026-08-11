@@ -4569,9 +4569,22 @@ class Tcg
 		$esPve = $duelo["dificultad"] !== null;
 		$idBot = $esPve ? $this->idBot() : 0;
 
-		// El bucle tiene tope: cada vuelta resuelve un tiro como mucho, y la
-		// tanda entera no puede pasar de TANDA_MAX_RONDAS por bando.
-		for ($vuelta = 0; $vuelta < self::TANDA_MAX_RONDAS * 2 + 4; $vuelta++) {
+		/* ⚠️ EL TOPE DE VUELTAS TIENE QUE CUBRIR EL PEOR CASO ENTERO, no solo
+		   "muchas". Este bucle no resuelve un tiro por vuelta: ABRIRLO (INSERT +
+		   `continue`) y RESOLVERLO son dos vueltas separadas, así que cada tiro
+		   cuesta 2. Y `tandaEstado()` solo corta por el tope mirando
+		   `hechos[0]` (el turno que tira primero en cada ronda), así que en el
+		   peor caso la tanda no se decide hasta el tiro número
+		   `2·TANDA_MAX_RONDAS − 1` (el turno 0 llega a su ronda 25 en el tiro
+		   49, antes de que el turno 1 dispare el suyo).
+		   Con el tope viejo (`TANDA_MAX_RONDAS*2+4` = 54) una muerte súbita que
+		   de verdad agotara las 25 rondas se quedaba a media resolución: la
+		   función devolvía `true` sin haber decidido nada, `liquidarPartido()`
+		   no tenía ganador que escribir, y el duelo se quedaba `en_juego` con
+		   el bote retenido — lo cazó `probar_tanda.php`, intermitente porque
+		   depende del `valor_sorteo` de cada duelo. `4 * TANDA_MAX_RONDAS`
+		   cubre con margen los ~99 pasos que hacen falta en el peor caso. */
+		for ($vuelta = 0; $vuelta < self::TANDA_MAX_RONDAS * 4; $vuelta++) {
 			$estado = $this->tandaEstado($id_duelo);
 			if ($estado["gana"] !== null) return true;
 

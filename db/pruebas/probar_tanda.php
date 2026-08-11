@@ -188,7 +188,35 @@ in_array((int) $d["id_ganador"], [9, 2], true) ? $ok("con un ganador") : $ko("si
 ($monedas(9) - $antes9) + ($monedas(2) - $antes2) === 120
     ? $ok("y el bote vuelve (120)") : $ko("bote retenido: " . (($monedas(9) - $antes9) + ($monedas(2) - $antes2)));
 
-echo "\n=== 7) CUALQUIER tanda a medias se puede cerrar siempre ===\n";
+echo "\n=== 7) MUERTE SUBITA LARGA: el tope de vueltas tiene que aguantarla entera ===\n";
+/* Encontrado el 2026-08-11 por una prueba que fallaba 1 de cada 4 ejecuciones
+   de la suite, sin ningun cambio de codigo entre medias. La causa: el bucle
+   de tandaAvanzar() tiene DOS vueltas por tiro (abrir + resolver), pero solo
+   corta por el tope mirando hechos[0] -el turno que tira primero-, asi que en
+   el peor caso hacen falta 2*TANDA_MAX_RONDAS-1 = 49 tiros (98 vueltas) antes
+   de que decida el tope, mas una vuelta final para leerlo. El tope viejo
+   (TANDA_MAX_RONDAS*2+4 = 54) se quedaba a medias en el tiro 27 y devolvia
+   sin haber decidido nada: liquidarPartido() no tenia ganador que escribir y
+   el duelo se quedaba en_juego con el bote retenido.
+
+   0.1250 es EL PEOR CASO EXHAUSTIVO: se probaron los 9999 valores posibles de
+   valor_sorteo con la precision real de la columna (decimal(12,4)) y ninguno
+   necesita mas de 49 tiros para decidir por el tope. Si esto vuelve a fallar,
+   el tope de vueltas ha vuelto a quedarse corto. */
+$id = montarEmpate($db, $p);
+$p->prepare("UPDATE duelos SET valor_sorteo = '0.1250' WHERE id_duelo = :d")->execute([":d" => $id]);
+$db->tandaAvanzar($id, true);
+$e = $db->tandaEstado($id);
+$tirosResueltos = count(array_filter($e["tiros"], fn($t) => $t["gol"] !== null));
+$tirosResueltos === 49 ? $ok("resuelve los 49 tiros del peor caso") : $ko("solo resolvio $tirosResueltos de 49");
+$e["gana"] !== null ? $ok("y la tanda queda decidida en UNA sola llamada") : $ko("UNA llamada no basta: se queda sin decidir");
+$db->liquidarPartido($id);
+$d = $p->query("SELECT estado, id_ganador FROM duelos WHERE id_duelo = $id")->fetch(PDO::FETCH_ASSOC);
+$d["estado"] === "resuelto" && $d["id_ganador"] !== null
+    ? $ok("y el duelo se liquida sin quedarse colgado")
+    : $ko("SE QUEDA COLGADO: estado " . $d["estado"]);
+
+echo "\n=== 8) CUALQUIER tanda a medias se puede cerrar siempre ===\n";
 /* Las pruebas de arriba dejan varios duelos con la tanda empezada y sin acabar:
    es justo el estado peligroso, porque ahi el bote esta retenido. Se comprueba
    que TODOS se pueden cerrar, que es la garantia que de verdad hace falta. */
