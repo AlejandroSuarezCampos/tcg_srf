@@ -34,7 +34,7 @@ function cerrarModalExpansion() {
 }
 
 function pedirBorrado(nombre, id) {
-  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Se perderá también la relación con sus cromos.', function () {
+  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Se borrarán TAMBIÉN todos sus cromos y sobres, quitándolos de cualquier colección, mazo o duelo jugado que los tenga. No se puede deshacer.', function () {
     window.location.href = 'expansiones.php?eliminar=' + encodeURIComponent(id);
   });
 }

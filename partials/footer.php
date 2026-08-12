@@ -63,7 +63,7 @@ $pieCompleto = $pieCompleto ?? false;
         Proyecto fan-made sin ánimo de lucro y sin monetización.
         Inazuma Eleven es propiedad de Level-5. Sin afiliación ni respaldo oficial.
       </p>
-      <p class="mono t-caption-sm t-dim">«a ese Gonzalo le gano fácil» · folclore de liga</p>
+      <p class="mono t-caption-sm t-dim">«Al agonzalo ese le gano fácil» · Payo Aguao</p>
     </div>
 
   </div>

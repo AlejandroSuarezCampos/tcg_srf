@@ -69,7 +69,7 @@ $activeAdmin = 'expansiones';
     <?php if (($_GET['error'] ?? '') === 'cartas_en_uso'): ?>
     <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
-      <span>No se puede eliminar esta expansión: todavía tiene cartas asociadas. Bórralas (o muévelas a otra expansión) primero.</span>
+      <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
     </div>
     <?php endif; ?>
 

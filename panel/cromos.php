@@ -15,8 +15,8 @@ if (isset($_SESSION['dictador'])) {
 
 // ----- Borrado (?eliminar=ID) -----
 if (isset($_GET['eliminar'])) {
-    $db->eliminarCromo((int) $_GET['eliminar']);
-    header('Location: cromos.php');
+    $borrado = $db->eliminarCromo((int) $_GET['eliminar']);
+    header('Location: cromos.php' . ($borrado ? '' : '?error=cromo_en_uso'));
     exit;
 }
 
@@ -95,6 +95,13 @@ $activeAdmin = 'cromos';
         <i class="ph ph-plus" aria-hidden="true"></i> Nuevo cromo
       </button>
     </div>
+
+    <?php if (($_GET['error'] ?? '') === 'cromo_en_uso'): ?>
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+      <i class="ph ph-warning-circle" aria-hidden="true"></i>
+      <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
+    </div>
+    <?php endif; ?>
 
     <form method="GET" class="barra-filtros">
       <div class="campo">

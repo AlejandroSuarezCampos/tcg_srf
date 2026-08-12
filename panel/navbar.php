@@ -4,7 +4,8 @@
  *
  * Antes de incluir este archivo, cada página define:
  *   $activeAdmin -> 'inicio' | 'cromos' | 'importar' | 'sobres' |
- *                   'expansiones' | 'plantillas' | 'usuarios'
+ *                   'expansiones' | 'cadenas' | 'codigos' | 'misiones' |
+ *                   'plantillas' | 'usuarios'
  *
  * El desplegable en móvil NO tiene JS propio: usa el mismo mecanismo que la
  * nav del sitio (assets/js/ui.js → iniciarNav()), que ya está cargado por
@@ -22,6 +23,9 @@ $enlaces = [
     ['importar',    'importar.php',    'Importar datos',  'ph-cloud-arrow-up'],
     ['sobres',      'sobres.php',      'Sobres',          'ph-package'],
     ['expansiones', 'expansiones.php', 'Expansiones',     'ph-folder-open'],
+    ['cadenas',     'cadenas.php',     'Cadenas PvE',     'ph-flow-arrow'],
+    ['codigos',     'codigos.php',     'Códigos',         'ph-ticket'],
+    ['misiones',    'misiones.php',    'Misiones',        'ph-target'],
     ['plantillas',  'plantillas.php',  'Plantillas 3D',   'ph-cube'],
     ['usuarios',    'usuarios.php',    'Usuarios',        'ph-users'],
 ];

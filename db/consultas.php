@@ -267,9 +267,35 @@ class Tcg
 		]);
 	}
 
+	// Cascade explícito, a propósito (decisión de Alejandro: borrar desde el
+	// panel nunca se bloquea). `coleccion.id_cromo` y `duelo_alineaciones.id_cromo`
+	// son RESTRICT en el esquema —protegen contra un DELETE a ciegas que
+	// reventaría con un error 500—, así que hay que vaciarlas a mano primero.
+	// Todo lo demás (cadena_rival_cartas, cadena_loot, cadena_numeracion,
+	// cromo_rasgos, y lo que cuelga de coleccion vía mazo_cartas/mercado/
+	// duelo_apuestas) ya es CASCADE en el esquema y se limpia solo.
+	//
+	// ⚠️ Efecto real: quita la carta de la colección de CUALQUIERA que la
+	// tenga, la saca de mazos y anuncios de mercado activos, y borra su rastro
+	// en duelos ya jugados. Si estaba en la plantilla de un rival de Cadenas,
+	// ese estilo se queda con menos de 11 huecos (mismo caso que se resolvió a
+	// mano en la limpieza del catálogo — aquí no hay quien lo reconstruya solo).
+	private function borrarCromoCascade($id_cromo) {
+		$this->pdo->prepare("DELETE FROM coleccion WHERE id_cromo = :id")->execute([":id" => $id_cromo]);
+		$this->pdo->prepare("DELETE FROM duelo_alineaciones WHERE id_cromo = :id")->execute([":id" => $id_cromo]);
+		$this->pdo->prepare("DELETE FROM cromos WHERE id_cromo = :id")->execute([":id" => $id_cromo]);
+	}
+
 	public function eliminarCromo($id_cromo) {
-		$stmt = $this->pdo->prepare("DELETE FROM cromos WHERE id_cromo = :id");
-		$stmt->execute([":id" => $id_cromo]);
+		try {
+			$this->pdo->beginTransaction();
+			$this->borrarCromoCascade($id_cromo);
+			$this->pdo->commit();
+			return true;
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			return false;
+		}
 	}
 
 	// ==========================================================
@@ -317,20 +343,30 @@ class Tcg
 		]);
 	}
 
-	// Devuelve false sin borrar si la expansión todavía tiene cartas (la FK
-	// cromos.id_expansion -> expansiones.id_expansion no tiene cascada, y
-	// borrar cartas en uso a ciegas se lo cargaría de golpe con un error
-	// fatal). El admin tiene que vaciarla o mover las cartas antes.
+	// Cascade explícito (mismo criterio que eliminarCromo()): borra primero
+	// cada cromo de la expansión con su propio cascade completo, luego los
+	// sobres (`sobre.id_expansion` también es RESTRICT), y por último la
+	// expansión. Una sola transacción para las tres cosas: si algo falla a
+	// medio camino, no se queda la expansión mutilada.
 	public function eliminarExpansion($id_expansion) {
-		$stmt = $this->pdo->prepare("SELECT COUNT(*) FROM cromos WHERE id_expansion = :id");
-		$stmt->execute([":id" => $id_expansion]);
-		if ((int) $stmt->fetchColumn() > 0) {
+		try {
+			$this->pdo->beginTransaction();
+
+			$stmt = $this->pdo->prepare("SELECT id_cromo FROM cromos WHERE id_expansion = :id");
+			$stmt->execute([":id" => $id_expansion]);
+			foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $idCromo) {
+				$this->borrarCromoCascade($idCromo);
+			}
+
+			$this->pdo->prepare("DELETE FROM sobre WHERE id_expansion = :id")->execute([":id" => $id_expansion]);
+			$this->pdo->prepare("DELETE FROM expansiones WHERE id_expansion = :id")->execute([":id" => $id_expansion]);
+
+			$this->pdo->commit();
+			return true;
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
 			return false;
 		}
-
-		$stmt = $this->pdo->prepare("DELETE FROM expansiones WHERE id_expansion = :id");
-		$stmt->execute([":id" => $id_expansion]);
-		return true;
 	}
 
 	// ==========================================================
@@ -381,6 +417,449 @@ class Tcg
 	public function eliminarUsuario($id_usuario) {
 		$stmt = $this->pdo->prepare("DELETE FROM usuarios WHERE id_usuario = :id");
 		$stmt->execute([":id" => $id_usuario]);
+	}
+
+	// ==========================================================
+	// PANEL DE CONTROL — CADENAS (crear el mapa, los rivales y el botín)
+	//
+	// Todo lo que hay en el bloque "CADENAS DE PARTIDO (PvE)" más abajo es de
+	// LECTURA para el jugador (mapa, progreso, resolución de duelo). Esto es
+	// lo contrario: escritura para quien diseña la cadena. Vive aquí, junto
+	// al resto de CRUD del panel, no junto al motor de juego.
+	// ==========================================================
+
+	// --- Cadenas ---
+
+	// A diferencia de listarCadenas() (la del jugador), esta trae también las
+	// inactivas y caducadas: el admin tiene que poder verlas para reactivarlas.
+	public function listarCadenasAdmin() {
+		return $this->pdo->query("
+			SELECT c.*, (SELECT COUNT(*) FROM cadena_nodos n WHERE n.id_cadena = c.id_cadena) AS total_nodos
+			FROM cadenas c ORDER BY c.orden, c.id_cadena
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function obtenerCadenaAdmin($id_cadena) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadenas WHERE id_cadena = :id");
+		$stmt->execute([":id" => $id_cadena]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	public function crearCadenaAdmin($nombre, $descripcion, $anfitrion, $orden, $activa, $formacion_recompensa, $fecha_fin) {
+		$stmt = $this->pdo->prepare("
+			INSERT INTO cadenas (nombre, descripcion, anfitrion, orden, activa, formacion_recompensa, fecha_fin)
+			VALUES (:nombre, :descripcion, :anfitrion, :orden, :activa, :formacion_recompensa, :fecha_fin)
+		");
+		$stmt->execute([
+			":nombre" => $nombre, ":descripcion" => $descripcion ?: null, ":anfitrion" => $anfitrion ?: null,
+			":orden" => $orden, ":activa" => $activa,
+			":formacion_recompensa" => $formacion_recompensa ?: null, ":fecha_fin" => $fecha_fin ?: null,
+		]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function actualizarCadenaAdmin($id_cadena, $nombre, $descripcion, $anfitrion, $orden, $activa, $formacion_recompensa, $fecha_fin) {
+		$stmt = $this->pdo->prepare("
+			UPDATE cadenas SET nombre = :nombre, descripcion = :descripcion, anfitrion = :anfitrion,
+				orden = :orden, activa = :activa, formacion_recompensa = :formacion_recompensa, fecha_fin = :fecha_fin
+			WHERE id_cadena = :id
+		");
+		$stmt->execute([
+			":nombre" => $nombre, ":descripcion" => $descripcion ?: null, ":anfitrion" => $anfitrion ?: null,
+			":orden" => $orden, ":activa" => $activa,
+			":formacion_recompensa" => $formacion_recompensa ?: null, ":fecha_fin" => $fecha_fin ?: null,
+			":id" => $id_cadena,
+		]);
+	}
+
+	// Cascade completo ya en el esquema (cadena_nodos, cadena_requisitos, y
+	// desde los nodos cadena_aristas/cadena_cofres/cadena_drops/cadena_loot/
+	// cadena_progreso, todo CASCADE): borrar la cadena SÍ se lleva por delante
+	// el progreso real de cualquier jugador en ella. Decisión de Alejandro:
+	// borrar desde el panel nunca se bloquea.
+	public function eliminarCadenaAdmin($id_cadena) {
+		$this->pdo->prepare("DELETE FROM cadenas WHERE id_cadena = :id")->execute([":id" => $id_cadena]);
+		return true;
+	}
+
+	// --- Requisitos de entrada ---
+
+	public function listarRequisitosAdmin($id_cadena) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadena_requisitos WHERE id_cadena = :id ORDER BY id_requisito");
+		$stmt->execute([":id" => $id_cadena]);
+		$filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		foreach ($filas as &$r) {
+			if ($r["tipo"] === "cadena") {
+				$n = $this->pdo->prepare("SELECT nombre FROM cadenas WHERE id_cadena = :v");
+			} else {
+				$n = $this->pdo->prepare("SELECT nombre FROM cromos WHERE id_cromo = :v");
+			}
+			$n->execute([":v" => $r["valor"]]);
+			$r["nombre_valor"] = $n->fetchColumn() ?: null;
+		}
+		unset($r);
+		return $filas;
+	}
+
+	// Un requisito tipo "cadena" es una arista id_cadena -> valor ("A exige
+	// haber completado B"). Añadir una arista que ya se puede alcanzar AL
+	// REVÉS desde B cierra un ciclo: ninguna de las cadenas implicadas se
+	// podría empezar nunca, ni un jugador real ni el guion de pruebas
+	// (probar_pve.php falló exactamente así al probarlo con datos reales).
+	private function requisitoCreariaCiclo($id_cadena, $id_cadena_exigida) {
+		$id_cadena = (int) $id_cadena;
+		$id_cadena_exigida = (int) $id_cadena_exigida;
+		if ($id_cadena === $id_cadena_exigida) {
+			return true; // una cadena no puede exigirse a sí misma
+		}
+
+		// BFS desde la cadena exigida, siguiendo las aristas "exige" que YA
+		// existen: si desde ahí se llega de vuelta a $id_cadena, la arista
+		// nueva cerraría el ciclo.
+		$visitados = [$id_cadena_exigida => true];
+		$pendientes = [$id_cadena_exigida];
+		while ($pendientes) {
+			$actual = array_pop($pendientes);
+			$stmt = $this->pdo->prepare("SELECT valor FROM cadena_requisitos WHERE id_cadena = :c AND tipo = 'cadena'");
+			$stmt->execute([":c" => $actual]);
+			foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $siguiente) {
+				$siguiente = (int) $siguiente;
+				if ($siguiente === $id_cadena) {
+					return true;
+				}
+				if (!isset($visitados[$siguiente])) {
+					$visitados[$siguiente] = true;
+					$pendientes[] = $siguiente;
+				}
+			}
+		}
+		return false;
+	}
+
+	// Devuelve false sin insertar si el requisito (tipo "cadena") cerraría un
+	// ciclo. Los de tipo "cromo" no pueden formar ciclos, así que pasan directos.
+	public function crearRequisito($id_cadena, $tipo, $valor) {
+		if ($tipo === "cadena" && $this->requisitoCreariaCiclo($id_cadena, $valor)) {
+			return false;
+		}
+		$this->pdo->prepare("INSERT INTO cadena_requisitos (id_cadena, tipo, valor) VALUES (:c, :t, :v)")
+			->execute([":c" => $id_cadena, ":t" => $tipo, ":v" => $valor]);
+		return true;
+	}
+
+	public function eliminarRequisito($id_requisito) {
+		$this->pdo->prepare("DELETE FROM cadena_requisitos WHERE id_requisito = :id")->execute([":id" => $id_requisito]);
+	}
+
+	// --- Nodos ---
+
+	public function listarNodosAdmin($id_cadena) {
+		$stmt = $this->pdo->prepare("
+			SELECT n.*, r.nombre AS rival
+			FROM cadena_nodos n
+			LEFT JOIN cadena_rivales r ON r.id_rival = n.id_rival
+			WHERE n.id_cadena = :id
+			ORDER BY n.columna, n.fila
+		");
+		$stmt->execute([":id" => $id_cadena]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function crearNodo($id_cadena, $tipo, $nombre, $columna, $fila, $es_final, $id_rival = null) {
+		$stmt = $this->pdo->prepare("
+			INSERT INTO cadena_nodos (id_cadena, id_rival, tipo, nombre, columna, fila, es_final)
+			VALUES (:c, :r, :t, :n, :col, :fil, :ef)
+		");
+		$stmt->execute([
+			":c" => $id_cadena, ":r" => $id_rival ?: null, ":t" => $tipo, ":n" => $nombre ?: null,
+			":col" => $columna, ":fil" => $fila, ":ef" => $es_final,
+		]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function actualizarNodo($id_nodo, $tipo, $nombre, $es_final, $id_rival = null) {
+		$this->pdo->prepare("
+			UPDATE cadena_nodos SET tipo = :t, nombre = :n, es_final = :ef, id_rival = :r
+			WHERE id_nodo = :id
+		")->execute([
+			":t" => $tipo, ":n" => $nombre ?: null, ":ef" => $es_final, ":r" => $id_rival ?: null, ":id" => $id_nodo,
+		]);
+	}
+
+	// Solo la posición: es lo único que toca arrastrar un nodo en el editor.
+	public function moverNodo($id_nodo, $columna, $fila) {
+		$this->pdo->prepare("UPDATE cadena_nodos SET columna = :col, fila = :fil WHERE id_nodo = :id")
+			->execute([":col" => $columna, ":fil" => $fila, ":id" => $id_nodo]);
+	}
+
+	// Igual que eliminarCadenaAdmin(): cascade completo ya en el esquema, así
+	// que borra el nodo aunque algún jugador tenga progreso real en él.
+	public function eliminarNodo($id_nodo) {
+		$this->pdo->prepare("DELETE FROM cadena_nodos WHERE id_nodo = :id")->execute([":id" => $id_nodo]);
+		return true;
+	}
+
+	// --- Aristas ---
+
+	public function listarAristasAdmin($id_cadena) {
+		$stmt = $this->pdo->prepare("
+			SELECT a.* FROM cadena_aristas a
+			INNER JOIN cadena_nodos n ON n.id_nodo = a.id_origen
+			WHERE n.id_cadena = :id
+		");
+		$stmt->execute([":id" => $id_cadena]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// INSERT IGNORE porque la PK es (id_origen, id_destino): conectar dos
+	// nodos ya conectados no debe reventar, simplemente no hace nada.
+	public function crearArista($id_origen, $id_destino) {
+		$this->pdo->prepare("INSERT IGNORE INTO cadena_aristas (id_origen, id_destino) VALUES (:o, :d)")
+			->execute([":o" => $id_origen, ":d" => $id_destino]);
+	}
+
+	public function eliminarArista($id_origen, $id_destino) {
+		$this->pdo->prepare("DELETE FROM cadena_aristas WHERE id_origen = :o AND id_destino = :d")
+			->execute([":o" => $id_origen, ":d" => $id_destino]);
+	}
+
+	// --- Rivales, estilos y su plantilla de 11 cartas ---
+
+	// A diferencia de listarRivales() (la del jugador), trae también los
+	// inactivos: el admin tiene que poder verlos para reutilizarlos o reactivarlos.
+	public function listarRivalesAdmin() {
+		return $this->pdo->query("
+			SELECT r.*, (SELECT COUNT(*) FROM cadena_rival_estilos e WHERE e.id_rival = r.id_rival) AS total_estilos
+			FROM cadena_rivales r ORDER BY r.nombre
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function crearRival($nombre, $escudo, $descripcion, $activo) {
+		$stmt = $this->pdo->prepare("
+			INSERT INTO cadena_rivales (nombre, escudo, descripcion, activo) VALUES (:n, :e, :d, :a)
+		");
+		$stmt->execute([":n" => $nombre, ":e" => $escudo ?: null, ":d" => $descripcion ?: null, ":a" => $activo]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function actualizarRival($id_rival, $nombre, $escudo, $descripcion, $activo) {
+		$this->pdo->prepare("
+			UPDATE cadena_rivales SET nombre = :n, escudo = :e, descripcion = :d, activo = :a WHERE id_rival = :id
+		")->execute([":n" => $nombre, ":e" => $escudo ?: null, ":d" => $descripcion ?: null, ":a" => $activo, ":id" => $id_rival]);
+	}
+
+	public function listarEstilosRivalAdmin($id_rival) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadena_rival_estilos WHERE id_rival = :r ORDER BY id_estilo");
+		$stmt->execute([":r" => $id_rival]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function crearEstiloRival($id_rival, $nombre, $formacion) {
+		$stmt = $this->pdo->prepare("
+			INSERT INTO cadena_rival_estilos (id_rival, nombre, formacion) VALUES (:r, :n, :f)
+		");
+		$stmt->execute([":r" => $id_rival, ":n" => $nombre, ":f" => $formacion]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function eliminarEstiloRival($id_estilo) {
+		$this->pdo->prepare("DELETE FROM cadena_rival_estilos WHERE id_estilo = :id")->execute([":id" => $id_estilo]);
+	}
+
+	// Upsert: la PK de cadena_rival_cartas es (id_estilo, hueco), así que
+	// volver a asignar un hueco ya cubierto sustituye la carta en vez de fallar.
+	public function asignarCartaEstilo($id_estilo, $hueco, $id_cromo) {
+		$this->pdo->prepare("
+			INSERT INTO cadena_rival_cartas (id_estilo, hueco, id_cromo) VALUES (:e, :h, :c)
+			ON DUPLICATE KEY UPDATE id_cromo = VALUES(id_cromo)
+		")->execute([":e" => $id_estilo, ":h" => $hueco, ":c" => $id_cromo]);
+	}
+
+	// --- Botín (cadena_loot) ---
+
+	public function listarLootNodo($id_nodo) {
+		$stmt = $this->pdo->prepare("
+			SELECT l.*, c.nombre AS cromo_nombre
+			FROM cadena_loot l
+			LEFT JOIN cromos c ON c.id_cromo = l.id_cromo
+			WHERE l.id_nodo = :id ORDER BY l.id_loot
+		");
+		$stmt->execute([":id" => $id_nodo]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	public function crearLoot($id_nodo, $tipo, $id_cromo, $monedas, $probabilidad, $rango_minimo) {
+		$this->pdo->prepare("
+			INSERT INTO cadena_loot (id_nodo, tipo, id_cromo, monedas, probabilidad, rango_minimo)
+			VALUES (:n, :t, :c, :m, :p, :r)
+		")->execute([
+			":n" => $id_nodo, ":t" => $tipo,
+			":c" => $tipo === "monedas" ? null : $id_cromo,
+			":m" => $tipo === "monedas" ? $monedas : null,
+			":p" => $probabilidad, ":r" => $rango_minimo ?: null,
+		]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function eliminarLoot($id_loot) {
+		$this->pdo->prepare("DELETE FROM cadena_loot WHERE id_loot = :id")->execute([":id" => $id_loot]);
+	}
+
+	// ==========================================================
+	// PANEL DE CONTROL — CÓDIGOS (crear/editar códigos de canje)
+	//
+	// obtenerCodigoPorTexto() y canjearCodigo(), más abajo, son de LECTURA
+	// para el jugador (perfil.php). Esto es la administración: quien crea el
+	// código, no quien lo usa.
+	// ==========================================================
+
+	public function listarCodigosAdmin() {
+		return $this->pdo->query("
+			SELECT c.*, COUNT(cc.id_canje) AS veces_canjeado
+			FROM codigos c
+			LEFT JOIN codigos_canjeados cc ON cc.id_codigo = c.id_codigo
+			GROUP BY c.id_codigo
+			ORDER BY c.creado DESC
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// El texto se normaliza a MAYÚSCULAS aquí, no solo al canjear: canjearCodigo()
+	// también hace strtoupper() sobre lo que escribe el jugador (assets/ajax/
+	// canjear_codigo.php), así que dos filas "abc123"/"ABC123" serían el mismo
+	// código a efectos del jugador pero dos filas distintas para obtenerCodigoPorTexto()
+	// (que compara tal cual) — de ahí el guard de duplicado también en mayúsculas.
+	private function normalizarCodigo($codigo) {
+		return strtoupper(trim($codigo));
+	}
+
+	private function codigoDuplicado($codigoNormalizado, $excluirId = null) {
+		$sql = "SELECT 1 FROM codigos WHERE codigo = :c";
+		$params = [":c" => $codigoNormalizado];
+		if ($excluirId !== null) {
+			$sql .= " AND id_codigo != :id";
+			$params[":id"] = $excluirId;
+		}
+		$stmt = $this->pdo->prepare($sql . " LIMIT 1");
+		$stmt->execute($params);
+		return (bool) $stmt->fetchColumn();
+	}
+
+	// Devuelve el id del código creado, o false si ya existe uno igual (sin
+	// distinguir mayúsculas/minúsculas, que es como lo ve el jugador).
+	public function crearCodigoAdmin($codigo, $tipo, $monedas, $activo) {
+		$codigo = $this->normalizarCodigo($codigo);
+		if ($codigo === '' || $this->codigoDuplicado($codigo)) {
+			return false;
+		}
+		$stmt = $this->pdo->prepare("
+			INSERT INTO codigos (codigo, tipo, monedas, activo) VALUES (:c, :t, :m, :a)
+		");
+		$stmt->execute([":c" => $codigo, ":t" => $tipo, ":m" => $monedas, ":a" => $activo]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function actualizarCodigoAdmin($id_codigo, $codigo, $tipo, $monedas, $activo) {
+		$codigo = $this->normalizarCodigo($codigo);
+		if ($codigo === '' || $this->codigoDuplicado($codigo, $id_codigo)) {
+			return false;
+		}
+		$this->pdo->prepare("
+			UPDATE codigos SET codigo = :c, tipo = :t, monedas = :m, activo = :a WHERE id_codigo = :id
+		")->execute([":c" => $codigo, ":t" => $tipo, ":m" => $monedas, ":a" => $activo, ":id" => $id_codigo]);
+		return true;
+	}
+
+	// codigos_canjeados no tiene clave ajena hacia codigos (mismo caso que
+	// duelo_minijuegos, §8 del CLAUDE.md de branding): borrar un código deja
+	// su historial de canjes huérfano pero inofensivo, y las monedas ya
+	// entregadas no se tocan. No hace falta guard de integridad.
+	public function eliminarCodigoAdmin($id_codigo) {
+		$this->pdo->prepare("DELETE FROM codigos WHERE id_codigo = :id")->execute([":id" => $id_codigo]);
+	}
+
+	public function listarCanjesCodigo($id_codigo) {
+		$stmt = $this->pdo->prepare("
+			SELECT cc.*, u.nombre AS usuario
+			FROM codigos_canjeados cc
+			INNER JOIN usuarios u ON u.id_usuario = cc.id_usuario
+			WHERE cc.id_codigo = :id
+			ORDER BY cc.fecha_canje DESC
+		");
+		$stmt->execute([":id" => $id_codigo]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// ==========================================================
+	// PANEL DE CONTROL — MISIONES (crear/editar misiones)
+	//
+	// listarMisionesConProgreso() y reclamarMision(), en la sección MISIONES
+	// más abajo, son de LECTURA para el jugador (misiones.php). Esto es la
+	// administración: quien define el objetivo y la recompensa.
+	// ==========================================================
+
+	const MISIONES_TIPOS = [
+		'cartas_distintas', 'copias_totales', 'duelos_jugados',
+		'duelos_ganados', 'expansiones_completas', 'mazos_creados',
+	];
+	const MISIONES_CICLOS = ['unica', 'diaria', 'semanal'];
+
+	public function listarMisionesAdmin() {
+		return $this->pdo->query("
+			SELECT m.*, COUNT(mp.id_progreso) AS veces_reclamada
+			FROM misiones m
+			LEFT JOIN misiones_progreso mp ON mp.id_mision = m.id_mision
+			GROUP BY m.id_mision
+			ORDER BY m.id_mision
+		")->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	// "expansiones_completas" es un hito de estado sin fecha propia: no se
+	// puede acotar a "completada esta semana" (progresoMision() lo explica).
+	// Cualquier otro tipo sí es un evento con fecha y funciona en los tres ciclos.
+	private function combinacionMisionValida($tipo, $ciclo) {
+		if (!in_array($tipo, self::MISIONES_TIPOS, true) || !in_array($ciclo, self::MISIONES_CICLOS, true)) {
+			return false;
+		}
+		return !($ciclo !== "unica" && $tipo === "expansiones_completas");
+	}
+
+	public function crearMisionAdmin($nombre, $descripcion, $tipo, $ciclo, $objetivo, $recompensa_monedas, $activo) {
+		if (!$this->combinacionMisionValida($tipo, $ciclo)) {
+			return false;
+		}
+		$stmt = $this->pdo->prepare("
+			INSERT INTO misiones (nombre, descripcion, tipo, ciclo, objetivo, recompensa_monedas, activo)
+			VALUES (:n, :d, :t, :c, :o, :r, :a)
+		");
+		$stmt->execute([
+			":n" => $nombre, ":d" => $descripcion, ":t" => $tipo, ":c" => $ciclo,
+			":o" => $objetivo, ":r" => $recompensa_monedas, ":a" => $activo,
+		]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	public function actualizarMisionAdmin($id_mision, $nombre, $descripcion, $tipo, $ciclo, $objetivo, $recompensa_monedas, $activo) {
+		if (!$this->combinacionMisionValida($tipo, $ciclo)) {
+			return false;
+		}
+		$this->pdo->prepare("
+			UPDATE misiones SET nombre = :n, descripcion = :d, tipo = :t, ciclo = :c,
+				objetivo = :o, recompensa_monedas = :r, activo = :a
+			WHERE id_mision = :id
+		")->execute([
+			":n" => $nombre, ":d" => $descripcion, ":t" => $tipo, ":c" => $ciclo,
+			":o" => $objetivo, ":r" => $recompensa_monedas, ":a" => $activo, ":id" => $id_mision,
+		]);
+		return true;
+	}
+
+	// Cascade completo ya en el esquema (misiones_progreso es CASCADE): borra
+	// la misión aunque algún jugador ya la haya reclamado, llevándose su
+	// historial de reclamo por delante. Decisión de Alejandro: borrar desde
+	// el panel nunca se bloquea.
+	public function eliminarMisionAdmin($id_mision) {
+		$this->pdo->prepare("DELETE FROM misiones WHERE id_mision = :id")->execute([":id" => $id_mision]);
+		return true;
 	}
 
 	// ==========================================================
@@ -7102,66 +7581,172 @@ class Tcg
 	// MISIONES
 	// ==========================================================
 
+	// Límites del "hoy" y del "esta semana" ACTUALES, calculados por MySQL y no
+	// por PHP: no hay ningún date_default_timezone_set() en el proyecto, así
+	// que la zona horaria de PHP depende de php.ini y podría no coincidir con
+	// la del servidor de MySQL. Todo lo que escribe una fecha en esta base de
+	// datos lo hace con NOW() (nunca con la hora de PHP), así que comparar
+	// contra límites calculados también en MySQL es la única forma de que
+	// "medianoche hora del servidor" signifique lo mismo en la escritura y en
+	// la lectura. El lunes de la semana sale de WEEKDAY() (0 = lunes), no de
+	// restar días a mano, que se lía con los cambios de mes/año.
+	private function limitesDePeriodo() {
+		$fila = $this->pdo->query("
+			SELECT
+				DATE_FORMAT(NOW(), '%Y-%m-%d') AS periodo_diaria,
+				CURDATE() AS desde_diaria,
+				DATE_FORMAT(NOW(), '%x-W%v') AS periodo_semanal,
+				DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) AS desde_semanal
+		")->fetch(PDO::FETCH_ASSOC);
+
+		return [
+			"diaria"  => ["periodo" => $fila["periodo_diaria"],  "desde" => $fila["desde_diaria"]],
+			"semanal" => ["periodo" => $fila["periodo_semanal"], "desde" => $fila["desde_semanal"]],
+		];
+	}
+
+	// `periodo`/`desde` de UNA misión según su ciclo. "unica" no tiene ventana:
+	// es la cadena vacía reservada de la 005 y el progreso es de toda la vida.
+	private function periodoDeCiclo($ciclo) {
+		if ($ciclo === "unica") {
+			return ["periodo" => "", "desde" => null];
+		}
+		return $this->limitesDePeriodo()[$ciclo];
+	}
+
 	// Progreso actual de un usuario para un TIPO de misión. Nunca se guarda en
 	// un contador propio (misiones_progreso solo registra el reclamo): se
 	// deriva siempre de las consultas que ya existen, para no tener una
 	// segunda fuente de verdad que se pueda desincronizar.
-	private function progresoMision($tipo, $id_usuario) {
+	//
+	// `$desde` acota el conteo a "ocurrido desde tal instante" (medianoche de
+	// hoy, o el lunes de esta semana) para las misiones diaria/semanal. `null`
+	// (el caso de "unica") es el comportamiento de siempre: acumulado de toda
+	// la vida, sin tocar.
+	private function progresoMision($tipo, $id_usuario, $desde = null) {
+		$params = [":id" => $id_usuario];
+		if ($desde !== null) { $params[":desde"] = $desde; }
+
 		switch ($tipo) {
 			case "cartas_distintas":
-				return $this->contarColeccionUsuario($id_usuario);
+				$sql = "SELECT COUNT(DISTINCT id_cromo) AS total FROM coleccion WHERE id_usuario = :id"
+					. ($desde !== null ? " AND obtenida >= :desde" : "");
+				break;
 			case "copias_totales":
-				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM coleccion WHERE id_usuario = :id");
-				$stmt->execute([":id" => $id_usuario]);
-				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+				$sql = "SELECT COUNT(*) AS total FROM coleccion WHERE id_usuario = :id"
+					. ($desde !== null ? " AND obtenida >= :desde" : "");
+				break;
 			case "expansiones_completas":
+				// Es un hito de ESTADO ("ya tienes toda la expansión"), no un evento
+				// con fecha propia: no hay columna que diga cuándo se cruzó el
+				// umbral, así que no se puede acotar a "completada esta semana". El
+				// panel no deja crear esta combinación (tipo=expansiones_completas +
+				// ciclo != única, ver crearMisionAdmin()); si de todos modos llegara
+				// aquí con $desde, se ignora y se responde el estado actual, que es
+				// lo menos sorprendente que se puede hacer.
 				return $this->contarExpansionesCompletas($id_usuario);
 			case "mazos_creados":
-				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM mazos WHERE id_usuario = :id");
-				$stmt->execute([":id" => $id_usuario]);
-				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+				$sql = "SELECT COUNT(*) AS total FROM mazos WHERE id_usuario = :id"
+					. ($desde !== null ? " AND creado >= :desde" : "");
+				break;
 			case "duelos_jugados":
-				$stmt = $this->pdo->prepare("
-					SELECT COUNT(*) AS total FROM duelos
-					WHERE estado = 'resuelto' AND (id_creador = :id OR id_rival = :id)
-				");
-				$stmt->execute([":id" => $id_usuario]);
-				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+				// Se acota por `duelos.creado`, no por cuándo se liquidó de verdad:
+				// esa fecha (`resuelto`) ya está tomada para otra cosa —la hora en la
+				// que arrancarPartidoSiToca() cuenta partido_espera_seg, ver §15.10—
+				// y reutilizarla rompería esa cuenta. Un duelo se cierra dentro de la
+				// misma sesión salvo abandono (hasta partido_abandono_seg = 1h), así
+				// que `creado` es una aproximación de sobra para una misión.
+				$sql = "SELECT COUNT(*) AS total FROM duelos
+					WHERE estado = 'resuelto' AND (id_creador = :id OR id_rival = :id)"
+					. ($desde !== null ? " AND creado >= :desde" : "");
+				break;
 			case "duelos_ganados":
-				$stmt = $this->pdo->prepare("SELECT COUNT(*) AS total FROM duelos WHERE id_ganador = :id");
-				$stmt->execute([":id" => $id_usuario]);
-				return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
+				$sql = "SELECT COUNT(*) AS total FROM duelos WHERE id_ganador = :id"
+					. ($desde !== null ? " AND creado >= :desde" : "");
+				break;
+			default:
+				return 0;
 		}
-		return 0;
+
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute($params);
+		return (int) $stmt->fetch(PDO::FETCH_ASSOC)["total"];
 	}
 
 	// Misiones activas con el progreso YA calculado y si están reclamadas.
-	// `periodo = ''` es el valor fijo de las misiones de una sola vez (ver 005);
-	// una misión reclamada no vuelve a recalcular progreso, se queda en el
-	// objetivo para no hacer trabajo de más.
+	// El `periodo` contra el que se busca el reclamo depende del CICLO de
+	// CADA misión (única -> '', diaria -> el día de hoy, semanal -> la semana
+	// de hoy), de ahí el CASE: no es el mismo valor para todas las filas.
+	// Una misión ya reclamada en el periodo actual no vuelve a recalcular
+	// progreso, se queda en el objetivo para no hacer trabajo de más.
 	public function listarMisionesConProgreso($id_usuario) {
+		$limites = $this->limitesDePeriodo();
+
 		$stmt = $this->pdo->prepare("
 			SELECT m.*, mp.fecha_reclamada
 			FROM misiones m
 			LEFT JOIN misiones_progreso mp
-				ON mp.id_mision = m.id_mision AND mp.id_usuario = :id_usuario AND mp.periodo = ''
+				ON mp.id_mision = m.id_mision AND mp.id_usuario = :id_usuario
+				AND mp.periodo = CASE m.ciclo
+					WHEN 'diaria'  THEN :periodo_diaria
+					WHEN 'semanal' THEN :periodo_semanal
+					ELSE ''
+				END
 			WHERE m.activo = 1
 			ORDER BY m.id_mision
 		");
-		$stmt->execute([":id_usuario" => $id_usuario]);
+		$stmt->execute([
+			":id_usuario" => $id_usuario,
+			":periodo_diaria" => $limites["diaria"]["periodo"],
+			":periodo_semanal" => $limites["semanal"]["periodo"],
+		]);
 		$misiones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 		foreach ($misiones as &$m) {
 			$m["reclamada"] = $m["fecha_reclamada"] !== null;
-			$m["progreso"]  = $m["reclamada"] ? (int) $m["objetivo"] : $this->progresoMision($m["tipo"], $id_usuario);
+			if ($m["reclamada"]) {
+				$m["progreso"] = (int) $m["objetivo"];
+			} else {
+				$desde = $m["ciclo"] === "unica" ? null : $limites[$m["ciclo"]]["desde"];
+				$m["progreso"] = $this->progresoMision($m["tipo"], $id_usuario, $desde);
+			}
 			$m["completada"] = $m["progreso"] >= (int) $m["objetivo"];
 		}
 		return $misiones;
 	}
 
-	// Reclamo manual: comprueba objetivo y que no se haya reclamado ya antes de
-	// pagar, bloqueando las filas implicadas (mismo patrón que comprarAnuncio()
-	// y canjearCodigo()) para que dos clics simultáneos no paguen dos veces.
+	// Reclamo manual: comprueba objetivo y que no se haya reclamado ya EN ESTE
+	// PERIODO antes de pagar, bloqueando las filas implicadas (mismo patrón
+	// que comprarAnuncio() y canjearCodigo()) para que dos clics simultáneos
+	// no paguen dos veces. Al llegar un periodo nuevo (mañana, o el lunes que
+	// viene) el `periodo` cambia solo y la fila de ayer/la semana pasada deja
+	// de bloquear nada: el "reinicio" no borra ni actualiza nada, sale gratis
+	// de que la clave única es (usuario, misión, periodo).
+	// Segundos hasta el próximo reinicio de cada ciclo, para pintar la cuenta
+	// atrás en misiones.php. Calculado en MySQL por el mismo motivo que
+	// limitesDePeriodo(): el servidor no fija zona horaria en PHP, así que
+	// "cuánto falta" tiene que salir de la misma hora con la que se decide
+	// cuándo cambia el periodo, o el reloj de la pantalla mentiría.
+	//
+	// La semana que viene no es siempre "+7 días": si hoy es lunes, el
+	// PRÓXIMO lunes cae dentro de 7 días (el de hoy ya pasó su medianoche);
+	// cualquier otro día, cae dentro de `7 - WEEKDAY(hoy)` días. WEEKDAY()
+	// da 0 para lunes, por eso el caso lunes necesita su propio IF.
+	public function proximosReinicios() {
+		$fila = $this->pdo->query("
+			SELECT
+				TIMESTAMPDIFF(SECOND, NOW(), DATE_ADD(CURDATE(), INTERVAL 1 DAY)) AS seg_diaria,
+				TIMESTAMPDIFF(SECOND, NOW(), DATE_ADD(CURDATE(), INTERVAL
+					IF(WEEKDAY(CURDATE()) = 0, 7, 7 - WEEKDAY(CURDATE())) DAY
+				)) AS seg_semanal
+		")->fetch(PDO::FETCH_ASSOC);
+
+		return [
+			"diaria"  => (int) $fila["seg_diaria"],
+			"semanal" => (int) $fila["seg_semanal"],
+		];
+	}
+
 	public function reclamarMision($id_mision, $id_usuario) {
 		try {
 			$this->pdo->beginTransaction();
@@ -7174,26 +7759,33 @@ class Tcg
 				return ["ok" => false, "error" => "Esa misión no existe."];
 			}
 
+			$limite = $this->periodoDeCiclo($mision["ciclo"]);
+
 			$stmtYa = $this->pdo->prepare("
 				SELECT 1 FROM misiones_progreso
-				WHERE id_mision = :id_mision AND id_usuario = :id_usuario AND periodo = ''
+				WHERE id_mision = :id_mision AND id_usuario = :id_usuario AND periodo = :periodo
 				FOR UPDATE
 			");
-			$stmtYa->execute([":id_mision" => $id_mision, ":id_usuario" => $id_usuario]);
+			$stmtYa->execute([":id_mision" => $id_mision, ":id_usuario" => $id_usuario, ":periodo" => $limite["periodo"]]);
 			if ($stmtYa->fetch()) {
 				$this->pdo->rollBack();
-				return ["ok" => false, "error" => "Ya has reclamado esta misión."];
+				$mensajes = [
+					"unica"   => "Ya has reclamado esta misión.",
+					"diaria"  => "Ya has reclamado esta misión hoy. Vuelve mañana.",
+					"semanal" => "Ya has reclamado esta misión esta semana. Vuelve el lunes.",
+				];
+				return ["ok" => false, "error" => $mensajes[$mision["ciclo"]] ?? $mensajes["unica"]];
 			}
 
-			if ($this->progresoMision($mision["tipo"], $id_usuario) < (int) $mision["objetivo"]) {
+			if ($this->progresoMision($mision["tipo"], $id_usuario, $limite["desde"]) < (int) $mision["objetivo"]) {
 				$this->pdo->rollBack();
 				return ["ok" => false, "error" => "Todavía no cumples el objetivo."];
 			}
 
 			$this->pdo->prepare("
 				INSERT INTO misiones_progreso (id_usuario, id_mision, periodo, fecha_reclamada)
-				VALUES (:id_usuario, :id_mision, '', NOW())
-			")->execute([":id_usuario" => $id_usuario, ":id_mision" => $id_mision]);
+				VALUES (:id_usuario, :id_mision, :periodo, NOW())
+			")->execute([":id_usuario" => $id_usuario, ":id_mision" => $id_mision, ":periodo" => $limite["periodo"]]);
 
 			$this->pdo->prepare("UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :id")
 				->execute([":m" => (int) $mision["recompensa_monedas"], ":id" => $id_usuario]);

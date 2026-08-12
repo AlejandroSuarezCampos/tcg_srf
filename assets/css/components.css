@@ -194,12 +194,17 @@
   position: relative;
   display: block;
   padding: 1px;                       /* el padding de 1px ES el borde */
+  /* misma trampa que .cer-escena/.submenu-tipos/etc. (§8 del CLAUDE.md de
+     branding): un display propio empata en especificidad con la regla
+     [hidden] del navegador, y gana el autor. album.js/coleccion.js ocultan
+     cartas con .hidden = true; sin esto, la carta seguía mostrándose. */
   border-radius: var(--radius-xl);
   background: var(--rz-borde);
   text-decoration: none;
   color: inherit;
   transition: transform var(--t-media) var(--ease);
 }
+.carta[hidden] { display: none; }
 
 .carta-marco {
   display: flex;

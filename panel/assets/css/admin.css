@@ -228,3 +228,48 @@
 .plantillas-acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .plantillas-acciones input[type="file"] { max-width: 190px; font-size: var(--fs-caption-sm); color: var(--frost-dim); }
 .plantillas-form-subida { display: flex; gap: var(--space-2); align-items: center; }
+
+/* ==========================================================================
+   EDITOR VISUAL DE CADENAS (panel/cadena_editor.php) — layout propio de esta
+   página. El lienzo es un div con scroll que crece con el mapa; los nodos
+   son <div> posicionados en absoluto y las aristas, líneas SVG superpuestas.
+   Todo el arrastre lo lleva scriptCadenaEditor.js; aquí solo el aspecto.
+   ========================================================================== */
+.cadena-editor-lienzo-wrap {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--void-2); overflow: auto; max-height: 72vh;
+}
+.cadena-editor-lienzo { position: relative; }
+.cadena-editor-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+.cadena-editor-linea { stroke: var(--frost-dim); stroke-width: 2; }
+.cadena-editor-linea--temporal { stroke: var(--amber); stroke-dasharray: 6 4; }
+.cadena-editor-linea-golpe {
+  stroke: transparent; stroke-width: 14; cursor: pointer; pointer-events: stroke;
+}
+.cadena-editor-linea-golpe:hover + .cadena-editor-linea,
+.cadena-editor-linea-golpe:hover { stroke: var(--danger); }
+
+.cadena-nodo {
+  position: absolute; width: 150px; min-height: 64px;
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3); cursor: grab; user-select: none;
+  box-shadow: var(--shadow-sm);
+}
+.cadena-nodo:active { cursor: grabbing; }
+.cadena-nodo--cofre { border-color: var(--amber-line); background: var(--amber-soft); }
+.cadena-nodo--final { box-shadow: 0 0 0 2px var(--amber), var(--shadow-md); }
+.cadena-nodo-cabeza { display: flex; align-items: center; justify-content: space-between; color: var(--amber-light); }
+.cadena-nodo-cabeza .ph-star { color: var(--amber); font-size: 14px; }
+.cadena-nodo-nombre { font-size: var(--fs-body-sm); font-weight: 600; margin-top: var(--space-1); }
+.cadena-nodo-rival { font-size: var(--fs-caption-sm); color: var(--frost-dim); margin-top: 2px; }
+.cadena-nodo-anilla {
+  position: absolute; right: -8px; top: 50%; transform: translateY(-50%);
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--void); border: 2px solid var(--amber); cursor: crosshair;
+}
+.cadena-nodo-anilla:hover { background: var(--amber); }
+
+.cadena-editor-bloque {
+  border-top: 1px solid var(--line); margin-top: var(--space-5); padding-top: var(--space-5);
+}
+.cadena-editor-bloque h3 { margin: 0 0 var(--space-3); font-size: var(--fs-body-sm); color: var(--frost-dim); }

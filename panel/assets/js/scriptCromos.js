@@ -59,7 +59,7 @@ document.getElementById('f_imagen')?.addEventListener('input', (e) => {
 });
 
 function pedirBorrado(nombre, id) {
-  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Esta acción no se puede deshacer.', function () {
+  SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Se quitará de la colección y de los mazos de CUALQUIERA que la tenga, y de su rastro en duelos ya jugados. No se puede deshacer.', function () {
     window.location.href = 'cromos.php?eliminar=' + encodeURIComponent(id);
   });
 }
