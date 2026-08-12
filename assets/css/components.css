@@ -262,11 +262,68 @@
   color: rgba(255, 255, 255, .10);
 }
 
-/* insignia de posición, esquina inferior izquierda de la placa */
+/* ---------------------------------------------------------------------------
+   MARCO CON FOTO (Común/Poco común/Raro/Épico) — plantillas de
+   assets/img/marcos/ (451×800 completas, sin recortar), una por rareza. El
+   cuadrado y el rectángulo blanco de cada plantilla caen siempre en el mismo
+   sitio (medido a mano), así que las dos zonas se posicionan en porcentaje
+   fijo — no dependen del arte que lleve dentro.
+
+   `background-size: contain`, no `cover`: la plantilla tiene una proporción
+   más alargada que `.carta-placa` (451/800 contra 233/361), y recortarla se
+   comía las estrellas y el emblema de abajo. Con `contain` se ve la plantilla
+   ENTERA y sobra hueco a los lados, que se rellena con `background-color` en
+   vez de dejarlo transparente — mismo criterio que ya usa el arte de
+   Legendario/SRF (una banda oscura antes que recortar algo). Por eso las
+   coordenadas de abajo son distintas a cuando era `cover`: con `contain` la
+   imagen no ocupa el 100% del ancho de la placa, así que el cuadrado y el
+   rectángulo quedan más centrados y más estrechos en proporción al hueco.
+   --------------------------------------------------------------------------- */
+.carta-placa--marco {
+  background-image: var(--marco-img);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: var(--void-2);
+}
+.carta[data-rareza="1"] .carta-placa--marco { --marco-img: url('../img/marcos/comun.jpg'); }
+.carta[data-rareza="2"] .carta-placa--marco { --marco-img: url('../img/marcos/poco-comun.jpg'); }
+.carta[data-rareza="3"] .carta-placa--marco { --marco-img: url('../img/marcos/raro.jpg'); }
+.carta[data-rareza="4"] .carta-placa--marco { --marco-img: url('../img/marcos/epico.jpg'); }
+
+.carta-foto-hueco {
+  position: absolute;
+  left: 18.1%; top: 9.25%; width: 64.1%; height: 41.25%;
+}
+/* El nombre real (mismo <h3>, solo movido) sobre el rectángulo blanco de la
+   plantilla: sigue siendo texto de verdad, no está "quemado" en la imagen —
+   lo sigue leyendo un lector de pantalla y lo sigue encontrando el buscador
+   del álbum (§7, WCAG 2.2, no negociable). */
+.carta-nombre-marco {
+  position: absolute;
+  left: 17.9%; top: 53.25%; width: 64.9%; height: 6.75%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  color: #14151A;
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+.carta--lg .carta-nombre-marco { font-size: var(--fs-caption); }
+
+/* insignia de posición, esquina SUPERIOR izquierda de la placa. Antes iba
+   abajo, pero ahí tapaba las estrellas de la plantilla de marco (§ arriba,
+   Común/Poco común/Raro/Épico). */
 .carta-pos {
   position: absolute;
   left: var(--space-2);
-  bottom: var(--space-2);
+  top: var(--space-2);
   z-index: 3;               /* por encima del tinte y el barrido holográficos */
   padding: 3px var(--space-2);
   border: 1px solid var(--line);

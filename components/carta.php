@@ -183,15 +183,39 @@ function render_carta(array $c, array $opts = []): void
           <?php endif; ?>
         </div>
 
-        <div class="carta-placa">
-          <?php if ($imagen !== ''): ?>
-            <img class="carta-arte"
-                 src="<?= htmlspecialchars($imagen) ?>"
-                 alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
-                 <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+        <?php
+        // Marco con foto de comunidad (Común/Poco común/Raro/Épico): la
+        // plantilla de branding/ trae su propio hueco cuadrado para la foto y
+        // su propio rectángulo blanco para el nombre — el nombre sigue siendo
+        // texto real (accesible, buscable, escalable), solo cambia DÓNDE se
+        // pinta. Legendario y SRF conservan el tratamiento de siempre (holo,
+        // corona), que no tiene plantilla estática.
+        $usaMarco = $idRareza >= 1 && $idRareza <= 4;
+        ?>
+        <div class="carta-placa<?= $usaMarco ? ' carta-placa--marco' : '' ?>">
+          <?php if ($usaMarco): ?>
+            <div class="carta-foto-hueco">
+              <?php if ($imagen !== ''): ?>
+                <img class="carta-arte"
+                     src="<?= htmlspecialchars($imagen) ?>"
+                     alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                     <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+              <?php else: ?>
+                <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+                <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+              <?php endif; ?>
+            </div>
+            <h3 class="carta-nombre-marco"><?= htmlspecialchars($nombre) ?></h3>
           <?php else: ?>
-            <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
-            <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php if ($imagen !== ''): ?>
+              <img class="carta-arte"
+                   src="<?= htmlspecialchars($imagen) ?>"
+                   alt="Ilustración de <?= htmlspecialchars($nombre) ?>"
+                   <?= $lazy ? 'loading="lazy" decoding="async"' : '' ?>>
+            <?php else: ?>
+              <span class="carta-placa-vacia" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+              <span class="sr-only">Esta carta todavía no tiene ilustración</span>
+            <?php endif; ?>
           <?php endif; ?>
 
           <?php if ($posicion !== ''): ?>
@@ -200,7 +224,9 @@ function render_carta(array $c, array $opts = []): void
         </div>
 
         <div class="carta-cuerpo">
-          <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+          <?php if (!$usaMarco): ?>
+            <h3 class="carta-nombre"><?= htmlspecialchars($nombre) ?></h3>
+          <?php endif; ?>
           <p class="carta-meta">
             <span class="carta-equipo"><?= htmlspecialchars($equipo) ?></span>
           </p>
