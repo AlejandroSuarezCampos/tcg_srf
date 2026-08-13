@@ -39,7 +39,7 @@ function cerrarModalMision() {
 
 function pedirBorradoMision(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar la misión "' + nombre + '"? Se borrará también el historial de quién la reclamó. No se puede deshacer.', function () {
-    window.location.href = 'misiones.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'misiones.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }
 

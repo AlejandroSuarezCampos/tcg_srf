@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -9,6 +10,11 @@ if (isset($_SESSION['dictador'])) {
     }
 } else {
     header('Location: ../landing.php');
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['eliminar'])) && !csrfValido($_REQUEST['csrf'] ?? null)) {
+    header('Location: usuarios.php?error=csrf');
     exit;
 }
 /**
@@ -169,6 +175,7 @@ $activeAdmin = 'usuarios';
     </div>
 
     <form method="POST" action="usuarios.php" id="formUsuario">
+      <?= csrfCampo() ?>
       <input type="hidden" name="id_usuario" id="fu_id_usuario">
 
       <div class="form-grid">
@@ -222,6 +229,7 @@ $activeAdmin = 'usuarios';
     </div>
 
     <form method="POST" action="usuarios.php" id="formResetPassword">
+      <?= csrfCampo() ?>
       <input type="hidden" name="accion" value="reset_password">
       <input type="hidden" name="id_usuario" id="rp_id_usuario">
 

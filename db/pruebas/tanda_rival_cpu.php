@@ -6,6 +6,9 @@
  *   php rival_pen.php <id_duelo> <zona>   -> el rival elige ese hueco
  *   php rival_pen.php <id_duelo>          -> solo mira como va
  */
+
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 require __DIR__ . "/../consultas.php";
 $db = new Tcg("127.0.0.1", 3306, "tcg", "root", "");
 $RIVAL = 2;

@@ -15,6 +15,7 @@
  */
 session_start();
 require_once __DIR__ . '/../../db/conexion.php';
+require_once __DIR__ . '/../../partials/csrf.php';
 
 header('Content-Type: application/json');
 
@@ -24,9 +25,18 @@ if (empty($_SESSION['id_usuario'])) {
     exit;
 }
 
+// El navegador siempre manda esto por POST (fetch o sendBeacon con FormData),
+// nunca por query string: el antiguo fallback a $_GET solo abría la puerta a
+// disparar 'salir' con un simple enlace (CSRF), no lo usaba nadie de verdad.
+if (!csrfValido($_POST['csrf'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido.']);
+    exit;
+}
+
 $id_usuario = (int) $_SESSION['id_usuario'];
-$id_duelo   = (int) ($_POST['id_duelo'] ?? $_GET['id_duelo'] ?? 0);
-$accion     = $_POST['accion'] ?? $_GET['accion'] ?? 'latir';
+$id_duelo   = (int) ($_POST['id_duelo'] ?? 0);
+$accion     = $_POST['accion'] ?? 'latir';
 
 $duelo = $db->obtenerDuelo($id_duelo, $id_usuario);
 if (!$duelo) {

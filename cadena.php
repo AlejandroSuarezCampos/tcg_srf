@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 function esPeticionAjax() {
     return isset($_SERVER['HTTP_X_REQUESTED_WITH'])
@@ -29,6 +30,18 @@ if ($pendientes) {
 }
 
 $aviso = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido($_POST['csrf'] ?? null)) {
+    if (esPeticionAjax()) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'La página ha caducado, inténtalo de nuevo.']);
+        exit;
+    }
+    $_SESSION['cadena_error'] = 'La página ha caducado, inténtalo de nuevo.';
+    header('Location: cadena.php?id=' . $id_cadena);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
@@ -366,6 +379,7 @@ include __DIR__ . '/navbar.php';
           <?php endif; ?>
         </p>
         <form method="POST" id="formReclamarCofre">
+          <?= csrfCampo() ?>
           <input type="hidden" name="accion" value="reclamar">
           <input type="hidden" name="id_nodo" value="<?= (int) $sel['id_nodo'] ?>">
           <button type="submit" class="btn btn-primary">
@@ -422,6 +436,7 @@ include __DIR__ . '/navbar.php';
       <div class="dificultades">
         <?php foreach (Tcg::DIFICULTADES as $d): ?>
           <form method="POST">
+            <?= csrfCampo() ?>
             <input type="hidden" name="accion" value="jugar">
             <input type="hidden" name="id_nodo" value="<?= (int) $sel['id_nodo'] ?>">
             <input type="hidden" name="dificultad" value="<?= $d ?>">

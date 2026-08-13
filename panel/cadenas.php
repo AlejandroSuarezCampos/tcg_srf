@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -9,6 +10,12 @@ if (isset($_SESSION['dictador'])) {
     }
 } else {
     header('Location: ../landing.php');
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['eliminar']) || isset($_GET['eliminar_requisito']))
+    && !csrfValido($_REQUEST['csrf'] ?? null)) {
+    header('Location: cadenas.php?error=csrf');
     exit;
 }
 
@@ -181,6 +188,7 @@ $activeAdmin = 'cadenas';
     </div>
 
     <form method="POST" action="cadenas.php" id="formCadena">
+      <?= csrfCampo() ?>
       <input type="hidden" name="id_cadena" id="fc_id_cadena">
 
       <div class="form-grid">
@@ -265,7 +273,7 @@ $activeAdmin = 'cadenas';
             <td><?= htmlspecialchars($r['nombre_valor'] ?? ('#' . $r['valor'])) ?></td>
             <td style="text-align:right;">
               <a class="icon-btn es-peligro" title="Quitar"
-                 href="cadenas.php?eliminar_requisito=<?= (int) $r['id_requisito'] ?>&id_cadena=<?= (int) $cadenaRequisitos['id_cadena'] ?>">
+                 href="cadenas.php?eliminar_requisito=<?= (int) $r['id_requisito'] ?>&id_cadena=<?= (int) $cadenaRequisitos['id_cadena'] ?>&csrf=<?= urlencode(csrfToken()) ?>">
                 <i class="ph ph-trash" aria-hidden="true"></i>
               </a>
             </td>
@@ -279,6 +287,7 @@ $activeAdmin = 'cadenas';
     </div>
 
     <form method="POST" action="cadenas.php" class="form-grid" style="margin-top:var(--space-4);">
+      <?= csrfCampo() ?>
       <input type="hidden" name="nuevo_requisito" value="1">
       <input type="hidden" name="id_cadena" value="<?= (int) $cadenaRequisitos['id_cadena'] ?>">
 

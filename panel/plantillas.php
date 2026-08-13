@@ -11,6 +11,7 @@
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
 require_once __DIR__ . '/../components/caja3d.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -40,7 +41,10 @@ if (isset($_GET['descargar'])) {
 // ----- subida de una plantilla ya recortada por el admin -----
 $mensaje = null;
 $mensajeTipo = 'success';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'subir_plantilla') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'subir_plantilla' && !csrfValido($_POST['csrf'] ?? null)) {
+    $mensaje = 'La página ha caducado, inténtalo de nuevo.';
+    $mensajeTipo = 'danger';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'subir_plantilla') {
     $tipo         = $_POST['tipo'] ?? '';
     $idReferencia = (int) ($_POST['id_referencia'] ?? 0);
 
@@ -126,6 +130,7 @@ $activeAdmin = 'plantillas';
               <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
             <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
+              <?= csrfCampo() ?>
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="caja_expansion">
               <input type="hidden" name="id_referencia" value="<?= (int) $idExp ?>">
@@ -174,6 +179,7 @@ $activeAdmin = 'plantillas';
               <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
             <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
+              <?= csrfCampo() ?>
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="caja_sobre">
               <input type="hidden" name="id_referencia" value="<?= (int) $idSobre ?>">
@@ -191,6 +197,7 @@ $activeAdmin = 'plantillas';
               <i class="ph ph-download-simple" aria-hidden="true"></i> Guía
             </a>
             <form method="POST" action="plantillas.php" enctype="multipart/form-data" class="plantillas-form-subida">
+              <?= csrfCampo() ?>
               <input type="hidden" name="accion" value="subir_plantilla">
               <input type="hidden" name="tipo" value="sobre">
               <input type="hidden" name="id_referencia" value="<?= (int) $idSobre ?>">

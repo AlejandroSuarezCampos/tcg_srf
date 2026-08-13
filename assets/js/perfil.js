@@ -34,6 +34,7 @@
 
     var datos = new FormData();
     datos.append('codigo', codigo);
+    datos.append('csrf', SRF.csrfToken());
 
     try {
       var res = await fetch('./assets/ajax/canjear_codigo.php', { method: 'POST', body: datos });

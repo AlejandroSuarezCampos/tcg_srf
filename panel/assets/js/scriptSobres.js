@@ -57,6 +57,6 @@ document.getElementById('fs_imagen')?.addEventListener('input', (e) => {
 
 function pedirBorrado(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar el sobre "' + nombre + '"? Esta acción no se puede deshacer.', function () {
-    window.location.href = 'sobres.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'sobres.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }

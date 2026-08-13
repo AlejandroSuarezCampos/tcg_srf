@@ -57,6 +57,6 @@ function cerrarResetPassword() {
 
 function pedirBorrado(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar al usuario "' + nombre + '"? Perderá su colección y su acceso.', function () {
-    window.location.href = 'usuarios.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'usuarios.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }

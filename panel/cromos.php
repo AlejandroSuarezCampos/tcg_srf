@@ -2,6 +2,8 @@
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
 require_once __DIR__ . '/../components/carta.php';
+require_once __DIR__ . '/../partials/csrf.php';
+require_once __DIR__ . '/../partials/subida_imagen.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -15,6 +17,10 @@ if (isset($_SESSION['dictador'])) {
 
 // ----- Borrado (?eliminar=ID) -----
 if (isset($_GET['eliminar'])) {
+    if (!csrfValido($_GET['csrf'] ?? null)) {
+        header('Location: cromos.php?error=csrf');
+        exit;
+    }
     $borrado = $db->eliminarCromo((int) $_GET['eliminar']);
     header('Location: cromos.php' . ($borrado ? '' : '?error=cromo_en_uso'));
     exit;
@@ -22,6 +28,10 @@ if (isset($_GET['eliminar'])) {
 
 // ----- Creación / edición (POST desde el modal) -----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfValido($_POST['csrf'] ?? null)) {
+        header('Location: cromos.php?error=csrf');
+        exit;
+    }
     $id_cromo     = $_POST['id_cromo'] ?? '';
     $nombre       = trim($_POST['nombre'] ?? '');
     $posicion     = $_POST['posicion'] ?? '';
@@ -31,6 +41,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_equipo    = (int) ($_POST['id_equipo'] ?? 0);
     $id_rareza    = (int) ($_POST['id_rareza'] ?? 0);
     $id_afinidad  = (int) ($_POST['id_afinidad'] ?? 0);
+    $errorSubida  = '';
+
+    // Si se ha subido un archivo, gana a la ruta escrita a mano: se guarda en
+    // assets/img/Cromos/<expansión>/ (misma carpeta que usan ya las cartas de
+    // esa expansión) con un nombre generado, nunca el que trae el navegador.
+    if (!empty($_FILES['imagen_archivo']) && $_FILES['imagen_archivo']['error'] !== UPLOAD_ERR_NO_FILE) {
+        $nombreExpansion = '';
+        foreach ($db->listarExpansiones() as $e) {
+            if ((int) $e['id_expansion'] === $id_expansion) { $nombreExpansion = $e['nombre']; break; }
+        }
+        $carpeta = slugCarpetaExpansion($nombreExpansion !== '' ? $nombreExpansion : 'Sin_expansion');
+        $carpetaDisco = __DIR__ . '/../assets/img/Cromos/' . $carpeta . '/';
+        $carpetaWeb   = './assets/img/Cromos/' . $carpeta . '/';
+
+        $subida = subirImagenPanel($_FILES['imagen_archivo'], $carpetaDisco, $carpetaWeb, $nombre !== '' ? $nombre : 'cromo');
+        if ($subida['ok']) {
+            $imagen = $subida['ruta'];
+        } else {
+            $errorSubida = $subida['error'];
+        }
+    }
+
+    if ($errorSubida !== '') {
+        header('Location: cromos.php?error=' . urlencode($errorSubida));
+        exit;
+    }
 
     if ($id_cromo !== '') {
         $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
@@ -100,6 +136,16 @@ $activeAdmin = 'cromos';
     <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
+    </div>
+    <?php elseif (($_GET['error'] ?? '') === 'csrf'): ?>
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+      <i class="ph ph-warning-circle" aria-hidden="true"></i>
+      <span>La página ha caducado, inténtalo de nuevo.</span>
+    </div>
+    <?php elseif (!empty($_GET['error'])): ?>
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+      <i class="ph ph-warning-circle" aria-hidden="true"></i>
+      <span><?= htmlspecialchars($_GET['error']) ?></span>
     </div>
     <?php endif; ?>
 
@@ -193,7 +239,8 @@ $activeAdmin = 'cromos';
       </button>
     </div>
 
-    <form method="POST" action="cromos.php" id="formCromo">
+    <form method="POST" action="cromos.php" id="formCromo" enctype="multipart/form-data">
+      <?= csrfCampo() ?>
       <input type="hidden" name="id_cromo" id="f_id_cromo">
 
       <div class="form-grid">
@@ -207,11 +254,13 @@ $activeAdmin = 'cromos';
           <div class="thumb-upload">
             <img class="admin-thumb" id="f_preview" src="../assets/img/perfil/apple-icon-120x120.png" alt="">
             <div class="thumb-upload-text">
-              <b>Pega la ruta de la imagen</b>
+              <b>Sube un archivo o pega la ruta de una imagen ya subida</b>
               <code>./assets/img/Cromos/...</code>
             </div>
           </div>
+          <input type="file" name="imagen_archivo" id="f_imagen_archivo" accept="image/png,image/jpeg,image/webp" style="margin-top:var(--space-2);">
           <input type="text" name="imagen" id="f_imagen" placeholder="./assets/img/Cromos/..." style="margin-top:var(--space-2);">
+          <span class="campo-hint">Si eliges un archivo, se guarda en <code>assets/img/Cromos/&lt;expansión&gt;/</code> y sustituye a la ruta de abajo.</span>
         </div>
 
         <div class="campo">

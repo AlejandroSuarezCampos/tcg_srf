@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -14,6 +15,10 @@ if (isset($_SESSION['dictador'])) {
 
 // ----- Borrado (?eliminar=ID) -----
 if (isset($_GET['eliminar'])) {
+    if (!csrfValido($_GET['csrf'] ?? null)) {
+        header('Location: sobres.php?error=csrf');
+        exit;
+    }
     $db->eliminarSobre((int) $_GET['eliminar']);
     header('Location: sobres.php');
     exit;
@@ -21,6 +26,10 @@ if (isset($_GET['eliminar'])) {
 
 // ----- Creación / edición (POST desde el modal) -----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfValido($_POST['csrf'] ?? null)) {
+        header('Location: sobres.php?error=csrf');
+        exit;
+    }
     $id_sobre     = $_POST['id_sobre'] ?? '';
     $nombre       = trim($_POST['nombre'] ?? '');
     $cantidad     = (int) ($_POST['cantidad'] ?? 1);
@@ -156,6 +165,7 @@ $activeAdmin = 'sobres';
     </div>
 
     <form method="POST" action="sobres.php" id="formSobre">
+      <?= csrfCampo() ?>
       <input type="hidden" name="id_sobre" id="fs_id_sobre">
 
       <div class="form-grid">

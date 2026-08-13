@@ -37,7 +37,7 @@ function cerrarModalCadena() {
 
 function pedirBorradoCadena(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar la cadena "' + nombre + '"? Se perderá también su mapa, sus requisitos, su botín, y el progreso real que tuvieran los jugadores en ella. No se puede deshacer.', function () {
-    window.location.href = 'cadenas.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'cadenas.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }
 

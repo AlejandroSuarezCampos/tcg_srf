@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -16,7 +17,9 @@ $titular = $db->obtenerMazoTitular($id_usuario);
 
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido($_POST['csrf'] ?? null)) {
+    $error = 'La página ha caducado, inténtalo de nuevo.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'crear') {
@@ -120,6 +123,7 @@ include __DIR__ . '/navbar.php';
       </p>
 
       <form method="POST" class="stack stack-4" id="formCrearDuelo">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="crear">
 
         <fieldset class="campo">
@@ -221,6 +225,7 @@ include __DIR__ . '/navbar.php';
                             data-confirmar="<?= $esCarta
                                 ? 'Vas a apostar una carta ' . htmlspecialchars($d['rareza_apuesta']) . '. Si pierdes, cambia de dueño.'
                                 : 'Vas a apostar ' . number_format((int) $d['monedas'], 0, ',', '.') . ' monedas.' ?>">
+                        <?= csrfCampo() ?>
                         <input type="hidden" name="accion" value="aceptar">
                         <input type="hidden" name="id_duelo" value="<?= $d['id_duelo'] ?>">
                         <?php if ($esCarta): ?>

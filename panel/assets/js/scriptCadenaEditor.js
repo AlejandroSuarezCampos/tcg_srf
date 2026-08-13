@@ -26,7 +26,20 @@
   };
 
   function post(accion, params) {
-    var body = new URLSearchParams(Object.assign({ accion: accion }, params || {}));
+    var body = new URLSearchParams(Object.assign({ accion: accion, csrf: SRF.csrfToken() }, params || {}));
+    return fetch(URL_AJAX, { method: 'POST', body: body })
+      .then(function (r) { return r.json(); });
+  }
+
+  // Igual que post(), pero en multipart: hace falta cuando el escudo se manda
+  // como archivo (crear_rival / actualizar_rival), URLSearchParams no puede
+  // llevar binarios.
+  function postConEscudo(accion, params, archivoEscudo) {
+    var body = new FormData();
+    body.append('accion', accion);
+    body.append('csrf', SRF.csrfToken());
+    Object.keys(params || {}).forEach(function (k) { body.append(k, params[k]); });
+    if (archivoEscudo) body.append('escudo_archivo', archivoEscudo);
     return fetch(URL_AJAX, { method: 'POST', body: body })
       .then(function (r) { return r.json(); });
   }
@@ -338,11 +351,14 @@
     var nombre = document.getElementById('fn_rival_nombre').value.trim();
     if (!nombre) { window.alert('Ponle un nombre al rival.'); return; }
 
-    post('crear_rival', {
+    var archivoInput = document.getElementById('fn_rival_escudo_archivo');
+    var archivo = archivoInput.files && archivoInput.files[0];
+
+    postConEscudo('crear_rival', {
       nombre: nombre,
       escudo: document.getElementById('fn_rival_escudo').value.trim(),
       descripcion: document.getElementById('fn_rival_descripcion').value.trim(),
-    }).then(function (r) {
+    }, archivo).then(function (r) {
       if (!r.ok) { window.alert(r.error || 'No se pudo crear el rival.'); return; }
       r.rival.estilos = [];
       estado.rivales.push(r.rival);
@@ -356,6 +372,7 @@
       document.getElementById('fn_nuevo_rival').hidden = true;
       document.getElementById('fn_rival_nombre').value = '';
       document.getElementById('fn_rival_escudo').value = '';
+      archivoInput.value = '';
       document.getElementById('fn_rival_descripcion').value = '';
 
       actualizarBloqueEstilos();
@@ -369,6 +386,7 @@
     var wrap = document.getElementById('fn_rival_escudo_wrap');
     var rival = idRival ? rivalPorId(idRival) : null;
     wrap.hidden = !rival;
+    document.getElementById('fn_rival_escudo_actual_archivo').value = '';
     if (rival) {
       document.getElementById('fn_rival_escudo_actual').value = rival.escudo || '';
     }
@@ -380,11 +398,16 @@
     var idRival = document.getElementById('fn_rival').value;
     if (!idRival) return;
     var escudo = document.getElementById('fn_rival_escudo_actual').value.trim();
+    var archivoInput = document.getElementById('fn_rival_escudo_actual_archivo');
+    var archivo = archivoInput.files && archivoInput.files[0];
 
-    post('actualizar_rival', { id_rival: idRival, escudo: escudo }).then(function (r) {
+    postConEscudo('actualizar_rival', { id_rival: idRival, escudo: escudo }, archivo).then(function (r) {
       if (!r.ok) { SRF.toast(r.error || 'No se pudo guardar el escudo.', 'danger'); return; }
       var rival = rivalPorId(idRival);
-      if (rival) rival.escudo = escudo;
+      var escudoFinal = r.escudo !== undefined ? r.escudo : escudo;
+      if (rival) rival.escudo = escudoFinal;
+      document.getElementById('fn_rival_escudo_actual').value = escudoFinal;
+      archivoInput.value = '';
       SRF.toast('Escudo guardado.', 'success');
     });
   }

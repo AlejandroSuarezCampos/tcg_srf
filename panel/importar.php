@@ -1,11 +1,17 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) { header('Location: ../landing.php'); exit; }
 } else {
     header('Location: ../landing.php'); exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['borrar_importadas'])) && !csrfValido($_REQUEST['csrf'] ?? null)) {
+    header('Location: importar.php?error=csrf');
+    exit;
 }
 
 // ----- Borrado de cartas importadas (?borrar_importadas=1) -----
@@ -81,6 +87,7 @@ $activeAdmin = 'importar';
 
     <?php if ($previsualizacion): ?>
       <form method="POST" id="formPrevisualizacion">
+        <?= csrfCampo() ?>
         <h2 class="t-h3">Previsualización</h2>
         <ul class="t-body-sm" style="margin:var(--space-3) 0 var(--space-5); padding-left:1.2em;">
           <li><?= $previsualizacion['jugadores_a_crear'] ?> jugadores a crear</li>
@@ -138,6 +145,7 @@ $activeAdmin = 'importar';
 
     <?php else: ?>
       <form method="POST" enctype="multipart/form-data">
+        <?= csrfCampo() ?>
         <div class="campo campo-full">
           <label for="i-json">Archivo datos_oficiales.json</label>
           <input type="file" name="json_datos" id="i-json" accept=".json,application/json" required>

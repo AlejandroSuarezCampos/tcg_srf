@@ -11,6 +11,9 @@
  * Se prueba sobre tcg_sinmig, una copia desechable a la que se le QUITA el valor
  * 'en_juego' del enum a propósito.
  */
+
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 require __DIR__ . "/../consultas.php";
 
 $p = new PDO("mysql:host=127.0.0.1;dbname=tcg_sinmig;charset=utf8mb4", "root", "",

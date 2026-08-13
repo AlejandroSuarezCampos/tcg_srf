@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -13,6 +14,11 @@ $TAMANO = Tcg::MAZO_TAMANO;
 
 // ----- Acciones (patrón POST → redirección, como el resto del sitio) -----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfValido($_POST['csrf'] ?? null)) {
+        header('Location: mazos.php?error=' . urlencode('La página ha caducado, inténtalo de nuevo.'));
+        exit;
+    }
+
     $accion = $_POST['accion'] ?? '';
     $destino = 'mazos.php';
 
@@ -193,6 +199,7 @@ include __DIR__ . '/navbar.php';
       <section class="panel">
         <h2 class="t-h3">Nuevo mazo</h2>
         <form method="POST" class="stack stack-3">
+          <?= csrfCampo() ?>
           <input type="hidden" name="accion" value="crear">
           <div class="campo">
             <label for="m-nombre">Nombre</label>
@@ -215,6 +222,7 @@ include __DIR__ . '/navbar.php';
 
       <?php else: ?>
         <form method="POST" id="formMazo">
+          <?= csrfCampo() ?>
           <input type="hidden" name="accion" value="guardar_cartas">
           <input type="hidden" name="id_mazo" value="<?= $mazoActivo['id_mazo'] ?>">
 
@@ -463,6 +471,7 @@ include __DIR__ . '/navbar.php';
 
         <div class="mazo-pie">
           <form method="POST" class="fila fila-entre">
+            <?= csrfCampo() ?>
             <input type="hidden" name="accion" value="titular">
             <input type="hidden" name="id_mazo" value="<?= $mazoActivo['id_mazo'] ?>">
             <button type="submit" class="btn btn-ghost"
@@ -472,6 +481,7 @@ include __DIR__ . '/navbar.php';
           </form>
 
           <form method="POST" data-confirmar="¿Seguro que quieres borrar este mazo?">
+            <?= csrfCampo() ?>
             <input type="hidden" name="accion" value="eliminar">
             <input type="hidden" name="id_mazo" value="<?= $mazoActivo['id_mazo'] ?>">
             <button type="submit" class="btn btn-plano">Borrar mazo</button>

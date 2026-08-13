@@ -24,6 +24,8 @@
  * Añadir --aplicar para que escriba; sin ese argumento solo informa.
  */
 
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 $aplicar = in_array('--aplicar', $argv, true);
 
 $pdo = new PDO("mysql:host=localhost;port=3306;dbname=tcg;charset=utf8mb4", "root", "");

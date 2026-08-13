@@ -13,6 +13,7 @@
  *   $bodyClass     -> clases del <body>
  */
 require_once __DIR__ . '/assets.php';   // assetUrl() / assetScript()
+require_once __DIR__ . '/csrf.php';     // csrfToken() / csrfCampo() / csrfValido()
 
 $base         = $base         ?? '';
 $paginaTitulo = $paginaTitulo ?? 'Superliga Frontier TCG';
@@ -29,6 +30,7 @@ $bodyClass    = $bodyClass    ?? '';
 <title><?= htmlspecialchars($paginaTitulo) ?> · Superliga Frontier TCG</title>
 <meta name="description" content="<?= htmlspecialchars($paginaDesc) ?>">
 <meta name="color-scheme" content="dark">
+<meta name="csrf-token" content="<?= htmlspecialchars(csrfToken()) ?>">
 <link rel="icon" type="image/png" href="<?= $base ?>assets/img/iconos/favicon.ico">
 
 <!-- PREFERENCIA DE MOVIMIENTO — va INLINE y lo primero de todo, a propósito.
@@ -45,6 +47,13 @@ $bodyClass    = $bodyClass    ?? '';
 (function () {
   var SRF = (window.SRF = window.SRF || {});
   var CLAVE = 'srf-animaciones';   // 'si' | 'no' | ausente = automático
+
+  // Token CSRF de la sesión, leído del <meta> de esta misma página. Todo
+  // fetch/sendBeacon que mute estado lo añade a su payload como 'csrf'.
+  SRF.csrfToken = function () {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : '';
+  };
 
   SRF.preferenciaMovimiento = function () {
     try { return localStorage.getItem(CLAVE); } catch (e) { return null; }

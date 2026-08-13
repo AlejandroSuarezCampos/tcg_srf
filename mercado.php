@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -17,8 +18,21 @@ function esPeticionAjax() {
 $mensaje = '';
 $error   = '';
 
+$esPostMutante = $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']);
+
+if ($esPostMutante && !csrfValido($_POST['csrf'] ?? null)) {
+    if (esPeticionAjax()) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'La página ha caducado, inténtalo de nuevo.']);
+        exit;
+    }
+    $error = 'La página ha caducado, inténtalo de nuevo.';
+    $esPostMutante = false;
+}
+
 // ----- Publicar un anuncio nuevo -----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'publicar') {
+if ($esPostMutante && $_POST['accion'] === 'publicar') {
     $id_coleccion = (int) ($_POST['id_coleccion'] ?? 0);
     $precio       = (int) ($_POST['precio'] ?? 0);
 
@@ -33,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
 }
 
 // ----- Retirar un anuncio propio -----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'retirar') {
+if ($esPostMutante && $_POST['accion'] === 'retirar') {
     $db->retirarAnuncio((int) $_POST['id_anuncio'], $id_usuario);
 
     if (esPeticionAjax()) {
@@ -47,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
 }
 
 // ----- Comprar una carta -----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'comprar') {
+if ($esPostMutante && $_POST['accion'] === 'comprar') {
     $resultado = $db->comprarAnuncio((int) $_POST['id_anuncio'], $id_usuario);
 
     if ($resultado['ok']) {
@@ -238,6 +252,7 @@ include __DIR__ . '/navbar.php';
             . '</span>Vende ' . htmlspecialchars($a['vendedor']) . '</span>'
             . '<form method="POST" action="mercado.php" class="js-mercado" data-confirmar="'
             . htmlspecialchars($confirmar, ENT_QUOTES) . '">'
+            . csrfCampo()
             . '<input type="hidden" name="accion" value="' . $accionNombre . '">'
             . '<input type="hidden" name="id_anuncio" value="' . (int) $a['id_anuncio'] . '">'
             . $boton . '</form>';
@@ -274,6 +289,7 @@ include __DIR__ . '/navbar.php';
       </div>
     <?php else: ?>
       <form method="POST" action="mercado.php" class="stack stack-5" id="formVender">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="publicar">
         <input type="hidden" name="id_coleccion" id="v-carta" required>
 

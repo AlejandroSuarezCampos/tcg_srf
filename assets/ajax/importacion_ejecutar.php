@@ -13,12 +13,19 @@
  */
 session_start();
 require_once __DIR__ . '/../../db/conexion.php';
+require_once __DIR__ . '/../../partials/csrf.php';
 
 header('Content-Type: application/json');
 
 if (empty($_SESSION['dictador']) || $_SESSION['dictador'] != 1) {
     http_response_code(403);
     echo json_encode(['error' => 'No autorizado.']);
+    exit;
+}
+
+if (!csrfValido($_POST['csrf'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Token CSRF inválido.']);
     exit;
 }
 

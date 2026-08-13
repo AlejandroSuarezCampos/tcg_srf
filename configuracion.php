@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -25,6 +26,12 @@ const FOTO_CARPETA_WEB = './assets/img/perfil/';
 const FOTO_POR_DEFECTO = './assets/img/perfil/apple-icon-120x120.png';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrfValido($_POST['csrf'] ?? null)) {
+        $_SESSION['config_error'] = 'La página ha caducado, inténtalo de nuevo.';
+        header('Location: configuracion.php');
+        exit;
+    }
+
     $accion = $_POST['accion'] ?? '';
 
     // ----- Cambiar nombre de invocador -----
@@ -174,6 +181,7 @@ include __DIR__ . '/navbar.php';
       </div>
 
       <form method="POST" action="configuracion.php" enctype="multipart/form-data" class="stack stack-5">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="cambiar_foto">
 
         <div class="ajustes-foto">
@@ -211,6 +219,7 @@ include __DIR__ . '/navbar.php';
       </div>
 
       <form method="POST" action="configuracion.php" class="stack stack-5">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="cambiar_nombre">
         <div class="campo">
           <label for="c-nombre">Nombre</label>
@@ -231,6 +240,7 @@ include __DIR__ . '/navbar.php';
       </div>
 
       <form method="POST" action="configuracion.php" class="stack stack-5">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="cambiar_password">
         <div class="campo">
           <label for="c-actual">Contraseña actual</label>

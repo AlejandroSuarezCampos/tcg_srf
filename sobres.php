@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
 require_once __DIR__ . '/components/caja3d.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 // Los 50 sobres de un tipo, ya listos para vivir DENTRO de .caja3d-interior
 // (requisito técnico del prompt: mismo árbol preserve-3d que la caja, nunca
@@ -46,7 +47,16 @@ function esPeticionAjax() {
 $error = '';
 
 // ----- Comprar y abrir un sobre -----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'comprar_sobre') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'comprar_sobre'
+    && !csrfValido($_POST['csrf'] ?? null)) {
+    if (esPeticionAjax()) {
+        header('Content-Type: application/json');
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'La página ha caducado, inténtalo de nuevo.']);
+        exit;
+    }
+    $error = 'La página ha caducado, inténtalo de nuevo.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'comprar_sobre') {
     $id_sobre = (int) ($_POST['id_sobre'] ?? 0);
 
     $resultado = $db->abrirSobre($id_sobre, $id_usuario);

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../partials/csrf.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -9,6 +10,11 @@ if (isset($_SESSION['dictador'])) {
     }
 } else {
     header('Location: ../landing.php');
+    exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['eliminar'])) && !csrfValido($_REQUEST['csrf'] ?? null)) {
+    header('Location: misiones.php?error=csrf');
     exit;
 }
 
@@ -158,6 +164,7 @@ $activeAdmin = 'misiones';
     </div>
 
     <form method="POST" action="misiones.php" id="formMision">
+      <?= csrfCampo() ?>
       <input type="hidden" name="id_mision" id="fm_id_mision">
 
       <div class="form-grid">

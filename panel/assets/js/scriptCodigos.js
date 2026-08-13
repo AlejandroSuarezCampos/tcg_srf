@@ -34,7 +34,7 @@ function cerrarModalCodigo() {
 
 function pedirBorradoCodigo(codigo, id) {
   SRF.confirmar('¿Seguro que quieres eliminar el código "' + codigo + '"? Su historial de canjes se queda, pero nadie podrá volver a usarlo.', function () {
-    window.location.href = 'codigos.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'codigos.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }
 

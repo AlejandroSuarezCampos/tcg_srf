@@ -118,7 +118,7 @@
   window.pedirBorradoImportados = function (idExpansion, nombre, total) {
     SRF.confirmar(
       '¿Borrar las ' + total + ' cartas importadas de "' + nombre + '"? Esta acción no se puede deshacer.',
-      function () { window.location.href = 'importar.php?borrar_importadas=1&id_expansion=' + idExpansion; }
+      function () { window.location.href = 'importar.php?borrar_importadas=1&id_expansion=' + idExpansion + '&csrf=' + encodeURIComponent(SRF.csrfToken()); }
     );
   };
 })();

@@ -324,7 +324,7 @@
       var res = await fetch('sobres.php', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ accion: 'comprar_sobre', id_sobre: btn.dataset.idSobre })
+        body: new URLSearchParams({ accion: 'comprar_sobre', id_sobre: btn.dataset.idSobre, csrf: SRF.csrfToken() })
       });
       var data = await res.json();
 

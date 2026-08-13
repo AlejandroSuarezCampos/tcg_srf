@@ -16,6 +16,8 @@
  * ha tocado algo del partido y hace falta la comprobación grande.
  */
 
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 $SUITES = [
     "probar_liquidar" => "la liquidación y la idempotencia del bote",
 ];

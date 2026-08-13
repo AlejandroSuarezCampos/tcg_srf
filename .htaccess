@@ -1,0 +1,15 @@
+# Endurecimiento básico del servidor para este proyecto (no toca el php.ini global).
+
+# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, branding/, .claude/...)
+Options -Indexes
+
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
+<IfModule php_module>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>

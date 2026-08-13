@@ -12,6 +12,7 @@ if (!empty($_SESSION['id_usuario'])) {
 
 $error = '';
 $nombreEnviado = '';
+$ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$nombreEnviado = trim($_POST['nombre'] ?? '');
@@ -19,10 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if ($nombreEnviado === '' || $password === '') {
 		$error = 'Escribe tu nombre y tu contraseña.';
+	} elseif (($minutos = $db->minutosBloqueoLogin($ip, $nombreEnviado)) > 0) {
+		$error = "Demasiados intentos fallidos. Vuelve a intentarlo en $minutos minuto" . ($minutos === 1 ? '' : 's') . '.';
 	} else {
 		$usuario = $db->verificarLogin($nombreEnviado, $password);
 
 		if ($usuario) {
+			$db->limpiarIntentosLogin($ip, $nombreEnviado);
+
 			// Regeneramos el id de sesión para evitar session fixation
 			session_regenerate_id(true);
 
@@ -36,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			exit;
 		}
 
+		$db->registrarIntentoLoginFallido($ip, $nombreEnviado);
 		$error = 'Nombre o contraseña incorrectos.';
 	}
 }

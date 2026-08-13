@@ -34,6 +34,7 @@
       var cuerpo = new FormData();
       cuerpo.append('id_duelo', idDuelo);
       cuerpo.append('accion', 'latir');
+      cuerpo.append('csrf', SRF.csrfToken());
 
       var res = await fetch(url, { method: 'POST', body: cuerpo });
       var datos = await res.json();
@@ -90,6 +91,7 @@
     var cuerpo = new FormData();
     cuerpo.append('id_duelo', idDuelo);
     cuerpo.append('accion', 'salir');
+    cuerpo.append('csrf', SRF.csrfToken());
     navigator.sendBeacon(url, cuerpo);
   });
 })();
@@ -132,6 +134,7 @@
       var cuerpo = new FormData();
       cuerpo.append('id_duelo', idDuelo);
       cuerpo.append('accion', 'estado');
+      cuerpo.append('csrf', SRF.csrfToken());
 
       var res = await fetch(url, { method: 'POST', body: cuerpo });
       var datos = await res.json();
@@ -669,7 +672,8 @@
       body: new URLSearchParams({
         id_duelo: simulacion.dataset.idDuelo,
         id_evento: idEvento,
-        opcion: clave
+        opcion: clave,
+        csrf: SRF.csrfToken()
       })
     })
       .then(function (r) { return r.json(); })
@@ -805,6 +809,7 @@
     var cuerpo = new FormData();
     cuerpo.append('id_duelo', simulacion.dataset.idDuelo);
     cuerpo.append('zona', zona);
+    cuerpo.append('csrf', SRF.csrfToken());
     fetch('assets/ajax/duelo_penalti.php', { method: 'POST', body: cuerpo })
       .then(function (r) { return r.json(); })
       .catch(function () { /* el sondeo se encarga: el plazo decide solo */ })

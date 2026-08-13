@@ -135,6 +135,68 @@ class Tcg
 		return $usuario;
 	}
 
+	// ==========================================================
+	// LÍMITE DE INTENTOS DE LOGIN (login.php)
+	// Se cuenta por IP + nombre probado, así que ni cambiar de IP ni
+	// probar contra otro nombre esquiva el bloqueo del par que sí se repite.
+	// ==========================================================
+
+	const LOGIN_MAX_INTENTOS   = 5;
+	const LOGIN_BLOQUEO_MINUTOS = 15;
+
+	/** Minutos que faltan de bloqueo para este IP+nombre, o 0 si puede intentarlo. */
+	public function minutosBloqueoLogin($ip, $nombre) {
+		$stmt = $this->pdo->prepare("
+			SELECT bloqueado_hasta FROM login_intentos
+			WHERE ip = :ip AND nombre = :nombre
+		");
+		$stmt->execute([":ip" => $ip, ":nombre" => $nombre]);
+		$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+
+		if (!$fila || $fila["bloqueado_hasta"] === null) {
+			return 0;
+		}
+
+		$restante = strtotime($fila["bloqueado_hasta"]) - time();
+		return $restante > 0 ? (int) ceil($restante / 60) : 0;
+	}
+
+	/** Suma un intento fallido; si llega al máximo, bloquea el par IP+nombre. */
+	public function registrarIntentoLoginFallido($ip, $nombre) {
+		$stmt = $this->pdo->prepare("
+			SELECT intentos, bloqueado_hasta FROM login_intentos
+			WHERE ip = :ip AND nombre = :nombre
+		");
+		$stmt->execute([":ip" => $ip, ":nombre" => $nombre]);
+		$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+
+		// Un bloqueo ya CADUCADO cuenta como si no hubiera intentos previos:
+		// si no, tras el primer bloqueo nunca se volvería a activar.
+		$bloqueoCaducado = $fila && $fila["bloqueado_hasta"] !== null
+			&& strtotime($fila["bloqueado_hasta"]) <= time();
+		$intentos = (!$fila || $bloqueoCaducado) ? 1 : (int) $fila["intentos"] + 1;
+
+		$bloqueadoHasta = $intentos >= self::LOGIN_MAX_INTENTOS
+			? date("Y-m-d H:i:s", time() + self::LOGIN_BLOQUEO_MINUTOS * 60)
+			: null;
+
+		$this->pdo->prepare("
+			INSERT INTO login_intentos (ip, nombre, intentos, ultimo_intento, bloqueado_hasta)
+			VALUES (:ip, :nombre, :intentos, NOW(), :bloqueado_hasta)
+			ON DUPLICATE KEY UPDATE
+				intentos = :intentos, ultimo_intento = NOW(), bloqueado_hasta = :bloqueado_hasta
+		")->execute([
+			":ip" => $ip, ":nombre" => $nombre,
+			":intentos" => $intentos, ":bloqueado_hasta" => $bloqueadoHasta,
+		]);
+	}
+
+	/** Login correcto: se olvida cualquier intento fallido previo de este par. */
+	public function limpiarIntentosLogin($ip, $nombre) {
+		$this->pdo->prepare("DELETE FROM login_intentos WHERE ip = :ip AND nombre = :nombre")
+			->execute([":ip" => $ip, ":nombre" => $nombre]);
+	}
+
 	public function listarColeccionCompleta(){
 		$sql = "
 			SELECT

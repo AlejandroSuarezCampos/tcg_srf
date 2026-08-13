@@ -6,6 +6,9 @@
  * solo que el ALTER pasa. Se borra de verdad un usuario con duelos por los dos
  * lados y se cuenta lo que queda.
  */
+
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 $p = new PDO("mysql:host=127.0.0.1;dbname=tcg_prueba;charset=utf8mb4", "root", "",
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 

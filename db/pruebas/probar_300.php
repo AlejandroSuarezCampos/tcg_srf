@@ -15,6 +15,9 @@
  *   · Ningún duelo se queda en_juego.
  *   · El ganador cuadra siempre con el marcador, o `resuelto_por_tanda` lo explica.
  */
+
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 require __DIR__ . "/../consultas.php";
 
 $p = new PDO("mysql:host=127.0.0.1;dbname=tcg_prueba;charset=utf8mb4", "root", "",

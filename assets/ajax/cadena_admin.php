@@ -13,6 +13,8 @@
  */
 session_start();
 require_once __DIR__ . '/../../db/conexion.php';
+require_once __DIR__ . '/../../partials/csrf.php';
+require_once __DIR__ . '/../../partials/subida_imagen.php';
 
 header('Content-Type: application/json');
 
@@ -20,6 +22,31 @@ if (empty($_SESSION['dictador']) || $_SESSION['dictador'] != 1) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'No autorizado.']);
     exit;
+}
+
+if (!csrfValido($_POST['csrf'] ?? null)) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido.']);
+    exit;
+}
+
+// Escudo subido como archivo (crear_rival / actualizar_rival): gana al campo
+// de texto si viene, se guarda siempre en assets/img/Escudos/ (carpeta plana,
+// sin subcarpetas por expansión — un rival no pertenece a ninguna).
+$escudoSubido = null;
+if (!empty($_FILES['escudo_archivo']) && $_FILES['escudo_archivo']['error'] !== UPLOAD_ERR_NO_FILE) {
+    $subida = subirImagenPanel(
+        $_FILES['escudo_archivo'],
+        __DIR__ . '/../../assets/img/Escudos/',
+        './assets/img/Escudos/',
+        $_POST['nombre'] ?? 'escudo'
+    );
+    if (!$subida['ok']) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => $subida['error']]);
+        exit;
+    }
+    $escudoSubido = $subida['ruta'];
 }
 
 $accion = $_POST['accion'] ?? '';
@@ -76,9 +103,10 @@ switch ($accion) {
     case 'crear_rival':
         $nombre = trim($_POST['nombre'] ?? '');
         if ($nombre === '') { echo json_encode(['ok' => false, 'error' => 'Falta el nombre.']); break; }
-        $idRival = $db->crearRival($nombre, trim($_POST['escudo'] ?? ''), trim($_POST['descripcion'] ?? ''), 1);
+        $escudo = $escudoSubido ?? trim($_POST['escudo'] ?? '');
+        $idRival = $db->crearRival($nombre, $escudo, trim($_POST['descripcion'] ?? ''), 1);
         echo json_encode(['ok' => true, 'rival' => [
-            'id_rival' => $idRival, 'nombre' => $nombre, 'total_estilos' => 0,
+            'id_rival' => $idRival, 'nombre' => $nombre, 'total_estilos' => 0, 'escudo' => $escudo,
         ]]);
         break;
 
@@ -87,11 +115,12 @@ switch ($accion) {
         $rival = $db->obtenerRival($idRival);
         if (!$rival) { echo json_encode(['ok' => false, 'error' => 'Rival no encontrado.']); break; }
         $nombre = trim($_POST['nombre'] ?? '') ?: $rival['nombre'];
+        $escudo = $escudoSubido ?? trim($_POST['escudo'] ?? '');
         $db->actualizarRival(
-            $idRival, $nombre, trim($_POST['escudo'] ?? ''),
+            $idRival, $nombre, $escudo,
             $rival['descripcion'], (int) $rival['activo']
         );
-        echo json_encode(['ok' => true]);
+        echo json_encode(['ok' => true, 'escudo' => $escudo]);
         break;
 
     case 'crear_estilo':

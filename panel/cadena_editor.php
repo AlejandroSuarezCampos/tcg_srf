@@ -169,9 +169,10 @@ $activeAdmin = 'cadenas';
            se ve. -->
       <div class="form-grid" id="fn_rival_escudo_wrap" hidden>
         <div class="campo">
-          <label for="fn_rival_escudo_actual">Escudo de este rival</label>
-          <input type="text" id="fn_rival_escudo_actual" placeholder="./assets/img/Escudos/...">
-          <span class="campo-hint">Ruta de la imagen. Vacío = se sigue mostrando el icono de espada en el mapa.</span>
+          <label for="fn_rival_escudo_actual_archivo">Escudo de este rival</label>
+          <input type="file" id="fn_rival_escudo_actual_archivo" accept="image/png,image/jpeg,image/webp">
+          <input type="text" id="fn_rival_escudo_actual" placeholder="./assets/img/Escudos/..." style="margin-top:var(--space-2);">
+          <span class="campo-hint">Sube un archivo o pega una ruta ya subida. Vacío = se sigue mostrando el icono de espada en el mapa.</span>
         </div>
         <div class="campo" style="align-self:end;">
           <button type="button" class="btn btn-plano" onclick="SRF.cadenaEditor.guardarEscudoRival()">
@@ -186,8 +187,9 @@ $activeAdmin = 'cadenas';
           <input type="text" id="fn_rival_nombre" placeholder="Ej. Escuadra Fantasma">
         </div>
         <div class="campo">
-          <label for="fn_rival_escudo">Escudo (ruta, opcional)</label>
-          <input type="text" id="fn_rival_escudo" placeholder="./assets/img/...">
+          <label for="fn_rival_escudo_archivo">Escudo (opcional)</label>
+          <input type="file" id="fn_rival_escudo_archivo" accept="image/png,image/jpeg,image/webp">
+          <input type="text" id="fn_rival_escudo" placeholder="./assets/img/... (o sube un archivo arriba)" style="margin-top:var(--space-2);">
         </div>
         <div class="campo campo-full">
           <label for="fn_rival_descripcion">Descripción (opcional)</label>

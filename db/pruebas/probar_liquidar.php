@@ -10,6 +10,9 @@
  *   3. Un empate se rompe en la tanda y queda marcado.
  *   4. Un duelo que no está en_juego no se toca.
  */
+
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
+
 $dsn = "mysql:host=127.0.0.1;dbname=tcg_prueba;charset=utf8mb4";
 $pdoDirecto = new PDO($dsn, "root", "", [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 

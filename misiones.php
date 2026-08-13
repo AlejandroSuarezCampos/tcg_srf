@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -11,7 +12,9 @@ $id_usuario = $_SESSION['id_usuario'];
 $mensaje = '';
 $error   = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reclamar') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reclamar' && !csrfValido($_POST['csrf'] ?? null)) {
+    $error = 'La página ha caducado, inténtalo de nuevo.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'reclamar') {
     $res = $db->reclamarMision((int) $_POST['id_mision'], $id_usuario);
     if ($res['ok']) {
         header('Location: misiones.php?reclamada=' . $res['recompensa']);
@@ -139,6 +142,7 @@ include __DIR__ . '/navbar.php';
                   <button type="button" class="btn btn-plano btn-sm" disabled>Ya reclamada</button>
                 <?php elseif ($m['completada']): ?>
                   <form method="POST">
+                    <?= csrfCampo() ?>
                     <input type="hidden" name="accion" value="reclamar">
                     <input type="hidden" name="id_mision" value="<?= $m['id_mision'] ?>">
                     <button type="submit" class="btn btn-primary btn-sm">Reclamar</button>

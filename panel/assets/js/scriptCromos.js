@@ -30,6 +30,7 @@ function abrirModalCromo(cromo) {
     submitBtn.textContent = 'Guardar cambios';
     document.getElementById('f_id_cromo').value = cromo.id_cromo || '';
     document.getElementById('f_nombre').value = cromo.nombre || '';
+    document.getElementById('f_imagen_archivo').value = '';
     document.getElementById('f_imagen').value = cromo.imagen || '';
     document.getElementById('f_preview').src = rutaPreview(cromo.imagen);
     document.getElementById('f_id_equipo').value = cromo.id_equipo || '';
@@ -58,8 +59,16 @@ document.getElementById('f_imagen')?.addEventListener('input', (e) => {
   document.getElementById('f_preview').src = rutaPreview(e.target.value);
 });
 
+// Elegir un archivo previsualiza ESE archivo (aún sin subir) y manda por
+// delante a la ruta escrita a mano, que es lo que hace también el servidor.
+document.getElementById('f_imagen_archivo')?.addEventListener('change', (e) => {
+  const archivo = e.target.files && e.target.files[0];
+  if (!archivo) return;
+  document.getElementById('f_preview').src = URL.createObjectURL(archivo);
+});
+
 function pedirBorrado(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar "' + nombre + '"? Se quitará de la colección y de los mazos de CUALQUIERA que la tenga, y de su rastro en duelos ya jugados. No se puede deshacer.', function () {
-    window.location.href = 'cromos.php?eliminar=' + encodeURIComponent(id);
+    window.location.href = 'cromos.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
   });
 }
