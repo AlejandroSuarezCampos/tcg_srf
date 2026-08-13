@@ -38,6 +38,14 @@ function abrirModalCromo(cromo) {
     document.getElementById('f_posicion').value = cromo.posicion || '';
     document.getElementById('f_id_rareza').value = cromo.id_rareza || '';
     document.getElementById('f_id_afinidad').value = cromo.id_afinidad || '';
+    document.getElementById('f_ataque').value = cromo.ataque || 0;
+    document.getElementById('f_defensa').value = cromo.defensa || 0;
+    document.getElementById('f_tecnica').value = cromo.tecnica || 0;
+    // El select solo refleja un rasgo concreto si es un override MANUAL: si es
+    // el que le tocó por derivación automática, se sigue viendo "Automático"
+    // aunque ya tenga uno asignado (es lo que es, un resultado, no una elección).
+    document.getElementById('f_compo').value =
+      (cromo.compo_manual == 1 && cromo.id_rasgo_compo) ? cromo.id_rasgo_compo : '';
     document.getElementById('f_descripcion').value = cromo.descripcion || '';
   } else {
     titulo.textContent = 'Nuevo cromo';

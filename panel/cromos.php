@@ -41,6 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id_equipo    = (int) ($_POST['id_equipo'] ?? 0);
     $id_rareza    = (int) ($_POST['id_rareza'] ?? 0);
     $id_afinidad  = (int) ($_POST['id_afinidad'] ?? 0);
+    $ataque       = max(0, min(99, (int) ($_POST['ataque'] ?? 0)));
+    $defensa      = max(0, min(99, (int) ($_POST['defensa'] ?? 0)));
+    $tecnica      = max(0, min(99, (int) ($_POST['tecnica'] ?? 0)));
+    $compo        = $_POST['compo'] ?? '';
     $errorSubida  = '';
 
     // Si se ha subido un archivo, gana a la ruta escrita a mano: se guarda en
@@ -69,15 +73,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($id_cromo !== '') {
-        $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
+        $db->actualizarCromo((int) $id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque, $defensa, $tecnica);
+        $idCromoFinal = (int) $id_cromo;
     } else {
-        $db->crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad);
+        $idCromoFinal = (int) $db->crearCromo($nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque, $defensa, $tecnica);
+    }
+
+    // Compo (rasgo de configuración): "" = automático, "aleatorio" = uno al
+    // azar entre los 4 de tipo configuración, o un id concreto elegido a mano.
+    // Se resuelve ANTES de derivarRasgosConfiguracion() de abajo: fijar aquí
+    // un id (o borrar el override para volver a automático) es justo lo que
+    // decide si esa derivación toca o no esta carta.
+    $configuracion = array_values(array_filter($db->rasgosCatalogo(), fn($r) => $r['tipo'] === 'configuracion'));
+    $idsValidos    = array_column($configuracion, 'id_rasgo');
+
+    if ($compo === 'aleatorio' && $configuracion) {
+        $elegido = $configuracion[array_rand($configuracion)];
+        $db->asignarRasgoManual($idCromoFinal, (int) $elegido['id_rasgo']);
+    } elseif ($compo !== '' && in_array((int) $compo, $idsValidos, true)) {
+        $db->asignarRasgoManual($idCromoFinal, (int) $compo);
+    } else {
+        // "Automático": si tenía un override manual, se quita para que la
+        // derivación de abajo pueda asignarle el que le toque de verdad.
+        $db->asignarRasgoManual($idCromoFinal, null);
     }
 
     // Capa 2: el rasgo de configuración sale del cruce puesto × afinidad, así
     // que cambiar cualquiera de los dos lo invalida. Se rederiva aquí para que
     // una carta nueva nunca se quede sin rasgo y una editada no conserve el que
-    // le correspondía antes. No pisa las asignaciones marcadas como manuales.
+    // le correspondía antes. No pisa las asignaciones marcadas como manuales
+    // (ni la de arriba, recién fijada, ni ninguna otra carta ya curada a mano).
     $db->derivarRasgosConfiguracion();
 
     header('Location: cromos.php');
@@ -90,6 +115,12 @@ $expansiones = $db->listarExpansiones();
 $rarezasDB   = $db->listarRarezas();
 $afinidades  = $db->listarAfinidades();
 $posiciones  = ['POR', 'DF', 'MC', 'DC', 'ENT', 'GER', 'ESCUDO', 'PRESIDENTE'];
+
+// Los 4 rasgos de "compo" que se pueden elegir a mano (Contraataque, Vínculo,
+// Justicia, Brecha) — el resto del catálogo (afinidad/derivado) no aplica aquí.
+$rasgosConfig = array_values(array_filter($db->rasgosCatalogo(), fn($r) => $r['tipo'] === 'configuracion'));
+$rasgosConfigPorId = [];
+foreach ($rasgosConfig as $r) { $rasgosConfigPorId[(int) $r['id_rasgo']] = $r['nombre']; }
 
 $rarezas = [];
 foreach ($rarezasDB as $r) {
@@ -183,6 +214,8 @@ $activeAdmin = 'cromos';
             <th scope="col">Expansión</th>
             <th scope="col">Posición</th>
             <th scope="col">Rareza</th>
+            <th scope="col">ATA/DEF/TÉC</th>
+            <th scope="col">Compo</th>
             <th scope="col" style="text-align:right;">Acciones</th>
           </tr>
         </thead>
@@ -204,6 +237,15 @@ $activeAdmin = 'cromos';
             <td><?= htmlspecialchars($c['expansion']) ?></td>
             <td><?= htmlspecialchars($c['posicion']) ?></td>
             <td><?= render_rareza((int) $c['id_rareza'], $rarezas[$c['id_rareza']] ?? $c['rareza']) ?></td>
+            <td class="mono"><?= (int) $c['ataque'] ?>/<?= (int) $c['defensa'] ?>/<?= (int) $c['tecnica'] ?></td>
+            <td>
+              <?php if ($c['id_rasgo_compo']): ?>
+                <?= htmlspecialchars($rasgosConfigPorId[(int) $c['id_rasgo_compo']] ?? '—') ?>
+                <?= ((int) $c['compo_manual'] === 1) ? '<span class="t-caption t-dim">(manual)</span>' : '' ?>
+              <?php else: ?>
+                <span class="t-dim">—</span>
+              <?php endif; ?>
+            </td>
             <td>
               <div class="row-actions">
                 <button type="button" class="icon-btn" title="Editar"
@@ -219,7 +261,7 @@ $activeAdmin = 'cromos';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($cromos)): ?>
-          <tr><td colspan="6" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron cromos con esos filtros.</td></tr>
+          <tr><td colspan="8" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron cromos con esos filtros.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
@@ -306,6 +348,31 @@ $activeAdmin = 'cromos';
             <option value="<?= (int) $af['id'] ?>"><?= htmlspecialchars($af['nombre']) ?></option>
             <?php endforeach; ?>
           </select>
+        </div>
+
+        <div class="campo">
+          <label for="f_ataque">Ataque</label>
+          <input type="number" name="ataque" id="f_ataque" min="0" max="99" value="0">
+        </div>
+        <div class="campo">
+          <label for="f_defensa">Defensa</label>
+          <input type="number" name="defensa" id="f_defensa" min="0" max="99" value="0">
+        </div>
+        <div class="campo">
+          <label for="f_tecnica">Técnica</label>
+          <input type="number" name="tecnica" id="f_tecnica" min="0" max="99" value="0">
+        </div>
+
+        <div class="campo campo-full">
+          <label for="f_compo">Compo (rasgo de configuración)</label>
+          <select name="compo" id="f_compo">
+            <option value="">Automático — según posición y afinidad</option>
+            <option value="aleatorio">Aleatorio</option>
+            <?php foreach ($rasgosConfig as $r): ?>
+            <option value="<?= (int) $r['id_rasgo'] ?>"><?= htmlspecialchars($r['nombre']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <span class="campo-hint">"Automático" deriva el rasgo del cruce posición × afinidad. Elegir uno a mano (o "Aleatorio", que fija uno al azar) lo deja fijado hasta que vuelvas a poner "Automático".</span>
         </div>
 
         <div class="campo campo-full">

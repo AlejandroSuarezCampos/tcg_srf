@@ -263,10 +263,15 @@ class Tcg
 			SELECT
 				c.id_cromo, c.nombre, c.posicion, c.descripcion, c.imagen,
 				c.id_expansion, c.id_equipo, c.id_rareza, c.id_afinidad,
+				c.ataque, c.defensa, c.tecnica,
 				e.nombre AS expansion,
 				eq.nombre AS equipo,
 				r.nombre AS rareza,
-				af.nombre AS afinidad
+				af.nombre AS afinidad,
+				(SELECT cr.id_rasgo FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS id_rasgo_compo,
+				(SELECT cr.manual FROM cromo_rasgos cr INNER JOIN rasgos rg ON rg.id_rasgo = cr.id_rasgo
+				 WHERE cr.id_cromo = c.id_cromo AND rg.tipo = 'configuracion' LIMIT 1) AS compo_manual
 			FROM cromos c
 			INNER JOIN expansiones e ON c.id_expansion = e.id_expansion
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
@@ -302,7 +307,7 @@ class Tcg
 		return $this->pdo->lastInsertId();
 	}
 
-	public function actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad) {
+	public function actualizarCromo($id_cromo, $nombre, $posicion, $descripcion, $imagen, $id_expansion, $id_equipo, $id_rareza, $id_afinidad, $ataque = 0, $defensa = 0, $tecnica = 0) {
 		$sql = "
 			UPDATE cromos SET
 				nombre = :nombre,
@@ -312,7 +317,10 @@ class Tcg
 				id_expansion = :id_expansion,
 				id_equipo = :id_equipo,
 				id_rareza = :id_rareza,
-				id_afinidad = :id_afinidad
+				id_afinidad = :id_afinidad,
+				ataque = :ataque,
+				defensa = :defensa,
+				tecnica = :tecnica
 			WHERE id_cromo = :id_cromo
 		";
 		$stmt = $this->pdo->prepare($sql);
@@ -325,6 +333,9 @@ class Tcg
 			":id_equipo" => $id_equipo,
 			":id_rareza" => $id_rareza,
 			":id_afinidad" => $id_afinidad,
+			":ataque" => $ataque,
+			":defensa" => $defensa,
+			":tecnica" => $tecnica,
 			":id_cromo" => $id_cromo,
 		]);
 	}
@@ -3026,6 +3037,33 @@ class Tcg
 			return 0;
 		}
 		return $tocadas;
+	}
+
+	/**
+	 * Fija (o quita) a mano el rasgo de CONFIGURACIÓN de un cromo, desde el panel.
+	 *
+	 * $id_rasgo = null vuelve al automático: borra el override manual y deja
+	 * que la próxima derivarRasgosConfiguracion() (el panel la llama siempre
+	 * justo después de crear/editar un cromo) le asigne el que le toque por
+	 * posición × afinidad.
+	 *
+	 * $id_rasgo = un id concreto lo fija con manual = 1, así que
+	 * derivarRasgosConfiguracion() nunca lo vuelve a tocar. Sirve tanto para
+	 * elegir uno a mano como para el botón "Aleatorio" (el panel ya resuelve
+	 * qué id le toca antes de llamar aquí).
+	 */
+	public function asignarRasgoManual($id_cromo, $id_rasgo) {
+		$this->pdo->prepare("
+			DELETE FROM cromo_rasgos
+			WHERE id_cromo = :id_cromo
+			  AND id_rasgo IN (SELECT id_rasgo FROM rasgos WHERE tipo = 'configuracion')
+		")->execute([":id_cromo" => $id_cromo]);
+
+		if ($id_rasgo !== null) {
+			$this->pdo->prepare("
+				INSERT INTO cromo_rasgos (id_cromo, id_rasgo, manual) VALUES (:id_cromo, :id_rasgo, 1)
+			")->execute([":id_cromo" => $id_cromo, ":id_rasgo" => $id_rasgo]);
+		}
 	}
 
 	/** Catálogo de rasgos indexado por clave. Se consulta varias veces por duelo. */
