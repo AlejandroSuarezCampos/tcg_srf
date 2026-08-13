@@ -273,3 +273,25 @@
   border-top: 1px solid var(--line); margin-top: var(--space-5); padding-top: var(--space-5);
 }
 .cadena-editor-bloque h3 { margin: 0 0 var(--space-3); font-size: var(--fs-body-sm); color: var(--frost-dim); }
+
+/* ---------------------------------------------------------------------------
+   Selector de cromo del botín (#fl_lista_cromos, dentro del bloque de arriba).
+   A propósito EN ESTE FICHERO y no en components.css: es el mismo componente
+   de carta que álbum/colección/mercado (render_carta(), sin copiar marcado),
+   pero el AJUSTE DE TAMAÑO para que quepa aquí vive aparte, en admin.css, que
+   solo carga el panel. Así se puede afinar el tamaño de esta rejilla sin
+   arriesgar nada de lo que ya funciona en las demás pantallas — un ID
+   (#fl_lista_cromos) gana siempre a las clases de components.css, así que
+   estas reglas mandan sin tocar ni una línea de ese fichero.
+   --------------------------------------------------------------------------- */
+#fl_lista_cromos .carta-nombre-marco {
+  font-size: 7.5px;
+  padding: 0 2px;
+  /* El componente base ya usa #14151A (casi negro) sobre el rectángulo
+     blanco de la plantilla, pero a este tamaño tan pequeño se leía mal
+     igual: negro puro y más peso, solo aquí. */
+  color: #000;
+  font-weight: var(--fw-bold);
+}
+#fl_lista_cromos .carta-nombre { font-size: 10px; -webkit-line-clamp: 1; }
+#fl_lista_cromos .rz { font-size: 7.5px; padding: 2px 4px; }

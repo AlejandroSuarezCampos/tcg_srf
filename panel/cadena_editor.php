@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../db/conexion.php';
+require_once __DIR__ . '/../components/carta.php';
 
 if (isset($_SESSION['dictador'])) {
     if ($_SESSION['dictador'] != 1) {
@@ -35,6 +36,18 @@ foreach ($nodos as &$n) {
 unset($n);
 
 $cromos = $db->listarCromosAdmin();
+
+// Las rutas de imagen en BD son relativas a la raíz del sitio ("./assets/...",
+// pensadas para páginas como mercado.php o coleccion.php). Desde panel/ un
+// "./" así apunta a panel/assets/... y la imagen no existe — mismo ajuste que
+// ya hace panel/cromos.php con sus miniaturas (anteponer un "." más).
+// Se usa una copia aparte para no tocar $cromos, que también viaja tal cual
+// a CADENA_EDITOR_DATOS.cromos (ese JSON no usa la imagen para nada).
+$cromosParaSelector = array_map(function ($c) {
+    if (!empty($c['imagen']))          { $c['imagen']          = '.' . $c['imagen']; }
+    if (!empty($c['afinidad_imagen'])) { $c['afinidad_imagen'] = '.' . $c['afinidad_imagen']; }
+    return $c;
+}, $cromos);
 
 $huecosPorFormacion = [];
 foreach (Tcg::FORMACIONES as $clave => $f) {
@@ -147,6 +160,26 @@ $activeAdmin = 'cadenas';
         </div>
       </div>
 
+      <!-- Escudo del rival ya elegido en el desplegable de arriba. El campo
+           "Escudo (ruta, opcional)" de "Nuevo rival" solo sirve al CREAR
+           uno; para los rivales que ya existían sin escudo asignado (todos,
+           hoy) hacía falta un sitio para ponérselo después. Mientras no
+           tenga ruta, cadena.php sigue mostrando el icono de espada de
+           siempre — este campo es exactamente lo que decide cuál de los dos
+           se ve. -->
+      <div class="form-grid" id="fn_rival_escudo_wrap" hidden>
+        <div class="campo">
+          <label for="fn_rival_escudo_actual">Escudo de este rival</label>
+          <input type="text" id="fn_rival_escudo_actual" placeholder="./assets/img/Escudos/...">
+          <span class="campo-hint">Ruta de la imagen. Vacío = se sigue mostrando el icono de espada en el mapa.</span>
+        </div>
+        <div class="campo" style="align-self:end;">
+          <button type="button" class="btn btn-plano" onclick="SRF.cadenaEditor.guardarEscudoRival()">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i> Guardar escudo
+          </button>
+        </div>
+      </div>
+
       <div id="fn_nuevo_rival" class="form-grid" hidden>
         <div class="campo">
           <label for="fn_rival_nombre">Nombre del rival</label>
@@ -216,9 +249,31 @@ $activeAdmin = 'cadenas';
           <label for="fl_monedas">Monedas</label>
           <input type="number" id="fl_monedas" min="0" value="100">
         </div>
-        <div class="campo" id="fl_grupo_cromo" hidden>
-          <label for="fl_cromo">Cromo</label>
-          <select id="fl_cromo"></select>
+        <div class="campo campo-full" id="fl_grupo_cromo" hidden>
+          <label for="fl_buscar_cromo">Cromo</label>
+          <!-- Selector visual, no un <select>: con el catálogo entero (varios
+               cientos de cromos) una lista desplegable se vuelve interminable
+               e irreconocible — mismo problema y misma solución que ya se
+               aplicó en mercado.php (§3 del CLAUDE.md, "Elige la carta"). -->
+          <input type="search" id="fl_buscar_cromo" placeholder="Buscar por nombre, equipo o rareza"
+                 autocomplete="off" aria-describedby="fl_conteo_cromo">
+          <span class="campo-hint" id="fl_conteo_cromo" role="status" aria-live="polite">
+            <?= count($cromos) ?> cromos
+          </span>
+          <input type="hidden" id="fl_cromo" required>
+
+          <div class="selector-cartas" id="fl_lista_cromos" role="radiogroup" aria-label="Cromos disponibles para el botín">
+            <?php foreach ($cromosParaSelector as $c): ?>
+              <label class="selector-item"
+                     data-nombre="<?= htmlspecialchars($c['nombre']) ?>"
+                     data-equipo="<?= htmlspecialchars($c['equipo']) ?>"
+                     data-rareza-nombre="<?= htmlspecialchars($c['rareza']) ?>">
+                <input type="radio" name="fl_cromo_radio" class="sr-only" value="<?= $c['id_cromo'] ?>">
+                <?php render_carta($c, ['tamano' => 'sm']); ?>
+              </label>
+            <?php endforeach; ?>
+            <p class="selector-vacio" hidden>Ningún cromo coincide con esa búsqueda.</p>
+          </div>
         </div>
         <div class="campo">
           <label for="fl_probabilidad">Probabilidad %</label>

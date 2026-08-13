@@ -1,6 +1,12 @@
 <?php
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/components/carta.php';
+
+function esPeticionAjax() {
+    return isset($_SERVER['HTTP_X_REQUESTED_WITH'])
+        && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+}
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -46,20 +52,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $idNodoReclamado = (int) ($_POST['id_nodo'] ?? 0);
         $res = $db->reclamarCofre($idNodoReclamado, $id_usuario);
 
+        // Se relee con nombres ya resueltos (listarDropsCofre hace el JOIN
+        // con cromos) en vez de formatear a mano el array de reclamarCofre.
+        $drops = $res['ok'] ? $db->listarDropsCofre($idNodoReclamado, $id_usuario) : [];
+
+        if (esPeticionAjax()) {
+            // La ceremonia de apertura pinta las cartas con el MISMO componente
+            // que el resto del sitio (igual que hace sobres.php): el HTML se
+            // genera aquí, JS no reimplementa el marcado de la carta.
+            $cartas = [];
+            $monedasGanadas = 0;
+            foreach ($drops as $d) {
+                if ($d['tipo'] === 'monedas') {
+                    $monedasGanadas += (int) $d['monedas'];
+                } elseif ($d['tipo'] === 'cromo' || $d['tipo'] === 'cromo_limitado') {
+                    $cartas[] = [
+                        'nombre'        => $d['cromo_nombre'],
+                        'rareza'        => $d['rareza'],
+                        'id_rareza'     => (int) $d['id_rareza'],
+                        'numero_serie'  => $d['numero_serie'] ? (int) $d['numero_serie'] : null,
+                        'cupo_numerado' => $d['cupo_numerado'] ? (int) $d['cupo_numerado'] : null,
+                        'html'          => carta_html([
+                            'nombre'          => $d['cromo_nombre'],
+                            'imagen'          => $d['imagen'],
+                            'posicion'        => $d['posicion'],
+                            'equipo'          => $d['equipo'],
+                            'id_rareza'       => (int) $d['id_rareza'],
+                            'rareza'          => $d['rareza'],
+                            'afinidad'        => $d['afinidad'],
+                            'afinidad_imagen' => $d['afinidad_imagen'],
+                        ], ['tamano' => 'sm', 'lazy' => false]),
+                    ];
+                }
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'ok'              => $res['ok'],
+                'error'           => $res['error'],
+                'monedas'         => $monedasGanadas,
+                'camino_perfecto' => !empty($res['camino_perfecto']),
+                'formacion'       => (!empty($res['formacion']) && isset(Tcg::FORMACIONES[$res['formacion']]))
+                    ? Tcg::FORMACIONES[$res['formacion']]['nombre'] : null,
+                'cartas'          => $cartas,
+            ]);
+            exit;
+        }
+
+        // Sin JS: mismo aviso de texto de siempre, por si acaso.
         if ($res['ok']) {
             $partes = ['Cofre abierto.'];
-            // El premio extra por camino perfecto se DICE. Si no, el jugador no
-            // tiene forma de saber que existe ni de distinguirlo de una tirada
-            // de botín afortunada, y un premio que no se entiende no premia.
             if (!empty($res['camino_perfecto'])) {
                 $partes[] = 'Camino perfecto: llegaste con todos los partidos en rango S en Extremo.';
             }
             if (!empty($res['formacion']) && isset(Tcg::FORMACIONES[$res['formacion']])) {
                 $partes[] = 'Has desbloqueado la formación ' . Tcg::FORMACIONES[$res['formacion']]['nombre'] . '.';
             }
-            // Se relee con nombres ya resueltos (listarDropsCofre hace el JOIN
-            // con cromos) en vez de formatear a mano el array de reclamarCofre.
-            foreach ($db->listarDropsCofre($idNodoReclamado, $id_usuario) as $d) {
+            foreach ($drops as $d) {
                 if ($d['tipo'] === 'monedas') {
                     $partes[] = '+' . number_format((int) $d['monedas'], 0, ',', '.') . ' monedas.';
                 } elseif ($d['tipo'] === 'cromo_limitado') {
@@ -247,6 +296,13 @@ include __DIR__ . '/navbar.php';
                     <i class="ph<?= $n['reclamado'] ? '' : '-fill' ?> ph-treasure-chest"></i>
                   <?php elseif (!$n['disponible']): ?>
                     <i class="ph ph-lock-simple"></i>
+                  <?php elseif (!empty($n['escudo_rival'])): ?>
+                    <!-- Escudo del rival en vez del icono de espada, si el
+                         admin le asignó uno (panel/cadena_editor.php). Sin
+                         escudo asignado se sigue viendo la espada de
+                         siempre: el <img> nunca sustituye al <i> a medias. -->
+                    <img class="nodo-escudo" src="<?= htmlspecialchars($n['escudo_rival']) ?>"
+                         alt="Escudo de <?= htmlspecialchars($n['rival'] ?? '') ?>">
                   <?php else: ?>
                     <i class="ph-fill ph-sword"></i>
                   <?php endif; ?>
@@ -309,7 +365,7 @@ include __DIR__ . '/navbar.php';
             <b><?= htmlspecialchars(Tcg::FORMACIONES[$cadena['formacion_recompensa']]['nombre']) ?></b>.
           <?php endif; ?>
         </p>
-        <form method="POST">
+        <form method="POST" id="formReclamarCofre">
           <input type="hidden" name="accion" value="reclamar">
           <input type="hidden" name="id_nodo" value="<?= (int) $sel['id_nodo'] ?>">
           <button type="submit" class="btn btn-primary">
@@ -385,7 +441,60 @@ include __DIR__ . '/navbar.php';
 
 </main>
 
+<?php include __DIR__ . '/partials/ceremonia_cofre.php'; ?>
 <?php include __DIR__ . '/partials/footer.php'; ?>
+
+<script>
+(function () {
+  // La ceremonia sustituye al aviso de texto de siempre: se abre justo al
+  // reclamar, centrada, así que no depende de por dónde ande el scroll (era
+  // el problema real: el botón está al fondo del panel y el aviso salía
+  // arriba del todo, fuera de vista — ver CLAUDE.md, sesión de hoy).
+  var form = document.getElementById('formReclamarCofre');
+  if (!form || typeof SRF === 'undefined' || !SRF.ceremoniaCofre) return;
+
+  var recargarAlCerrar = false;
+  document.addEventListener('click', function (e) {
+    if (recargarAlCerrar && e.target.closest && e.target.closest('#modalCofre [data-cerrar-modal]')) {
+      location.reload();
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (recargarAlCerrar && e.key === 'Escape') location.reload();
+  });
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    btn.disabled = true;
+
+    try {
+      var res = await fetch('cadena.php?id=<?= $id_cadena ?>', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: new URLSearchParams(new FormData(form))
+      });
+      var data = await res.json();
+
+      if (!data.ok) {
+        SRF.toast(data.error || 'No se pudo abrir el cofre.', 'danger');
+        btn.disabled = false;
+        return;
+      }
+
+      // El mapa (nodos desbloqueados, sello "Abierto") solo se pone al día
+      // recargando: se hace al cerrar la ceremonia, no antes, para no
+      // interrumpir el revelado.
+      recargarAlCerrar = true;
+      SRF.ceremoniaCofre(data);
+    } catch (err) {
+      console.error(err);
+      SRF.toast('No se pudo conectar con el servidor.', 'danger');
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
 
 </body>
 </html>

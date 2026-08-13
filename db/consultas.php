@@ -634,6 +634,12 @@ class Tcg
 		")->fetchAll(PDO::FETCH_ASSOC);
 	}
 
+	public function obtenerRival($id_rival) {
+		$stmt = $this->pdo->prepare("SELECT * FROM cadena_rivales WHERE id_rival = :id");
+		$stmt->execute([":id" => $id_rival]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
 	public function crearRival($nombre, $escudo, $descripcion, $activo) {
 		$stmt = $this->pdo->prepare("
 			INSERT INTO cadena_rivales (nombre, escudo, descripcion, activo) VALUES (:n, :e, :d, :a)
@@ -7100,12 +7106,24 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	/** Lo que se entregó al reclamar un cofre concreto. */
+	/**
+	 * Lo que se entregó al reclamar un cofre concreto. Trae también las
+	 * columnas que espera `carta_html()` (equipo, rareza, afinidad...) para
+	 * que la ceremonia de apertura pueda pintar la carta real sin una
+	 * segunda consulta.
+	 */
 	public function listarDropsCofre($id_nodo, $id_usuario) {
 		$stmt = $this->pdo->prepare("
-			SELECT d.*, c.nombre AS cromo_nombre, c.cupo_numerado
+			SELECT d.*,
+			       c.nombre AS cromo_nombre, c.cupo_numerado,
+			       c.imagen, c.posicion, c.id_rareza,
+			       eq.nombre AS equipo, r.nombre AS rareza,
+			       af.nombre AS afinidad, af.imagen AS afinidad_imagen
 			FROM cadena_drops d
 			LEFT JOIN cromos c ON c.id_cromo = d.id_cromo
+			LEFT JOIN equipos eq ON eq.id_equipo = c.id_equipo
+			LEFT JOIN rarezas r ON r.id_rareza = c.id_rareza
+			LEFT JOIN afinidad af ON af.id = c.id_afinidad
 			WHERE d.id_nodo = :n AND d.id_usuario = :u AND d.id_duelo IS NULL
 			ORDER BY d.id_drop
 		");
