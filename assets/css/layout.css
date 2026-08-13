@@ -1204,6 +1204,7 @@
   transition: transform var(--t-micro) var(--ease), filter var(--t-media) var(--ease);
 }
 .nodo-hex-int {
+  position: relative;    /* ancla a .nodo-escudo, que se posiciona en absoluto contra este hueco */
   display: grid;
   place-items: center;
   width: 100%; height: 100%;
@@ -1213,6 +1214,28 @@
               color-mix(in srgb, var(--nodo-fondo, var(--ruta-pieza)) 86%, var(--ruta-cian-hondo)) 100%);
   color: var(--nodo-tinta, var(--ruta-tinta));
   font-size: 26px;
+}
+
+/* Escudo del rival dentro de la ficha hexagonal. El clip-path de
+   .nodo-hex-int (mismo hexágono) ya recorta cualquier contenido suyo, así
+   que el escudo no puede salirse del hueco aunque su imagen no sea
+   perfectamente hexagonal.
+
+   `position: absolute; inset: 6px` en vez de `width/height: 100%` sueltos:
+   .nodo-hex-int es una fila de grid AUTO (sin alto propio, lo hereda de su
+   padre), así que un `height: 100%` en un hijo de grid no tenía contra qué
+   resolverse y el navegador lo sustituía por el alto intrínseco de la
+   imagen — la hacía más alta que el hueco real y quedaba descentrada hacia
+   abajo. En absoluto, `inset` sí resuelve siempre contra el hueco (mismo
+   criterio que usa `.carta-arte` contra `.carta-placa`, que sí es
+   `position: relative` con alto explícito). `contain`, nunca `cover`, para
+   que se vea el escudo entero. */
+.nodo-escudo {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  object-fit: contain;
 }
 
 /* Sello de rango: disco dorado en la esquina con borde oscuro y sombra dura,

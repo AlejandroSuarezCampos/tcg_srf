@@ -82,6 +82,18 @@ switch ($accion) {
         ]]);
         break;
 
+    case 'actualizar_rival':
+        $idRival = (int) ($_POST['id_rival'] ?? 0);
+        $rival = $db->obtenerRival($idRival);
+        if (!$rival) { echo json_encode(['ok' => false, 'error' => 'Rival no encontrado.']); break; }
+        $nombre = trim($_POST['nombre'] ?? '') ?: $rival['nombre'];
+        $db->actualizarRival(
+            $idRival, $nombre, trim($_POST['escudo'] ?? ''),
+            $rival['descripcion'], (int) $rival['activo']
+        );
+        echo json_encode(['ok' => true]);
+        break;
+
     case 'crear_estilo':
         $formacion = $_POST['formacion'] ?? '';
         if (!isset(Tcg::FORMACIONES[$formacion])) { echo json_encode(['ok' => false, 'error' => 'Formación no válida.']); break; }

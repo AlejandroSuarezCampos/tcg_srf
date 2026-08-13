@@ -275,9 +275,9 @@
     selRival.value = n.id_rival || '';
 
     alternarTipoNodo();
-    actualizarBloqueEstilos();
+    cambiarRival();
     renderizarLoot();
-    poblarSelectCromos(document.getElementById('fl_cromo'));
+    reiniciarSelectorCromoLoot();
     alternarTipoLoot();
 
     SRF.abrirModal('modalNodo');
@@ -364,7 +364,29 @@
 
   function cambiarRival() {
     document.getElementById('fn_nuevo_rival').hidden = true;
+
+    var idRival = document.getElementById('fn_rival').value;
+    var wrap = document.getElementById('fn_rival_escudo_wrap');
+    var rival = idRival ? rivalPorId(idRival) : null;
+    wrap.hidden = !rival;
+    if (rival) {
+      document.getElementById('fn_rival_escudo_actual').value = rival.escudo || '';
+    }
+
     actualizarBloqueEstilos();
+  }
+
+  function guardarEscudoRival() {
+    var idRival = document.getElementById('fn_rival').value;
+    if (!idRival) return;
+    var escudo = document.getElementById('fn_rival_escudo_actual').value.trim();
+
+    post('actualizar_rival', { id_rival: idRival, escudo: escudo }).then(function (r) {
+      if (!r.ok) { SRF.toast(r.error || 'No se pudo guardar el escudo.', 'danger'); return; }
+      var rival = rivalPorId(idRival);
+      if (rival) rival.escudo = escudo;
+      SRF.toast('Escudo guardado.', 'success');
+    });
   }
 
   function actualizarBloqueEstilos() {
@@ -486,16 +508,82 @@
     return select;
   }
 
-  function poblarSelectCromos(select) {
-    select.innerHTML = '';
-    estado.cromos.forEach(function (c) {
-      select.appendChild(new Option(c.nombre + ' (' + c.equipo + ')', c.id_cromo));
-    });
-  }
-
   /* ------------------------------------------------------------------------
      BOTÍN del nodo
      ------------------------------------------------------------------------ */
+
+  /* Selector visual del cromo del botín: el catálogo entero no cabe en un
+     <select> legible (mismo problema que se resolvió en mercado.php, "Elige
+     la carta"), así que aquí se busca y se elige viendo la carta. El
+     marcado ya sale de cadena_editor.php con TODOS los cromos —esto solo
+     busca dentro de lo ya pintado, no repuebla nada. */
+  function selectorCromoLoot() {
+    var buscar = document.getElementById('fl_buscar_cromo');
+    var lista  = document.getElementById('fl_lista_cromos');
+    if (!buscar || !lista) return;
+
+    var oculto = document.getElementById('fl_cromo');
+    var conteo = document.getElementById('fl_conteo_cromo');
+    var vacio  = lista.querySelector('.selector-vacio');
+    var items  = lista.querySelectorAll('.selector-item');
+    var total  = items.length;
+
+    function textoConteo(n) {
+      return n + (n === 1 ? ' cromo' : ' cromos');
+    }
+
+    lista.addEventListener('change', function (e) {
+      if (!e.target.matches('input[type="radio"]')) return;
+      Array.prototype.forEach.call(items, function (item) {
+        var marcado = item.contains(e.target);
+        item.classList.toggle('esta-elegida', marcado);
+        var carta = item.querySelector('.carta');
+        if (carta) carta.classList.toggle('is-seleccionada', marcado);
+      });
+      oculto.value = e.target.value;
+    });
+
+    var temporizador = null;
+    buscar.addEventListener('input', function () {
+      clearTimeout(temporizador);
+      temporizador = setTimeout(function () {
+        var texto = buscar.value.trim().toLowerCase();
+        var visibles = 0;
+        Array.prototype.forEach.call(items, function (item) {
+          var d = item.dataset;
+          var coincide = texto === '' ||
+            (d.nombre + ' ' + d.equipo + ' ' + d.rarezaNombre).toLowerCase().indexOf(texto) !== -1;
+          item.hidden = !coincide;
+          if (coincide) visibles++;
+        });
+        vacio.hidden = visibles !== 0;
+        conteo.textContent = texto === '' ? textoConteo(total) : textoConteo(visibles);
+      }, 160);
+    });
+  }
+
+  /* Se llama cada vez que se abre el modal de un nodo: limpia la elección
+     (y la búsqueda) que pudiera quedar de la entrada de botín anterior. */
+  function reiniciarSelectorCromoLoot() {
+    var buscar = document.getElementById('fl_buscar_cromo');
+    var lista  = document.getElementById('fl_lista_cromos');
+    var oculto = document.getElementById('fl_cromo');
+    if (!buscar || !lista) return;
+
+    buscar.value = '';
+    oculto.value = '';
+    Array.prototype.forEach.call(lista.querySelectorAll('.selector-item'), function (item) {
+      item.hidden = false;
+      item.classList.remove('esta-elegida');
+      var radio = item.querySelector('input[type="radio"]');
+      if (radio) radio.checked = false;
+      var carta = item.querySelector('.carta');
+      if (carta) carta.classList.remove('is-seleccionada');
+    });
+    lista.querySelector('.selector-vacio').hidden = true;
+    document.getElementById('fl_conteo_cromo').textContent =
+      lista.querySelectorAll('.selector-item').length + ' cromos';
+  }
 
   function alternarTipoLoot() {
     var tipo = document.getElementById('fl_tipo').value;
@@ -536,7 +624,17 @@
     var n = estado.nodoActual;
     var tipo = document.getElementById('fl_tipo').value;
     var idCromo = document.getElementById('fl_cromo').value;
-    var cromoTexto = document.getElementById('fl_cromo').selectedOptions[0] ? document.getElementById('fl_cromo').selectedOptions[0].textContent : '';
+    var itemElegido = document.querySelector('#fl_lista_cromos .selector-item.esta-elegida');
+    var cromoTexto = itemElegido ? itemElegido.dataset.nombre : '';
+
+    // Con el <select> de antes siempre había un cromo preseleccionado (el
+    // primero de la lista); con el selector visual puede no haber ninguno
+    // elegido todavía, y eso no puede llegar al servidor como "sin cromo".
+    if (tipo !== 'monedas' && !idCromo) {
+      SRF.toast('Elige primero un cromo de la lista.', 'danger');
+      document.getElementById('fl_buscar_cromo').focus();
+      return;
+    }
 
     post('crear_loot', {
       id_nodo: n.id_nodo, tipo: tipo,
@@ -555,6 +653,7 @@
         rango_minimo: document.getElementById('fl_rango').value,
       });
       renderizarLoot();
+      reiniciarSelectorCromoLoot();
     });
   }
 
@@ -580,6 +679,7 @@
     mostrarNuevoRival: mostrarNuevoRival,
     crearRival: crearRival,
     cambiarRival: cambiarRival,
+    guardarEscudoRival: guardarEscudoRival,
     mostrarNuevoEstilo: mostrarNuevoEstilo,
     crearEstilo: crearEstilo,
     cambiarEstilo: cambiarEstilo,
@@ -587,5 +687,8 @@
     crearLoot: crearLoot,
   };
 
-  document.addEventListener('DOMContentLoaded', renderTodo);
+  document.addEventListener('DOMContentLoaded', function () {
+    renderTodo();
+    selectorCromoLoot();
+  });
 })();

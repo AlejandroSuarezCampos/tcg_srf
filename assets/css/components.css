@@ -1143,10 +1143,18 @@
 /* :not([hidden]) por la misma razón que .cer-escena/.cer-walkout/
    .cer-aviso-motion: ceremonia.js hace mesa.hidden = true/false y sin el
    guard esta regla de autor le ganaría siempre al [hidden] de user-agent. */
+/* minmax(110px, 170px), NO 1fr: con "1fr" una mesa de una sola carta (un
+   cofre que solo suelta una, el caso más común) tenía una única columna que
+   se estiraba a los 780px del modal entero y, con aspect-ratio 5/7 en la
+   carta, se disparaba también en alto — el "se ve ultra grande" que se vio
+   al probarlo. Con un tope fijo la carta para en su tamaño natural aunque
+   sea la única, y justify-content la centra en vez de pegarla a la
+   izquierda cuando la fila no se llena. */
 .ceremonia-mesa:not([hidden]) {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 170px));
+  justify-content: center;
   gap: var(--space-3);
   perspective: 1200px;
 }
@@ -1165,6 +1173,29 @@
    cabecera y el pie quedan siempre fijos alrededor y el sobre entero, del
    tamaño que sea, es alcanzable. */
 .ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+/* Resumen del cofre: monedas y bonus (camino perfecto, formación), por
+   encima de las cartas si trae alguna. Un cofre solo-monedas no tiene mesa
+   que enseñar, así que este es el único rastro visible del botín — tiene
+   que sostenerse solo. */
+.cer-cofre-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+}
+.cer-cofre-bonus span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--success) 45%, var(--line));
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--frost);
+  font-size: var(--fs-body-sm);
+}
+.cer-cofre-bonus span i { color: var(--success); }
 
 /* ==========================================================================
    ESCENA DE APERTURA — inmersiva y a pantalla completa.
@@ -1344,6 +1375,72 @@
   opacity: 0;
 }
 
+/* ---- el cofre (ceremonia_cofre.js) ----
+   Misma lógica que el sobre: sin `transform` de centrado en CSS, lo escribe
+   GSAP entero. La tapa gira sobre una bisagra trasera (transform-origin
+   abajo, rotateX negativo levanta el borde de delante). */
+.cer-cofre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(160px, 22vh, 220px);
+  aspect-ratio: 1 / .82;
+  transform-style: preserve-3d;
+  z-index: 3;
+  filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .8));
+}
+.cer-cofre-cuerpo {
+  position: absolute;
+  inset: 14% 0 0;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) 22%, var(--panel)) 0%, var(--void-2) 78%);
+  border: 1px solid var(--line-strong);
+  box-shadow: inset 0 -10px 18px rgba(0, 0, 0, .5);
+  z-index: 2;
+}
+.cer-cofre-cierre {
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  width: 15%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--amber-light), var(--amber));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+  z-index: 4;
+}
+.cer-cofre-tapa {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 34%;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) 30%, var(--panel)), var(--panel));
+  border: 1px solid var(--line-strong);
+  border-bottom: none;
+  transform-origin: bottom center;
+  z-index: 5;
+}
+/* el brillo del interior, revelado al abrirse la tapa. z-index por ENCIMA
+   del cuerpo (2): es opaco, así que un brillo detrás de él no se vería
+   nunca — mismo motivo que el z-index de .cer-sobre-boca sobre el cuerpo. */
+.cer-cofre-brillo {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 16%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--amber-light), transparent 72%);
+  filter: blur(6px);
+  opacity: 0;
+  z-index: 3;
+}
+
 /* ---- la carta que sale ---- */
 /* Sin `transform` en CSS a propósito: lo escribe GSAP entero. El giro va con
    rotationY desde JS, nunca con una clase — un transform en línea de GSAP le
@@ -1469,6 +1566,7 @@
 
 @media (max-width: 600px) {
   .cer-sobre { width: clamp(130px, 19vh, 170px); }
+  .cer-cofre { width: clamp(140px, 20vh, 175px); }
   .cer-carta { width: clamp(150px, 27vh, 200px); }
   .cer-saltar { top: var(--space-3); right: var(--space-3); }
 }
