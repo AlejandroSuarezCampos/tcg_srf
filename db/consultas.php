@@ -89,18 +89,33 @@ class Tcg
 		return $resultado['total'] > 0;
 	}
 
-	// Inserta un nuevo usuario con la contraseña hasheada y foto por defecto
+	/**
+	 * Inserta un nuevo usuario con la contraseña hasheada y foto por defecto.
+	 * Devuelve null si el nombre ya existe (visto en auditoría: dos registros
+	 * simultáneos con el mismo nombre pasan los dos el comprobarEmailExiste()
+	 * de registro.php, porque ninguno ha escrito todavía; el UNIQUE de la
+	 * columna `nombre` frena al segundo, pero como PDO por defecto lanza
+	 * excepción en el fallo, sin este try/catch ese segundo request moría
+	 * en un 500 en vez de con el mismo "ese nombre ya está en uso" de siempre).
+	 */
 	public function registrarUsuario($nombre, $pass)
 	{
 		$sentencia = "INSERT INTO usuarios(nombre, password_hash, foto) VALUES (:nombre, :password_hash, :foto)";
 		$ejecucion = $this->pdo->prepare($sentencia);
-		$ejecucion->execute(
-			array(
-				":nombre" => $nombre,
-				":password_hash" => password_hash($pass, PASSWORD_DEFAULT),
-				":foto" => "./assets/img/perfil/apple-icon-120x120.png"
-			)
-		);
+		try {
+			$ejecucion->execute(
+				array(
+					":nombre" => $nombre,
+					":password_hash" => password_hash($pass, PASSWORD_DEFAULT),
+					":foto" => "./assets/img/perfil/apple-icon-120x120.png"
+				)
+			);
+		} catch (PDOException $e) {
+			if ($e->getCode() === '23000') { // violación de UNIQUE
+				return null;
+			}
+			throw $e;
+		}
 
 		return $this->pdo->lastInsertId();
 	}
@@ -161,34 +176,56 @@ class Tcg
 		return $restante > 0 ? (int) ceil($restante / 60) : 0;
 	}
 
-	/** Suma un intento fallido; si llega al máximo, bloquea el par IP+nombre. */
+	/**
+	 * Suma un intento fallido; si llega al máximo, bloquea el par IP+nombre.
+	 *
+	 * Va dentro de una transacción con `SELECT ... FOR UPDATE` (mismo patrón
+	 * que canjearCodigo()): sin esto, dos peticiones concurrentes leen el
+	 * mismo `intentos` antes de que ninguna escriba y se pisan entre sí —
+	 * confirmado en auditoría: 30 intentos de login simultáneos solo dejaban
+	 * contados 5, es decir, una fuerza bruta con hilos en paralelo se comía el
+	 * bloqueo casi gratis. El `INSERT IGNORE` de antes asegura que la fila
+	 * exista para poder bloquearla: `FOR UPDATE` no bloquea lo que no existe.
+	 */
 	public function registrarIntentoLoginFallido($ip, $nombre) {
-		$stmt = $this->pdo->prepare("
-			SELECT intentos, bloqueado_hasta FROM login_intentos
-			WHERE ip = :ip AND nombre = :nombre
-		");
-		$stmt->execute([":ip" => $ip, ":nombre" => $nombre]);
-		$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+		try {
+			$this->pdo->beginTransaction();
 
-		// Un bloqueo ya CADUCADO cuenta como si no hubiera intentos previos:
-		// si no, tras el primer bloqueo nunca se volvería a activar.
-		$bloqueoCaducado = $fila && $fila["bloqueado_hasta"] !== null
-			&& strtotime($fila["bloqueado_hasta"]) <= time();
-		$intentos = (!$fila || $bloqueoCaducado) ? 1 : (int) $fila["intentos"] + 1;
+			$this->pdo->prepare("
+				INSERT IGNORE INTO login_intentos (ip, nombre, intentos, ultimo_intento, bloqueado_hasta)
+				VALUES (:ip, :nombre, 0, NOW(), NULL)
+			")->execute([":ip" => $ip, ":nombre" => $nombre]);
 
-		$bloqueadoHasta = $intentos >= self::LOGIN_MAX_INTENTOS
-			? date("Y-m-d H:i:s", time() + self::LOGIN_BLOQUEO_MINUTOS * 60)
-			: null;
+			$stmt = $this->pdo->prepare("
+				SELECT intentos, bloqueado_hasta FROM login_intentos
+				WHERE ip = :ip AND nombre = :nombre
+				FOR UPDATE
+			");
+			$stmt->execute([":ip" => $ip, ":nombre" => $nombre]);
+			$fila = $stmt->fetch(PDO::FETCH_ASSOC);
 
-		$this->pdo->prepare("
-			INSERT INTO login_intentos (ip, nombre, intentos, ultimo_intento, bloqueado_hasta)
-			VALUES (:ip, :nombre, :intentos, NOW(), :bloqueado_hasta)
-			ON DUPLICATE KEY UPDATE
-				intentos = :intentos, ultimo_intento = NOW(), bloqueado_hasta = :bloqueado_hasta
-		")->execute([
-			":ip" => $ip, ":nombre" => $nombre,
-			":intentos" => $intentos, ":bloqueado_hasta" => $bloqueadoHasta,
-		]);
+			// Un bloqueo ya CADUCADO cuenta como si no hubiera intentos previos:
+			// si no, tras el primer bloqueo nunca se volvería a activar.
+			$bloqueoCaducado = $fila["bloqueado_hasta"] !== null
+				&& strtotime($fila["bloqueado_hasta"]) <= time();
+			$intentos = $bloqueoCaducado ? 1 : (int) $fila["intentos"] + 1;
+
+			$bloqueadoHasta = $intentos >= self::LOGIN_MAX_INTENTOS
+				? date("Y-m-d H:i:s", time() + self::LOGIN_BLOQUEO_MINUTOS * 60)
+				: null;
+
+			$this->pdo->prepare("
+				UPDATE login_intentos SET intentos = :intentos, ultimo_intento = NOW(), bloqueado_hasta = :bloqueado_hasta
+				WHERE ip = :ip AND nombre = :nombre
+			")->execute([
+				":intentos" => $intentos, ":bloqueado_hasta" => $bloqueadoHasta,
+				":ip" => $ip, ":nombre" => $nombre,
+			]);
+
+			$this->pdo->commit();
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+		}
 	}
 
 	/** Login correcto: se olvida cualquier intento fallido previo de este par. */

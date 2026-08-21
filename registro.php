@@ -35,19 +35,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$campoError = 'nombre';
 	} else {
 		$idUsuario = $db->registrarUsuario($nombreEnviado, $password);
-		$usuario   = $db->obtenerUsuarioPorNombre($nombreEnviado);
 
-		// Iniciamos sesión automáticamente tras el registro
-		session_regenerate_id(true);
+		if ($idUsuario === null) {
+			// Alguien registró este mismo nombre en el instante entre el
+			// comprobarEmailExiste() de arriba y el INSERT (visto en
+			// auditoría con registros simultáneos). NO se sigue: leer el
+			// usuario por nombre aquí encontraría la cuenta de ESA OTRA
+			// persona y la sesión actual iniciaría dentro de ella.
+			$error = 'Ese nombre ya está en uso.';
+			$campoError = 'nombre';
+		} else {
+			$usuario = $db->obtenerUsuarioPorNombre($nombreEnviado);
 
-		$_SESSION['id_usuario'] = $usuario['id_usuario'];
-		$_SESSION['nombre']     = $usuario['nombre'];
-		$_SESSION['foto']       = $usuario['foto'];
-		$_SESSION['monedas']    = $usuario['monedas'];
-		$_SESSION['dictador']   = (bool) $usuario['dictador'];
+			// Iniciamos sesión automáticamente tras el registro
+			session_regenerate_id(true);
 
-		header('Location: landing.php');
-		exit;
+			$_SESSION['id_usuario'] = $usuario['id_usuario'];
+			$_SESSION['nombre']     = $usuario['nombre'];
+			$_SESSION['foto']       = $usuario['foto'];
+			$_SESSION['monedas']    = $usuario['monedas'];
+			$_SESSION['dictador']   = (bool) $usuario['dictador'];
+
+			header('Location: landing.php');
+			exit;
+		}
 	}
 }
 

@@ -3,6 +3,17 @@
 # No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, branding/, .claude/...)
 Options -Indexes
 
+ErrorDocument 404 /tcg_srf/404.php
+
+# Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
+# tipo .xxx). Sin esto, aunque el listado de directorio esté desactivado,
+# .git/HEAD, .git/config, .git/index, etc. se pueden pedir uno a uno por su
+# nombre exacto y reconstruir el repositorio entero con git-dumper.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "(^|/)\." - [F]
+</IfModule>
+
 <IfModule mod_php.c>
     php_flag session.cookie_httponly On
     php_value session.cookie_samesite Lax

@@ -1,6 +1,6 @@
 # Superliga Frontier TCG — contexto de trabajo
 
-> Documento de traspaso, versión 7.5 (2026-08-11).
+> Documento de traspaso, versión 7.7 (2026-08-21).
 > Léelo entero antes de tocar código. Si trabajas desde otro equipo con **la
 > misma copia del proyecto** (mismos ficheros, misma base de datos `tcg`), este
 > fichero es todo el contexto necesario: no hace falta la conversación anterior.
@@ -300,6 +300,104 @@
 > monedas y de copias no cambia, y el 58,3 % de los duelos acabó con un marcador
 > distinto al que salió de la simulación** — antes era el 0 %. Tabla completa en el
 > §15.10.
+>
+> ---
+>
+> ## v7.7 — Auditoría de seguridad (CSRF, rate limiting de login) + panel de cromos con combate y compo manual
+>
+> Dos commits sin relación entre sí, ambos del 2026-08-13, y una tercera pasada de
+> `db/tcg.sql` sin datos nuevos (solo IDs/timestamps de `cromo_rasgos` regenerados
+> al probar el selector de compo — verificado fila a fila antes de sustituir el
+> volcado).
+>
+> ### Hardening de seguridad
+>
+> Nada de esto cambia comportamiento para un usuario normal; todo es defensa
+> contra abuso. Lo que hay que saber antes de tocar un formulario o un endpoint:
+>
+> 1. **Token CSRF en todo lo que muta estado.** `partials/csrf.php` es el helper
+>    nuevo: `csrfToken()` (genera/lee, en `$_SESSION['csrf']`), `csrfCampo()` (el
+>    `<input type="hidden" name="csrf">` para formularios normales) y
+>    `csrfValido($token)` (compara con `hash_equals()`, tiempo constante). Los
+>    formularios normales llevan el campo oculto; los endpoints AJAX (`fetch`)
+>    leen el token de un `<meta name="csrf-token">` que ahora pinta
+>    `partials/head.php` y lo mandan ellos mismos en el payload — así lo hacen
+>    `assets/js/duelo.js`, `assets/js/perfil.js` y `assets/js/sobres.js`. **Si
+>    añades un formulario o un endpoint AJAX que mute estado, tiene que llevar el
+>    token** — si no, rechaza con un error genérico. Tocó prácticamente todas las
+>    páginas raíz (`cadena.php`, `configuracion.php`, `duelos.php`, `login.php`,
+>    `mazos.php`, `mercado.php`, `misiones.php`, `sobres.php`) y del panel
+>    (`cadena_editor.php`, `cadenas.php`, `codigos.php`, `cromos.php`,
+>    `expansiones.php`, `importar.php`, `misiones.php`, `plantillas.php`,
+>    `sobres.php`, `usuarios.php`) y sus `assets/ajax/*.php` correspondientes.
+> 2. **Bloqueo temporal por IP+usuario tras 5 intentos fallidos de login.** Tabla
+>    nueva `login_intentos` (migración **`028_intentos_login.sql`**, aditiva y
+>    re-ejecutable como el resto): clave primaria `(ip, nombre)`, cuenta
+>    `intentos`, `ultimo_intento` y `bloqueado_hasta`. No guarda nada de logins
+>    correctos — solo lo necesario para frenar fuerza bruta. `login.php` es quien
+>    la lee y la escribe; no hay job ni limpieza automática todavía, las filas se
+>    quedan (son ligeras: una por combinación IP+usuario que haya fallado alguna
+>    vez).
+> 3. **`db/pruebas/*.php` y los demás scripts de depuración de `db/` ahora exigen
+>    `PHP_SAPI === 'cli'`.** Ojo al leer el resumen del commit ("scripts de
+>    prueba fuera de HTTP"): **no se movieron de carpeta**, siguen en
+>    `db/pruebas/` y en `db/` — lo que cambió es que ahora rechazan la petición
+>    si se piden por navegador/HTTP en vez de por línea de comandos. Antes eran
+>    alcanzables por HTTP **sin autenticación**, y algunos (`probar_300.php`,
+>    `tanda_rival_cpu.php`) tocan o pueden tocar tablas reales. Sigue lanzándose
+>    igual que siempre: `C:\xampp\php\php.exe db/pruebas/correr_todas.php`.
+> 4. **`.htaccess` nuevo en la raíz**: `Options -Indexes` (ya no se puede listar
+>    el contenido de `db/`, `db/pruebas/`, `assets/`, `branding/`, `.claude/`...
+>    entrando directo a la carpeta) y cookies de sesión endurecidas a nivel de
+>    proyecto (`session.cookie_httponly On`, `session.cookie_samesite Lax`,
+>    `display_errors Off`), duplicado bajo `mod_php.c` y `php_module` porque
+>    según la build de XAMPP carga uno u otro.
+> 5. **Subida directa de archivo para imágenes**, además de la ruta manual que ya
+>    existía: la imagen de un cromo (a `assets/img/Cromos/<expansión>/`, la
+>    carpeta se crea sola si no existe) y el escudo de un rival de cadena (a
+>    `assets/img/Escudos/`). Helper compartido nuevo,
+>    `partials/subida_imagen.php` → `subirImagenPanel($archivo, $carpetaDisco,
+>    $carpetaWeb, $nombreBase)`: whitelist de extensión (`jpg`/`jpeg`/`png`/
+>    `webp`), `getimagesize()` real (no basta con la extensión), tope de 6 MB, y
+>    el nombre de archivo final es un slug del nombre + 4 bytes aleatorios en
+>    hex — **nunca** el nombre que trae el navegador. Mismo patrón que ya usaba
+>    `configuracion.php` para la foto de perfil, ahora en un solo sitio para no
+>    repetir la lógica en cada formulario del panel que suba una imagen.
+> 6. **`db/tcg.sql` se ha vuelto a volcar entero**, con todas las migraciones
+>    (incluida la `028`) ya aplicadas — sirve para importar la base de una sola
+>    vez sin encadenar migraciones a mano.
+>
+> ### Panel de cromos: estadísticas editables y compo manual/aleatorio
+>
+> Dos huecos del panel que llevaban abiertos desde que se escribió, ninguno de
+> los dos citado como pendiente en ningún sitio del documento porque no se sabía
+> que estaban rotos hasta que Alejandro los tocó:
+>
+> 1. **`actualizarCromo()` ni siquiera tocaba `ataque`/`defensa`/`tecnica`.**
+>    Toda carta creada o editada a mano desde `panel/cromos.php` se quedaba en
+>    `0/0/0` para siempre — el formulario no las mandaba y la consulta no las
+>    escribía. Ahora el formulario las lee y `crearCromo()`/`actualizarCromo()`
+>    las guardan de verdad. **El §15.6 (dentro del §16, importador) sigue
+>    describiendo el estado viejo** ("Hoy el panel deja `ataque`/`defensa`/
+>    `tecnica` a 0") — eso ya no es cierto para la creación/edición manual desde
+>    el panel; la fórmula `BASE_TOTAL`/`SPLIT_POR_POSICION` de esa sección sigue
+>    vigente tal cual para el importador automático, que es un camino distinto.
+> 2. **Selector de "compo" nuevo** (rasgo de configuración) en el formulario de
+>    un cromo: **Automático** (deriva de posición × afinidad, como hasta ahora,
+>    vía `derivarRasgosConfiguracion()`), **Aleatorio** (sortea uno de los
+>    válidos) o **uno concreto a mano**. Usa el flag `cromo_rasgos.manual`, que
+>    ya existía en el esquema desde la Capa 2 (§10) pero que ningún sitio del
+>    panel escribía — estaba en la tabla y no se usaba. Elegir "Automático" tras
+>    haber puesto un override manual lo quita, para que vuelva a derivarse solo;
+>    los rasgos marcados como manuales no se tocan cuando se recalculan los
+>    automáticos.
+> 3. **Tabla de cromos del panel**: columnas nuevas ATA/DEF/TÉC y Compo (con la
+>    etiqueta "(manual)" cuando `compo_manual = 1`), para verlo de un vistazo sin
+>    entrar a editar cada carta.
+>
+> No hay migración nueva en este commit: `cromo_rasgos.manual` ya estaba en el
+> esquema. Lo único que tocó la BD fue el volcado de refresco del commit
+> siguiente (`6956b5a`), y solo por las IDs/timestamps regenerados, no por datos.
 
 ---
 
@@ -316,7 +414,7 @@ ni lo revises salvo que Alejandro lo pida.
 **Si vas a tocar duelos, lee el §15 antes que nada.** Es lo más nuevo, lo que
 más se ha movido, y tiene reglas propias que no se deducen del resto.
 
-> ## ⚠️ ESTADO EXACTO AL CERRAR LA SESIÓN DEL 2026-08-11 — LEE ESTO PRIMERO
+> ## ⚠️ ESTADO EXACTO AL CERRAR LA SESIÓN DEL 2026-08-21 — LEE ESTO PRIMERO
 >
 > **1. El interruptor de pruebas ya está QUITADO** (`depuracion_forzar_empate = 0`
 > desde el 2026-08-11, por decisión de Alejandro). Los partidos PvP vuelven a
@@ -329,23 +427,29 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > C:\xampp\mysql\bin\mysql.exe -u root -e "UPDATE tcg.configuracion SET valor='0' WHERE clave='depuracion_forzar_empate';"
 > ```
 >
-> **2. La rama es `minijuegos-x75` y SÍ hay remoto.** Está en
-> `github.com/AlejandroSuarezCampos/tcg_srf`, empujada y al día (10 commits sobre
-> `bb27722`). La nota antigua de "hay `.git` pero sin remoto" **ya no vale**.
+> **2. La rama es `master` y SÍ hay remoto.** El merge de `minijuegos-x75` a
+> `master` ya se hizo (`e4b0426`); esa rama de trabajo **ya no se usa**, todo el
+> desarrollo va directo a `master`. Sigue en
+> `github.com/AlejandroSuarezCampos/tcg_srf`. Si ves referencias a
+> `minijuegos-x75` en este documento fuera del changelog histórico (v7.2 a v7.6),
+> están desfasadas — corresponden a sesiones anteriores a la v7.7.
 >
-> **3. Migraciones hasta la `026`. Tres son OBLIGATORIAS**, y es la primera vez que
-> hay migraciones que no se pueden saltar: la `019` (añade `en_juego` al enum), la
-> `021` (columna `resuelto_por_tanda`) y la `024` (tabla `duelo_penaltis`). Sin
-> ellas los duelos PvP no se montan o no se pueden cerrar. Ver §5.2.
+> **3. Migraciones hasta la `028`. Tres son OBLIGATORIAS para que los duelos
+> PvP funcionen**, mismas de siempre: la `019` (añade `en_juego` al enum), la
+> `021` (columna `resuelto_por_tanda`) y la `024` (tabla `duelo_penaltis`). La
+> `028` (`login_intentos`, §5.2) es nueva y **no** es de esa lista — sin ella el
+> bloqueo por intentos fallidos de login simplemente no frena nada, no rompe
+> nada más. Ver §5.2.
 >
-> **4. Hay una suite de pruebas EN EL REPO. Ejecútala antes y después de tocar el
-> partido:**
-> ```
-> C:\xampp\php\php.exe db/pruebas/correr_todas.php
-> ```
-> Monta y borra `tcg_prueba` ella sola, **nunca toca la base real**, y sale con
-> código 1 si algo falla. Hoy: 5 suites en verde. La grande, `probar_300.php`
-> (300 duelos de punta a punta, ~7 min), se lanza aparte.
+> **4. Hay una suite de pruebas EN EL REPO.** Se intentó ejecutar en esta sesión
+> (`C:\xampp\php\php.exe db/pruebas/correr_todas.php`) y **MariaDB perdió la
+> conexión a mitad de la primera suite y el proceso `mysqld` murió** — no se pudo
+> confirmar si las 5 suites siguen en verde. **No verificado esta sesión.** Antes
+> de fiarte de "hoy: 5 suites en verde" (la nota de la v7.6), vuelve a lanzarla
+> con MariaDB recién arrancado. Si vuelve a caerse en el mismo punto, mira primero
+> el `mysql_error.log` por si es el mismo tipo de corrupción de Aria que ya
+> apareció una vez (§8) antes de sospechar de un cambio de código — el hardening
+> de seguridad de la v7.7 no tocó nada del motor de partido.
 >
 > **5. Las CADENAS (§15.12) están terminadas**, con el premio del camino perfecto ya
 > declarado (migración `026`, carta provisional). **Lo único que queda ahí es
@@ -356,11 +460,28 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
 > medido en el §15.12. Si alguien reporta que "el rango no sube nunca", es esto.
 >
 > **6. Los 16 PNG originales ya no existen y el borrado está commiteado**
-> (2026-08-11). Alejandro confirmó que los eliminó a propósito, así que la carpeta
-> `assets/img/_originales_sin_optimizar/` **ha desaparecido entera** del proyecto y
-> del árbol del §2. Ningún fichero de código la referenciaba — se comprobó antes de
-> registrar el borrado. El arte servido es el WebP optimizado de
+> (2026-08-11); sigue así el 2026-08-21, `assets/img/_originales_sin_optimizar/`
+> no ha vuelto a aparecer. El arte servido es el WebP optimizado de
 > `assets/img/Cromos/`, que no se ha tocado.
+>
+> **7. Auditoría de seguridad completa y ya en `master`** (v7.7, commit
+> `db076ec`): CSRF en todos los formularios y AJAX que mutan estado, bloqueo de
+> login por intentos (migración `028`), scripts de `db/pruebas/` y `db/`
+> bloqueados fuera de CLI, `.htaccess` con `Options -Indexes` y cookies
+> endurecidas, y subida directa de imagen para cromos y escudos. Detalle completo
+> en el changelog de la v7.7, arriba.
+>
+> **8. Panel de cromos: ataque/defensa/técnica ya se guardan** desde el
+> formulario manual (antes se quedaban en `0/0/0` siempre) **y hay selector de
+> compo** (automático/aleatorio/manual) sobre `cromo_rasgos.manual`. v7.7,
+> commit `e8dc021`.
+>
+> **9. Hay cambios sin commitear en la copia con la que se escribió esta
+> revisión** (2026-08-21): `.htaccess` tiene una línea `ErrorDocument 404
+> /tcg_srf/404.php` añadida a mano, y hay un `404.php` nuevo en la raíz sin
+> trackear por git. Ninguno de los dos es parte de ningún commit descrito en este
+> documento — es trabajo en curso de la sesión, no confirmado como terminado.
+> Coméntalo con Alejandro antes de darlo por definitivo o de commitearlo.
 
 **Lo primero que tienes que hacer, en este orden:**
 
@@ -372,12 +493,14 @@ más se ha movido, y tiene reglas propias que no se deducen del resto.
    ```
    for f in *.php partials/*.php components/*.php db/*.php assets/ajax/*.php panel/*.php; do C:/xampp/php/php.exe -l "$f"; done
    ```
-4. **Hay `.git` Y hay remoto**, en la rama `minijuegos-x75`:
+4. **Hay `.git` Y hay remoto**, en la rama `master`:
    ```
    git remote -v      # github.com/AlejandroSuarezCampos/tcg_srf
-   git status -sb     # debe estar a la par con origin/minijuegos-x75
+   git status -sb     # debe estar a la par con origin/master
    ```
-   *(La nota antigua decía "sin remoto". Se configuró el 2026-08-11.)*
+   *(La nota antigua decía "sin remoto". Se configuró el 2026-08-11. La rama de
+   trabajo era `minijuegos-x75` hasta que se fusionó a `master` el 2026-08-13 —
+   ver v7.7. Todo el desarrollo va directo a `master` desde entonces.)*
    Si en tu copia NO hay `.git` porque Alejandro volvió a descomprimir un ZIP,
    entonces sí aplica el aviso viejo: no asumas commits ni ramas, y considera
    `git init` antes de cambios grandes, avisando primero.
@@ -446,8 +569,10 @@ entrenadores y escudos reales de una comunidad activa, no personajes de ficción
   o `http://localhost/tcg_srf-master/` según cómo esté montada la copia local).
 - **Control de versiones:** hay `.git` **y hay remoto** —
   `github.com/AlejandroSuarezCampos/tcg_srf`, configurado el 2026-08-11. La rama
-  de trabajo es **`minijuegos-x75`**, empujada y a la par con `origin`.
-  *(Este punto decía "repo local, sin remoto configurado". Ya no es cierto.)*
+  de trabajo es **`master`**, empujada y a la par con `origin`.
+  *(Este punto decía "repo local, sin remoto configurado". Ya no es cierto. La
+  rama de trabajo fue `minijuegos-x75` hasta el merge del 2026-08-13
+  (`e4b0426`); desde entonces todo va directo a `master` — v7.7.)*
   El `.git` se creó como red de seguridad antes de una reescritura destructiva del
   sistema de cajas/sobres (§14), y el primer commit
   (`"Checkpoint antes de reescribir..."`) es el estado previo a ella — útil si algo
@@ -547,6 +672,8 @@ admins. Dos cosas que hay que saber antes de ejecutarlo:
 | **§16 — Importador de datos oficiales** | `panel/importar.php`, importación por lotes con barra de progreso, borrado por expansión, migración `014` | ✅ **Construido (viene de `srf-franshu`)** |
 | **Rediseño del componente de tarjeta** | Modo artwork, `mostrar_stats`, stats en modal | ❌ **Retirado de esta rama a propósito** — ver el aviso v7.2 y `srf-franshu-backup-20260807` |
 | **Fase 3 — Pulido y escala** | Panel admin al sistema nuevo, motion unificado, doc de expansiones | 🟡 **Panel admin migrado (2026-08-11)**; quedan motion unificado y la doc de expansiones |
+| **Auditoría de seguridad** | CSRF (`partials/csrf.php`) en formularios y AJAX que mutan estado, bloqueo de login por intentos (`login_intentos`, migración `028`), scripts de `db/` fuera de HTTP, `.htaccess` endurecido, subida directa de imagen (`partials/subida_imagen.php`) | ✅ **Construido (v7.7)** |
+| **Panel de cromos — combate y compo manual** | `ataque`/`defensa`/`tecnica` editables desde el formulario (antes se quedaban en `0/0/0`); selector de compo automático/aleatorio/manual sobre `cromo_rasgos.manual` | ✅ **Construido (v7.7)** |
 
 > **El modelo de combate cambió en `93642b2`.** Cada línea ya no puntúa con una
 > sola estadística: pondera las tres (`Tcg::PESOS_LINEA`). Eso movió el peso de
@@ -586,11 +713,20 @@ veredicto y desglose completo).
 
 ```
 tcg_srf/
+├── .htaccess              ← endurecimiento (v7.7): Options -Indexes (sin listar
+│                              db/, db/pruebas/, assets/, branding/, .claude/...),
+│                              cookies de sesión endurecidas (httponly, samesite=Lax)
 ├── partials/
-│   ├── head.php          ← abre el documento: fuentes, CSS, <body>, skip-link
+│   ├── head.php          ← abre el documento: fuentes, CSS, <body>, skip-link;
+│   │                        pinta el <meta name="csrf-token"> que leen los AJAX
 │   ├── footer.php        ← pie + AVISO LEGAL + carga de ui.js
 │   ├── ceremonia.php     ← modal de apertura de sobres (reveal de cartas)
-│   └── confirmar.php     ← modal de confirmación compartido (SRF.confirmar)
+│   ├── confirmar.php     ← modal de confirmación compartido (SRF.confirmar)
+│   ├── csrf.php          ← (v7.7) csrfToken()/csrfCampo()/csrfValido() — token
+│   │                        CSRF por sesión, hash_equals() a tiempo constante
+│   └── subida_imagen.php ← (v7.7) subirImagenPanel() — sube y valida imagen de
+│                              cromo/escudo desde el panel (whitelist, getimagesize(),
+│                              nombre aleatorio; nunca el nombre del navegador)
 ├── components/
 │   ├── carta.php         ← EL componente de tarjeta (render_carta, carta_html)
 │   └── caja3d.php        ← cajas/sobres en pseudo-3D CSS (§14): pack3d_caja_html,
@@ -642,10 +778,12 @@ tcg_srf/
 │   ├── verificar_minijuegos.php  ← comprueba las invariantes del catálogo
 │   │                        (ciclo cerrado, sin opción dominante, determinismo,
 │   │                        valor de la pista). Solo CLI. Pásalo al añadir uno.
-│   ├── pruebas/          ← SUITES DEL PARTIDO. Solo CLI, y **nunca tocan la base
-│   │   │                    real**: montan y borran `tcg_prueba` (§8). Han cazado
-│   │   │                    cinco bugs que el razonamiento no cazó, tres con
-│   │   │                    dinero de por medio.
+│   ├── pruebas/          ← SUITES DEL PARTIDO. Solo CLI —desde la v7.7 lo exigen
+│   │   │                    de verdad (`PHP_SAPI === 'cli'`; antes eran
+│   │   │                    alcanzables por HTTP sin autenticación)— y **nunca
+│   │   │                    tocan la base real**: montan y borran `tcg_prueba`
+│   │   │                    (§8). Han cazado cinco bugs que el razonamiento no
+│   │   │                    cazó, tres con dinero de por medio.
 │   │   ├── correr_todas.php   ← el lanzador. Un comando, cinco suites, código 1
 │   │   │                        si algo falla. Es el que hay que ejecutar.
 │   │   ├── probar_tope.php    ← el tope de goles que puede mover un jugador
@@ -681,8 +819,10 @@ tcg_srf/
 │   │   ├── 019 a 025                       el partido decide el duelo y la
 │   │   │                                   tanda jugable (§15.10, §15.11)
 │   │   ├── 026_bonus_camino_perfecto.sql   el premio del camino perfecto (§15.12)
-│   │   └── 027_calibrar_conversion_goles.sql  conecta gol_base/gol_sens y
-│   │                                       expone ocasion_* (§15.8c)
+│   │   ├── 027_calibrar_conversion_goles.sql  conecta gol_base/gol_sens y
+│   │   │                                   expone ocasion_* (§15.8c)
+│   │   └── 028_intentos_login.sql          tabla login_intentos, bloqueo de
+│   │                                       login por intentos fallidos (v7.7)
 │   └── tcg.sql
 ├── branding/
 │   ├── CLAUDE.md         ← este documento
@@ -923,6 +1063,7 @@ no se pueden saltar:
 | `025_depuracion_forzar_empate.sql` | el interruptor de pruebas que fuerza el 1-1 | no, vale 0 por defecto |
 | `026_bonus_camino_perfecto.sql` | el **premio del camino perfecto** en los cofres finales (§15.12) | no para jugar — sin ella el bonus se reconoce pero no entrega nada |
 | `027_calibrar_conversion_goles.sql` | conecta de verdad `gol_base`/`gol_sens` y expone `ocasion_*` (§15.8c) | no, los 6 valores son los que el motor ya tenía escritos a fuego |
+| `028_intentos_login.sql` | tabla **`login_intentos`** — bloqueo de login por intentos fallidos, por IP+usuario (v7.7) | no para jugar; sin ella el código de bloqueo en `login.php` no tiene dónde escribir y el freno simplemente no existe |
 
 **Sobre la `023`:** corrige una asimetría, no añade una pérdida. `id_creador` ya era
 CASCADE, así que al borrar una cuenta los duelos que esa cuenta CREÓ ya
@@ -3459,8 +3600,15 @@ escribir el self-check, sobre el diseño original de este apartado.)
 
 ### 15.6 Stats de combate
 
-Hoy el panel deja `ataque`/`defensa`/`tecnica` a 0 (el formulario de
-`cromos.php` no las expone). Para que las cartas importadas pesen en combate:
+> ⚠️ **Desfasado desde la v7.7:** el formulario manual de `panel/cromos.php` ya
+> lee y guarda `ataque`/`defensa`/`tecnica` (antes se quedaban en `0/0/0` para
+> toda carta creada a mano — ver el changelog v7.7). Lo que sigue describe el
+> camino del **importador automático**, que es un flujo distinto y donde este
+> cálculo sigue vigente tal cual: el importador no pasa por el formulario
+> manual, así que necesita su propia forma de asignar stats a partir de la
+> posición y la rareza.
+
+Para que las cartas importadas pesen en combate:
 
 ```
 BASE_TOTAL = ['comun' => 165, 'poco_comun' => 190, 'raro' => 215, 'epico' => 240]
