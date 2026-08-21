@@ -1,0 +1,39 @@
+# Endurecimiento básico del servidor para este proyecto (no toca el php.ini global).
+
+# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, branding/...)
+Options -Indexes
+
+# Qué archivo servir cuando se visita una carpeta sin nombre de archivo
+# (la raíz del dominio, por ejemplo). El proyecto no tiene index.php/html,
+# usa landing.php como portada.
+DirectoryIndex landing.php index.php
+
+# Ruta relativa (no absoluta): así funciona tanto si el proyecto se sube a la
+# raíz del dominio en IONOS como si se sube a una subcarpeta.
+ErrorDocument 404 404.php
+
+# Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
+# tipo .xxx). Sin esto, aunque el listado de directorio esté desactivado,
+# .git/HEAD, .git/config, .git/index, etc. se pueden pedir uno a uno por su
+# nombre exacto y reconstruir el repositorio entero con git-dumper.
+# (Esta copia no lleva .git, pero la regla se deja como red de seguridad.)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "(^|/)\." - [F]
+</IfModule>
+
+# IONOS Hosting Web sirve PHP casi siempre vía PHP-FPM/FastCGI, no como
+# módulo de Apache (mod_php). Con FastCGI, php_flag/php_value en .htaccess
+# NO surte efecto — por eso estos ajustes están duplicados en .user.ini
+# (que sí lee PHP-FPM) y se dejan aquí también por si el hosting usa
+# mod_php en algún momento.
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
+<IfModule php_module>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
