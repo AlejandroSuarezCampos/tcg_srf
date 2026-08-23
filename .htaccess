@@ -1,0 +1,40 @@
+# Endurecimiento básico del servidor para este proyecto (no toca el php.ini global).
+
+# ⚠️ LA PORTADA ES landing.php, NO index.php.
+# Sin esta línea Apache busca index.php / index.html, no encuentra ninguno, y
+# como el listado de directorios está desactivado responde
+# "Forbidden. You don't have permission to access this resource" en la raíz
+# del dominio — que es justo lo que pasaba en tcgfrontier.es. La regla de
+# RewriteRule de más abajo hace lo mismo, pero solo si mod_rewrite está
+# activo; DirectoryIndex no depende de ningún módulo, así que es la que de
+# verdad sostiene la portada.
+DirectoryIndex landing.php index.php index.html
+
+# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, branding/, .claude/...)
+Options -Indexes
+
+# Ruta desde la raíz del dominio. En producción el proyecto ES la raíz, así que
+# es /404.php. (Apache no admite rutas relativas aquí: sin la barra inicial se
+# toma como texto literal y se manda tal cual al navegador.)
+ErrorDocument 404 /404.php
+# Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
+# tipo .xxx). Sin esto, aunque el listado de directorio esté desactivado,
+# .git/HEAD, .git/config, .git/index, etc. se pueden pedir uno a uno por su
+# nombre exacto y reconstruir el repositorio entero con git-dumper.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule "(^|/)\." - [F]
+
+    # Si piden la raíz del sitio, servir landing.php sin cambiar la URL visible
+    RewriteRule ^$ landing.php [L]
+</IfModule>
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
+<IfModule php_module>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>

@@ -1,0 +1,2520 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — CHROME DE PÁGINA
+   Logotipo, cabecera de página y pie. La navegación se incorpora en la Fase 1.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   LOGOTIPO
+   El lockup principal siempre es "Superliga Frontier · TCG". El apodo
+   "Superruina Frontier" no aparece aquí nunca (briefing, sección 9).
+   -------------------------------------------------------------------------- */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+  font-size: 1.125rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--frost);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.logo-punto { color: var(--amber); }
+
+/* --------------------------------------------------------------------------
+   NAVEGACIÓN
+   Es sticky, no fija en superposición: al ocupar sitio en el flujo se elimina
+   de raíz que tape contenido con el foco puesto (WCAG 2.2 SC 2.4.11). El
+   scroll-padding de base.css cubre el resto de casos.
+   -------------------------------------------------------------------------- */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 12, 16, .88);
+  backdrop-filter: blur(12px);
+}
+.nav-interior {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--wrap);
+  min-height: var(--nav-h);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.nav-lista {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+}
+.nav-enlace {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.nav-enlace:hover { color: var(--frost); background: rgba(255, 255, 255, .05); }
+.nav-enlace.is-activo { color: var(--frost); font-weight: var(--fw-semibold); }
+
+/* separador entre clústeres: en escritorio los grupos se leen por el espacio
+   y esta línea, sin necesidad de desplegables para un solo destino */
+.nav-sep {
+  width: 1px;
+  height: 18px;
+  margin-inline: var(--space-2);
+  background: var(--line);
+}
+/* los títulos de grupo y los iconos solo existen en el panel móvil */
+.nav-grupo-titulo, .nav-ico { display: none; }
+
+.nav-derecha { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+
+/* --------------------------------------------------------------------------
+   Con Duelos, Misiones, Cadenas y Panel, la nav pasó a tener 12 destinos: el
+   logo (265px) + todos los enlaces en una fila (926px) + el chip de usuario
+   (176px) necesitan de verdad ~1460px sin recortar nada. Entre los 901px del
+   fin del panel móvil y ese ancho, algo tiene que ceder.
+   No es el logo (es el nombre del sitio) ni el chip (ya está reducido a
+   icono+número+icono, no hay más que quitarle sin perder la salida rápida).
+   Cede la tira de enlaces: se vuelve deslizable horizontalmente, mismo
+   patrón que .tabs. min-width:0 es lo que permite que .nav-menu se
+   encoja por debajo de los 926px de su contenido en vez de forzar el
+   desbordamiento de toda la fila — y con ella, de la página entera. */
+@media (min-width: 901px) {
+  .nav-interior .logo,
+  .nav-derecha { flex-shrink: 0; }
+
+  .nav-menu {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-menu::-webkit-scrollbar { display: none; }
+}
+.nav-salir {
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  margin-right: -6px;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--frost-dim);
+  font-size: 16px;
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.nav-salir:hover { color: var(--amber-light); }
+
+.nav-burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  /* flex-shrink:0 es necesario: dentro de la barra flex el botón se comprimía
+     a 20px de ancho y se quedaba por debajo del objetivo táctil mínimo */
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.nav-burger span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--frost);
+  transition: transform var(--t-media) var(--ease), opacity var(--t-micro) var(--ease);
+}
+.nav-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+@media (max-width: 900px) {
+  /* El orden visual en móvil es logo · chip de usuario · hamburguesa.
+     El `margin-left:auto` tiene que vivir en el chip, no en la hamburguesa:
+     si lo lleva la hamburguesa, empuja el chip fuera del viewport y la página
+     se puede deslizar de lado. */
+  .nav-burger { display: flex; order: 3; margin-left: var(--space-2); }
+  .nav-derecha { order: 2; margin-left: auto; min-width: 0; }
+  .nav-interior { gap: var(--space-2); }
+
+  /* En 375px no caben logo + chip completo + hamburguesa: el chip se queda
+     solo con las monedas, que es el dato que hay que tener siempre a la vista.
+     El avatar es redundante (el usuario sabe quién es) y la salida se mueve
+     al menú desplegable. */
+  .chip-usuario { padding: 5px var(--space-3); min-width: 0; }
+  .chip-usuario .avatar,
+  .chip-usuario .nav-salir { display: none; }
+
+  /* el logotipo cede espacio antes que nada y nunca fuerza desbordamiento */
+  .nav-interior .logo {
+    min-width: 0;
+    font-size: .8125rem;
+    letter-spacing: .02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* enlaces que solo existen en el menú móvil */
+.solo-movil { display: none; }
+@media (max-width: 900px) {
+  .solo-movil { display: block; }
+
+  .nav-menu {
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    max-height: 0;
+    overflow: hidden;
+    border-bottom: 1px solid transparent;
+    background: rgba(11, 12, 16, .98);
+    backdrop-filter: blur(12px);
+    transition: max-height var(--t-media) var(--ease);
+  }
+  .nav-menu.is-abierto {
+    max-height: min(70vh, 560px);
+    overflow-y: auto;
+    border-bottom-color: var(--line);
+  }
+
+  .nav-lista {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: var(--space-3) var(--gutter) var(--space-5);
+  }
+  .nav-enlace { min-height: 48px; font-size: var(--fs-body); padding-inline: var(--space-2); }
+
+  /* en móvil los clústeres sí se etiquetan */
+  .nav-grupo-titulo {
+    display: block;
+    margin-top: var(--space-4);
+    padding: 0 var(--space-2) var(--space-2);
+    font-size: var(--fs-caption-sm);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tracking-caption);
+    text-transform: uppercase;
+    color: var(--frost-dim);
+  }
+  .nav-ico { display: inline-block; width: 20px; font-size: 18px; }
+  .nav-sep { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   CABECERA DE PÁGINA INTERNA
+   -------------------------------------------------------------------------- */
+.cabecera {
+  position: relative;
+  padding-block: var(--space-7) var(--space-6);
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 60% 60% at 12% 0%, var(--amber-soft), transparent 62%),
+    var(--void);
+  overflow: hidden;
+}
+.cabecera-contenido { position: relative; z-index: 2; }
+.cabecera p {
+  max-width: 60ch;
+  margin-top: var(--space-3);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.cabecera-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-5);
+}
+
+/* línea de campo: firma visual discreta del sitio, no un grid de puntos */
+.linea-campo { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.linea-campo::before {
+  content: '';
+  position: absolute;
+  top: 42%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(70vw, 640px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, .055);
+  border-radius: 50%;
+}
+.linea-campo::after {
+  content: '';
+  position: absolute;
+  top: 42%; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, .055);
+}
+
+/* --------------------------------------------------------------------------
+   HERO (portada)
+   -------------------------------------------------------------------------- */
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: min(78vh, 720px);
+  padding-block: var(--space-8);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 6%, var(--amber-soft), transparent 62%),
+    var(--void);
+}
+.hero-contenido { position: relative; z-index: 2; text-align: center; }
+.hero h1 { margin-inline: auto; max-width: 18ch; }
+.hero-sub {
+  max-width: 46ch;
+  margin: var(--space-5) auto 0;
+  font-size: clamp(1rem, .95rem + .4vw, 1.25rem);
+  color: var(--frost-dim);
+}
+.hero-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+}
+@media (max-width: 520px) {
+  .hero-acciones { flex-direction: column; }
+  .hero-acciones .btn { width: 100%; }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  margin-bottom: var(--space-5);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--amber-line);
+  border-radius: var(--radius-pill);
+  background: var(--amber-soft);
+  color: var(--amber-light);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+.eyebrow:hover { border-color: var(--amber); }
+
+/* --------------------------------------------------------------------------
+   AUTENTICACIÓN (login / registro)
+   Estas páginas no llevan navegación: el único camino de vuelta es explícito.
+   -------------------------------------------------------------------------- */
+.auth {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-6) var(--gutter);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 0%, var(--amber-soft), transparent 62%),
+    var(--void);
+}
+.auth-caja { position: relative; z-index: 2; width: 100%; max-width: 420px; }
+.auth-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  margin-bottom: var(--space-3);
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.auth-volver:hover { color: var(--frost); }
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+.auth-cabecera { display: flex; flex-direction: column; gap: var(--space-2); text-align: center; }
+.auth-cabecera .logo { justify-content: center; margin-bottom: var(--space-3); font-size: 1rem; }
+.auth-cabecera h1 { font-size: var(--fs-h2); }
+.auth-cambio { text-align: center; }
+.auth-cambio a { color: var(--amber-light); font-weight: var(--fw-semibold); }
+
+/* en las páginas de auth el pie se pega abajo, sin margen superior grande */
+.auth + .pie { margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   EXPANSIONES (portada y álbum)
+   -------------------------------------------------------------------------- */
+.expansion-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+.expansion-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  text-decoration: none;
+  transition: border-color var(--t-micro) var(--ease), transform var(--t-media) var(--ease);
+}
+@media (hover: hover) {
+  .expansion-tarjeta:hover { transform: translateY(-4px); border-color: var(--amber-line); }
+}
+.expansion-tarjeta h3 { font-size: var(--fs-h3); }
+.expansion-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--amber-light);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+}
+
+/* cabecera de grupo de expansión, en álbum y sobres */
+.expansion-grupo { margin-bottom: var(--space-8); }
+.expansion-grupo:last-child { margin-bottom: 0; }
+.expansion-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT CON PANEL DE FILTROS (colección, álbum)
+   En móvil los filtros van arriba y se pliegan; en escritorio, en columna fija.
+   -------------------------------------------------------------------------- */
+.con-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .con-filtros { grid-template-columns: 260px 1fr; gap: var(--space-7); }
+}
+
+.filtros {
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.filtros fieldset { border: 0; }
+.filtros .campo-label { display: block; margin-bottom: var(--space-2); }
+
+/* en móvil los filtros se pliegan: si no, empujan la rejilla de cartas
+   media pantalla hacia abajo */
+.filtros-resumen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  list-style: none;
+}
+.filtros-resumen::-webkit-details-marker { display: none; }
+.filtros-resumen span { display: flex; align-items: center; gap: var(--space-2); }
+.filtros-caret { transition: transform var(--t-micro) var(--ease); }
+.filtros[open] .filtros-caret { transform: rotate(180deg); }
+.filtros[open] .filtros-cuerpo { padding-top: var(--space-5); }
+/* .filtros-cuerpo también lleva la clase utilitaria .stack (display: flex),
+   que por ser una regla de autor gana al display:none nativo que el
+   navegador aplica a los hijos de un <details> cerrado —los orígenes de
+   hoja de estilo (user-agent vs autor) no compiten por especificidad, autor
+   gana siempre—. Sin esto, el panel de filtros se renderiza igual de
+   plegado que desplegado y se solapa con el resto de la página; con
+   rejillas largas (colección completa) es donde más se nota. */
+.filtros:not([open]) .filtros-cuerpo { display: none; }
+
+@media (min-width: 1024px) {
+  /* La columna acompaña al scroll. El panel es más alto que el viewport, así
+     que además de sticky necesita altura máxima y scroll propio: sin eso hay
+     que bajar hasta el final de la página para ver el último filtro. */
+  .filtros {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--space-4));
+    max-height: calc(100vh - var(--nav-h) - var(--space-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .filtros-resumen { display: none; }
+  .filtros .filtros-cuerpo { padding-top: 0; }
+
+  /* barra de scroll discreta dentro del panel */
+  .filtros::-webkit-scrollbar { width: 6px; }
+  .filtros::-webkit-scrollbar-thumb {
+    border-radius: var(--radius-pill);
+    background: var(--line-strong);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   MAZOS (deck builder)
+   Reaprovecha .con-filtros: la columna estrecha lista los mazos y la ancha es
+   el editor, exactamente igual que filtros + rejilla en colección.
+   -------------------------------------------------------------------------- */
+.lista-mazos { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+
+.mazo-fila {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.mazo-fila.es-activo { border-color: var(--amber-line); background: var(--amber-soft); }
+
+/* La columna baja a ~210px, y ahí no caben a la vez nombre + formación +
+   insignia de cuenta + insignia "Titular" en una sola línea sin que algo se
+   trunque de forma ilegible o se solape con lo de al lado — se probó y las
+   dos cosas pasaron de verdad. La fila se parte en dos líneas reales, ambas
+   a lo ancho completo del enlace: nombre+formación arriba, las dos insignias
+   juntas abajo. Por eso "Titular" pasó a vivir DENTRO de .mazo-enlace junto
+   a la insignia de cuenta (antes era hermana suelta en el <li>): mientras
+   estuvo fuera, seguía compitiendo por ancho con la fila entera aunque el
+   nombre ya estuviera partido en dos líneas por su cuenta. */
+.mazo-enlace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;              /* objetivo táctil, §7 */
+  color: inherit;
+  text-decoration: none;
+}
+
+.mazo-nombre {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+/* el nombre es lo único que se trunca; la formación y las insignias de
+   cuenta/titular siempre se quedan enteras */
+.mazo-nombre-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mazo-formacion { flex-shrink: 0; }
+
+.mazo-insignias { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.mazo-insignias > .pastilla { flex-shrink: 0; }
+
+.pastilla-titular {
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
+  color: var(--amber-light);
+}
+
+.mazo-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.mazo-totales { display: flex; gap: var(--space-5); }
+
+/* Cabecera de la pantalla: los mazos y el alta, en fila y a lo ancho.
+   Antes vivían en la columna estrecha de `.con-filtros` (260px, y menos aún
+   con el taller al lado): los nombres largos y las insignias se cortaban, y
+   encima le robaban ancho al campo, que es lo que hay que ver. */
+.mazos-cabecera {
+  display: grid;
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+@media (min-width: 800px) {
+  .mazos-cabecera { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; }
+}
+/* Con varios mazos la lista se reparte en columnas en vez de crecer hacia
+   abajo y empujar el taller fuera de la pantalla. */
+.mazos-cabecera-lista .lista-mazos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-2);
+}
+.mazos-editor { min-width: 0; }
+
+/* --------------------------------------------------------------------------
+   EL TALLER — campo a la izquierda, selección a la derecha
+   Antes el editor era una columna única y muy larga: campo, compos, guardar
+   y al final del todo el buscador con los jugadores. Colocar a alguien era
+   bajar hasta abajo, elegir, y volver a subir a mirar el campo — once veces.
+
+   Ahora son dos paneles: el campo se queda arriba a la izquierda y la lista
+   de jugadores tiene su PROPIO scroll a la derecha, así que las dos cosas
+   están a la vista a la vez. Por debajo de 1100px se apila, que en un móvil
+   es lo correcto: ahí no caben dos paneles y el scroll de página es el que
+   toca.
+   -------------------------------------------------------------------------- */
+.mazo-taller { display: grid; gap: var(--space-6); }
+
+@media (min-width: 1100px) {
+  .mazo-taller {
+    /* 380px es el suelo por una razón medida: por debajo de eso los tres
+       distintivos de una fila (posición, rareza, compo) se parten en dos
+       líneas y cada jugador pasa de 147px de alto a 183. */
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
+    align-items: start;
+  }
+  .mazo-taller-selector {
+    position: sticky;
+    /* 88px = alto de la nav fija + un respiro */
+    top: 88px;
+    /* El panel nunca es más alto que la ventana: lo que sobra se desplaza
+       DENTRO de la lista, no arrastrando la página entera. */
+    max-height: calc(100vh - 108px);
+    display: flex;
+    flex-direction: column;
+  }
+  .mazo-selector-lista { overflow-y: auto; }
+}
+
+.mazo-taller-selector {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.mazo-selector-cabecera { margin-bottom: var(--space-4); }
+.mazo-selector-cabecera h3 { margin: 0; }
+.mazo-selector-cabecera p { margin: var(--space-1) 0 0; }
+
+.mazo-filtros {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.mazo-filtros-fila { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.mazo-filtros-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* La lista lleva su propio scroll dentro del panel (ver arriba). El
+   `padding-right` deja sitio a la barra para que no se coma el borde de las
+   filas. */
+.mazo-selector-lista { padding-right: var(--space-2); }
+.mazo-selector-lista .selector-vacio {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+}
+
+/* Las compos, debajo del campo, ya no al final de una columna kilométrica. */
+.mazo-taller-campo .compos { margin-block: var(--space-5) 0; }
+
+.mazo-acciones { margin-bottom: var(--space-5); }
+
+.mazo-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+/* jugador ya colocado en otro hueco: se apaga en vez de desaparecer, para que
+   se vea que lo tienes pero que ya está sobre el campo */
+.selector-item[disabled] { opacity: .38; cursor: not-allowed; }
+
+/* copia repetida de alguien YA alineado. Se apaga aún más y se marca con una
+   banda, porque el motivo es distinto: no es que esta copia esté usada, es que
+   ese jugador ya está en el once y nadie juega dos veces en el mismo equipo. */
+.selector-item.es-repetido { opacity: .22; }
+.selector-item.es-repetido::after {
+  content: 'Ya alineado';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: rgba(11, 12, 16, .9);
+  font-size: 9px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--frost-dim);
+  white-space: nowrap;
+}
+.selector-item { position: relative; }
+
+/* ---- los 11 huecos, dispuestos como en un campo de fútbol real ----
+   Las coordenadas NO están aquí: las calcula Tcg::coordenadasDe() y llegan
+   como `style` en cada hueco. Con ocho formaciones, tenerlas en CSS serían 88
+   reglas :nth-child que habría que mantener en sincronía a mano con el orden
+   de los huecos de PHP — y desincronizarlas no rompe nada visible, solo coloca
+   a la gente en el sitio equivocado. El terreno se dibuja con un SVG de líneas
+   de campo en el fondo (banda, círculo central, áreas), en tonos apagados para
+   no pelear con el resto del sistema de color del sitio. */
+.alineacion {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto var(--space-6);
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background-color: #0E1710;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(255,255,255,.025) 0 10%, transparent 10% 20%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='2' y='2' width='96' height='136'/%3E%3Cline x1='2' y1='70' x2='98' y2='70'/%3E%3Ccircle cx='50' cy='70' r='14'/%3E%3Crect x='20' y='2' width='60' height='24'/%3E%3Crect x='35' y='2' width='30' height='10'/%3E%3Crect x='20' y='112' width='60' height='24'/%3E%3Crect x='35' y='128' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='70' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 100% 100%;
+}
+
+.hueco {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: clamp(60px, 15%, 84px);
+  /* al cambiar de formación los huecos se deslizan a su nueva posición en vez
+     de saltar, que es lo que hace legible de un vistazo qué se ha movido */
+  transition: left var(--t-media) var(--ease), top var(--t-media) var(--ease);
+}
+:root[data-motion="reduce"] .hueco { transition: none; }
+/* En pantalla estrecha, una línea de seis medios deja ~52px por jugador: el
+   retrato se encoge para que quepan sin pisarse ni salirse del campo. El
+   botón entero sigue por encima del objetivo táctil mínimo. */
+@media (max-width: 430px) {
+  .hueco { width: clamp(52px, 15%, 84px); }
+}
+
+/* El selector de formación va bajo el nombre del mazo, no en la barra de
+   totales: es una decisión de plantilla, no un dato de resultado. */
+.campo-formacion { margin-top: var(--space-3); max-width: 240px; }
+
+.hueco-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;          /* objetivo táctil, aunque el retrato sea menor */
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* El aro del retrato usa EXACTAMENTE la misma técnica que .carta en
+   components.css: el borde no es un `border`, es un `padding` que deja ver el
+   `background` de debajo (--rz-borde), con un círculo interior encima que
+   pinta el contenido real. Así el mazo no inventa un lenguaje de borde propio:
+   reutiliza los mismos colores mezclados (color-mix) y el mismo tratamiento
+   especial de legendario (metálico) y SRF (arcoíris animado) que ya se ve en
+   colección, álbum y mercado. */
+.hueco-avatar {
+  --rz-borde: var(--line-strong);
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 11vw, 56px);
+  aspect-ratio: 1;
+  padding: 2px;                 /* el padding ES el borde, igual que .carta */
+  border-radius: 50%;
+  background: var(--rz-borde);
+  overflow: hidden;
+}
+
+.hueco-avatar-int {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--frost-dim);
+  font-size: 16px;
+  overflow: hidden;
+}
+.hueco-avatar-int img { width: 100%; height: 100%; object-fit: cover; }
+
+/* mismos valores que .carta[data-rareza] en components.css: 1–4 son el color
+   de la rareza mezclado con transparencia (nunca el tono puro), 5 un
+   degradado metálico, 6 el arcoíris animado (misma keyframe holoDeriva). */
+.hueco[data-rareza="2"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz2) 34%, transparent); }
+.hueco[data-rareza="3"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz3) 38%, transparent); }
+.hueco[data-rareza="4"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz4) 42%, transparent); }
+.hueco[data-rareza="5"] .hueco-avatar { --rz-borde: linear-gradient(140deg, #FFE0AE, #E8752A 30%, #7A3A12 52%, #F2B134 72%, #FFE0AE); }
+.hueco[data-rareza="6"] .hueco-avatar {
+  padding: 3px;
+  background: var(--rz6-grad);
+  background-size: 300% 100%;
+  animation: holoDeriva 4s linear infinite;
+}
+
+.hueco:not(.esta-lleno) .hueco-avatar {
+  padding: 0;
+  background: none;
+  border: 2px dashed var(--line-strong);
+}
+/* seleccionado para recibir jugador: mismo recurso que .carta.is-seleccionada
+   en el resto del sitio, un anillo ámbar sustituyendo al de rareza */
+.hueco.es-activo .hueco-avatar { --rz-borde: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+/* colocado fuera de su posición natural: no es un error, es una decisión, así
+   que se señala sin alarmar, no con el mismo tono que un error */
+.hueco.es-desubicado .hueco-avatar { outline: 2px solid var(--warning-line); outline-offset: 2px; }
+
+.hueco-nombre {
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(11, 12, 16, .78);
+  backdrop-filter: blur(4px);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--frost);
+}
+.hueco:not(.esta-lleno) .hueco-nombre {
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--frost-dim);
+}
+
+.hueco-quitar {
+  position: absolute;
+  top: -6px; right: -6px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  /* 26px, no 22: por debajo de 24×24 incumple el objetivo táctil mínimo
+     (WCAG 2.2 SC 2.5.8) y en el selector de mazos era además el elemento
+     que quedaba más cerca del borde de la pantalla en móvil. */
+  width: 26px; height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--frost-dim);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hueco-quitar:hover { color: var(--frost); border-color: var(--frost-dim); }
+
+@media (max-width: 480px) {
+  .hueco-nombre { font-size: 9px; }
+}
+
+/* --------------------------------------------------------------------------
+   CAPA 2 — COMPOS
+   Panel de rasgos activos, en el constructor de mazos y en el resultado de
+   duelo. El nivel se lee por puntos llenos/vacíos además de por el número:
+   misma regla que las rarezas, nunca solo por color.
+   -------------------------------------------------------------------------- */
+.compos {
+  margin-block: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.compos-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+/* `auto-fit` + un mínimo más bajo, no `auto-fill` con 240px: en la columna del
+   taller (que ahora es más estrecha que la página entera) 240px dejaba una
+   sola compo por fila con medio panel vacío al lado, y el detalle de cada una
+   —"3 en el once · +1,20 % Defensa"— se partía en tres líneas. Con 190px caben
+   dos y el texto respira. */
+.compos-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+}
+.compo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--void-2);
+}
+/* El nombre parte por palabras en vez de desbordar: "Contraataque" no cabe en
+   una columna estrecha, y truncarlo con puntos dejaría compos indistinguibles
+   entre sí ("Contraa…" / "Contraat…"). */
+.compo-nombre { overflow-wrap: anywhere; }
+.compo-nivel { flex-shrink: 0; }
+/* afinidad y configuración se distinguen por el filo izquierdo, pero el tipo
+   también se lee en el texto del detalle: el color no es la única señal */
+.compo--afinidad { border-left-color: var(--amber); }
+.compo--configuracion { border-left-color: var(--info); }
+.compo--derivado { border-left-color: var(--success); }
+
+.compo-nombre { font-weight: var(--fw-semibold); }
+.compo-detalle { grid-column: 1 / -1; font-size: var(--fs-caption-sm); }
+
+.compo-nivel { display: inline-flex; align-items: center; gap: 3px; }
+.compo-punto {
+  width: 7px; height: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+.compo-punto.esta-lleno { background: var(--amber); border-color: var(--amber); }
+
+.compos-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.compos-resumen .dato.es-malo b { color: var(--danger-text); }
+.compos .alerta { margin-top: var(--space-4); }
+
+/* en el resultado de duelo van dos paneles enfrentados */
+.compos--duelo { margin-block: 0; }
+.compos-enfrentadas {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+@media (min-width: 900px) {
+  .compos-enfrentadas { grid-template-columns: 1fr 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   DUELOS — lobby
+   La pantalla era literalmente un formulario y dos tablas. Lo que se apuesta
+   —que es de lo que va la pantalla— tenía el mismo peso visual que cualquier
+   campo, y para entrar en una sala de carta se elegía cuál en un desplegable
+   de nombres sueltos: se arriesgaba a ciegas un objeto que cambia de dueño.
+   -------------------------------------------------------------------------- */
+
+/* Qué se apuesta: dos opciones grandes, con su consecuencia escrita. El radio
+   es real y sigue ahí (oculto con .sr-only), así que el teclado, el foco y el
+   envío del formulario funcionan sin una línea de JavaScript; el JS solo
+   añade el resaltado. */
+.apuesta-opciones {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+@media (min-width: 640px) {
+  .apuesta-opciones { grid-template-columns: 1fr 1fr; }
+}
+.apuesta-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--void-2);
+  cursor: pointer;
+  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.apuesta-opcion:hover { border-color: var(--line-strong); }
+.apuesta-opcion.esta-elegida { border-color: var(--amber-line); background: var(--amber-soft); }
+/* El foco se dibuja sobre la opción entera, no sobre el radio invisible. */
+.apuesta-opcion:focus-within { outline: 2px solid var(--amber-light); outline-offset: 2px; }
+.apuesta-opcion-ico {
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--amber-light);
+  font-size: 20px;
+}
+.apuesta-opcion.esta-elegida .apuesta-opcion-ico { background: var(--amber); color: var(--amber-ink); }
+.apuesta-opcion-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* Filtros del selector de apuesta. Van en fila porque son tres y cortos; si
+   ocuparan un bloque propio competirían con la lista, que es lo que hay que
+   mirar. */
+.apuesta-filtros {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 var(--space-4);
+}
+@media (min-width: 700px) {
+  .apuesta-filtros { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+}
+/* La lista de apuesta tiene tope de altura y scroll propio: con la colección
+   hecha, dejarla crecer empujaba el botón de "Abrir sala" fuera de la vista. */
+/* Cuántas cartas llevas elegidas de las que caben. Va ARRIBA de la lista y no
+   debajo: la lista tiene scroll propio, así que un contador al final quedaría
+   fuera de pantalla justo cuando hace falta mirarlo. */
+.apuesta-contador {
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.apuesta-contador.esta-lleno { color: var(--amber-light); }
+.apuesta-contador.esta-vacio { color: var(--danger-text); }
+
+.carta-lista--apuesta { max-height: 52vh; overflow-y: auto; padding-right: var(--space-2); }
+.carta-lista--apuesta .selector-vacio {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--frost-dim);
+  font-size: var(--fs-body-sm);
+}
+
+/* Salas abiertas. Cada una enseña QUÉ hay en juego en vez de describirlo en
+   una celda de tabla. */
+.salas {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--space-3);
+  /* Mismo criterio que `.carta-lista`: la sala se adapta al ANCHO DE LA LISTA,
+     no al de la ventana. Con media queries, una sala metida en una columna
+     estrecha con la ventana ancha aplastaba la columna del entrenador hasta
+     0px — medido. */
+  container-type: inline-size;
+  container-name: salas;
+}
+.sala {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+.sala:hover { border-color: var(--line-strong); }
+/* Una sala de carta se distingue del filo, no solo del texto: es la que puede
+   costarte un objeto y no monedas. */
+.sala--carta { border-left-color: var(--amber); }
+
+.sala-entrenador { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.sala-entrenador span { display: flex; flex-direction: column; min-width: 0; }
+.sala-entrenador b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sala-apuesta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sala-apuesta-etiqueta {
+  font-size: var(--fs-caption-sm);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+.sala-apuesta-valor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--fw-semibold);
+}
+.sala-apuesta-valor--monedas { color: var(--warning-text); }
+.sala-apuesta-valor i { color: var(--amber-light); }
+
+.sala-accion { display: flex; align-items: center; justify-content: flex-end; }
+.sala-accion .t-caption { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+@container salas (max-width: 700px) {
+  .sala { grid-template-columns: minmax(0, 1fr) auto; }
+  .sala-accion { grid-column: 1 / -1; justify-content: stretch; }
+  .sala-accion form { width: 100%; }
+  .sala-accion .btn { width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   DUELOS — sala de espera y pantalla de partido
+   -------------------------------------------------------------------------- */
+.sala-espera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+
+/* Tres puntos que laten. Es la única señal de que la sala sigue viva, así que
+   tiene que verse sin depender de que cargue la fuente de iconos. */
+.sala-latido { display: flex; gap: var(--space-2); }
+.sala-latido span {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: latido 1.4s var(--ease) infinite;
+}
+.sala-latido span:nth-child(2) { animation-delay: .18s; }
+.sala-latido span:nth-child(3) { animation-delay: .36s; }
+
+@keyframes latido {
+  0%, 100% { opacity: .25; transform: scale(.85); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+
+/* con reducción de movimiento la sala no parpadea, pero sigue leyéndose que
+   está activa */
+:root[data-motion="reduce"] .sala-latido span { animation: none; opacity: .8; }
+
+/* ---- fase de aumento pre-partido ---- */
+.aumento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+.aumento-reloj { font-size: var(--fs-h2); font-weight: var(--fw-bold); }
+
+.aumento-opciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 720px;
+  margin-top: var(--space-4);
+}
+
+.aumento-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: inherit;
+  cursor: pointer;
+  transition: transform var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.aumento-boton:hover { transform: translateY(-2px); }
+
+.aumento-tier {
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.aumento-pct { font-size: var(--fs-h2); line-height: 1.1; }
+.aumento-stat { font-weight: var(--fw-semibold); }
+.aumento-efecto { font-size: var(--fs-caption); color: var(--frost-dim); }
+
+/* Los tres tiers se distinguen por color Y por texto ("Plata"/"Oro"/"Prisma"),
+   nunca solo por color: es la misma regla que siguen las rarezas. */
+.aumento-opcion.es-plata  .aumento-tier { color: var(--frost-dim); }
+.aumento-opcion.es-oro    .aumento-tier { color: var(--warning); }
+.aumento-opcion.es-prisma .aumento-tier { color: var(--amber-light); }
+.aumento-opcion.es-oro    .aumento-boton { border-color: var(--warning-line); }
+.aumento-opcion.es-prisma .aumento-boton { border-color: var(--amber-line); }
+
+/* destape de los dos aumentos, ya con el duelo resuelto */
+.aumento-destape {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.aumento-destape-lado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 220px;
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.aumento-destape-lado b { font-size: var(--fs-h3); }
+/* mismo motivo que .partido-nombre: un nombre de invocador largo y sin
+   espacios (hasta 50 caracteres, válido en el registro) no tiene dónde
+   romper de forma natural y se salía de esta tarjeta */
+.aumento-destape-lado > span.t-caption {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aumento-destape-lado.es-oro    { border-color: var(--warning-line); }
+.aumento-destape-lado.es-prisma { border-color: var(--amber-line); }
+
+/* ---- marcador ---- */
+.partido-marcador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+/* min-width:0 es necesario para que .partido-lado pueda encogerse dentro de
+   .partido-marcador (flex): sin él, un nombre de invocador largo y sin
+   espacios (permitido, hasta 50 caracteres) no tiene dónde romper y se sale
+   del marcador en vez de truncarse. Mismo patrón que .rz-texto en las cartas. */
+.partido-lado { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.partido-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 15ch;
+  font-weight: var(--fw-semibold);
+}
+.partido-goles { font-size: var(--fs-h1); line-height: 1; flex-shrink: 0; }
+.partido-guion { color: var(--frost-dim); font-size: var(--fs-h2); }
+
+.partido-veredicto {
+  margin-bottom: var(--space-5);
+  text-align: center;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  letter-spacing: -.01em;
+}
+.partido.es-victoria .partido-veredicto { color: var(--success); }
+.partido.es-derrota  .partido-veredicto { color: var(--frost-dim); }
+
+/* "en los penaltis" cuelga del titular cuando el duelo se decidió en la tanda.
+   Va en su propia línea y más pequeño: es la aclaración de por qué hay un
+   ganador con el marcador empatado, no parte del veredicto. Sin esto heredaría
+   el tamaño del <h1> y competiría con la palabra que importa. */
+.partido-tanda {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  color: var(--frost-dim);
+}
+
+/* ---- VEREDICTO DEL PARTIDO (§1.5 regla 7) ----
+   El dato memorable del encuentro, también al perder. Va justo bajo el
+   titular y por encima de todo lo demás porque es lo que se lee y lo que se
+   comparte; las estadísticas quedan debajo, de apoyo. */
+.veredicto {
+  margin-bottom: var(--space-5);
+  text-align: center;
+}
+.veredicto-detalle {
+  margin: 0 auto var(--space-2);
+  max-width: 46ch;
+  font-size: var(--fs-body);
+  color: var(--frost);
+}
+.veredicto-actuacion {
+  margin: 0 0 var(--space-3);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.veredicto-copiar { margin-bottom: var(--space-4); }
+
+.veredicto-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.veredicto-stats > div { text-align: center; }
+.veredicto-stats dt {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+.veredicto-stats dd {
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  color: var(--frost);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- sello de rango (S/A/B) de las cadenas ----
+   Primer guiño retro de las Cadenas: letra grande y maciza, borde duro y sin
+   degradados, como el rango de un marcador de recreativa. La paleta sigue
+   siendo la del sitio, así que hace de homenaje sin desentonar con el resto
+   de la pantalla, que es lo que pidió Alejandro. */
+.rango-sello {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin: 0 auto var(--space-5);
+  padding: var(--space-2) var(--space-4);
+  width: fit-content;
+  max-width: 100%;
+  border: 2px solid var(--rango-color, var(--line-strong));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--rango-color, var(--panel)) 10%, transparent);
+}
+.rango-letra {
+  font-family: var(--font-mono);
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--rango-color, var(--frost));
+  /* el "relieve" de recreativa es una sombra dura, sin desenfoque */
+  text-shadow: 2px 2px 0 color-mix(in srgb, var(--rango-color, var(--frost)) 30%, transparent);
+}
+.rango-texto { font-size: var(--fs-body-sm); color: var(--frost-dim); text-align: left; }
+
+/* La letra ya distingue el rango por sí sola: el color solo lo refuerza, así
+   que quien no perciba la diferencia cromática no pierde información. */
+.rango-s { --rango-color: var(--amber); }
+.rango-a { --rango-color: var(--frost); }
+.rango-b { --rango-color: var(--frost-dim); }
+
+/* ==========================================================================
+   MAPA DE CADENA — pantalla de ruta estilo Inazuma Eleven
+   Esta pantalla ROMPE a propósito con la paleta oscura del sitio. Las dos
+   capturas de referencia (rutas de la DS y de la era GO) se definen ante todo
+   por su fondo cian brillante con panal hexagonal y sus piezas claras de borde
+   grueso: en oscuro es imposible parecerse a ellas, por muy hexagonales que
+   sean los nodos. Se trata como lo que es, una pantalla de juego embebida,
+   con su propio marco; el resto del sitio no se toca.
+
+   Sus colores viven aquí y no en tokens.css justamente porque son locales de
+   esta pantalla y no forman parte del sistema de diseño.
+   ========================================================================== */
+.mapa-marco {
+  --ruta-cian:      #45CFE8;
+  --ruta-cian-hondo:#1F9CC4;
+  --ruta-borde:     #12557A;
+  --ruta-pieza:     #EAF7FD;   /* relleno claro de las piezas */
+  --ruta-tinta:     #12405C;   /* icono/letra sobre pieza clara */
+  --ruta-oro:       #FFC933;
+  --ruta-camino:    #F2FBFF;
+
+  position: relative;
+  overflow-x: auto;             /* solo aquí: el body sigue con overflow-x clip */
+  overscroll-behavior-x: contain;
+  padding: var(--space-5) var(--space-4) 0;
+  border: 3px solid var(--ruta-borde);
+  border-radius: var(--radius-lg);
+  /* Panal hexagonal sobre el degradado cian: es la textura de fondo de la
+     captura de la era GO. El panal va en un SVG en línea porque es un patrón
+     que se repite, no una imagen que haya que descargar. */
+  background-color: var(--ruta-cian);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='96' viewBox='0 0 56 96'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.30' stroke-width='2'%3E%3Cpath d='M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z'/%3E%3Cpath d='M28 64 L56 80 L56 112 L28 128 L0 112 L0 80 Z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 50% 25%, rgba(255,255,255,.38), transparent 65%),
+    linear-gradient(180deg, var(--ruta-cian) 0%, var(--ruta-cian-hondo) 100%);
+  background-size: 56px 96px, auto, auto;
+}
+.mapa { position: relative; margin: 0 auto; }
+
+.mapa-lineas { position: absolute; inset: 0; overflow: visible; }
+
+/* Los caminos son cintas claras: una carcasa azul oscura y encima una banda
+   casi blanca. Dos trazos del MISMO path, así que no pueden desalinearse. */
+.mapa-carcasa {
+  fill: none;
+  stroke: var(--ruta-borde);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mapa-energia {
+  fill: none;
+  stroke: #A9D8EA;              /* tramo aún no abierto: apagado */
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* tramo ya recorrido: cinta blanca encendida, como en las capturas */
+.mapa-energia.es-recorrida {
+  stroke: var(--ruta-camino);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, .9));
+}
+
+/* Rótulo inferior con el nombre de la ruta, como la barra azul de
+   "Cadena Refriega" de la captura de la era GO. */
+.mapa-rotulo {
+  position: sticky;
+  left: 0;
+  margin: var(--space-4) calc(var(--space-4) * -1) 0;
+  padding: 6px var(--space-4);
+  background: var(--ruta-borde);
+  color: #EAF7FD;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.nodo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nodo-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+.nodo-boton[aria-disabled="true"] { cursor: default; }
+.nodo-boton:focus-visible { outline: 3px solid #123A5A; outline-offset: 2px; }
+
+/* La pieza envuelve hexágono y sello para poder colgar el sello de la esquina. */
+.nodo-pieza { position: relative; display: block; }
+
+/* El hexágono usa la misma técnica de borde que las cartas del sitio: relleno
+   por debajo y una capa interior encima que deja ver el borde. Con clip-path
+   no se puede usar `border`, así que esto no es un capricho.
+   Borde grueso (4px) y relleno CLARO: así son las piezas de las capturas,
+   fichas macizas sobre el cian, no cajas oscuras. */
+.nodo-hex {
+  display: block;
+  width: 70px; height: 62px;
+  padding: 4px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: var(--nodo-borde, var(--ruta-borde));
+  filter: var(--nodo-brillo, drop-shadow(0 3px 0 rgba(9, 52, 78, .45)));
+  transition: transform var(--t-micro) var(--ease), filter var(--t-media) var(--ease);
+}
+.nodo-hex-int {
+  position: relative;    /* ancla a .nodo-escudo, que se posiciona en absoluto contra este hueco */
+  display: grid;
+  place-items: center;
+  width: 100%; height: 100%;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* brillo arriba: da el volumen de ficha que tienen las piezas del original */
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--nodo-fondo, var(--ruta-pieza)) 55%,
+              color-mix(in srgb, var(--nodo-fondo, var(--ruta-pieza)) 86%, var(--ruta-cian-hondo)) 100%);
+  color: var(--nodo-tinta, var(--ruta-tinta));
+  font-size: 26px;
+}
+
+/* Escudo del rival dentro de la ficha hexagonal. El clip-path de
+   .nodo-hex-int (mismo hexágono) ya recorta cualquier contenido suyo, así
+   que el escudo no puede salirse del hueco aunque su imagen no sea
+   perfectamente hexagonal.
+
+   `position: absolute; inset: 6px` en vez de `width/height: 100%` sueltos:
+   .nodo-hex-int es una fila de grid AUTO (sin alto propio, lo hereda de su
+   padre), así que un `height: 100%` en un hijo de grid no tenía contra qué
+   resolverse y el navegador lo sustituía por el alto intrínseco de la
+   imagen — la hacía más alta que el hueco real y quedaba descentrada hacia
+   abajo. En absoluto, `inset` sí resuelve siempre contra el hueco (mismo
+   criterio que usa `.carta-arte` contra `.carta-placa`, que sí es
+   `position: relative` con alto explícito). `contain`, nunca `cover`, para
+   que se vea el escudo entero. */
+.nodo-escudo {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  object-fit: contain;
+}
+
+/* Sello de rango: disco dorado en la esquina con borde oscuro y sombra dura,
+   exactamente como marca el rango el mapa de rutas de la DS. */
+.nodo-sello {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ruta-borde);
+  background: var(--rango-color, var(--ruta-oro));
+  color: #3A2600;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);   /* sombra dura, sin desenfoque */
+}
+/* En el mapa los tres rangos van en oro, como en el original; la letra es la
+   que los distingue. El color por rango se reserva al sello grande del
+   resultado, donde sí hay sitio para leerlo. */
+.nodo-sello.rango-s { background: var(--ruta-oro); }
+.nodo-sello.rango-a { background: #E4E9EE; }
+.nodo-sello.rango-b { background: #C79A6B; }
+
+.nodo-nombre {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(18, 64, 92, .82);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .07em;
+  text-transform: uppercase;   /* rotulación de mapa, no texto de web */
+  line-height: 1.25;
+  text-align: center;
+  color: #EAF7FD;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Casilla de salida, como el "Inicio" rojo del mapa de la DS. */
+.nodo.es-inicio .nodo-pieza::after {
+  content: 'INICIO';
+  position: absolute;
+  left: 50%; top: -11px;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--ruta-borde);
+  background: #E33B2E;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  letter-spacing: .08em;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);
+}
+
+/* Los estados se distinguen por icono ADEMÁS de por color (candado, espada,
+   cofre, sello de rango), así que no dependen de percibir el matiz. */
+/* El nodo bloqueado se apaga con un relleno grisáceo, NO con opacity: bajar la
+   opacidad lo mezclaba con el cian del fondo y el candado se quedaba en 3,04:1
+   de contraste, justo en el límite. Con relleno propio el icono se lee bien y
+   la pieza sigue viéndose claramente apagada. */
+.nodo.es-bloqueado {
+  --nodo-borde: #2C6E8E;
+  --nodo-fondo: #9FB4BF;
+  --nodo-tinta: #22414F;
+  --nodo-brillo: drop-shadow(0 3px 0 rgba(9, 52, 78, .35));
+}
+
+.nodo.es-disponible {
+  --nodo-borde: var(--ruta-oro);
+  --nodo-fondo: #FFF6DE;
+  --nodo-tinta: #7A4B00;
+}
+.nodo.es-superado {
+  --nodo-borde: var(--ruta-borde);
+  --nodo-fondo: var(--ruta-pieza);
+  --nodo-tinta: var(--ruta-tinta);
+}
+/* EL CONTROL DE PASO (`045`). Un bloqueo sin cumplir sale como `es-disponible`
+   —se puede pinchar para ver qué pide—, pero con el oro y el latido de los
+   nodos jugables diría justo lo contrario de lo que hace: invitaría a jugarlo.
+   Rojo y quieto, que es lo que significa un STOP. Una vez cumplido cae en
+   `es-superado` y se pinta como cualquier otro nodo pasado. */
+.nodo--bloqueo.es-disponible {
+  --nodo-borde: #B3352E;
+  --nodo-fondo: #FFE1DE;
+  --nodo-tinta: #8A2019;
+}
+.nodo--bloqueo.es-disponible .nodo-hex { animation: none; }
+
+.nodo.es-elegido {
+  --nodo-borde: #FFFFFF;
+  --nodo-brillo: drop-shadow(0 0 9px rgba(255, 255, 255, .95)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45));
+}
+.nodo.es-elegido .nodo-hex { transform: scale(1.12); }
+
+a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
+
+/* Latido del nodo que toca jugar: es el "aquí estás" de los mapas de la saga.
+   Solo lo lleva el disponible sin elegir, para que no compitan dos cosas
+   parpadeando a la vez. */
+.nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: nodoLatido 1.9s var(--ease) infinite; }
+@keyframes nodoLatido {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 201, 51, .65)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(255, 201, 51, 1))  drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+}
+
+:root[data-motion="reduce"] .nodo-hex,
+:root[data-motion="reduce"] a.nodo-boton:hover .nodo-hex,
+:root[data-motion="reduce"] .nodo.es-elegido .nodo-hex { transition: none; }
+:root[data-motion="reduce"] .nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: none; }
+
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- lista de cadenas ---- */
+.lista-cadenas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+.cadena-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.cadena-tarjeta.es-bloqueada { opacity: .72; }
+.cadena-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cadena-pie { margin-top: auto; }
+
+.lista-requisitos { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-3) 0; }
+.lista-requisitos li { display: flex; align-items: center; gap: var(--space-2); color: var(--frost-dim); }
+
+/* Requisito de un CONTROL DE PASO (`045`), que además del texto lleva barra.
+   Se apoya en .lista-requisitos —es la misma lista de "lo que te falta"— y solo
+   añade lo que el de cadena no tiene: el progreso. */
+.requisito-cuerpo { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.requisito-texto  { display: block; }
+.requisito-barra {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--frost-dim) 25%, transparent);
+  overflow: hidden;
+}
+.requisito-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--amber);
+}
+
+/* ---- recompensas de un partido/cofre de cadena ---- */
+.lista-recompensas { display: flex; flex-direction: column; gap: var(--space-2); }
+.lista-recompensas li { display: flex; align-items: center; gap: var(--space-2); }
+.lista-recompensas .ph-fill.ph-coins { color: var(--amber); }
+.lista-recompensas .ph-fill.ph-seal-star { color: var(--rz5); }
+
+/* ---- selector de dificultad de una cadena ---- */
+.dificultades {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+.dificultad {
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  border-left: 3px solid var(--dif-color, var(--line-strong));
+}
+.dificultad-nombre { font-weight: var(--fw-semibold); }
+.dificultad-nota { font-size: var(--fs-caption-sm); color: var(--frost-dim); }
+
+/* La dificultad se lee en el texto; el color solo acompaña. */
+.dificultad--facil       { --dif-color: var(--success); }
+.dificultad--medio       { --dif-color: var(--info); }
+.dificultad--dificil     { --dif-color: var(--warning); }
+.dificultad--muy_dificil { --dif-color: var(--amber); }
+.dificultad--extremo     { --dif-color: var(--danger); }
+
+/* ---- desglose por líneas ---- */
+.partido-lineas {
+  max-width: 460px;
+  margin: 0 auto var(--space-7);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.partido-lineas-cab,
+.partido-linea {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+.partido-lineas-cab {
+  background: var(--panel);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--frost-dim);
+}
+.partido-lineas-cab span:last-child { text-align: right; }
+.partido-linea { border-top: 1px solid var(--line); }
+.partido-linea span {
+  text-align: center;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.partido-linea b { color: var(--frost-dim); }
+.partido-linea b:last-child { text-align: right; }
+/* el lado que ganó esa línea: se marca con color Y con peso, para no depender
+   solo del color */
+.partido-linea b.es-mejor { color: var(--amber-light); font-weight: var(--fw-bold); }
+.partido-linea.es-total { background: var(--panel); }
+.partido-linea.es-total b { color: var(--frost); }
+
+.partido-alineaciones {
+  display: grid;
+  gap: var(--space-7);
+}
+@media (min-width: 900px) {
+  .partido-alineaciones { grid-template-columns: 1fr 1fr; }
+}
+.partido-alineaciones h2 { margin-bottom: var(--space-3); }
+
+/* lo que aportó cada carta en su hueco, bajo la propia carta */
+.carta-aporte {
+  display: block;
+  text-align: center;
+  font-size: var(--fs-caption-sm);
+  color: var(--frost-dim);
+}
+.carta-aporte b { color: var(--frost); }
+
+.carta-grid--compacta { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
+/* --------------------------------------------------------------------------
+   SIMULACIÓN DEL PARTIDO
+   Ceremonia exclusiva de duelo: reloj + goles que aparecen, nunca ruleta ni
+   tragaperras. El marcador y la barra reutilizan .partido-marcador y
+   .progreso ya existentes; aquí solo lo que es nuevo de verdad.
+   -------------------------------------------------------------------------- */
+.simulacion-cuerpo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-2);
+  overflow: hidden;
+  /* Alto mínimo para que el minijuego, que se superpone con `inset: 0`, tenga
+     una caja contra la que centrarse desde el primer evento: sin esto, en los
+     primeros segundos el cuerpo mide lo que mide el marcador y la decisión
+     salía comprimida en una franja. */
+  min-height: 340px;
+}
+.simulacion-cuerpo .linea-campo { opacity: .5; }
+.simulacion-cuerpo .partido-marcador { position: relative; z-index: 1; margin-bottom: 0; }
+
+.simulacion-reloj {
+  position: relative;
+  z-index: 1;
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  color: var(--frost-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.simulacion-barra { position: relative; z-index: 1; width: 100%; max-width: 360px; }
+
+/* El MODO CLÁSICO vivía aquí: reloj y una insignia de gol que aparecía y se
+   iba, para las cadenas. Se retiró con él en el §15.12 —.simulacion-eventos,
+   .simulacion-evento y su @keyframes— cuando el partido pasó a decidir también
+   en PvE y dejó de haber un marcador previo que dramatizar. */
+
+/* ==========================================================================
+   MODO NARRADO — el del PARTIDO, en duelos PvP y en cadenas (Biblia §1).
+   ========================================================================== */
+
+/* --- MOMENTUM (Biblia §1.4) ---
+   Barra simétrica: el centro es el equilibrio y la aguja se desplaza hacia
+   quien está generando las ocasiones. Indicador de LECTURA, no toca ningún
+   cálculo del duelo. */
+.sim-momentum {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.sim-momentum-riel {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--danger) 45%, transparent),
+    var(--line) 46% 54%,
+    color-mix(in srgb, var(--amber) 55%, transparent));
+}
+.sim-momentum-aguja {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--frost);
+  box-shadow: 0 0 10px rgba(0, 0, 0, .7);
+  /* el centrado va en el propio transform, así que "left" es la única
+     propiedad que anima: mover translateX aquí lo descentraría */
+  transform: translate(-50%, -50%);
+  transition: left var(--t-media) var(--ease), background var(--t-micro) var(--ease);
+}
+.sim-momentum-aguja.es-mio { background: var(--amber-light); }
+.sim-momentum-etiqueta {
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+
+/* --- EL RELATO ---
+   Alto FIJO para las últimas líneas: si creciera con el contenido, cada
+   evento nuevo empujaría el modal entero y el marcador daría saltos. */
+.sim-relato {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.sim-linea {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+  animation: simLinea var(--t-media) var(--ease) both;
+}
+.sim-linea-min {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
+  color: var(--frost-dim);
+  opacity: .7;
+}
+.sim-linea.es-hito { color: var(--frost-dim); font-style: italic; opacity: .75; }
+.sim-linea.es-gol-mio {
+  color: var(--amber-light);
+  font-weight: var(--fw-semibold);
+}
+.sim-linea.es-gol-suyo {
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}
+@keyframes simLinea {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- MINIJUEGO (§2) ---
+   El partido se para aquí. `:not([hidden])` es obligatorio, como en el resto
+   de esta pantalla: una regla de display de autor le gana siempre al [hidden]
+   del navegador, y el panel se quedaría visible todo el partido. */
+.sim-minijuego:not([hidden]) {
+  /* ⚠️ EL MINIJUEGO SE PONE DELANTE, NO AL FINAL DE LA PÁGINA.
+     Antes era un bloque más del cuerpo, detrás del relato: con unas cuantas
+     jugadas narradas quedaba por debajo del corte y había que hacer scroll
+     para verlo... con el reloj de decisión corriendo. Quien no lo encontraba a
+     tiempo se comía la opción segura sin saber que le habían preguntado.
+     Ahora tapa el panel entero: es lo único que importa mientras dure. */
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  width: 100%;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border: 0;
+  border-radius: inherit;
+  /* Velo propio: el partido se sigue intuyendo detrás —el marcador, el
+     minuto— pero apagado, para que la vista vaya a la decisión. */
+  background:
+    radial-gradient(70% 60% at 50% 45%, rgba(232, 117, 42, .10), transparent 70%),
+    rgba(11, 12, 16, .93);
+  animation: simLinea var(--t-media) var(--ease) both;
+}
+/* El contenido del minijuego se centra en una columna estrecha aunque el velo
+   ocupe todo: leer un enunciado a 900 px de ancho es peor, no mejor. */
+.sim-minijuego:not([hidden]) > * { width: 100%; max-width: 440px; }
+
+/* Si el panel es MUY bajo (móvil apaisado), el minijuego puede desplazarse por
+   dentro sin arrastrar la página. */
+@media (max-height: 560px) {
+  .sim-minijuego:not([hidden]) {
+    justify-content: flex-start;
+    overflow-y: auto;
+  }
+}
+.sim-mj-titulo {
+  margin: 0;
+  font-size: var(--fs-caption);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--amber-light);
+}
+.sim-mj-enunciado {
+  margin: 0;
+  text-align: center;
+  /* Es LA pregunta, y se contesta contra reloj: se lee de un vistazo o no se
+     lee. Antes iba al tamaño del cuerpo, igual que una línea de relato. */
+  font-size: var(--fs-h3);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-bold);
+  color: var(--frost);
+  text-wrap: balance;
+}
+/* reloj de decisión: la barra se vacía (§3.4 pide que la urgencia se VEA) y el
+   número lleva la cuenta. El número no es redundante: con "reducir movimiento"
+   la barra no se anima, así que sin él esa preferencia dejaría al jugador
+   decidiendo sin saber cuánto le queda. */
+.sim-mj-tiempo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.sim-mj-segundos {
+  flex-shrink: 0;
+  min-width: 3ch;
+  text-align: right;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  font-variant-numeric: tabular-nums;
+}
+.sim-mj-reloj {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+.sim-mj-reloj-relleno {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--amber);
+  transform-origin: left center;
+}
+/* `:not([hidden])` obligatorio: el medidor y los botones se alternan desde JS
+   con la propiedad `hidden`, y una regla de display de autor le gana siempre.
+   Sin esto se verían los dos a la vez y parecería que el JS no se ejecuta —
+   la misma trampa que ya mordió en cinco sitios más del proyecto. */
+.sim-mj-opciones:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.sim-mj-opcion {
+  flex: 1 1 150px;
+  /* 56 y no 44: se pulsa con prisa y con el pulgar. El mínimo táctil es el
+     suelo, no el objetivo, y aquí fallar el botón cuesta el partido. */
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--panel), var(--void-2));
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--t-micro) var(--ease),
+              background var(--t-micro) var(--ease),
+              transform var(--t-micro) var(--ease);
+}
+.sim-mj-opcion:hover:not(:disabled) {
+  border-color: var(--amber);
+  border-top-color: var(--amber);
+  background: linear-gradient(180deg, var(--amber-soft), var(--void-2));
+  transform: translateY(-2px);
+}
+.sim-mj-opcion:active:not(:disabled) { transform: none; }
+.sim-mj-opcion:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-opcion:disabled { opacity: .45; cursor: default; }
+.sim-mj-opcion b { display: block; font-weight: var(--fw-semibold); }
+.sim-mj-opcion span {
+  display: block;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  margin-top: 2px;
+}
+/* --- MEDIDOR (Biblia §2.1, segunda primitiva) ---
+   La aguja recorre las tres zonas en bucle y el jugador la detiene: la zona
+   donde para ES la opción elegida, así que el ciclo cerrado, la pista y la
+   opción segura del catálogo siguen valiendo sin tocar nada del servidor.
+
+   La zona del MEDIO se cruza dos veces por ciclo, así que es la más fácil de
+   acertar; por eso las entradas de medidor colocan ahí la opción segura y
+   nunca la de más premio. Es §1.5 regla 4 llevada a la ejecución: fallar el
+   pulso te deja en lo conservador, no en lo arriesgado. */
+.sim-mj-medidor:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+/* `min-height`, NUNCA `height`. Con altura fija más el `overflow: hidden` que
+   recorta la aguja en los bordes, la pista de cada zona se cortaba por abajo: el
+   nombre y su pista no caben en 62 px cuando la columna mide un tercio del panel,
+   y en móvil la pista pasa a tres líneas y desaparece media frase. Medido: hacían
+   falta 63 px de 60 disponibles ya en escritorio. */
+.sim-mj-pista {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--void-2);
+  overflow: hidden;
+}
+.sim-mj-zona {
+  flex: 1 1 0;
+  min-width: 0;              /* que se recorte el texto, no las zonas */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: var(--space-1);
+  text-align: center;
+  border-right: 1px solid var(--line);
+  transition: background var(--t-micro) var(--ease);
+}
+.sim-mj-zona:last-child { border-right: 0; }
+.sim-mj-zona b {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--frost);
+}
+.sim-mj-zona span {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.sim-mj-zona.es-viva { background: var(--amber-soft); }
+.sim-mj-aguja {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  margin-left: -1.5px;       /* centrada en su posición, no a su derecha */
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber);
+}
+.sim-mj-parar {
+  width: 100%;
+  min-height: 44px;          /* objetivo táctil (§7) */
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.sim-mj-parar:hover:not(:disabled) { background: var(--amber); color: var(--amber-ink); }
+.sim-mj-parar:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-parar:disabled { opacity: .45; cursor: default; }
+
+/* --- CLIC-EN-ZONA (Biblia §2.1, primera primitiva) ---
+   Las opciones van colocadas sobre un mapa. Los nombres de las áreas de la
+   rejilla son LITERALMENTE los huecos de Tcg::LIENZOS_ZONA: el JS pone
+   `grid-area` con el valor que manda el servidor, así que un hueco que no esté
+   en la plantilla de su lienzo se auto-coloca y descuadra el mapa sin dar
+   error. El verificador comprueba que no pase. */
+.sim-mj-zonas:not([hidden]) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.sim-mj-lienzo {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  max-width: 400px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+/* El marco de la portería visto de frente: postes y travesaño con el borde.
+
+   Filas con MÍNIMO y crecimiento, nunca `aspect-ratio`. La proporción fija
+   calculaba la altura a partir del ancho, y en móvil las celdas recortaban el
+   texto: medido, 105 px necesarios de 84 disponibles a 375 px de ventana. Así el
+   mapa conserva su forma en pantalla ancha (las filas se quedan en su mínimo) y
+   crece solo cuando la pista de una opción ocupa más líneas. Mismo fallo que
+   tenía el medidor con `height` fija. */
+.sim-mj-lienzo.es-porteria {
+  grid-template-rows: repeat(2, minmax(96px, auto));
+  border: 3px solid var(--frost-dim);
+  border-bottom-width: 1px;              /* la línea de gol se insinúa */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    repeating-linear-gradient(0deg,  transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    var(--void-2);
+  grid-template-areas:
+    "escuadra_izq centro_alto escuadra_der"
+    "raso_izq     centro_bajo raso_der";
+}
+/* El área vista desde arriba, con la frontal por detrás del punto de penalti. */
+.sim-mj-lienzo.es-area {
+  grid-template-rows: repeat(2, minmax(92px, auto));   /* ver la nota de es-porteria */
+  border: 2px solid color-mix(in srgb, var(--frost) 45%, transparent);
+  border-top-width: 3px;                 /* la línea de gol, arriba */
+  background: color-mix(in srgb, var(--success) 7%, var(--void-2));
+  grid-template-areas:
+    "primer_palo punto_penalti segundo_palo"
+    ".           frontal       .";
+}
+/* El último tercio visto desde arriba: bandas y centro. */
+.sim-mj-lienzo.es-campo {
+  grid-template-rows: minmax(190px, auto);             /* ver la nota de es-porteria */
+  border: 2px solid color-mix(in srgb, var(--frost) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, var(--void-2));
+  grid-template-areas: "banda_izq centro banda_der";
+}
+.sim-mj-zona-btn {
+  min-height: 44px;                      /* objetivo táctil (§7) */
+  padding: var(--space-1);
+  border: 1px dashed color-mix(in srgb, var(--frost) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--void) 55%, transparent);
+  color: var(--frost);
+  font: inherit;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+}
+.sim-mj-zona-btn b {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+}
+.sim-mj-zona-btn span {
+  display: block;
+  margin-top: 2px;
+  color: var(--frost-dim);
+}
+.sim-mj-zona-btn:hover:not(:disabled) { border-color: var(--amber); background: var(--amber-soft); }
+.sim-mj-zona-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.sim-mj-zona-btn:disabled { opacity: .45; cursor: default; }
+
+/* --- LA TANDA DE PENALTIS (§15.11) ---
+   La portería partida en cuatro. Reutiliza .sim-mj-zona-btn a propósito: es el
+   mismo gesto que el clic-en-zona de los minijuegos y aprendido una vez vale
+   para los dos.
+
+   `repeat(2, minmax(...))` y NUNCA aspect-ratio ni height fija: es la trampa del
+   §8 que ya recortó el texto del medidor una vez. */
+.sim-mj-lienzo.es-porteria4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(84px, auto));
+  border: 3px solid var(--frost-dim);
+  border-bottom-width: 1px;              /* la línea de gol se insinúa */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    repeating-linear-gradient(0deg,  transparent 0 11px, color-mix(in srgb, var(--frost) 7%, transparent) 11px 12px),
+    var(--void-2);
+  grid-template-areas:
+    "arriba_izq arriba_der"
+    "abajo_izq  abajo_der";
+  margin: 0 auto var(--space-3);
+}
+
+/* Un display normal ganaría a [hidden]; de ahí el :not(). Misma trampa del §8. */
+.sim-tanda:not([hidden]) {
+  display: block;
+  text-align: center;
+}
+.sim-tanda-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+.sim-tanda-cab b { font-size: var(--fs-h3); color: var(--frost); }
+.sim-tanda-orden {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--frost);
+}
+.sim-tanda-reloj {
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+}
+/* El historial: un punto por tiro, para leer la tanda de un vistazo. */
+.sim-tanda-historial {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sim-tanda-historial li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--void-2);
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+}
+.sim-tanda-historial li.es-gol   { color: var(--success); }
+.sim-tanda-historial li.es-parada { color: var(--frost-dim); }
+.sim-tanda-historial li.es-mio   { border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent); }
+
+/* --- ARRASTRE (Biblia §2.2, Familia DS) ---
+   Se arrastra desde el balón; el ángulo cae en uno de tres sectores. Los botones
+   de opción siguen visibles a la vez, por WCAG 2.2 SC 2.5.7. */
+.sim-mj-arrastre:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+}
+.sim-mj-lona {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 2 / 1.15;
+  border: 2px solid color-mix(in srgb, var(--frost) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background:
+    /* los tres sectores, insinuados desde el balón */
+    conic-gradient(from 215deg at 50% 100%,
+      color-mix(in srgb, var(--amber) 9%, transparent) 0 40deg,
+      transparent 40deg 50deg,
+      color-mix(in srgb, var(--amber) 9%, transparent) 50deg 90deg,
+      transparent 90deg 100deg,
+      color-mix(in srgb, var(--amber) 9%, transparent) 100deg 140deg,
+      transparent 140deg),
+    color-mix(in srgb, var(--success) 7%, var(--void-2));
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;          /* sin esto el navegador se lleva el gesto al scroll */
+}
+.sim-mj-lona.esta-arrastrando { cursor: grabbing; }
+.sim-mj-balon {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--frost);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--frost) 60%, transparent);
+}
+/* La guía se dibuja como una línea que nace en el balón y gira con el gesto. */
+.sim-mj-guia {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 3px;
+  height: 0;
+  margin-left: -1.5px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(to top, var(--amber), transparent);
+  pointer-events: none;
+}
+.sim-mj-sector-nombre {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  color: var(--amber-light);
+  pointer-events: none;
+}
+.sim-mj-arrastre-ayuda {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  text-align: center;
+}
+:root[data-motion="reduce"] .sim-mj-guia { transition: none; }
+
+.sim-mj-resultado:not([hidden]) {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+}
+.sim-mj-resultado.es-acierto { color: var(--success); }
+.sim-mj-resultado.es-fallo   { color: var(--danger); }
+.sim-mj-resultado.es-neutro  { color: var(--frost-dim); }
+
+:root[data-motion="reduce"] .sim-minijuego:not([hidden]) { animation: none; }
+:root[data-motion="reduce"] .sim-mj-reloj-relleno { transition: none; }
+/* Con movimiento reducido el medidor no se ofrece: duelo.js cae a los botones,
+   porque una aguja que hay que cazar ES movimiento y sin ella no hay juego que
+   jugar. Esta regla es el cinturón por si alguna vez se pintara igual. */
+:root[data-motion="reduce"] .sim-mj-zona { transition: none; }
+
+/* Las estadísticas en vivo (§1.4) se retiraron del partido por decisión de
+   Alejandro: durante el encuentro compiten con el relato y el momentum, que es
+   lo que se está mirando. El motor las sigue calculando y el sondeo las sigue
+   enviando en d.stats, así que recuperarlas —en la pantalla de resultado, por
+   ejemplo— es escribir el marcado, no rehacer nada. */
+
+/* con movimiento reducido el partido SÍ se ve y se juega; lo que se apaga son
+   las animaciones */
+:root[data-motion="reduce"] .sim-linea { animation: none; }
+:root[data-motion="reduce"] .sim-momentum-aguja { transition: none; }
+
+/* entrada del marcador al llegar recién resuelto */
+.partido.es-revelando .partido-marcador,
+.partido.es-revelando .partido-veredicto {
+  animation: entradaMarcador var(--t-ceremonia) var(--ease) both;
+}
+@keyframes entradaMarcador {
+  from { opacity: 0; transform: translateY(10px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* select pequeño dentro de una fila de tabla */
+.campo-inline {
+  max-width: 160px;
+  margin-right: var(--space-2);
+  padding: 6px var(--space-2);
+  font-size: var(--fs-body-sm);
+}
+
+/* --------------------------------------------------------------------------
+   PERFIL
+   -------------------------------------------------------------------------- */
+.perfil-cabecera {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+.perfil-cabecera h1 { font-size: var(--fs-h2); }
+
+/* --------------------------------------------------------------------------
+   AJUSTES (configuración)
+   -------------------------------------------------------------------------- */
+.ajustes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.ajustes-foto { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); }
+
+/* --------------------------------------------------------------------------
+   BARRA DE FILTROS HORIZONTAL (mercado)
+   -------------------------------------------------------------------------- */
+.barra-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+@media (min-width: 768px) {
+  .barra-filtros { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+}
+.barra-filtros-acciones { display: flex; gap: var(--space-2); }
+
+/* --------------------------------------------------------------------------
+   PIE
+   -------------------------------------------------------------------------- */
+.pie {
+  margin-top: var(--space-8);
+  padding-block: var(--space-7) var(--space-5);
+  border-top: 1px solid var(--line);
+  background: var(--void-2);
+}
+.pie-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+@media (min-width: 768px) {
+  .pie-grid { grid-template-columns: 2fr 1fr 1fr; gap: var(--space-7); }
+}
+
+.pie-col h2 { margin-bottom: var(--space-3); color: var(--frost); }
+.pie-col ul { list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.pie-col a {
+  /* el relleno vertical lleva el objetivo táctil por encima del mínimo de
+     24×24 (WCAG 2.2 SC 2.5.8); sin él estos enlaces medían 20px de alto */
+  display: inline-block;
+  padding-block: var(--space-2);
+  font-size: var(--fs-body-sm);
+  color: var(--frost-dim);
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease);
+}
+.pie-col a:hover { color: var(--frost); text-decoration: underline; }
+
+.pie-redes { display: flex; gap: var(--space-3); }
+.pie-redes a {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--frost-dim);
+  font-size: 18px;
+  text-decoration: none;
+  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+}
+.pie-redes a:hover { color: var(--frost); border-color: var(--amber-line); }
+
+/* el aviso legal aparece en TODAS las páginas, no solo en la portada */
+.pie-legal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.pie-legal p { line-height: 1.5; }
+
+/* ==========================================================================
+   MISIONES (misiones.php) — las pestañas (diarias/semanales/objetivos) son
+   `.tabs`/`.tab-panel` del sistema real (perfil.php ya las usa igual); las
+   tarjetas son `.panel`, `.pastilla` y `.progreso`. Lo único propio de esta
+   página es la insignia de cuenta atrás.
+   ========================================================================== */
+.mision-cuenta-atras {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--frost-dim);
+  font-size: var(--fs-caption-sm);
+}
+.mision-cuenta-atras .ph-hourglass { color: var(--amber-light); }
+.mision-cuenta-atras-valor { color: var(--frost); }
+
+/* --------------------------------------------------------------------------
+   DIFICULTADES DE TODA LA CADENA (editor de nodos, migración `043`)
+
+   Una fila por dificultad con su interruptor y, al lado, en cuántos partidos
+   está encendida. Ese contador no es decoración: el estado puede estar A
+   MEDIAS —alguien apagó el Extremo solo en dos nodos— y un interruptor que
+   dijera "encendido" sobre siete de nueve estaría mintiendo.
+   -------------------------------------------------------------------------- */
+.dificultades-cadena {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.dificultad-cadena {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--void-2);
+  cursor: pointer;
+}
+.dificultad-cadena:hover { border-color: var(--line-strong); }
+.dificultad-cadena-nombre { flex: 1; font-weight: var(--fw-semibold); }

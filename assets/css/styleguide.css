@@ -1,0 +1,75 @@
+/* ==========================================================================
+   Estilos exclusivos de la guía de estilo (styleguide.php).
+   No forman parte del sistema: solo maquetan la documentación.
+   ========================================================================== */
+
+.sg-sub {
+  margin: var(--space-6) 0 var(--space-4);
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+.sg-sub:first-of-type { margin-top: 0; }
+
+.sg-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+.sg-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+.sg-muestra {
+  height: 56px;
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.sg-swatch b { font-size: var(--fs-caption); }
+
+.sg-caso { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.sg-fila-cartas {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.sg-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+}
+@media (min-width: 768px) { .sg-form { grid-template-columns: 1fr 1fr; } }
+
+.sg-dos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (min-width: 900px) { .sg-dos { grid-template-columns: 1fr 1fr; } }
+
+.sg-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.sg-sub + .carta-grid, .sg-sub + .sg-fila-cartas { margin-bottom: var(--space-6); }
+
+code.mono {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .07);
+  font-size: .9em;
+}

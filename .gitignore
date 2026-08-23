@@ -1,0 +1,7 @@
+.superpowers/
+assets/img/Cromos/Importados/
+ionos/db/conexion.php
+
+
+# Conexión local de desarrollo: nunca debe subirse
+db/conexion.local.php
