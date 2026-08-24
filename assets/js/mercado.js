@@ -16,6 +16,17 @@
   function pedirConfirmacion(form) {
     formPendiente = form;
     texto.textContent = form.dataset.confirmar || '¿Confirmas esta acción?';
+
+    /* El modal es COMPARTIDO y SRF.confirmar() puede haberle dejado puesto un
+       botón extra y otro rótulo en el principal (los sobres lo usan para
+       "Abrir 1 / Abrir 10"). Esta vía no pasa por ahí, así que lo devuelve a
+       su estado de sí/no antes de enseñarlo. Hoy las dos pantallas no
+       coinciden nunca, pero depender de eso es cómo aparece un "Abrir 10" en
+       una compra del mercado el día que alguien las junte. */
+    if (btnSi) btnSi.textContent = 'Confirmar';
+    var extra = document.getElementById('confirmarExtra');
+    if (extra) extra.hidden = true;
+
     SRF.abrirModal(modal);
   }
 

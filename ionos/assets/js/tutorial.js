@@ -146,6 +146,7 @@
       velo.style.clipPath = '';
       foco.hidden = true;
       globo.classList.add('esta-centrado');
+      globo.classList.remove('es-arriba');
       globo.style.top = '';
       globo.style.left = '';
       globo.style.maxHeight = '';
@@ -166,7 +167,7 @@
         r.right <= 0 || r.left >= window.innerWidth) {
       velo.style.clipPath = '';
       foco.hidden = true;
-      globo.classList.remove('esta-centrado');
+      globo.classList.remove('esta-centrado', 'es-arriba');
       globo.style.maxHeight = '';
       if (esEstrecho()) { globo.style.top = ''; globo.style.left = ''; return; }
       globo.style.top = (window.innerHeight - globo.offsetHeight - 8) + 'px';
@@ -202,8 +203,26 @@
       // una medida anterior en horizontal, que si no se queda pegado.
       globo.style.top = '';
       globo.style.left = '';
+
+      /* ⚠️ LA HOJA SE SUBE ARRIBA SI TAPA LO QUE SEÑALA.
+         En móvil el globo es una hoja pegada abajo que ocupa hasta 46vh, y
+         `acercarObjetivo()` sube lo señalado bajo la barra de navegación. Eso
+         funciona MIENTRAS quede página por debajo para desplazar. Cuando lo
+         señalado está al final del documento —el botón "Usar como titular" al
+         pie de mazos, el de guardar, cualquier cosa del último bloque— el
+         scroll ya no puede bajar más, el objetivo se queda en la mitad
+         inferior y la hoja se le pone justo encima: el tutorial te pide que
+         pulses algo que él mismo está tapando, con el anillo y el hueco del
+         velo brillando debajo. Es el "no se muestra bien" de móvil.
+
+         Se mide de verdad —dónde ha quedado el objetivo contra dónde empieza
+         la hoja— en lugar de suponerlo, porque la altura del globo cambia con
+         el texto de cada paso. */
+      var arribaHoja = window.innerHeight - globo.offsetHeight - 12;
+      globo.classList.toggle('es-arriba', y + h > arribaHoja);
       return;
     }
+    globo.classList.remove('es-arriba');
 
     var alto = globo.offsetHeight || 200;
     var ancho = globo.offsetWidth || 320;

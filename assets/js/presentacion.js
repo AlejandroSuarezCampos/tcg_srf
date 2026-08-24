@@ -49,28 +49,27 @@
 
   /* Los tiempos, en un solo sitio. Con movimiento reducido se acortan además
      de quitarse el desplazamiento: un fundido no necesita lo mismo que una
-     entrada con rebote, y alargarlo solo hace esperar.
+     entrada con rebote, y alargarlo solo hace esperar. */
+  /* ⚠️ SE ALARGÓ LO QUE SE LEE, NO EL FLOREO.
+     Con los tiempos de antes la presentación entera duraba 7,4 s para dos
+     onces: no daba tiempo a leer el nombre del rival, su formación, sus cuatro
+     líneas y su aumento antes de que la pantalla pasara a lo siguiente.
 
-     ⚠️ TECHO DURO: LA INTRO NO PUEDE PASAR DE ~12 s (unos 7 de animación más
-     los 2,5 de precarga). El reloj del partido lo arma el primer sondeo, que
-     no se manda hasta que esto termina —así que la intro NO roba minutos—,
-     pero el servidor tiene una espera máxima (`partido_espera_seg`, 15 s por
-     defecto) tras la cual arranca el reloj haya quien haya. Una intro más
-     larga que esa espera empezaría a comerse el partido de verdad. Si algún
-     día se alarga, hay que subir también esa configuración. */
+     Lo que se sube es la ficha de cada equipo (`bloque`), el desgrane de sus
+     líneas (`linea`) y sobre todo la PAUSA ENTRE LOS DOS EQUIPOS
+     (`entreEquipos`), que es donde se termina de leer al primero. El VS y el
+     "comienza el partido" se quedan casi igual: son la parte más vistosa y la
+     que menos información lleva, y es la que se hacía larga a la décima vez.
+
+     ⚠️ EL TECHO SIGUE SIENDO `partido_espera_seg` (15 s por defecto, ajustable
+        desde el panel): pasado ese tiempo el servidor arranca el reloj haya
+        quien haya mirando, así que una intro más larga se comería minutos del
+        partido de verdad. Con estos números ronda los 11 s y queda margen. Si
+        se vuelve a alargar, hay que subir también esa configuración. */
   var T = quieto
-    ? { entrada: .22, bloque: .16, linea: .09, entreEquipos: .16, vs: .38, arranque: .38, cierre: .18 }
-    : { entrada: .35, bloque: .30, linea: .16, entreEquipos: .22, vs: .55, arranque: .55, cierre: .25 };
+    ? { entrada: .28, bloque: .24, linea: .14, entreEquipos: .40, vs: .40, arranque: .40, cierre: .20 }
+    : { entrada: .45, bloque: .45, linea: .26, entreEquipos: .55, vs: .60, arranque: .60, cierre: .30 };
 
-  /* Medido con un once por lado (cuatro líneas): 7,4 s de principio a fin, con
-     el reparto que pedía el encargo —local hasta el segundo 3, visitante hasta
-     el 6, enfrentamiento y pitido—. Con menos líneas sale sola más corta,
-     porque el coste por línea es el que es y no hay ningún relleno fijo.
-     Se recortó de 9,2 s quitando cola y solapando: el VS y el "comienza el
-     partido" son la parte más vistosa pero la que menos información lleva, y
-     es donde antes se hacía larga a la décima vez. Los 160 ms entre líneas se
-     mantienen: por debajo dejan de leerse como cuatro entradas y se ven como
-     una sola. */
 
   var STATS  = { ataque: 'Ataque', defensa: 'Defensa', tecnica: 'Técnica' };
   var EFECTO = {
@@ -360,7 +359,11 @@
          precarga y ahí no servía de nada: un atasco EN la precarga se lo
          saltaba entero y dejaba al jugador mirando una pantalla negra sin
          partido detrás. */
-      setTimeout(acabar, 15000);
+      /* 20 s y no 15: la intro pasó a durar ~11 s y la precarga puede sumar
+         2,5 más, así que el corte de seguridad de antes se le echaba encima y
+         podía cortar una presentación que iba bien. Sigue por debajo de lo que
+         espera el servidor (`partido_espera_seg`, subido a 22 en la 049). */
+      setTimeout(acabar, 20000);
 
       /* Las alineaciones ya vienen pintadas del servidor, con `render_carta()`
          (partials/presentacion_duelo.php): son las cartas de verdad, con su
