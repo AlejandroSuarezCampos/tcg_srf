@@ -47,6 +47,34 @@ def iconos_usados():
             # los que se construyen en JavaScript: 'ph-treasure-chest'
             for m in re.finditer(r"'ph-([a-z0-9-]+)'", t):
                 usados['regular'].add(m.group(1))
+
+    # ------------------------------------------------------------------
+    # TODOS LOS NOMBRES, EN TODOS LOS PESOS.
+    #
+    # Escanear el par «peso + nombre» no basta y por eso no se veían los
+    # iconos de Defensa y Técnica. El marcado que los pinta es:
+    #
+    #     <i class="ph-fill <?= $s['icono'] ?>">
+    #
+    # El nombre llega en una variable, así que el primer patrón —que busca
+    # `ph-fill` seguido de `ph-algo` LITERAL— no casa nunca, y el segundo
+    # recoge 'ph-shield' de la tabla de PHP pero lo apunta a `regular`. El
+    # resultado: `.ph-fill.ph-sword` sí se declaraba (aparece literal en otro
+    # sitio) y `.ph-fill.ph-shield` no, con la fuente `fill` reducida a diez
+    # glifos. Escudo y rayo salían en blanco.
+    #
+    # No se puede saber estáticamente con qué peso se va a pintar un nombre
+    # que vive en una variable, así que se deja de intentar: cada peso que el
+    # sitio usa se lleva la lista COMPLETA de nombres. Cuesta unos kilobytes
+    # —el subconjunto entero sigue estando quince veces por debajo de las tres
+    # hojas de unpkg— y a cambio no puede volver a pasar.
+    # ------------------------------------------------------------------
+    todos = set()
+    for nombres in usados.values():
+        todos |= nombres
+    for peso in usados:
+        usados[peso] = set(todos)
+
     return usados
 
 
