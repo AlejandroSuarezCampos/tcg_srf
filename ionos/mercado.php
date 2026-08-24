@@ -39,7 +39,23 @@ if ($esPostMutante && $_POST['accion'] === 'publicar') {
     if ($id_coleccion <= 0 || $precio <= 0) {
         $error = 'Elige una carta y un precio de al menos 1 moneda.';
     } elseif (!$db->publicarAnuncio($id_coleccion, $id_usuario, $precio)) {
-        $error = 'No se pudo publicar el anuncio. Comprueba que la carta sigue siendo tuya y que no está protegida.';
+        /* «No se pudo publicar» a secas deja al vendedor sin saber qué
+           arreglar, y desde que hay horquilla de precio el motivo más probable
+           es justo ese. Se vuelve a tasar la carta para poder decir el rango
+           exacto en vez de un no genérico. */
+        $cartaFallo = $db->cartaDeCopia($id_coleccion, $id_usuario);
+        if ($cartaFallo) {
+            $tasaFallo = $db->valorCarta($cartaFallo);
+            if ($precio < $tasaFallo['min'] || $precio > $tasaFallo['max']) {
+                $error = 'Ese precio se sale de lo que vale la carta. '
+                       . htmlspecialchars($cartaFallo['nombre']) . ' se puede publicar entre '
+                       . number_format($tasaFallo['min'], 0, ',', '.') . ' y '
+                       . number_format($tasaFallo['max'], 0, ',', '.') . ' monedas.';
+            }
+        }
+        if ($error === null || $error === '') {
+            $error = 'No se pudo publicar el anuncio. Comprueba que la carta sigue siendo tuya y que no está protegida.';
+        }
     } else {
         header('Location: mercado.php?ok=publicado');
         exit;
@@ -274,8 +290,16 @@ include __DIR__ . '/navbar.php';
             . '<input type="hidden" name="id_anuncio" value="' . (int) $a['id_anuncio'] . '">'
             . $boton . '</form>';
 
+        /* El nombre del vendedor lleva a su perfil. Es el sitio donde de verdad
+           da curiosidad saber quién es el que vende, y hasta ahora era texto
+           muerto. El propio no se enlaza: llevaría a `perfil.php`, que ya está
+           en la barra. */
         $vendedor = '<span class="carta-vendedor"><span class="avatar avatar--sm">' . htmlspecialchars($iniciales)
-            . '</span>Vende ' . htmlspecialchars($a['vendedor']) . '</span>';
+            . '</span>Vende ' . ($esTuyo
+                ? htmlspecialchars($a['vendedor'])
+                : '<a href="usuario.php?u=' . (int) $a['id_vendedor'] . '">'
+                  . htmlspecialchars($a['vendedor']) . '</a>')
+            . '</span>';
 
         if ($vista === 'lista') {
             $precioHtml = '<span class="carta-fila-precio">'
@@ -346,10 +370,19 @@ include __DIR__ . '/navbar.php';
         <div class="selector-cartas" id="v-lista" role="radiogroup" aria-label="Cartas disponibles para vender">
           <?php foreach ($porCromoVendible as $grupo): ?>
             <?php $c = $grupo['fila']; ?>
+            <?php /* La horquilla se calcula en el servidor y viaja con cada
+                     carta: así el precio se puede acotar y sugerir en cuanto
+                     se elige una, sin ir a preguntar. El servidor la vuelve a
+                     comprobar al publicar de todas formas — esto es ayuda para
+                     el vendedor, no la defensa. */
+                  $tasa = $db->valorCarta($c); ?>
             <label class="selector-item"
                    data-nombre="<?= htmlspecialchars($c['nombre']) ?>"
                    data-equipo="<?= htmlspecialchars($c['equipo']) ?>"
-                   data-rareza-nombre="<?= htmlspecialchars($c['rareza']) ?>">
+                   data-rareza-nombre="<?= htmlspecialchars($c['rareza']) ?>"
+                   data-precio-min="<?= (int) $tasa['min'] ?>"
+                   data-precio-max="<?= (int) $tasa['max'] ?>"
+                   data-precio-sug="<?= (int) $tasa['valor'] ?>">
               <input type="radio" name="seleccion_carta" class="sr-only"
                      value="<?= $c['id_coleccion'] ?>">
               <?php render_carta($c, ['tamano' => 'sm', 'cantidad' => $grupo['cantidad']]); ?>
@@ -363,7 +396,7 @@ include __DIR__ . '/navbar.php';
           <label for="v-precio">Precio en monedas</label>
           <input type="number" name="precio" id="v-precio" min="1" step="1" required
                  placeholder="250" aria-describedby="v-precio-hint">
-          <span class="campo-hint" id="v-precio-hint">Recibirás el importe completo cuando alguien la compre.</span>
+          <span class="campo-hint" id="v-precio-hint">Elige una carta y aquí saldrá entre qué precios se puede publicar.</span>
         </div>
 
         <p class="alerta alerta-danger" id="v-error" role="alert" hidden>

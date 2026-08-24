@@ -109,6 +109,8 @@
     var vacio   = lista.querySelector('.selector-vacio');
     var error   = document.getElementById('v-error');
     var items   = lista.querySelectorAll('.selector-item');
+    var precio  = document.getElementById('v-precio');
+    var pista   = document.getElementById('v-precio-hint');
     var total   = items.length;
 
     function textoConteo(n) {
@@ -128,6 +130,36 @@
 
       oculto.value = e.target.value;
       error.hidden = true;
+
+      /* LA HORQUILLA DE PRECIO DE ESA CARTA.
+
+         El servidor la manda con cada carta (`data-precio-*`) y la vuelve a
+         comprobar al publicar; esto es solo para que el vendedor no descubra
+         el rango a base de que le rechacen el anuncio. Se acota el `input` y
+         se sugiere la tasación, que es el precio al que la carta se vende
+         sola. */
+      var elegido = Array.prototype.filter.call(items, function (it) {
+        return it.contains(e.target);
+      })[0];
+      if (!elegido || !precio) return;
+
+      var min = parseInt(elegido.dataset.precioMin, 10);
+      var max = parseInt(elegido.dataset.precioMax, 10);
+      var sug = parseInt(elegido.dataset.precioSug, 10);
+      if (!isFinite(min) || !isFinite(max)) return;
+
+      precio.min = min;
+      precio.max = max;
+      precio.placeholder = sug;
+      // Solo se rellena si está vacío: si ya habías escrito un precio, pisarlo
+      // al cambiar de carta sería quitarte lo que acabas de decidir.
+      if (precio.value === '') { precio.value = sug; }
+
+      if (pista) {
+        pista.textContent = 'Entre ' + min.toLocaleString('es-ES') + ' y ' +
+          max.toLocaleString('es-ES') + ' monedas. Lo que suele valer: ' +
+          sug.toLocaleString('es-ES') + '.';
+      }
     });
 
     /* búsqueda */
