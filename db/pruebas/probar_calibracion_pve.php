@@ -15,8 +15,8 @@
  *   5. Calibrar en global escribe los cinco `pve_mult_*` y el porcentaje MEDIDO
  *      cae cerca del objetivo. Es la prueba de fuego: si esto falla, el panel
  *      está prometiendo un número que el juego no da.
- *   6. Los anclajes que fijó Alejandro: Extremo va del 7 % (preset más blando)
- *      al 1 % (preset más duro).
+ *   6. El ancla que fijó Alejandro: el preset `normal` baja de veinte en
+ *      veinte — 80 / 60 / 40 / 20 / 10 —, un número redondo por dificultad.
  *   7. Calibrar una cadena escribe un ajuste por nodo y dificultad, y los nodos
  *      sin alineación rival se REPORTAN en vez de calibrarse con ceros.
  */
@@ -95,13 +95,19 @@ empty($rompe)
 	? $ok("un preset más duro nunca deja ganar más en ninguna dificultad")
 	: $ko("presets no monótonos: " . implode("; ", $rompe));
 
-/* --- 6. Los anclajes de Alejandro ---------------------------------------- */
-abs(Tcg::PRESETS_PVE["mas_facil"]["extremo"] - 0.07) < 1e-9
-	? $ok("anclaje: en el preset más blando, Extremo es el 7 %")
-	: $ko("el anclaje del 7 % en Extremo se ha movido");
-abs(Tcg::PRESETS_PVE["extremo"]["extremo"] - 0.01) < 1e-9
-	? $ok("anclaje: en el preset más duro, Extremo es el 1 %")
-	: $ko("el anclaje del 1 % en Extremo se ha movido");
+/* --- 6. El ancla de Alejandro -------------------------------------------- */
+/* El preset `normal` es el que se juega por defecto y el que fija el tono de
+   toda la tabla: 80 / 60 / 40 / 20 / 10. Si alguien lo mueve sin querer, aquí
+   salta — los otros tres presets se colocan en relación a este. */
+$ancla = ["facil" => 0.80, "medio" => 0.60, "dificil" => 0.40,
+          "muy_dificil" => 0.20, "extremo" => 0.10];
+$anclaOk = true;
+foreach ($ancla as $dif => $esperado) {
+	if (abs(Tcg::PRESETS_PVE["normal"][$dif] - $esperado) > 1e-9) { $anclaOk = false; }
+}
+$anclaOk
+	? $ok("ancla: el preset normal es 80 / 60 / 40 / 20 / 10")
+	: $ko("el ancla del preset normal se ha movido");
 
 /* --- 5. Calibración global ------------------------------------------------ */
 $r = $db->calibrarPveGlobal("normal");
