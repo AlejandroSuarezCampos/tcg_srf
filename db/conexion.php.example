@@ -1,0 +1,23 @@
+<?php
+	include_once("consultas.php");
+
+	// Credenciales de la base de datos en IONOS.
+	//
+	// Este es un fichero de EJEMPLO — cópialo a "conexion.php" (sin .example)
+	// y rellena los 5 valores con los datos reales que te da IONOS al crear
+	// la base de datos MySQL (panel → Bases de datos → MySQL). El archivo
+	// real "conexion.php" está en .gitignore a propósito: nunca debe subirse
+	// a git porque lleva la contraseña de la base de datos de producción.
+	//
+	// Se leen de variables de entorno si tu hosting las soporta (Hosting
+	// Web IONOS con PHP permite definirlas en el panel, en "Configuración
+	// > PHP"); si no, sustituye directamente los valores por defecto de
+	// abajo por los tuyos.
+	$dbHost = getenv('TCG_DB_HOST') ?: 'dbXXXXXXXXX.hosting-data.io';
+	$dbPort = getenv('TCG_DB_PORT') ?: 3306;
+	$dbName = getenv('TCG_DB_NAME') ?: 'dbsXXXXXXXX';
+	$dbUser = getenv('TCG_DB_USER') ?: 'dbuXXXXXXXX';
+	$dbPass = getenv('TCG_DB_PASS') ?: 'tu-contraseña-real';
+
+	$db = new Tcg($dbHost, $dbPort, $dbName, $dbUser, $dbPass);
+?>

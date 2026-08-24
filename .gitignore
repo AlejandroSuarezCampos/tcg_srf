@@ -1,7 +1,23 @@
 .superpowers/
-assets/img/Cromos/Importados/
+# (Los cromos importados SÍ se suben: son material del proyecto y el
+#  repositorio hace también de copia de seguridad.)
 ionos/db/conexion.php
+
+# Credenciales de producción. NO se hashean: MySQL necesita la contraseña real
+# para autenticar, así que un hash —que es de una sola dirección— no serviría
+# para conectar. Lo único que funciona es que el archivo no viaje al repositorio.
+# `db/conexion.php.example` es la plantilla que sí se sube; se copia a
+# `conexion.php` y se rellena en cada máquina.
+db/conexion.php
 
 
 # Conexión local de desarrollo: nunca debe subirse
 db/conexion.local.php
+
+# Herramienta de desarrollo: inicia sesión como CUALQUIER usuario con ?u=N y
+# sin comprobar nada. En un servidor sería una puerta abierta a la cuenta
+# administradora, así que no sale de esta máquina.
+_tmp_sesion.php
+
+# Restos de pruebas
+_tut.txt
