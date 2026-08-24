@@ -28,6 +28,13 @@ if (!csrfValido($_POST['csrf'] ?? null)) {
     exit;
 }
 
+/* Se suelta el bloqueo de sesión: este endpoint solo LEE de ella. Ver la nota
+   larga en `duelo_narracion.php` — mientras un script la tiene abierta,
+   cualquier otra petición de la misma persona espera en su `session_start()`,
+   y esa cola es la que acababa en «Gateway Timeout». Si algún día hace falta
+   escribir en `$_SESSION` aquí, hay que quitar esta línea. */
+session_write_close();
+
 /* Convertir el catálogo entero de imágenes tarda segundos, no milisegundos:
    son cientos de archivos leídos, recomprimidos y escritos. Con el límite de
    30 s por defecto la tarea moría a media faena y dejaba media carpeta

@@ -29,6 +29,13 @@ if (!csrfValido($_POST['csrf'] ?? null)) {
     exit;
 }
 
+/* Se suelta el bloqueo de sesión: este endpoint solo LEE de ella. Ver la nota
+   larga en `duelo_narracion.php` — mientras un script la tiene abierta,
+   cualquier otra petición de la misma persona espera en su `session_start()`,
+   y esa cola es la que acababa en «Gateway Timeout». Si algún día hace falta
+   escribir en `$_SESSION` aquí, hay que quitar esta línea. */
+session_write_close();
+
 switch ($_POST['accion'] ?? '') {
 
     case 'crear_equipo':

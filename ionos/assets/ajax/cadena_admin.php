@@ -30,6 +30,13 @@ if (!csrfValido($_POST['csrf'] ?? null)) {
     exit;
 }
 
+/* Se suelta el bloqueo de sesión: este endpoint solo LEE de ella. Ver la nota
+   larga en `duelo_narracion.php` — mientras un script la tiene abierta,
+   cualquier otra petición de la misma persona espera en su `session_start()`,
+   y esa cola es la que acababa en «Gateway Timeout». Si algún día hace falta
+   escribir en `$_SESSION` aquí, hay que quitar esta línea. */
+session_write_close();
+
 // Escudo subido como archivo (crear_rival / actualizar_rival): gana al campo
 // de texto si viene, se guarda siempre en assets/img/Escudos/ (carpeta plana,
 // sin subcarpetas por expansión — un rival no pertenece a ninguna).

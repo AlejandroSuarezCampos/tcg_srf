@@ -29,7 +29,15 @@
     if (temporizador) { clearInterval(temporizador); temporizador = null; }
   }
 
+  /* `setInterval` NO espera a que termine la vuelta anterior: si una petición
+     tarda más que el intervalo, se solapan y la cola crece sola. Con la base de
+     datos en otra máquina eso pasa en cuanto hay un pico. El testigo hace que
+     un latido lento simplemente se salte el siguiente, en vez de acumularlos. */
+  var latiendo = false;
+
   async function latir() {
+    if (latiendo) return;
+    latiendo = true;
     try {
       var cuerpo = new FormData();
       cuerpo.append('id_duelo', idDuelo);
@@ -53,6 +61,8 @@
       /* un fallo puntual de red no debe matar la sala: el servidor aún tiene
          margen antes de darla por abandonada, así que se reintenta */
       console.error(err);
+    } finally {
+      latiendo = false;
     }
   }
 
@@ -129,7 +139,10 @@
 
   /* Sondeo aparte: si el rival termina antes de que venza el plazo, no hay que
      esperar a que el reloj llegue a cero para empezar el partido. */
+  var sondeando = false;
   var sondeo = setInterval(async function () {
+    if (sondeando) return;   // mismo motivo que el latido: no solapar vueltas
+    sondeando = true;
     try {
       var cuerpo = new FormData();
       cuerpo.append('id_duelo', idDuelo);
@@ -152,6 +165,8 @@
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      sondeando = false;
     }
   }, 2500);
 })();
