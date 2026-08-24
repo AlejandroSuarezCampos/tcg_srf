@@ -300,6 +300,8 @@
   var mjSegundos  = document.getElementById('simMjSegundos');
   var mjOpciones  = document.getElementById('simMjOpciones');
   var mjResultado = document.getElementById('simMjResultado');
+  var mjJuego     = document.getElementById('simMjJuego');
+  var mjPorDefecto = document.getElementById('simMjPorDefecto');
   var mjMedidor   = document.getElementById('simMjMedidor');
   var mjPista     = document.getElementById('simMjPista');
   var mjAguja     = document.getElementById('simMjAguja');
@@ -314,6 +316,67 @@
   var panelPuesto = null;   // qué hay pintado ahora: id de evento, 'rival' o null
   var enviando = false;
 
+  /* Qué se juega uno en esta decisión, dicho en una línea.
+
+     ⚠️ `impacto` NO ES `cambia_marcador`. Un minijuego de impacto "jugada"
+        solo mueve el resultado si a este jugador le queda presupuesto de goles
+        o paradas; gastado el cupo, la misma decisión sigue puntuando la
+        actuación pero ya no puede tocar el marcador. Anunciar "puede cambiar
+        el marcador" en ese caso sería una promesa falsa, así que se distingue.
+
+     No se dice qué opción conviene: eso sigue sin salir del servidor. Se dice
+     cuánto pesa, que es lo que no se puede deducir mirando la pantalla. */
+  var EFECTO_TEXTO = {
+    presupuesto_gol:    'Acertar amplía los goles que puedes meter en lo que queda.',
+    presupuesto_parada: 'Acertar amplía las paradas que puedes hacer en lo que queda.',
+    decision:           'Acertar te da una decisión más en lo que queda.'
+  };
+
+  function pintarQueHayEnJuego(mj) {
+    if (!mjJuego) return;
+
+    var nivel = mj.impacto || 'ninguno';
+    var texto;
+
+    if (nivel === 'partido') {
+      texto = 'Afecta al resto del partido. ' + (EFECTO_TEXTO[mj.efecto] || '');
+    } else if (nivel === 'jugada') {
+      texto = mj.cambia_marcador
+        ? 'Esta jugada puede acabar en gol o en parada según lo que elijas.'
+        : 'Decide cómo acaba la jugada, pero ya no te queda margen para mover el marcador.';
+    } else {
+      texto = 'No cambia el marcador: cuenta para tu puntuación de actuación.';
+    }
+
+    mjJuego.textContent = texto.trim();
+    mjJuego.dataset.impacto = nivel;
+    mjJuego.hidden = false;
+  }
+
+  /* La opción que aplica el servidor si se agota el plazo. */
+  function pintarPorDefecto(mj) {
+    if (!mjPorDefecto) return;
+
+    var segura = (mj.opciones || []).filter(function (o) { return o.segura; })[0];
+    if (!segura) { mjPorDefecto.hidden = true; return; }
+
+    mjPorDefecto.textContent = 'Si se acaba el tiempo: ' + segura.nombre + '.';
+    mjPorDefecto.hidden = false;
+  }
+
+  /* Marca visualmente la opción segura allá donde se pinte. Lo llaman las tres
+     primitivas: sin esto, la marca solo existiría en los botones y el medidor
+     y las zonas seguirían escondiendo el mismo dato. */
+  function marcarSegura(el, opcion) {
+    if (!opcion.segura) return;
+    el.classList.add('es-segura');
+    /* El título lo lee el ratón; para el lector de pantalla va en el nombre
+       accesible, que si no diría solo el nombre de la opción. */
+    el.title = 'Es la que se aplica sola si se acaba el tiempo';
+    var etiqueta = (el.textContent || '').trim();
+    el.setAttribute('aria-label', etiqueta + '. Opción por defecto si se acaba el tiempo');
+  }
+
   function pintarMinijuego(mj) {
     if (panelPuesto === mj.id_evento) return;   // ya está puesto, no repintar
     panelPuesto = mj.id_evento;
@@ -325,6 +388,8 @@
     mjTexto.textContent = mj.enunciado + (mj.pista ? '  ' + mj.pista : '');
     mjResultado.hidden = true;
     mjResultado.className = 'sim-mj-resultado';
+    pintarQueHayEnJuego(mj);
+    pintarPorDefecto(mj);
     panel.hidden = false;
 
     /* La PRIMITIVA decide cómo se elige, no qué se decide: las dos ramas mandan
@@ -477,6 +542,7 @@
       z.innerHTML = '<b></b><span></span>';
       z.querySelector('b').textContent = o.nombre;
       z.querySelector('span').textContent = o.pista;
+      marcarSegura(z, o);
       z.addEventListener('click', function () { decidir(mj.id_evento, o.clave); });
       mjLienzo.appendChild(z);
     });
@@ -500,6 +566,7 @@
       b.innerHTML = '<b></b><span></span>';
       b.querySelector('b').textContent = o.nombre;
       b.querySelector('span').textContent = o.pista;
+      marcarSegura(b, o);
       b.addEventListener('click', function () { decidir(mj.id_evento, o.clave); });
       mjOpciones.appendChild(b);
     });
@@ -535,6 +602,7 @@
       z.innerHTML = '<b></b><span></span>';
       z.querySelector('b').textContent = o.nombre;
       z.querySelector('span').textContent = o.pista;
+      marcarSegura(z, o);
       mjPista.insertBefore(z, mjAguja);
     });
 
@@ -744,9 +812,16 @@
           dice += defendia
             ? ' ¡Paradón! El gol no sube al marcador.'
             : ' ¡Dentro! Ese sí cuenta.';
+          // Solo el final para el destape: la cabecera la lleva el relato.
           marcadorFinal = d.marcador;
-          golesYoEl.textContent   = d.marcador[0];
-          golesOtroEl.textContent = d.marcador[1];
+          /* La cabecera sí se corrige AQUÍ, y con el delta de esta jugada, no
+             con el marcador final: el relato ya no va a volver a contar este
+             gol —el servidor lo recalcula y los eventos que quedan llegan con
+             el marcador corregido—, así que sin esto la cabecera se quedaría
+             como estaba hasta el siguiente evento, que puede tardar. */
+          var casilla = defendia ? golesOtroEl : golesYoEl;
+          casilla.textContent = Math.max(0, (parseInt(casilla.textContent, 10) || 0) +
+                                            (defendia ? -1 : 1));
         }
         mjResultado.textContent = dice;
         mjResultado.classList.add('es-' + d.resultado);
@@ -962,16 +1037,19 @@
       mostrarEvento(e);
     });
 
-    /* El marcador que se destapará al final sale SIEMPRE de aquí, del último
-       sondeo, nunca del que el servidor pintó en la página al cargarla.
-       Antes solo se actualizaba cuando el gol lo parabas TÚ, así que si lo
-       paraba el rival tu pantalla no se enteraba y acababa enseñando un
-       marcador distinto al suyo: una cuenta veía 4-2 y la otra 4-3. */
-    if (d.marcador) {
-      golesYoEl.textContent   = d.marcador[0];
-      golesOtroEl.textContent = d.marcador[1];
-      marcadorFinal = d.marcador;
-    }
+    /* `d.marcador` es el marcador FINAL del partido, no el que va por el minuto
+       que se está narrando. Sirve para destapar el resultado al terminar —y
+       tiene que salir de aquí, del último sondeo, para que una parada del
+       RIVAL también llegue a esta pantalla: si no, una cuenta veía 4-2 y la
+       otra 4-3—, pero NO puede pintarse en la cabecera mientras se juega.
+
+       Se pintaba, y era el bug del marcador: el sondeo corre cada segundo y
+       machacaba el marcador corriente que mostrarEvento() acababa de poner con
+       el del evento narrado, así que la cabecera enseñaba el resultado final
+       desde el minuto 0 y no se movía con los goles que se estaban contando.
+       Los goles los pone mostrarEvento() y solo él; aquí únicamente se guarda
+       el final para revelarResultado(). */
+    if (d.marcador) marcadorFinal = d.marcador;
 
     if (d.minijuego) {
       pintarMinijuego(d.minijuego);

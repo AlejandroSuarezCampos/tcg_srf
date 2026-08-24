@@ -49,7 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($accion === 'jugar') {
         $res = $db->crearPartidoCadena($id_usuario, (int) ($_POST['id_nodo'] ?? 0), $_POST['dificultad'] ?? '');
         if ($res['ok']) {
-            header('Location: duelo.php?id=' . $res['id_duelo']);
+            /* Si se ha reanudado uno a medias en vez de empezar otro, se dice.
+               Sin aviso parece que el botón no ha hecho nada —o peor, que el
+               partido "se ha quedado igual"— y es justo lo que llevaba a
+               pulsarlo otra vez. */
+            if (!empty($res['reanudado'])) {
+                $_SESSION['cadena_ok'] = 'Sigues el partido que habías dejado a medias.';
+            }
+            header('Location: duelo.php?id=' . $res['id_duelo'] . (!empty($res['reanudado']) ? '&reanudado=1' : ''));
             exit;
         }
         $_SESSION['cadena_error'] = $res['error']

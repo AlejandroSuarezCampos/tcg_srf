@@ -136,7 +136,7 @@ $suAlineacion    = $jugado ? $db->listarAlineacionDuelo($id_duelo, $idRival) : [
 $miAumento = $jugado ? $db->aumentoElegido($id_duelo, $id_usuario) : null;
 $suAumento = $jugado ? $db->aumentoElegido($id_duelo, $idRival) : null;
 // Formaciones CONGELADAS. Un duelo anterior a que existieran las formaciones
-// no tiene ninguna guardada y fue, por definición, un 1-4-4-2.
+// no tiene ninguna guardada y fue, por definición, un 4-4-2.
 $miFormacion = ($soyCreador ? $duelo['formacion_creador'] : $duelo['formacion_rival']) ?: Tcg::FORMACION_BASE;
 $suFormacion = ($soyCreador ? $duelo['formacion_rival'] : $duelo['formacion_creador']) ?: Tcg::FORMACION_BASE;
 
@@ -331,6 +331,29 @@ include __DIR__ . '/navbar.php';
         <?php endif; ?>
       </p>
 
+      <?php /* ⚠️ SE DICE QUE ESTAS TRES SON LAS QUE HAY. Alguien descubrió que
+               saliéndose de la pantalla y volviendo a entrar a la cadena se
+               generaba otro partido con OTRAS tres opciones, y se dedicó a
+               recargar hasta que le salía una buena. Ya no se puede —el
+               partido a medias se reanuda en vez de crear otro— pero si no se
+               dice, la gente lo intenta igual y lo que ve es "el juego no
+               responde". Mejor contarlo que dejar que lo descubran a base de
+               pelearse con la interfaz. */ ?>
+      <?php if (!$conPlazo): ?>
+        <p class="t-caption t-dim">
+          <i class="ph ph-info" aria-hidden="true"></i>
+          Estas tres son las tuyas para este partido. Salir y volver a entrar te
+          devuelve aquí con las mismas.
+        </p>
+      <?php endif; ?>
+
+      <?php if (isset($_GET['reanudado'])): ?>
+        <p class="alerta alerta-info" role="status">
+          <i class="ph ph-info" aria-hidden="true"></i>
+          <span>Sigues el partido que habías dejado a medias.</span>
+        </p>
+      <?php endif; ?>
+
       <?php if ($conPlazo): ?>
         <p class="aumento-reloj" id="aumentoReloj" role="timer" aria-live="off">
           <span class="mono" id="aumentoSegundos"><?= $segundosRest ?></span> s
@@ -504,7 +527,7 @@ include __DIR__ . '/navbar.php';
                   <i class="ph-fill ph-coins" aria-hidden="true"></i>
                   <span class="mono">+<?= number_format((int) $d['monedas'], 0, ',', '.') ?></span> monedas
                 <?php elseif ($d['tipo'] === 'cromo_limitado'): ?>
-                  <i class="ph-fill ph-seal-star" aria-hidden="true"></i>
+                  <i class="ph-fill ph-seal-check" aria-hidden="true"></i>
                   <?= htmlspecialchars($d['cromo_nombre']) ?>
                   <span class="pastilla pastilla-titular">
                     #<?= (int) $d['numero_serie'] ?><?= $d['cupo_numerado'] ? '/' . (int) $d['cupo_numerado'] : '' ?>
@@ -729,6 +752,13 @@ include __DIR__ . '/navbar.php';
            aplica la opción SEGURA, nunca la de más premio (§1.5 regla 4). -->
       <div class="sim-minijuego" id="simMinijuego" hidden>
         <p class="sim-mj-titulo" id="simMjTitulo"></p>
+        <?php /* QUÉ HAY EN JUEGO. El catálogo lo declara por minijuego
+                 (`impacto`, y `efecto` en los de partido) pero no llegaba a
+                 pantalla: la decisión que solo puntúa tu actuación y la que
+                 amplía el presupuesto del resto del partido se veían igual, y
+                 con nueve segundos encima no hay forma de distinguirlas.
+                 Ahora se dice antes del enunciado, que es cuando sirve. */ ?>
+        <p class="sim-mj-juego" id="simMjJuego" hidden></p>
         <p class="sim-mj-enunciado" id="simMjEnunciado"></p>
         <!-- Reloj de decisión. La barra comunica la urgencia de un vistazo
              (§3.4), pero con "reducir movimiento" no se anima, así que el
@@ -740,6 +770,14 @@ include __DIR__ . '/navbar.php';
           </div>
           <span class="sim-mj-segundos mono" id="simMjSegundos" role="timer" aria-live="off"></span>
         </div>
+        <?php /* QUÉ PASA SI NO DECIDES. El servidor aplica la opción `segura`
+                 al agotarse el plazo (§1.5 regla 4), y ese dato ya viajaba al
+                 cliente —lo usa el medidor para colocar la aguja— pero no se
+                 enseñaba en ninguna parte. No es secreto: el propio catálogo
+                 dice que "el jugador la acaba conociendo igual", porque es la
+                 que se le aplica. Escrito, deja de ser algo que se aprende
+                 perdiendo jugadas. */ ?>
+        <p class="sim-mj-defecto" id="simMjPorDefecto" hidden></p>
         <div class="sim-mj-opciones" id="simMjOpciones" role="group"
              aria-labelledby="simMjEnunciado"></div>
         <!-- MEDIDOR (Biblia §2.1, segunda primitiva). La aguja recorre las
