@@ -1,0 +1,25 @@
+﻿id_rareza;rareza;posicion;puesto;ataque_min;ataque_max;defensa_min;defensa_max;tecnica_min;tecnica_max
+1;Común;POR;Portero;23;37;62;76;52;66
+1;Común;DF;Defensa;37;51;57;71;47;61
+1;Común;MC;Centrocampista;48;62;49;63;56;70
+1;Común;DC;Delantero;63;77;37;51;50;64
+2;"Poco común";POR;Portero;31;45;68;82;59;73
+2;"Poco común";DF;Defensa;43;57;65;79;53;67
+2;"Poco común";MC;Centrocampista;56;70;57;71;65;79
+2;"Poco común";DC;Delantero;69;83;45;59;58;72
+3;Raro;POR;Portero;39;53;74;88;65;79
+3;Raro;DF;Defensa;50;64;72;86;60;74
+3;Raro;MC;Centrocampista;64;78;65;79;73;87
+3;Raro;DC;Delantero;76;90;53;67;66;80
+4;Épico;POR;Portero;47;61;80;94;72;86
+4;Épico;DF;Defensa;56;70;79;93;66;80
+4;Épico;MC;Centrocampista;72;86;73;87;81;95
+4;Épico;DC;Delantero;82;96;60;74;74;88
+5;Legendario;POR;Portero;55;69;86;99;79;93
+5;Legendario;DF;Defensa;63;77;86;99;73;87
+5;Legendario;MC;Centrocampista;80;94;81;95;90;99
+5;Legendario;DC;Delantero;89;99;68;82;83;97
+6;SRF;POR;Portero;63;77;92;99;86;99
+6;SRF;DF;Defensa;69;83;92;99;79;93
+6;SRF;MC;Centrocampista;88;99;89;99;92;99
+6;SRF;DC;Delantero;92;99;76;90;91;99
