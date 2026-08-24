@@ -95,5 +95,8 @@ $base = $base ?? '';
   </div>
 </div>
 
-<script src="<?= $base ?>assets/js/vendor/gsap/gsap.min.js"></script>
+<?php /* Con versión, como todo lo demás: el `.htaccess` cachea los .js un año
+         con `immutable`, así que un GSAP sin `?v=` se quedaría congelado en el
+         navegador de la gente el día que se actualice la librería. */ ?>
+<?= assetScript($base, "assets/js/vendor/gsap/gsap.min.js") ?>
 <script src="<?= $base ?>assets/js/ceremonia_cofre.js?v=<?= @filemtime(__DIR__ . '/../assets/js/ceremonia_cofre.js') ?>"></script>

@@ -46,6 +46,11 @@
   var avisoMotion    = document.getElementById('cerAvisoMotion');
   var btnActivarMotion  = document.getElementById('cerActivarMotion');
   var btnRechazarMotion = document.getElementById('cerRechazarMotion');
+  var recuento    = document.getElementById('ceremoniaRecuento');
+  var pieSaltar   = document.getElementById('ceremoniaPieSaltar');
+  var pieFinal    = document.getElementById('ceremoniaPieFinal');
+  var btnOtro     = document.getElementById('ceremoniaOtro');
+  var btnOtrosDiez = document.getElementById('ceremoniaOtrosDiez');
   if (!mesa || !cerCarta) return;
 
   // Se consulta EN CADA APERTURA, no una vez al cargar: cambiar la preferencia
@@ -71,6 +76,8 @@
   var avanzar = null;        // resolve() de la carta actual
   var sobreActual = null;    // para poder repetir la apertura con animación
   var enReparto = false;     // false mientras se abre el sobre, true al repartir
+  var paquetes = 1;          // cuántos sobres hay en lo que se está enseñando
+  var repetirActual = null;  // fn(veces) que vuelve a abrir, si quien llamó la dio
 
   // Cierra el modal (X, Escape, "Continuar") a media ceremonia: detener() no
   // puede cancelar de verdad la promesa pendiente de escenaCarta() (avanzar),
@@ -497,9 +504,52 @@
   /* ---------------------------------------------------------------------
      ESCENA 3 — resumen: todas las cartas ya reveladas
      --------------------------------------------------------------------- */
+  /* La tira de recuento: cuántas de cada rareza, de la mejor a la peor.
+     Con cinco cartas es un detalle; con una tanda de diez sobres es LO ÚNICO
+     que se puede leer de un vistazo — cincuenta cartas en una rejilla no dicen
+     nada sin un titular encima. */
+  function pintarRecuento() {
+    if (!recuento) return;
+
+    var porRareza = {};
+    cartas.forEach(function (c) {
+      var k = c.id_rareza;
+      if (!porRareza[k]) { porRareza[k] = { nombre: c.rareza, n: 0 }; }
+      porRareza[k].n++;
+    });
+
+    var claves = Object.keys(porRareza).sort(function (a, b) { return b - a; });
+
+    recuento.innerHTML = '';
+
+    var titulo = document.createElement('span');
+    titulo.className = 'cer-recuento-total';
+    titulo.textContent = paquetes > 1
+      ? paquetes + ' sobres · ' + cartas.length + ' cartas'
+      : cartas.length + (cartas.length === 1 ? ' carta' : ' cartas');
+    recuento.appendChild(titulo);
+
+    claves.forEach(function (k) {
+      var pastilla = document.createElement('span');
+      pastilla.className = 'cer-recuento-rz';
+      pastilla.dataset.rareza = k;
+      pastilla.innerHTML = '<b class="mono">' + porRareza[k].n + '</b> ' + porRareza[k].nombre;
+      recuento.appendChild(pastilla);
+    });
+
+    recuento.hidden = false;
+  }
+
   function pintarMesa() {
     mesa.innerHTML = '';
-    cartas.forEach(function (carta) {
+
+    /* De la mejor rareza a la peor, y no en el orden en que salieron. El orden
+       de reparto ya se vivió carta a carta; aquí lo que se busca es "qué me ha
+       tocado", y eso se responde con lo bueno arriba. `slice()` porque el
+       orden de `cartas` lo sigue usando el reparto si se vuelve a repetir. */
+    var enMesa = cartas.slice().sort(function (a, b) { return b.id_rareza - a.id_rareza; });
+
+    enMesa.forEach(function (carta) {
       var ranura = document.createElement('div');
       ranura.className = 'ranura esta-volteada';
       ranura.dataset.rareza = carta.id_rareza;
@@ -512,6 +562,7 @@
       mesa.appendChild(ranura);
     });
     mesa.hidden = false;
+    pintarRecuento();
     if (!reducido()) {
       gsap.fromTo(mesa.children,
         { opacity: 0, y: 16 },
@@ -545,10 +596,34 @@
     inmersivo(false);
     pintarMesa();
     anunciar();
-    btnSaltarCarta.disabled = true;
-    btnSaltar.disabled = true;
+
+    /* Los botones de saltar DESAPARECEN en vez de quedarse desactivados. Un
+       control apagado sigue pidiendo atención y ocupando el sitio donde se
+       busca qué hacer ahora; y aquí ya no hay nada que saltar. */
+    if (pieSaltar) pieSaltar.hidden = true;
+
+    if (pieFinal) {
+      var hayRepetir = typeof repetirActual === 'function';
+      pieFinal.hidden = !hayRepetir;
+      if (btnOtro)      btnOtro.hidden = !hayRepetir;
+      if (btnOtrosDiez) btnOtrosDiez.hidden = !hayRepetir;
+    }
+
     ofrecerAnimaciones();
   }
+
+  /* Vuelve a abrir SIN pasar por la caja. La animación de la caja sirve para
+     elegir sobre y el sobre ya está elegido: repetirla sería hacer esperar por
+     una decisión que ya está tomada. */
+  function repetir(veces) {
+    if (typeof repetirActual !== 'function') return;
+    var volver = repetirActual;
+    SRF.cerrarModal('modalSobre');
+    volver(veces);
+  }
+
+  if (btnOtro)      btnOtro.addEventListener('click', function () { repetir(1); });
+  if (btnOtrosDiez) btnOtrosDiez.addEventListener('click', function () { repetir(10); });
 
   if (btnActivarMotion) {
     btnActivarMotion.addEventListener('click', function () {
@@ -556,7 +631,10 @@
       avisoMotion.hidden = true;
       // se repite la apertura, ahora sí con ceremonia: las cartas ya están
       // en la colección, esto solo vuelve a reproducir el espectáculo
-      ceremonia(cartas, sobreActual);
+      /* Se reponen `paquetes` y `repetir`: sin ellos, activar las animaciones
+         desde el aviso convertía una tanda de diez en un sobre suelto y
+         borraba los botones de reapertura. */
+      ceremonia(cartas, sobreActual, { paquetes: paquetes, repetir: repetirActual });
     });
   }
   if (btnRechazarMotion) {
@@ -578,13 +656,26 @@
     terminar();
   }
 
-  function ceremonia(listaCartas, sobre) {
+  /**
+   * @param listaCartas  todas las cartas conseguidas, ya renderizadas.
+   * @param sobre        { nombre, imagen, frente, reverso } de SU plantilla.
+   * @param opciones     opcional:
+   *                       · paquetes  cuántos sobres son (por defecto 1). Con
+   *                                   más de uno se va DIRECTO al resumen.
+   *                       · repetir   fn(veces) para volver a abrir sin pasar
+   *                                   por la caja. Sin ella no salen los
+   *                                   botones de reapertura.
+   */
+  function ceremonia(listaCartas, sobre, opciones) {
     if (!listaCartas || !listaCartas.length) return;
+    opciones = opciones || {};
 
     var miSesion = ++sesion;
 
     cartas = listaCartas;
     sobreActual = sobre || null;
+    paquetes = Math.max(1, parseInt(opciones.paquetes, 10) || 1);
+    repetirActual = typeof opciones.repetir === 'function' ? opciones.repetir : null;
     indice = 0;
     saltandoTodo = false;
     enReparto = false;
@@ -597,6 +688,9 @@
     mesa.hidden = true;
     escena.hidden = true;
     walkout.hidden = true;
+    if (recuento) { recuento.hidden = true; recuento.innerHTML = ''; }
+    if (pieSaltar) pieSaltar.hidden = false;
+    if (pieFinal)  pieFinal.hidden = true;
     inmersivo(false);
 
     /* ⚠️ LA CARTA SE APAGA AQUÍ, Y NO ES REDUNDANTE.
@@ -620,7 +714,12 @@
 
     SRF.abrirModal('modalSobre');
 
-    if (reducido()) {
+    /* UNA TANDA NO SE REVELA CARTA A CARTA. Diez sobres son cincuenta clics
+       para dar la vuelta a cincuenta cartas: la ceremonia está pensada para el
+       sobre que abres mirando, y repetida cincuenta veces deja de ser un
+       premio y pasa a ser un peaje. Quien abre diez de golpe va a por el
+       resultado, así que se le da el resultado. */
+    if (reducido() || paquetes > 1) {
       terminar();
       return;
     }

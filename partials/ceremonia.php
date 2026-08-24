@@ -80,7 +80,11 @@ $base = $base ?? '';
       <p class="cer-contador mono" id="ceremoniaContador"></p>
     </div>
 
-    <!-- ESCENA 3: resumen -->
+    <!-- ESCENA 3: resumen.
+         La tira de recuento va ARRIBA y fuera de la mesa: la mesa tiene scroll
+         propio (ver components.css) y un resumen dentro se iría con ella
+         justo cuando más se mira, que es al llegar abajo del todo. -->
+    <div class="cer-recuento" id="ceremoniaRecuento" hidden></div>
     <div class="ceremonia-mesa" id="ceremoniaMesa"></div>
 
     <!-- Se te ha saltado la ceremonia por la preferencia del SISTEMA y aún no
@@ -104,13 +108,38 @@ $base = $base ?? '';
 
     <p class="sr-only" id="ceremoniaAnuncio" role="status" aria-live="polite"></p>
 
+    <?php /* EL PIE CAMBIA SEGÚN LA FASE, y eso es deliberado.
+
+             Antes tenía siempre los mismos tres botones y al acabar el reparto
+             los dos de saltar se quedaban ahí, desactivados: dos controles
+             muertos ocupando el sitio justo donde la persona busca qué hacer
+             ahora. Ahora los de saltar solo existen mientras hay algo que
+             saltar, y al terminar salen los de seguir abriendo.
+
+             «Abrir otro» y «Abrir 10» reabren SIN pasar por la caja: la
+             animación de la caja está para elegir sobre, y ya lo has elegido.
+             Los pinta ceremonia.js solo si quien la abrió le pasó `repetir`
+             —el sobre de bienvenida, por ejemplo, no se repite—. */ ?>
     <div class="modal-pie">
-      <button type="button" class="btn btn-ghost" id="ceremoniaSaltarCarta">Saltar carta</button>
-      <button type="button" class="btn btn-ghost" id="ceremoniaSaltar">Saltar todo</button>
+      <div class="cer-pie-grupo" id="ceremoniaPieSaltar">
+        <button type="button" class="btn btn-ghost" id="ceremoniaSaltarCarta">Saltar carta</button>
+        <button type="button" class="btn btn-ghost" id="ceremoniaSaltar">Saltar todo</button>
+      </div>
+      <div class="cer-pie-grupo" id="ceremoniaPieFinal" hidden>
+        <button type="button" class="btn btn-ghost" id="ceremoniaOtro" hidden>
+          <i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i> Abrir otro
+        </button>
+        <button type="button" class="btn btn-ghost" id="ceremoniaOtrosDiez" hidden>
+          <i class="ph ph-stack" aria-hidden="true"></i> Abrir 10
+        </button>
+      </div>
       <button type="button" class="btn btn-primary" data-cerrar-modal>Continuar</button>
     </div>
   </div>
 </div>
 
-<script src="<?= $base ?>assets/js/vendor/gsap/gsap.min.js"></script>
+<?php /* Con versión, como todo lo demás: el `.htaccess` cachea los .js un año
+         con `immutable`, así que un GSAP sin `?v=` se quedaría congelado en el
+         navegador de la gente el día que se actualice la librería. */ ?>
+<?= assetScript($base, "assets/js/vendor/gsap/gsap.min.js") ?>
 <script src="<?= $base ?>assets/js/ceremonia.js?v=<?= @filemtime(__DIR__ . '/../assets/js/ceremonia.js') ?>"></script>

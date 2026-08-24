@@ -35,6 +35,11 @@
   // ratón la caja daba un salto brusco hasta quedar de frente.
   var GIRO_X = -18, GIRO_Y = -32;
 
+  /* Cuántos sobres abre "Abrir 10". Tiene que coincidir con
+     Tcg::SOBRES_POR_TANDA, que es quien acota de verdad: si aquí se pidieran
+     más, el servidor recortaría la tanda en silencio. */
+  var TANDA = 10;
+
   function initPackBox(cajaEl) {
     if (reducido()) return;
     // tilt sobre .pack3d-tilt, NUNCA sobre .pack3d-volumen: esa capa lleva la
@@ -158,12 +163,52 @@
    * enganchar el click, porque los manejadores se pusieron uno a uno sobre los
    * elementos que existían al cargar la página.
    */
+  /* CUÁNTOS SOBRES SE METEN EN LA CAJA.
+     Cincuenta en pantalla grande, diez en móvil.
+
+     ⚠️ NO ES SOLO ESTÉTICA. En una pantalla de 375 px los cincuenta sobres se
+        apilan en unos pocos píxeles de profundidad: no se distingue uno de
+        otro, no hay dónde acertar con el dedo, y son cincuenta nodos 3D con su
+        textura compuestos por una GPU de móvil cada vez que la caja gira. Con
+        diez se ven los cantos, se pueden tocar y la caja va suelta.
+
+     Se decide en el CLIENTE y no en PHP porque el servidor no sabe el tamaño
+     de la pantalla: la plantilla trae siempre los cincuenta y aquí se clonan
+     los que caben. El `<template>` no maqueta ni descarga nada, así que los
+     cuarenta que no se usan no cuestan. */
+  var SOBRES_MOVIL = 10;
+  var ANCHO_MOVIL = 700;
+
+  function cuantosSobres() {
+    return window.innerWidth <= ANCHO_MOVIL ? SOBRES_MOVIL : Infinity;
+  }
+
   function poblarBahia(portal) {
     var bahia = portal.querySelector('.pack3d-interior-sobres');
     var plantilla = portal.querySelector('.pack3d-sobres-plantilla');
     if (!bahia || !plantilla || bahia.children.length) { return; }
 
-    bahia.appendChild(plantilla.content.cloneNode(true));
+    var copia = plantilla.content.cloneNode(true);
+    var tope  = cuantosSobres();
+    var todos = copia.querySelectorAll('.js-sobre-individual');
+
+    if (todos.length > tope) {
+      for (var i = tope; i < todos.length; i++) { todos[i].remove(); }
+
+      /* ⚠️ HAY QUE REESCRIBIR --i Y --n. El CSS coloca cada sobre en
+         profundidad con `--z: (i - (n-1)/2) * (d*.88/n)`, y `--n` lo escribió
+         PHP con el total de la plantilla. Quedándose diez sobres que siguen
+         diciendo `--n:50`, los diez se amontonan en la quinta parte delantera
+         de la caja en vez de repartirse por dentro: parecía que la caja se
+         había quedado medio vacía y torcida. */
+      var quedan = copia.querySelectorAll('.js-sobre-individual');
+      Array.prototype.forEach.call(quedan, function (el, n) {
+        el.style.setProperty('--i', n);
+        el.style.setProperty('--n', quedan.length);
+      });
+    }
+
+    bahia.appendChild(copia);
 
     var nuevos = bahia.querySelectorAll('.js-sobre-individual');
     Array.prototype.forEach.call(nuevos, engancharSobre);
@@ -210,11 +255,21 @@
     // interior y los cantos de los sobres, como una caja de cromos real
     // abierta sobre la mesa. La tapa va de 90° (tumbada, cerrada) a 205°
     // (de pie, inclinada hacia atrás) girando sobre su charnela trasera.
+    /* Mientras la caja se abre y los sobres suben, la bahía NO acepta clics.
+       Pulsar un sobre a medio camino dejaba la animación de entrada corriendo
+       por debajo de la ceremonia y la caja no volvía nunca a su sitio.
+
+       Se pide la ficha ANTES de la bifurcación de movimiento reducido: sin
+       animación el candado dura un suspiro, pero invalidar la apertura
+       anterior hay que hacerlo igual — si no, el final tardío de la que
+       acabamos de matar podría llegar después. */
+    var ficha = bloquearBahia(portal);
+
     if (reducido()) {
       gsap.set(caja, { scale: 1, opacity: 1 });
       gsap.set(tilt, { rotateX: -52, rotateY: -20 });
       gsap.set(tapa, { rotateX: 205 });
-      revealEnvelopesInsideBox(portal);
+      revealEnvelopesInsideBox(portal, ficha);
       return;
     }
 
@@ -222,18 +277,13 @@
     gsap.set(tilt, { rotateX: GIRO_X, rotateY: GIRO_Y });
     gsap.set(tapa, { rotateX: 90 });
 
-    /* Mientras la caja se abre y los sobres suben, la bahía NO acepta clics.
-       Pulsar un sobre a medio camino dejaba la animación de entrada corriendo
-       por debajo de la ceremonia y la caja no volvía nunca a su sitio. */
-    bloquearBahia(portal);
-
     animacionApertura = gsap.timeline({
       onComplete: function () { animacionApertura = null; },
     })
       .to(caja, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(1.3)' })
       .to(tilt, { rotateX: -52, rotateY: -20, duration: .7, ease: 'power2.inOut' }, '-=.25')
       .to(tapa, { rotateX: 205, duration: .65, ease: 'power2.inOut' }, '-=.4')
-      .call(function () { revealEnvelopesInsideBox(portal); });
+      .call(function () { revealEnvelopesInsideBox(portal, ficha); });
   }
 
   // Deja el sobre exactamente como lo describe el CSS, sin inline residual.
@@ -248,37 +298,64 @@
   }
 
   /* --------------------------------------------------------------------
-     EL BLOQUEO SIEMPRE SE LEVANTA
+     EL BLOQUEO SIEMPRE SE LEVANTA — Y SOLO LO LEVANTA QUIEN LO PUSO
 
      La bahía se cierra a los clics mientras entran los sobres, y se abre en
      cuanto terminan. El problema es "en cuanto terminan": GSAP corre sobre
      requestAnimationFrame, y rAF NO SE EJECUTA con la pestaña en segundo
      plano. Alguien que abra una caja y se cambie de pestaña deja la animación
      congelada a medias; si además la pestaña se recupera rara, el bloqueo se
-     queda puesto y esa caja ya no se puede usar más — que es justo el atasco
-     del que venimos.
+     queda puesto y esa caja ya no se puede usar más.
 
      Así que además del final normal hay un TECHO de reloj de pared: pasado
      ese tiempo la bahía se abre pase lo que pase. Nunca hay un estado del que
      no se pueda salir.
+
+     ⚠️ CADA APERTURA LLEVA SU FICHA, Y ESO ES LO QUE ARREGLA EL CLIC
+        PREMATURO. Antes el candado era un booleano —la clase `esta-animando`—
+        con UN SOLO temporizador para toda la página, y el tween de entrada
+        llamaba a `desbloquearBahia` desde `onInterrupt`. Bastaba con volver a
+        pulsar la caja mientras entraban los sobres: la apertura nueva ponía el
+        candado, la vieja moría, su `onInterrupt` lo quitaba, y a partir de ahí
+        se podía pulsar un sobre con la caja todavía a medio abrir. De ahí la
+        ceremonia lanzándose sobre una animación viva y la caja que ya no
+        volvía a su sitio.
+
+        Ahora cada apertura saca un número (`portal._srfApertura`) y solo puede
+        levantar el candado quien lo puso. El desbloqueo de una apertura
+        muerta es un no-op, y el temporizador es POR PORTAL: dos cajas abiertas
+        no se pisan el reloj la una a la otra.
      -------------------------------------------------------------------- */
-  var relojBloqueo = null;
   var TECHO_BLOQUEO = 4000;
 
+  /** Abre una apertura nueva sobre este portal y devuelve su ficha. */
   function bloquearBahia(portal) {
+    var ficha = (portal._srfApertura || 0) + 1;
+    portal._srfApertura = ficha;
+
     portal.classList.add('esta-animando');
-    if (relojBloqueo) { clearTimeout(relojBloqueo); }
-    relojBloqueo = setTimeout(function () { desbloquearBahia(portal); }, TECHO_BLOQUEO);
+    if (portal._srfReloj) { clearTimeout(portal._srfReloj); }
+    portal._srfReloj = setTimeout(function () { desbloquearBahia(portal, ficha); }, TECHO_BLOQUEO);
+
+    return ficha;
   }
 
-  function desbloquearBahia(portal) {
-    if (relojBloqueo) { clearTimeout(relojBloqueo); relojBloqueo = null; }
+  /**
+   * Levanta el candado. Con `ficha`, solo si esa apertura sigue siendo la
+   * vigente; sin ella (cierre del portal) a la fuerza, invalidando de paso
+   * cualquier apertura en vuelo para que su final tardío no toque nada.
+   */
+  function desbloquearBahia(portal, ficha) {
+    if (ficha !== undefined && ficha !== portal._srfApertura) { return; }
+    if (ficha === undefined) { portal._srfApertura = (portal._srfApertura || 0) + 1; }
+
+    if (portal._srfReloj) { clearTimeout(portal._srfReloj); portal._srfReloj = null; }
     portal.classList.remove('esta-animando');
   }
 
-  function revealEnvelopesInsideBox(portal) {
+  function revealEnvelopesInsideBox(portal, ficha) {
     var sobres = portal.querySelectorAll('.pack3d-sobre');
-    var abrir = function () { desbloquearBahia(portal); };
+    var abrir = function () { desbloquearBahia(portal, ficha); };
 
     // El estado de reposo ya lo da el CSS (.pack3d--abierta .pack3d-sobre):
     // con reduced-motion no hace falta escribir nada.
@@ -294,7 +371,9 @@
         duration: .5, stagger: .012, ease: 'power3.out',
         /* `onInterrupt` además de `onComplete`: si la caja se cierra a mitad,
            GSAP mata el tween y `onComplete` NO se llama. Sin esto la bahía se
-           quedaba bloqueada para siempre y no se podía volver a abrir. */
+           quedaba bloqueada para siempre y no se podía volver a abrir. La
+           ficha hace que, si quien interrumpe es una apertura NUEVA, este
+           desbloqueo no le quite el candado a ella. */
         onComplete: function () { limpiarInline(sobres); abrir(); },
         onInterrupt: abrir
       });
@@ -308,10 +387,15 @@
     var tapa    = portal.querySelector('.pack3d-tapa');
     var bahia   = portal.querySelector('.pack3d-interior-sobres');
 
+    /* El candado se levanta ANTES de matar nada, no después: `desbloquearBahia`
+       sin ficha invalida la apertura en vuelo, así que el `onInterrupt` que
+       van a disparar los `kill` de abajo llega ya caducado y no toca el estado
+       de una apertura posterior. Al revés —matar primero— funcionaba de
+       casualidad y dependía del orden. */
+    desbloquearBahia(portal);
     if (animacionApertura) { animacionApertura.kill(); animacionApertura = null; }
     gsap.killTweensOf([caja, tilt, tapa]);
     gsap.killTweensOf(bahia.querySelectorAll('.pack3d-sobre'));
-    desbloquearBahia(portal);
 
     portal.classList.remove('esta-abierta', 'con-seleccion');
     caja.classList.remove('pack3d--abierta');
@@ -370,8 +454,14 @@
       return;
     }
 
+    var precioTanda = precio * TANDA;
+    var llegaTanda  = saldo >= precioTanda;
+
     var texto = 'Vas a abrir «' + btn.dataset.nombre + '» por ' + precio.toLocaleString('es-ES') +
-      ' monedas. Tienes ' + saldo.toLocaleString('es-ES') + '.';
+      ' monedas. Tienes ' + saldo.toLocaleString('es-ES') + '. ' +
+      (llegaTanda
+        ? 'Abrir ' + TANDA + ' cuesta ' + precioTanda.toLocaleString('es-ES') + '.'
+        : 'Para abrir ' + TANDA + ' necesitas ' + precioTanda.toLocaleString('es-ES') + '.');
 
     function limpiar() {
       document.removeEventListener('click', alCancelarClick);
@@ -388,7 +478,15 @@
 
     SRF.confirmar(texto, function () {
       limpiar();
-      comprar(btn, bahia, portal);
+      comprar(btn, bahia, portal, 1);
+    }, {
+      aceptar: 'Abrir 1',
+      extra: {
+        texto: 'Abrir ' + TANDA,
+        desactivado: !llegaTanda,
+        titulo: llegaTanda ? '' : 'No tienes monedas suficientes para ' + TANDA + ' sobres',
+        alPulsar: function () { limpiar(); comprar(btn, bahia, portal, TANDA); }
+      }
     });
   }
 
@@ -401,13 +499,17 @@
   // "el resto de sobres y la caja se desvanecen al iniciarse la selección"
   // (Fase 4): ya lo resuelve .con-seleccion en components.css (opacity 0/.2)
   // en el momento del click (selectEnvelope), antes de la confirmación.
-  async function comprar(btn, bahia, portal) {
+  async function comprar(btn, bahia, portal, veces) {
+    veces = Math.max(1, parseInt(veces, 10) || 1);
     btn.disabled = true;
     try {
       var res = await fetch('sobres.php', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ accion: 'comprar_sobre', id_sobre: btn.dataset.idSobre, csrf: SRF.csrfToken() })
+        body: new URLSearchParams({
+          accion: 'comprar_sobre', id_sobre: btn.dataset.idSobre,
+          veces: veces, csrf: SRF.csrfToken()
+        })
       });
       var data = await res.json();
 
@@ -419,20 +521,54 @@
         return;
       }
 
+      // Se pidieron diez y salieron siete porque se acabaron las monedas: hay
+      // que decirlo, o parece que faltan tres sobres.
+      if (data.aviso) { SRF.toast(data.aviso, 'warning'); }
+
       if (typeof data.monedas === 'number') actualizarSaldo(data.monedas);
       cerrarPortal(portal);
-      SRF.ceremonia(data.cartas || [], {
-        nombre:  btn.dataset.nombre,
-        imagen:  btn.dataset.imagen,
-        frente:  btn.dataset.frente,
-        reverso: btn.dataset.reverso
-      });
+      mostrarBotin(btn, data);
     } catch (err) {
       console.error(err);
       revertirSeleccion(btn, bahia, portal);
       btn.disabled = false;
       SRF.toast('No se pudo conectar con el servidor.', 'danger');
     }
+  }
+
+  /**
+   * Enseña lo que ha tocado y deja enganchada la reapertura.
+   *
+   * `repetir` vuelve a `comprar()` con el MISMO botón de sobre, así que la
+   * reapertura pasa por el mismo camino de siempre —mismo cobro, mismo
+   * saldo, mismo aviso si se corta— pero sin la animación de la caja: el
+   * sobre ya está elegido y volver a elegirlo no aporta nada.
+   */
+  function mostrarBotin(btn, data) {
+    var sobres = data.sobres || [];
+    var todas  = sobres.length ? [].concat.apply([], sobres) : (data.cartas || []);
+    if (!todas.length) return;
+
+    SRF.ceremonia(todas, {
+      nombre:  btn.dataset.nombre,
+      imagen:  btn.dataset.imagen,
+      frente:  btn.dataset.frente,
+      reverso: btn.dataset.reverso
+    }, {
+      paquetes: Math.max(1, sobres.length),
+      repetir: function (veces) {
+        var bahia  = btn.closest('.pack3d-interior-sobres');
+        var portal = btn.closest('.pack3d-portal');
+        var precio = parseInt(btn.dataset.precio, 10) || 0;
+
+        // El saldo pudo quedarse corto entre una tanda y la siguiente.
+        if (saldoActual() < precio * veces) {
+          SRF.toast('No tienes monedas suficientes.', 'danger');
+          return;
+        }
+        comprar(btn, bahia, portal, veces);
+      }
+    });
   }
 
   /** Cuántas monedas hay ahora mismo, según lo que se ve en pantalla. */

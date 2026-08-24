@@ -58,38 +58,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['
     $error = 'La página ha caducado, inténtalo de nuevo.';
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion']) && $_POST['accion'] === 'comprar_sobre') {
     $id_sobre = (int) ($_POST['id_sobre'] ?? 0);
+    // `veces` es opcional: sin él se abre uno, que es lo que mandaban las
+    // llamadas de antes de existir la tanda (el sobre de bienvenida, entre
+    // otras). abrirSobresVarios() ya acota al tope.
+    $veces = (int) ($_POST['veces'] ?? 1);
 
-    $resultado = $db->abrirSobre($id_sobre, $id_usuario);
+    $resultado = $db->abrirSobresVarios($id_sobre, $id_usuario, $veces);
 
     if ($resultado['ok']) {
         $_SESSION['monedas'] = $resultado['monedas'];
     }
 
     if (esPeticionAjax()) {
+        /* Cada carta viaja ya renderizada por el componente compartido: la
+           ceremonia no reimplementa el marcado de carta en JavaScript.
+
+           Modo arte, igual que en colección y mercado: el arte a sangre con su
+           plantilla, sin datos encima. Abrir un sobre es el momento en que MÁS
+           se mira la ilustración. SIN pie de foto: la plantilla ya lleva el
+           nombre escrito en su rectángulo blanco y la rareza se reconoce por el
+           marco, así que repetir «Nombre · Rareza» debajo era decir dos veces lo
+           mismo y encima metía una caja de texto en mitad de la ceremonia. */
+        $pintar = function ($c) {
+            return [
+                'nombre'    => $c['nombre'],
+                'rareza'    => $c['rareza'],
+                'id_rareza' => (int) $c['id_rareza'],
+                'html'      => carta_html($c, ['modo' => 'arte', 'lazy' => false]),
+            ];
+        };
+        $sobres = array_map(fn($cartas) => array_map($pintar, $cartas), $resultado['sobres'] ?? []);
+
         header('Content-Type: application/json');
         echo json_encode([
-            'ok'      => $resultado['ok'],
-            'error'   => $resultado['error'],
-            'monedas' => $resultado['monedas'] ?? ($_SESSION['monedas'] ?? null),
-            // Cada carta viaja ya renderizada por el componente compartido: la
-            // ceremonia no reimplementa el marcado de carta en JavaScript.
-            'cartas'  => array_map(function ($c) {
-                return [
-                    'nombre'    => $c['nombre'],
-                    'rareza'    => $c['rareza'],
-                    'id_rareza' => (int) $c['id_rareza'],
-                    /* Modo arte, igual que en colección y mercado: el arte a
-                       sangre con su plantilla, sin datos encima. Abrir un sobre
-                       es el momento en que MÁS se mira la ilustración, y era la
-                       única pantalla que seguía enseñándola con la ficha puesta.
-                       SIN pie de foto: la plantilla ya lleva el nombre escrito
-                       en su rectángulo blanco y la rareza se reconoce por el
-                       marco, así que repetir «Nombre · Rareza» debajo era decir
-                       dos veces lo mismo y encima metía una caja de texto en
-                       mitad de la ceremonia. */
-                    'html'      => carta_html($c, ['modo' => 'arte', 'lazy' => false]),
-                ];
-            }, $resultado['cartas'] ?? []),
+            'ok'       => $resultado['ok'],
+            'error'    => $resultado['error'],
+            'aviso'    => $resultado['aviso'] ?? null,
+            'monedas'  => $resultado['monedas'] ?? ($_SESSION['monedas'] ?? null),
+            'sobres'   => $sobres,
+            'abiertos' => $resultado['abiertos'] ?? 0,
+            /* `cartas` se mantiene con el contenido del PRIMER sobre por
+               compatibilidad: el botón del sobre de bienvenida y la vista
+               previa del panel siguen leyendo de ahí y no abren tandas. */
+            'cartas'   => $sobres[0] ?? [],
         ]);
         exit;
     }
