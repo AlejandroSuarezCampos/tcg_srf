@@ -103,16 +103,27 @@ function rareza_marcas(int $idRareza): string
  *
  * Dependen dos cosas, y las dos tienen que cumplirse.
  *
- * 1. QUE SU ARTE SEA LA FOTO DEL JUGADOR.
+ * 1. QUE SU ARTE SEA LA FOTO DEL JUGADOR, Y ESO SE MIDE: ES CUADRADA.
  *    El marco no es un adorno que se pueda poner encima de cualquier cosa: es
- *    una maqueta con un hueco cuadrado para un RETRATO. Las cartas importadas
- *    (`assets/img/Cromos/Importados/`) son exactamente eso —la foto del
- *    jugador, sin ilustración propia— y por eso el marco las completa.
- *    Las demás llevan arte original a sangre, pensado para verse entero: meterlo
- *    en el cuadradito de una plantilla sería recortar justo lo que se dibujó
- *    para llenar la carta.
- *    Es lo que decide, no la rareza. Hasta ahora se miraba el nivel (1 a 4) y
- *    coincidía de casualidad, porque todo lo importado es de rareza baja; en
+ *    una maqueta con un hueco CUADRADO para un RETRATO. Un retrato cuadrado
+ *    entra entero; un arte vertical de 451x800 metido ahí se recorta justo por
+ *    donde se dibujó para llenar la carta.
+ *
+ *    ⚠️ ANTES SE MIRABA LA CARPETA (`/Cromos/Importados/`) Y ESO DEJABA FUERA
+ *       A TODO LO DEMÁS QUE TAMBIÉN ERA UN RETRATO. Las 88 cartas cuadradas de
+ *       `/Cromos/InazumaWorldCup/` se pintaban a sangre —foto de 256x256
+ *       estirada a la carta entera, sin marco de rareza y sin placa de nombre—
+ *       solo por vivir en otra carpeta. La carpeta era un proxy de "esto es un
+ *       retrato"; la forma de la imagen ES el dato, así que ahora se mide.
+ *
+ *    Medido sobre la biblioteca actual: 743 de 743 en `Importados` son
+ *    cuadradas (la regla vieja y la nueva coinciden ahí, por eso sigue estando
+ *    el atajo sin E/S), 88 de 96 en `InazumaWorldCup`, y el resto del catálogo
+ *    —ALL STARS, Apuesta Segura, Cartas Exclusivas— no tiene ni una: son artes
+ *    a sangre y se quedan como estaban.
+ *
+ *    Es lo que decide, no la rareza. Hasta hace poco se miraba el nivel (1 a 4)
+ *    y coincidía de casualidad, porque todo lo importado es de rareza baja; en
  *    cuanto exista una legendaria con foto de jugador, la regla por rareza
  *    habría fallado en los dos sentidos.
  *
@@ -149,7 +160,68 @@ function carta_usa_marco(int $idRareza, string $imagen): bool
     // "todavía sin ilustración", que se ve mejor solo que dentro de un marco.
     if ($imagen === '') { return false; }
 
-    return stripos($imagen, '/Cromos/Importados/') !== false;
+    /* Atajo sin E/S para lo importado, que son 743 cartas y TODAS cuadradas:
+       es el caso mayoritario de cualquier listado, y resolverlo con una
+       comparación de cadena ahorra abrir 743 ficheros por página. */
+    if (stripos($imagen, '/Cromos/Importados/') !== false) { return true; }
+
+    return carta_imagen_cuadrada($imagen);
+}
+
+/**
+ * ¿La imagen es un retrato cuadrado, o sea del tipo que cabe en la plantilla?
+ *
+ * ⚠️ SE MEMORIZA POR PETICIÓN. Un listado repite la misma carta varias veces
+ *    (rejilla y miniatura de la fila, por ejemplo) y sin caché se abriría el
+ *    fichero una vez por aparición. `getimagesize()` solo lee la cabecera, pero
+ *    200 cartas × 2 apariciones son 400 accesos a disco por página gratis.
+ *
+ * ⚠️ TOLERANCIA DEL 2 %, NO IGUALDAD EXACTA. Los retratos vienen de recortes y
+ *    conversiones, y un 256x255 es tan retrato como un 256x256. Con `==` esa
+ *    carta se habría quedado sin marco y nadie habría sabido por qué.
+ *
+ * Un fichero que no existe devuelve `false` y la carta se pinta a sangre, que
+ * es lo que ya hacía: nunca se rompe por una ruta muerta.
+ */
+function carta_imagen_cuadrada(string $imagen): bool
+{
+    /* EL MANIFIESTO PRIMERO, EL DISCO SOLO SI NO ESTÁ.
+       `components/cromos_cuadrados.php` trae la respuesta ya calculada para
+       las 890 imágenes del catálogo, así que lo normal es no tocar el disco
+       ni una vez. Se carga una sola vez por petición y son 63 KB de array,
+       que PHP resuelve en microsegundos.
+
+       El respaldo a `getimagesize()` NO sobra: una carta subida desde el panel
+       no está en el manifiesto hasta que alguien lo regenere, y sin el
+       respaldo saldría sin marco sin que nadie supiera por qué. */
+    static $manifiesto = null;
+    static $memo = [];
+
+    if ($manifiesto === null) {
+        $f = __DIR__ . '/cromos_cuadrados.php';
+        $manifiesto = is_file($f) ? require $f : [];
+    }
+    /* `array_key_exists` y no `isset`: el manifiesto trae TODAS las imágenes
+       del catálogo, también las que NO son cuadradas, y con `isset` un `false`
+       se leería como "no la conozco" y volvería a abrir el fichero — que es
+       justo lo que se venía a evitar para esas 58. */
+    if (array_key_exists($imagen, $manifiesto)) { return $manifiesto[$imagen]; }
+
+    if (isset($memo[$imagen])) { return $memo[$imagen]; }
+
+    // Las rutas se guardan relativas a la raíz del sitio ('./assets/...');
+    // este fichero vive en components/, así que se sube uno.
+    $ruta = __DIR__ . '/../' . preg_replace('#^\./#', '', $imagen);
+
+    $cuadrada = false;
+    if (is_file($ruta)) {
+        $medidas = @getimagesize($ruta);
+        if ($medidas && $medidas[0] > 0 && $medidas[1] > 0) {
+            $cuadrada = abs($medidas[0] - $medidas[1]) <= max($medidas[0], $medidas[1]) * 0.02;
+        }
+    }
+
+    return $memo[$imagen] = $cuadrada;
 }
 
 /**

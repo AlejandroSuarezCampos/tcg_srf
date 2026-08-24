@@ -313,10 +313,41 @@ include __DIR__ . '/navbar.php';
               $desubicado = $carta && $carta['posicion'] !== $linea;
               $aporte = $carta ? (int) round(Tcg::aportarCarta($carta, $linea)) : null;
               ?>
+              <?php
+              /* La ficha que sale al pasar el ratón. Se manda ya resuelta
+                 desde aquí y no se recalcula en el navegador: `aporte` y la
+                 comparación posición/línea ya están hechas arriba con las
+                 MISMAS funciones que puntúan el duelo (Tcg::aportarCarta),
+                 así que lo que se lee en la ficha no puede discrepar de lo
+                 que vale la carta de verdad. */
+              $detalle = $carta ? json_encode([
+                  'nombre'    => $carta['nombre'],
+                  'posicion'  => $carta['posicion'],
+                  'linea'     => $linea,
+                  'lineaTexto'=> $etiquetaLinea[$linea],
+                  'desubicado'=> $desubicado,
+                  'equipo'    => $carta['equipo'],
+                  'rareza'    => $carta['rareza'],
+                  'idRareza'  => (int) $carta['id_rareza'],
+                  'afinidad'  => $carta['afinidad'],
+                  'afinidadImg' => $carta['afinidad_imagen'],
+                  'rasgo'     => $carta['rasgo'],
+                  'ataque'    => (int) $carta['ataque'],
+                  'defensa'   => (int) $carta['defensa'],
+                  'tecnica'   => (int) $carta['tecnica'],
+                  'aporte'    => $aporte,
+                  'pesos'     => Tcg::PESOS_LINEA[$linea],
+                  // Cuánto rinde por estar (o no) en su puesto: 1,00 en su
+                  // sitio, menos cuanto más lejos. La ficha lo dice cuando
+                  // no es 1, que es cuando explica un número bajo.
+                  'rendimiento' => Tcg::rendimientoPuesto($carta['posicion'], $linea),
+              ], JSON_UNESCAPED_UNICODE) : null;
+              ?>
               <div class="hueco<?= $carta ? ' esta-lleno' : '' ?><?= $desubicado ? ' es-desubicado' : '' ?>"
                    style="left:<?= $coords[$i]['x'] ?>%; top:<?= $coords[$i]['y'] ?>%;"
                    data-hueco="<?= $i ?>" data-linea="<?= $linea ?>"
                    data-pesos="<?= htmlspecialchars(json_encode(Tcg::PESOS_LINEA[$linea]), ENT_QUOTES) ?>"
+                   <?= $detalle ? 'data-detalle="' . htmlspecialchars($detalle, ENT_QUOTES) . '"' : '' ?>
                    <?= $carta ? 'data-rareza="' . (int) $carta['id_rareza'] . '"' : '' ?>>
                 <input type="hidden" name="huecos[<?= $i ?>]"
                        value="<?= $carta ? (int) $carta['id_coleccion'] : '' ?>">
@@ -345,6 +376,17 @@ include __DIR__ . '/navbar.php';
                 <?php endif; ?>
               </div>
             <?php endforeach; ?>
+
+            <?php /* LA FICHA AL VUELO. Uno solo para los once huecos: se
+                     rellena y se recoloca al pasar por cada uno. Vive DENTRO
+                     de .alineacion para poder posicionarse en % sobre el campo
+                     igual que los huecos, sin medir nada con getBoundingRect.
+
+                     `aria-hidden` porque no aporta nada a un lector de
+                     pantalla: el `aria-label` del botón del hueco ya dice
+                     nombre, línea y puntos. Esto es ayuda visual, y duplicarlo
+                     en la capa de accesibilidad sería leer dos veces lo mismo. */ ?>
+            <div class="hueco-ficha" id="m-huecoFicha" hidden aria-hidden="true"></div>
           </div>
 
           <!-- CAPA 2 — COMPOS
@@ -534,6 +576,32 @@ include __DIR__ . '/navbar.php';
                   </div>
                 </div>
 
+                <?php /* ORDENAR POR ESTADÍSTICA.
+
+                         Va en su propia fila y NO lleva `.m-filtro`: los
+                         filtros esconden filas y este las recoloca, así que
+                         compartir clase con ellos lo metería en el `every()`
+                         de filtrar() y no coincidiría con nada — todas las
+                         cartas desaparecerían al elegir un orden.
+
+                         Un solo desplegable con las seis combinaciones en vez
+                         de "campo" + "dirección": son dos clics para lo mismo,
+                         y en móvil dos desplegables ocupan una fila entera. */ ?>
+                <div class="mazo-filtros-fila">
+                  <div class="campo campo-ancho">
+                    <label for="m-orden">Ordenar por</label>
+                    <select id="m-orden">
+                      <option value="">Sin ordenar (los de tu colección)</option>
+                      <option value="ataque-desc">Ataque · de mayor a menor</option>
+                      <option value="ataque-asc">Ataque · de menor a mayor</option>
+                      <option value="defensa-desc">Defensa · de mayor a menor</option>
+                      <option value="defensa-asc">Defensa · de menor a mayor</option>
+                      <option value="tecnica-desc">Técnica · de mayor a menor</option>
+                      <option value="tecnica-asc">Técnica · de menor a mayor</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div class="mazo-filtros-pie">
                   <span class="t-caption t-dim" id="m-conteo" role="status" aria-live="polite">
                     <?= count($porCromo) ?> jugadores disponibles
@@ -577,6 +645,8 @@ include __DIR__ . '/navbar.php';
 
           </div><!-- /.mazo-taller -->
         </form>
+
+        <?php include __DIR__ . '/partials/mazos_ayuda.php'; ?>
 
         <div class="mazo-pie">
           <form method="POST" class="fila fila-entre">

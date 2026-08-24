@@ -93,16 +93,38 @@
 
   var ETIQUETA_LINEA = { POR: 'Portería', DF: 'Defensa', MC: 'Medio', DC: 'Ataque' };
 
-  /* Cuánto aporta una carta a la línea del hueco donde se coloca. Los tres
-     pesos vienen del servidor (Tcg::PESOS_LINEA vía data-pesos), así que esto
-     no es una segunda definición del balance, solo la misma cuenta hecha aquí
-     para no tener que recargar la página cada vez que cambias a un jugador. */
-  function aporte(item, pesos) {
-    return Math.round(
-      (parseFloat(item.dataset.ataque)  || 0) * pesos.ataque +
-      (parseFloat(item.dataset.defensa) || 0) * pesos.defensa +
-      (parseFloat(item.dataset.tecnica) || 0) * pesos.tecnica
-    );
+  /* Copia de Tcg::RENDIMIENTO_FUERA_DE_PUESTO: cuánto rinde una carta de la
+     posición X colocada en la línea Y. Ojo al mantenerla — si se desincroniza
+     del servidor, la previsualización promete una fuerza que el duelo no da. */
+  var RENDIMIENTO = {
+    POR: { POR: 1.00, DF: 0.75, MC: 0.62, DC: 0.50 },
+    DF:  { POR: 0.60, DF: 1.00, MC: 0.90, DC: 0.75 },
+    MC:  { POR: 0.55, DF: 0.90, MC: 1.00, DC: 0.90 },
+    DC:  { POR: 0.50, DF: 0.75, MC: 0.90, DC: 1.00 }
+  };
+
+  /**
+   * Cuánto aporta una carta a la línea del hueco donde se coloca.
+   *
+   * Los pesos vienen del servidor (Tcg::PESOS_LINEA vía `data-pesos`), así que
+   * esto no es una segunda definición del balance: es la misma cuenta hecha
+   * aquí para no recargar la página cada vez que cambias a un jugador.
+   *
+   * ⚠️ LA PENALIZACIÓN POR JUGAR FUERA DE PUESTO TAMBIÉN VA AQUÍ. Sin ella,
+   *    el número que se ve al colocar y el que usa el servidor al resolver el
+   *    partido dejarían de coincidir justo en el caso que importa —un portero
+   *    puesto de delantero— y la pantalla estaría prometiendo una fuerza que
+   *    el duelo no va a dar.
+   */
+  function aporte(item, pesos, linea) {
+    var bruto = (parseFloat(item.dataset.ataque)  || 0) * pesos.ataque +
+                (parseFloat(item.dataset.defensa) || 0) * pesos.defensa +
+                (parseFloat(item.dataset.tecnica) || 0) * pesos.tecnica;
+    return Math.round(bruto * rendimientoPuesto(item.dataset.posicion, linea));
+  }
+
+  function rendimientoPuesto(posicion, linea) {
+    return (RENDIMIENTO[posicion] && RENDIMIENTO[posicion][linea]) || 1;
   }
 
   /* El hueco pinta un retrato compacto (no la tarjeta completa: en 11 sitios
@@ -141,7 +163,7 @@
     boton.appendChild(nombre);
 
     boton.setAttribute('aria-label', 'Hueco de ' + (ETIQUETA_LINEA[linea] || linea) + ': ' + item.dataset.nombre
-      + ', ' + aporte(item, pesos) + ' puntos');
+      + ', ' + aporte(item, pesos, linea) + ' puntos');
 
     hueco.classList.add('esta-lleno');
     hueco.classList.toggle('es-desubicado', item.dataset.posicion !== linea);
@@ -250,13 +272,64 @@
     conteoBusca.textContent = visibles + (visibles === 1 ? ' jugador disponible' : ' jugadores disponibles');
   }
 
+  /* ---- ordenar por estadística ----
+     Reordena el DOM de verdad en vez de esconder nada: convive con los filtros
+     sin saber nada de ellos, y el orden se mantiene al filtrar porque las
+     filas ya están colocadas.
+
+     ⚠️ SE GUARDA EL ORDEN ORIGINAL AL ARRANCAR. Sin él, "Sin ordenar" no
+        podría volver atrás: una vez movidas las filas, el orden con el que
+        vinieron de la colección se habría perdido. Es también el que manda al
+        vaciar los filtros.
+
+     ⚠️ SE MUEVEN LAS FILAS, NO SE REPINTAN. Cada `<li>` lleva sus `data-*` y
+        los manejadores de clic que engancha marcarActivo/colocar; recrearlas
+        obligaría a volver a enganchar todo y a recuperar el estado de
+        "elegida". appendChild sobre un nodo que ya existe lo MUEVE, que es
+        justo lo que hace falta. */
+  var orden = document.getElementById('m-orden');
+  var ordenOriginal = items.slice();
+
+  function ordenarLista() {
+    if (!orden || !lista) return;
+
+    var elegido = orden.value;
+    var secuencia;
+
+    if (!elegido) {
+      secuencia = ordenOriginal;
+    } else {
+      var partes = elegido.split('-');
+      var campo  = partes[0];
+      var signo  = partes[1] === 'asc' ? 1 : -1;
+
+      secuencia = ordenOriginal.slice().sort(function (a, b) {
+        var va = parseInt(a.dataset[campo], 10) || 0;
+        var vb = parseInt(b.dataset[campo], 10) || 0;
+        // A igualdad de estadística manda el orden de la colección, para que
+        // la lista no baile entre dos ordenaciones equivalentes.
+        if (va !== vb) { return (va - vb) * signo; }
+        return ordenOriginal.indexOf(a) - ordenOriginal.indexOf(b);
+      });
+    }
+
+    /* El aviso de "ninguno coincide" es el último hijo y tiene que seguir
+       siéndolo: se reinserta después de mover las filas. */
+    secuencia.forEach(function (item) { lista.appendChild(item); });
+    if (vacio) lista.appendChild(vacio);
+  }
+
   if (buscar) buscar.addEventListener('input', filtrar);
   filtros.forEach(function (sel) { sel.addEventListener('change', filtrar); });
+  if (orden) orden.addEventListener('change', ordenarLista);
 
   if (limpiar) {
     limpiar.addEventListener('click', function () {
       if (buscar) buscar.value = '';
       filtros.forEach(function (sel) { sel.value = ''; });
+      // El orden también es un filtro para quien lo usa: "quitar filtros" que
+      // deja la lista ordenada por ataque no ha quitado todos los filtros.
+      if (orden) { orden.value = ''; ordenarLista(); }
       filtrar();
       if (buscar) buscar.focus();
     });
@@ -344,4 +417,161 @@
       });
     });
   });
+})();
+
+
+/* --------------------------------------------------------------------------
+   FICHA AL VUELO SOBRE LOS TITULARES
+
+   Pasar el ratón por un hueco ocupado enseña lo relevante del jugador y de su
+   carta sin salir del campo: rareza, afinidad, las tres estadísticas y —lo que
+   de verdad importa aquí— CUÁNTO APORTA EN ESE HUECO y por qué.
+
+   ⚠️ EL APORTE NO SE CALCULA AQUÍ. Viaja ya resuelto en `data-detalle`, hecho
+      en servidor con `Tcg::aportarCarta()`, que es la misma función que puntúa
+      el duelo. Recalcularlo en JavaScript sería tener dos fuentes de la misma
+      verdad; el día que cambien los pesos, la ficha diría una cosa y el
+      partido otra, y no habría forma de notarlo hasta perderlo.
+
+   Solo ratón y teclado: en táctil el hueco ya hace otra cosa al tocarlo (abrir
+   el selector), y robarle el primer toque para enseñar una ficha es el patrón
+   que obliga a tocar dos veces todo. En móvil el detalle sigue estando en la
+   tarjeta completa del selector de abajo.
+   -------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+
+  var alineacion = document.getElementById('m-alineacion');
+  var ficha      = document.getElementById('m-huecoFicha');
+  if (!alineacion || !ficha) return;
+
+  var ETIQUETA = { ataque: 'ATA', defensa: 'DEF', tecnica: 'TEC' };
+
+  function escapar(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : s;
+    return d.innerHTML;
+  }
+
+  function filaStat(clave, valor, peso) {
+    /* El peso se enseña junto a la estadística porque es lo que explica el
+       total: un 90 de defensa en el ataque vale 0,15 de lo que parece, y sin
+       verlo escrito la cifra de abajo no se entiende. */
+    return '<span class="hf-stat">'
+      + '<b class="mono">' + valor + '</b>'
+      + '<span class="hf-stat-et">' + ETIQUETA[clave] + '</span>'
+      + '<span class="hf-stat-peso mono">×' + peso + '</span>'
+      + '</span>';
+  }
+
+  function pintar(d) {
+    var partes = [];
+
+    partes.push('<span class="hf-nombre">' + escapar(d.nombre) + '</span>');
+
+    partes.push('<span class="hf-meta">'
+      + '<span class="rz rz-' + d.idRareza + '">' + escapar(d.rareza) + '</span>'
+      + '<span class="hf-pos">' + escapar(d.posicion) + '</span>'
+      + (d.equipo ? '<span class="hf-equipo">' + escapar(d.equipo) + '</span>' : '')
+      + '</span>');
+
+    /* El hexágono, con el mismo marcado que la carta para que herede su
+       estilo. Sin gráfico se enseña solo el nombre de la afinidad: el dato no
+       depende de que exista el icono. */
+    if (d.afinidad) {
+      partes.push('<span class="hf-afinidad">'
+        + (d.afinidadImg
+            ? '<span class="carta-afinidad"><img src="' + escapar(d.afinidadImg)
+              + '" alt=""></span>'
+            : '')
+        + escapar(d.afinidad) + '</span>');
+    }
+
+    partes.push('<span class="hf-stats">'
+      + filaStat('ataque',  d.ataque,  d.pesos.ataque)
+      + filaStat('defensa', d.defensa, d.pesos.defensa)
+      + filaStat('tecnica', d.tecnica, d.pesos.tecnica)
+      + '</span>');
+
+    partes.push('<span class="hf-aporte">'
+      + 'Aporta <b class="mono">' + d.aporte + '</b> en ' + escapar(d.lineaTexto)
+      + '</span>');
+
+    if (d.desubicado) {
+      /* Se dice CUÁNTO cuesta, no solo que está fuera de sitio. Antes era un
+         aviso sin consecuencia visible y no explicaba el número de arriba. */
+      var merma = Math.round((1 - (d.rendimiento != null ? d.rendimiento : 1)) * 100);
+      partes.push('<span class="hf-aviso">'
+        + '<i class="ph ph-warning" aria-hidden="true"></i> '
+        + 'Es ' + escapar(d.posicion) + ' jugando de ' + escapar(d.lineaTexto).toLowerCase()
+        + (merma > 0 ? ': rinde un <b>' + merma + ' % menos</b>' : '')
+        + '</span>');
+    }
+
+    if (d.rasgo) {
+      partes.push('<span class="hf-rasgo">'
+        + '<i class="ph ph-users-three" aria-hidden="true"></i> ' + escapar(d.rasgo)
+        + '</span>');
+    }
+
+    ficha.innerHTML = partes.join('');
+    ficha.dataset.rareza = d.idRareza;
+  }
+
+  function mostrar(hueco) {
+    var crudo = hueco.dataset.detalle;
+    if (!crudo) return;
+
+    var d;
+    try { d = JSON.parse(crudo); } catch (e) { return; }
+
+    pintar(d);
+
+    /* Se ancla al hueco en las MISMAS unidades en que está colocado el hueco
+       (% sobre el campo), así que no hace falta medir nada y sigue cuadrando
+       si el campo cambia de tamaño. `es-abajo` cuando el hueco está en la
+       mitad superior: si no, la ficha se saldría por arriba del campo. */
+    var x = parseFloat(hueco.style.left) || 50;
+    var y = parseFloat(hueco.style.top) || 50;
+
+    ficha.style.left = x + '%';
+    ficha.style.top  = y + '%';
+    ficha.classList.toggle('es-abajo', y < 45);
+    /* Pegada a una banda se saldría de lado: se ancla por su borde en vez de
+       por el centro. */
+    ficha.classList.toggle('es-izquierda', x < 22);
+    ficha.classList.toggle('es-derecha',  x > 78);
+
+    ficha.hidden = false;
+  }
+
+  function ocultar() { ficha.hidden = true; }
+
+  /* Delegación en el contenedor: los huecos se repintan al cambiar de
+     formación (aplicarFormacion), y con listeners uno a uno habría que volver
+     a engancharlos cada vez — el clásico "funciona hasta que cambias algo". */
+  alineacion.addEventListener('mouseover', function (e) {
+    var hueco = e.target.closest && e.target.closest('.hueco.esta-lleno');
+    if (hueco) { mostrar(hueco); }
+  });
+  alineacion.addEventListener('mouseout', function (e) {
+    var hueco = e.target.closest && e.target.closest('.hueco.esta-lleno');
+    // Solo se esconde al salir del hueco de verdad, no al pasar de un hijo a
+    // otro dentro del mismo (mouseout burbujea desde cada descendiente).
+    if (hueco && !hueco.contains(e.relatedTarget)) { ocultar(); }
+  });
+
+  // Teclado: la ficha aparece al tabular hasta el hueco, igual que con el
+  // ratón. Sin esto sería información accesible solo con un puntero.
+  alineacion.addEventListener('focusin', function (e) {
+    var hueco = e.target.closest && e.target.closest('.hueco.esta-lleno');
+    if (hueco) { mostrar(hueco); }
+  });
+  alineacion.addEventListener('focusout', function (e) {
+    var hueco = e.target.closest && e.target.closest('.hueco.esta-lleno');
+    if (hueco && !hueco.contains(e.relatedTarget)) { ocultar(); }
+  });
+
+  // Al tocar se abre el selector: la ficha ahí solo estorbaría.
+  alineacion.addEventListener('click', ocultar);
 })();
