@@ -2178,6 +2178,67 @@ class Tcg
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
+	/** Tope de sobres por tanda. Es lo que cabe en el resumen sin volverlo ilegible. */
+	const SOBRES_POR_TANDA = 10;
+
+	/**
+	 * Abre varios sobres del mismo tipo de una tirada.
+	 *
+	 * ⚠️ SON N APERTURAS DE VERDAD, NO UNA CON N×CARTAS. Cada `abrirSobre()`
+	 *    hace su propia tirada de rareza destacada, que desde que la
+	 *    probabilidad es POR SOBRE (ver `elegirCartasSobre()`) es justo lo que
+	 *    tiene que pasar: diez sobres son diez oportunidades de SRF, no una
+	 *    con cincuenta cartas —que, con el corte premium, daría como mucho un
+	 *    premio en toda la tanda—.
+	 *
+	 * ⚠️ SE COBRA SOBRE A SOBRE Y SE PARA AL PRIMER FALLO. Cada apertura es su
+	 *    propia transacción, así que una tanda cortada a la mitad deja al
+	 *    jugador con exactamente los sobres que ha pagado: no hay estado raro
+	 *    que reparar. Se devuelve `abiertos` para poder decírselo.
+	 *
+	 * Devuelve los sobres POR SEPARADO y no las cartas en un montón: el
+	 * resumen enseña de qué sobre salió cada cosa, y con las cartas ya
+	 * mezcladas eso no se puede reconstruir.
+	 */
+	public function abrirSobresVarios($id_sobre, $id_usuario, $veces = 1) {
+		$veces = max(1, min((int) $veces, self::SOBRES_POR_TANDA));
+
+		$sobres  = [];
+		$monedas = null;
+		$error   = null;
+
+		for ($i = 0; $i < $veces; $i++) {
+			$r = $this->abrirSobre($id_sobre, $id_usuario);
+
+			if (!$r["ok"]) {
+				// El primero que falla corta la tanda. Si ya había alguno
+				// abierto no es un error: es una tanda más corta, y se cuenta.
+				$error = $r["error"];
+				break;
+			}
+
+			$sobres[] = $r["cartas"] ?? [];
+			$monedas  = $r["monedas"];
+		}
+
+		if (!$sobres) {
+			return ["ok" => false, "error" => $error ?: "No se pudo abrir el sobre.",
+			        "sobres" => [], "abiertos" => 0, "monedas" => null];
+		}
+
+		return [
+			"ok"       => true,
+			"error"    => null,
+			"sobres"   => $sobres,
+			"abiertos" => count($sobres),
+			"pedidos"  => $veces,
+			// Se cuenta lo que ha pasado de verdad, no lo que se pidió: quien
+			// pide diez y se queda sin monedas al séptimo tiene que enterarse.
+			"aviso"    => count($sobres) < $veces ? $error : null,
+			"monedas"  => $monedas,
+		];
+	}
+
 	// Compra y abre un sobre: cobra al usuario y le da $cantidad cartas al azar
 	// de la expansión del sobre, respetando la probabilidad real de cada rareza
 	// (columna `probabilidad` de la tabla `rarezas`).
@@ -2233,7 +2294,15 @@ class Tcg
 					c.id_cromo, c.nombre, c.imagen, c.posicion,
 					eq.nombre AS equipo, c.universo,
 					c.id_rareza, r.nombre AS rareza, r.probabilidad,
-					c.cupo_numerado
+					/* El cupo SOLO vale si la carta es de la rareza Numerada.
+					   `cupo_numerado` es una columna suelta y ponérsela a una
+					   carta de otra rareza la convertía en numerada de hecho:
+					   Shawn Froste (SRF, cupo 10) salía de los sobres con
+					   número de serie. Neutralizándolo aquí, el resto de esta
+					   función lo ve como NULL y lo trata como carta normal
+					   —sigue saliendo, solo que sin número—, sin tener que
+					   repetir la condición en los cuatro sitios que la leen. */
+					IF(c.id_rareza = :rareza_numerada, c.cupo_numerado, NULL) AS cupo_numerado
 				FROM cromos c
 				INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
 				INNER JOIN rarezas r ON c.id_rareza = r.id_rareza
@@ -2249,11 +2318,16 @@ class Tcg
 				     dentro, el sorteo la elegiría, la entrega fallaría y la
 				     persona se quedaría con una carta menos sin que nada se lo
 				     explicara. Mejor que no pueda ni salir. */
-				  AND (c.cupo_numerado IS NULL OR c.cupo_numerado = 0
+				  AND (c.id_rareza <> :rareza_numerada2
+				       OR c.cupo_numerado IS NULL OR c.cupo_numerado = 0
 				       OR (SELECT COUNT(*) FROM cadena_numeracion n
 				           WHERE n.id_cromo = c.id_cromo) < c.cupo_numerado)
 			");
-			$stmtCartas->execute([":id_expansion" => $sobre["id_expansion"]]);
+			$stmtCartas->execute([
+				":id_expansion"     => $sobre["id_expansion"],
+				":rareza_numerada"  => self::RAREZA_NUMERADA,
+				":rareza_numerada2" => self::RAREZA_NUMERADA,
+			]);
 			$cartasDisponibles = $stmtCartas->fetchAll(PDO::FETCH_ASSOC);
 
 			if (empty($cartasDisponibles)) {
@@ -2306,7 +2380,23 @@ class Tcg
 						continue;
 					}
 					if (!$sinNumerar) { continue; }   // no hay con qué sustituirla
-					$carta = $sinNumerar[array_rand($sinNumerar)];
+
+					/* El recambio es DE SU MISMA RAREZA siempre que lo haya.
+					   Cogiéndolo del montón entero, un SRF numerado agotado se
+					   cambiaba por lo primero que saliera —casi siempre un
+					   Común, porque son los más numerosos—, y de paso podía
+					   colar un segundo premium en un sobre que ya traía el
+					   suyo, saltándose la tirada única de
+					   `elegirCartasSobre()`. Solo si esa rareza se ha quedado
+					   sin ninguna carta libre se cae al montón general, que es
+					   preferible a entregar el sobre con un hueco. */
+					$mismaRareza = array_values(array_filter(
+						$sinNumerar,
+						fn($c) => (int) $c["id_rareza"] === (int) $carta["id_rareza"]
+					));
+					$recambio = $mismaRareza ?: $sinNumerar;
+
+					$carta = $recambio[array_rand($recambio)];
 					$cartasObtenidas[$i] = $carta;
 				}
 
@@ -2339,13 +2429,73 @@ class Tcg
 		}
 	}
 
-	// Elige $cantidad cartas al azar respetando la probabilidad real de cada
-	// rareza (solo entre las rarezas que de verdad tienen cartas en esa expansión,
-	// para no "desperdiciar" probabilidad en un tier vacío)
+	/**
+	 * De esta rareza para arriba, LA PROBABILIDAD ES POR SOBRE.
+	 *
+	 * Es el corte entre "relleno" y "premio". Las rarezas por debajo pueden
+	 * salir varias veces en el mismo sobre; las de aquí arriba solo pueden
+	 * llegar por la tirada única de `sortearPremio()`, y por eso su número en
+	 * la tabla `rarezas` se lee TAL CUAL, sin ninguna cuenta de por medio:
+	 * 0,20 % es un SRF cada 500 SOBRES, exacto.
+	 *
+	 * Subirlo hace los sobres más generosos con los tiers altos; bajarlo, más
+	 * tacaños. Es la única palanca que hay que tocar para recalibrar.
+	 */
+	const RAREZA_PREMIUM = 4;   // Épico
+
+	/**
+	 * La rareza «Numerada». Es la ÚNICA que puede llevar tirada limitada.
+	 *
+	 * `cromos.cupo_numerado` es una columna suelta y nada impedía ponérsela a
+	 * una carta de otra rareza. Pasó: Shawn Froste (SRF) tenía cupo 10, así que
+	 * salía de los sobres con número de serie —«numerada a 10»— cuando no es
+	 * una numerada y de momento no existe ninguna numerada SRF. El cupo se
+	 * quitó de esa carta en la migración `050`, y desde aquí además se ignora
+	 * el de cualquier carta que no sea de esta rareza, para que un cupo puesto
+	 * por error en el panel no vuelva a convertir una carta en numerada.
+	 */
+	const RAREZA_NUMERADA = 7;
+
+	/**
+	 * Elige $cantidad cartas para un sobre.
+	 *
+	 * ⚠️ UNA TIRADA POR SOBRE, NO UNA POR CARTA. Antes se sorteaba la rareza
+	 *    de CADA carta contra la tabla, así que el 0,50 % del SRF se aplicaba
+	 *    tantas veces como cartas trajera el sobre: con sobres de cinco, la
+	 *    probabilidad real de ver un SRF era del 2,47 % por sobre —uno cada 40
+	 *    en vez de uno cada 200—. El número publicado y el que se sentía
+	 *    jugando no eran el mismo, y se notaba: salían SRF a puñados.
+	 *
+	 *    Ahora el sobre tira UNA vez, y SOLO entre las rarezas premium. Si le
+	 *    toca una, una de sus cartas —en un hueco al azar, para que no se sepa
+	 *    cuál es antes de darle la vuelta— es de esa rareza. El resto del sobre
+	 *    se llena de la tabla BASE, la de las rarezas por debajo del corte,
+	 *    renormalizada.
+	 *
+	 *    La consecuencia buscada: los tiers altos solo pueden entrar por esa
+	 *    puerta, así que su probabilidad por sobre es exactamente la que dice
+	 *    la tabla. La consecuencia asumida: un sobre ya no puede traer dos
+	 *    Épicos. Es el precio de que el número publicado sea verdad.
+	 *
+	 * ⚠️ LA TIRADA VA CONTRA 100, NO CONTRA LA SUMA DE LA TABLA. Antes se
+	 *    sorteaba contra el total de las rarezas PRESENTES, así que el número
+	 *    publicado solo era verdad si la tabla sumaba justo 100: con la de hoy
+	 *    (96,63) un SRF al 0,20 % salía en realidad al 0,207 %, uno cada 483
+	 *    sobres en vez de cada 500. Poca cosa, pero el compromiso es que el
+	 *    número se lea tal cual, y con una escala fija se lee tal cual sin
+	 *    depender de lo que sumen las demás filas. Lo que sobra hasta 100 es
+	 *    «este sobre no lleva premium», que es lo que toca.
+	 *
+	 * El "solo entre las rarezas que de verdad tienen cartas en esa expansión"
+	 * de siempre se mantiene para el RELLENO. Para el premio ya no hace falta
+	 * repartir el hueco vacío: si una expansión no tiene SRF, ese 0,20 % se
+	 * queda sin premium en vez de regalárselo al Épico, que es justo lo que
+	 * hace que el ratio del Épico sea el suyo y no el suyo más las sobras.
+	 */
 	private function elegirCartasSobre($cartasDisponibles, $cantidad) {
 		$porRareza = [];
 		foreach ($cartasDisponibles as $carta) {
-			$idRareza = $carta["id_rareza"];
+			$idRareza = (int) $carta["id_rareza"];
 			if (!isset($porRareza[$idRareza])) {
 				$porRareza[$idRareza] = [
 					"probabilidad" => (float) $carta["probabilidad"],
@@ -2355,31 +2505,75 @@ class Tcg
 			$porRareza[$idRareza]["cartas"][] = $carta;
 		}
 
-		$totalProbabilidad = array_sum(array_column($porRareza, "probabilidad"));
-		if ($totalProbabilidad <= 0) {
-			$totalProbabilidad = count($porRareza); // fallback por si alguna probabilidad está a 0
-		}
+		$base = array_filter($porRareza, fn($r) => $r < self::RAREZA_PREMIUM, ARRAY_FILTER_USE_KEY);
+
+		/* Una expansión que solo tenga premium no puede repartir relleno. Antes
+		   de devolver un sobre a medias se cae al bombo completo: es el
+		   comportamiento viejo, peor calibrado pero entero. */
+		if (!$base) { $base = $porRareza; }
 
 		$elegidas = [];
-
 		for ($i = 0; $i < $cantidad; $i++) {
-			$tirada    = mt_rand() / mt_getrandmax() * $totalProbabilidad;
-			$acumulado = 0;
-			$rarezaElegida = array_key_first($porRareza);
+			$elegidas[] = self::sacarDe($base);
+		}
 
-			foreach ($porRareza as $idRareza => $grupo) {
-				$acumulado += $grupo["probabilidad"];
-				if ($tirada <= $acumulado) {
-					$rarezaElegida = $idRareza;
-					break;
-				}
-			}
-
-			$cartasDeEsaRareza = $porRareza[$rarezaElegida]["cartas"];
-			$elegidas[] = $cartasDeEsaRareza[array_rand($cartasDeEsaRareza)];
+		// La tirada del sobre. Devuelve null la inmensa mayoría de las veces:
+		// entonces el sobre es todo relleno, que es lo que ya hay montado.
+		$destacada = self::sortearPremio($porRareza);
+		if ($destacada !== null && $cantidad > 0) {
+			$elegidas[random_int(0, $cantidad - 1)] = self::sacarDe([$destacada => $porRareza[$destacada]]);
 		}
 
 		return $elegidas;
+	}
+
+	/**
+	 * La tirada de premio del sobre: devuelve el `id_rareza` premium que toca,
+	 * o null si a este sobre no le toca ninguno.
+	 *
+	 * La escala es 100 fija (ver el ⚠️ de `elegirCartasSobre()`), así que el
+	 * valor de `rarezas.probabilidad` ES el porcentaje por sobre. Una tabla mal
+	 * puesta cuyos premium sumaran más de 100 dejaría a los últimos sin
+	 * opciones, pero eso ya sería una tabla en la que el 100 % de los sobres
+	 * lleva premium: no hay nada sensato que hacer ahí y no merece código.
+	 */
+	private static function sortearPremio(array $porRareza) {
+		$premium = array_filter($porRareza, fn($r) => $r >= self::RAREZA_PREMIUM, ARRAY_FILTER_USE_KEY);
+		if (!$premium) { return null; }
+
+		$tirada    = mt_rand() / mt_getrandmax() * 100.0;
+		$acumulado = 0.0;
+		foreach ($premium as $idRareza => $grupo) {
+			$acumulado += (float) $grupo["probabilidad"];
+			if ($tirada < $acumulado) { return (int) $idRareza; }
+		}
+		return null;
+	}
+
+	/**
+	 * Qué rareza sale, según el peso de cada una. Devuelve el `id_rareza`.
+	 * Recibe el mismo array agrupado que arma `elegirCartasSobre()`.
+	 */
+	private static function sortearRareza(array $porRareza) {
+		$total = array_sum(array_column($porRareza, "probabilidad"));
+		if ($total <= 0) { $total = count($porRareza); }   // por si alguna está a 0
+
+		$tirada    = mt_rand() / mt_getrandmax() * $total;
+		$acumulado = 0;
+		$elegida   = array_key_first($porRareza);
+
+		foreach ($porRareza as $idRareza => $grupo) {
+			$acumulado += $grupo["probabilidad"];
+			if ($tirada <= $acumulado) { return (int) $idRareza; }
+			$elegida = $idRareza;
+		}
+		return (int) $elegida;
+	}
+
+	/** Sortea rareza dentro del grupo que se le pase y devuelve UNA carta. */
+	private static function sacarDe(array $porRareza) {
+		$cartas = $porRareza[self::sortearRareza($porRareza)]["cartas"];
+		return $cartas[array_rand($cartas)];
 	}
 	// ==========================================================
 	// PANEL DE CONTROL — SOBRES (crear / editar / eliminar)
@@ -2745,35 +2939,143 @@ class Tcg
 
 	/**
 	 * Cuánto pesa cada estadística de la carta según la línea donde la pongas.
-	 * Decisión de Alejandro: antes cada línea puntuaba con UNA sola estadística
-	 * (Portería/Defensa con defensa, Medio con técnica, Ataque con ataque); ahora
-	 * las tres estadísticas de la carta cuentan siempre, pero con distinto peso
-	 * según dónde la coloques — así que un portero con buen ataque ya no es un
-	 * dato irrelevante, aporta un poco, pero mucho menos que su defensa.
+	 * Las tres cuentan siempre, con distinto peso según el sitio: un portero
+	 * con buen ataque aporta un poco, pero mucho menos que su defensa.
 	 *
-	 * Los pesos NO están normalizados a que sumen 1: son los que pidió
-	 * Alejandro literalmente, y siguen dejando clara cuál es la estadística
-	 * "dueña" de cada línea (la de peso más alto) sin que las otras dos sean
-	 * cero. Ver aportarCarta().
+	 * ⚠️ LAS CUATRO LÍNEAS SUMAN LO MISMO (2,0), Y ESO NO ES COSMÉTICA.
+	 *
+	 *    La proporción entre las tres estadísticas de una línea es la de
+	 *    siempre —la que pidió Alejandro—, pero antes cada línea sumaba un
+	 *    total distinto: POR 3,00; DF 1,75; MC 2,00; DC 2,15. Como
+	 *    `fuerzaAlineacion()` SUMA las cuatro líneas para sacar el total del
+	 *    equipo, eso significaba que la MISMA carta valía un 71 % más metida en
+	 *    la portería que en la defensa. Dónde la pusieras no cambiaba solo QUÉ
+	 *    estadística suya contaba: cambiaba CUÁNTO valía la carta.
+	 *
+	 *    Consecuencia medida con el baremo real, y vista en partidas de verdad:
+	 *      · un delantero Común aportaba 182 de portero y 149,6 de delantero,
+	 *      · un medio aportaba 198 de portero y 135 de medio.
+	 *    O sea que la jugada óptima era ignorar las posiciones y amontonar lo
+	 *    mejor donde más pagaba. Había gente ganando duelos a onces mucho
+	 *    mejores, y cadenas en dificultad alta, con el equipo entero cambiado
+	 *    de sitio. No era una estrategia: era un agujero en la fórmula.
+	 *
+	 *    Normalizando, el reparto interno de cada línea se conserva intacto
+	 *    (la defensa sigue mandando en portería, el ataque en la punta) y lo
+	 *    único que desaparece es la línea "que paga más". Colocar bien vuelve a
+	 *    ser lo que más rinde, que es de lo que iba el metajuego.
+	 *
+	 *    El total del equipo apenas se mueve: un 1-4-4-2 de Comunes pasa de
+	 *    1.532 a ~1.507, así que la calibración del PvE y la curva de Elo
+	 *    siguen valiendo.
+	 *
+	 * Lo comprueba db/pruebas/probar_posiciones.php, que falla si alguna línea
+	 * vuelve a sumar distinto o si una carta renta más fuera de su puesto.
 	 */
 	const PESOS_LINEA = [
-		"POR" => ["ataque" => 0,    "defensa" => 2,    "tecnica" => 1],
-		"DF"  => ["ataque" => 0.25, "defensa" => 1,    "tecnica" => 0.5],
-		"MC"  => ["ataque" => 0.5,  "defensa" => 0.5,  "tecnica" => 1],
-		"DC"  => ["ataque" => 1.25, "defensa" => 0.15, "tecnica" => 0.75],
+		//                      ataque         defensa        técnica      suma
+		"POR" => ["ataque" => 0,      "defensa" => 1.3333, "tecnica" => 0.6667],
+		"DF"  => ["ataque" => 0.2857, "defensa" => 1.1429, "tecnica" => 0.5714],
+		"MC"  => ["ataque" => 0.5,    "defensa" => 0.5,    "tecnica" => 1],
+		"DC"  => ["ataque" => 1.1628, "defensa" => 0.1395, "tecnica" => 0.6977],
+	];
+
+	/**
+	 * Orden de las líneas sobre el campo. Sirve para medir CUÁNTO se ha
+	 * desplazado una carta de su puesto: de portería a defensa hay un paso, de
+	 * portería al ataque hay tres.
+	 */
+	const ORDEN_LINEA = ["POR" => 0, "DF" => 1, "MC" => 2, "DC" => 3];
+
+	/**
+	 * Cuánto rinde una carta según SU posición (fila) y la línea donde se la
+	 * coloca (columna). 1,00 es "en su sitio".
+	 *
+	 * ⚠️ ES UNA MATRIZ Y NO UNA TABLA POR DISTANCIA, y la diferencia es todo el
+	 *    arreglo. La primera versión medía "cuántas líneas se ha movido" y le
+	 *    aplicaba 0,92 / 0,82 / 0,70. Eso trata POR→DF como un desplazamiento
+	 *    pequeño, igual que DF→MC, y no lo es: un defensa en la portería
+	 *    rendía al 92 %, un 8 % de castigo por jugar de portero sin serlo.
+	 *    Como en el baremo POR y DF tienen ESTADÍSTICAS IDÉNTICAS, ese 8 % no
+	 *    cambiaba el metajuego: seguía saliendo a cuenta rellenar la portería
+	 *    con cualquiera y tratar el puesto como un hueco más.
+	 *
+	 *    Ser portero es OTRO OFICIO, no una línea más atrás. Por eso la fila y
+	 *    la columna de POR llevan castigos duros en los dos sentidos (0,50 a
+	 *    0,60), mientras que moverse entre líneas de campo —de defensa a medio,
+	 *    de medio a delantero— sigue siendo barato (0,90), que es donde de
+	 *    verdad se quiere que haya decisión y no prohibición.
+	 *
+	 *    Con esto, meter a un defensa bajo palos cuesta un 40 % de su
+	 *    aportación en vez de un 8 %, y el hueco de portero vuelve a pedir un
+	 *    portero.
+	 *
+	 * ⚠️ POR QUÉ HIZO FALTA ESTO, Y POR QUÉ NO BASTABA CON LOS PESOS.
+	 *
+	 *    La idea original era que los pesos de cada línea hicieran el trabajo
+	 *    solos: cada posición tiene su perfil de estadísticas, así que la carta
+	 *    adecuada rendiría más en su hueco sin necesidad de ninguna regla. Con
+	 *    los pesos ya normalizados eso se cumple para MC y DC... pero NO para
+	 *    portería y defensa, y no por un descuido de la fórmula sino por los
+	 *    DATOS: en el baremo de rareza x posición, `POR` y `DF` tienen rangos
+	 *    IDÉNTICOS en las tres estadísticas y en las siete rarezas. Un portero
+	 *    y un defensa son, numéricamente, la misma carta.
+	 *
+	 *    Consecuencia medida: como la línea de portería concentra el peso en la
+	 *    defensa y descarta el ataque, un DEFENSA aportaba 141,3 puesto de
+	 *    portero y 137,4 puesto de defensa. O sea que lo óptimo era meter a tu
+	 *    mejor central bajo palos, y poner porteros de defensa salía gratis.
+	 *    Con dos posiciones indistinguibles, ninguna fórmula basada solo en
+	 *    estadísticas puede distinguirlas: hace falta mirar la carta.
+	 *
+	 *    Esto NO contradice la regla de "cualquier carta en cualquier hueco":
+	 *    se sigue pudiendo colocar a quien sea donde sea. Lo que cambia es que
+	 *    ahora cuesta, y cuesta más cuanto más lejos de su sitio. Un once bien
+	 *    colocado no pierde ni un punto (multiplicador 1,00), así que la
+	 *    calibración del PvE y la curva de Elo no se mueven para quien juega
+	 *    bien: el ajuste solo muerde a quien coloca mal.
+	 */
+	const RENDIMIENTO_FUERA_DE_PUESTO = [
+		//              juega de:  POR     DF      MC      DC
+		"POR" => ["POR" => 1.00, "DF" => 0.75, "MC" => 0.62, "DC" => 0.50],
+		"DF"  => ["POR" => 0.60, "DF" => 1.00, "MC" => 0.90, "DC" => 0.75],
+		"MC"  => ["POR" => 0.55, "DF" => 0.90, "MC" => 1.00, "DC" => 0.90],
+		"DC"  => ["POR" => 0.50, "DF" => 0.75, "MC" => 0.90, "DC" => 1.00],
 	];
 
 	/** Cuánto aporta UNA carta a la línea en la que está colocada. */
 	public static function aportarCarta(array $carta, $linea) {
 		$pesos = self::PESOS_LINEA[$linea] ?? self::PESOS_LINEA["MC"];
-		return (float) ($carta["ataque"]  ?? 0) * $pesos["ataque"]
-			 + (float) ($carta["defensa"] ?? 0) * $pesos["defensa"]
-			 + (float) ($carta["tecnica"] ?? 0) * $pesos["tecnica"];
+
+		$bruto = (float) ($carta["ataque"]  ?? 0) * $pesos["ataque"]
+		       + (float) ($carta["defensa"] ?? 0) * $pesos["defensa"]
+		       + (float) ($carta["tecnica"] ?? 0) * $pesos["tecnica"];
+
+		return $bruto * self::rendimientoPuesto($carta["posicion"] ?? null, $linea);
+	}
+
+	/**
+	 * El multiplicador por jugar dentro o fuera de su puesto.
+	 *
+	 * ⚠️ SIN POSICIÓN NO SE PENALIZA. Una carta que llegue sin el campo
+	 *    `posicion` —un escudo, un entrenador, o cualquier consulta que no lo
+	 *    seleccione— se trata como si estuviera en su sitio. Castigar por un
+	 *    dato que falta sería restar fuerza a alguien por un fallo de consulta,
+	 *    y encima de forma invisible.
+	 */
+	public static function rendimientoPuesto($posicion, $linea) {
+		return self::RENDIMIENTO_FUERA_DE_PUESTO[$posicion][$linea] ?? 1.0;
 	}
 
 	/**
 	 * Las formaciones jugables. La clave es lo que se guarda en
 	 * `mazos.formacion` y en la formación congelada de un duelo.
+	 *
+	 * ⚠️ EL NOMBRE NO CUENTA AL PORTERO. Un "4-4-2" son cuatro defensas, cuatro
+	 * medios y dos delanteros; el portero no se nombra porque es siempre uno y
+	 * en todas, así que decirlo en las cuarenta y cinco no distingue ninguna.
+	 * La CLAVE sigue siendo la misma de siempre ("442"), que es lo que hay
+	 * guardado en `mazos.formacion` y en los duelos congelados.
 	 *
 	 * `lineas` es [nº de DF, nº de MC, nº de DC]. El portero es siempre uno,
 	 * así que las tres cifras suman 10 y la alineación son siempre 11 huecos:
@@ -2789,14 +3091,277 @@ class Tcg
 	 * metajuego, en decidir esas colocaciones.
 	 */
 	const FORMACIONES = [
-		"442" => ["nombre" => "1-4-4-2", "lineas" => [4, 4, 2]],
-		"433" => ["nombre" => "1-4-3-3", "lineas" => [4, 3, 3]],
-		"352" => ["nombre" => "1-3-5-2", "lineas" => [3, 5, 2]],
-		"532" => ["nombre" => "1-5-3-2", "lineas" => [5, 3, 2]],
-		"451" => ["nombre" => "1-4-5-1", "lineas" => [4, 5, 1]],
-		"343" => ["nombre" => "1-3-4-3", "lineas" => [3, 4, 3]],
-		"541" => ["nombre" => "1-5-4-1", "lineas" => [5, 4, 1]],
-		"361" => ["nombre" => "1-3-6-1", "lineas" => [3, 6, 1]],
+		"442" => ["nombre" => "4-4-2", "lineas" => [4, 4, 2]],
+		"433" => ["nombre" => "4-3-3", "lineas" => [4, 3, 3]],
+		"352" => ["nombre" => "3-5-2", "lineas" => [3, 5, 2]],
+		"532" => ["nombre" => "5-3-2", "lineas" => [5, 3, 2]],
+		"451" => ["nombre" => "4-5-1", "lineas" => [4, 5, 1]],
+		"343" => ["nombre" => "3-4-3", "lineas" => [3, 4, 3]],
+		"541" => ["nombre" => "5-4-1", "lineas" => [5, 4, 1]],
+		"361" => ["nombre" => "3-6-1", "lineas" => [3, 6, 1]],
+
+		/* ------------------------------------------------------------------
+		   FORMACIONES DE MÁS DE TRES LÍNEAS (`filas`)
+		   Ver la nota larga sobre `filas` encima de huecosDe().
+
+		   El ROL de cada hueco lo decide dónde juega, no en qué fila está
+		   dibujado — que es justo lo que `lineas` no sabía expresar. En un
+		   4-2-3-1 la fila de tres son un extremo, un mediapunta y otro
+		   extremo: los extremos puntúan como ATAQUE (viven de rematar y
+		   desbordar) y el mediapunta como MEDIO (vive de la técnica). Con el
+		   modelo viejo los tres habrían tenido que ser lo mismo, y la
+		   formación no habría significado nada.
+		   ------------------------------------------------------------------ */
+		"4231" => ["nombre" => "4-2-3-1", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 58, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 37, "arco" => "MC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"4141" => ["nombre" => "4-1-4-1", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 60, "arco" => "MC", "roles" => ["MC"]],
+			// Los cuatro del medio son MEDIOS, también los de banda: en un
+			// 4-1-4-1 las bandas recorren el carril entero, no rematan.
+			["y" => 38, "arco" => "MC", "roles" => ["MC", "MC", "MC", "MC"]],
+			["y" => 16, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"4321" => ["nombre" => "4-3-2-1", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 57, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			// El "árbol de Navidad": dos mediapuntas por dentro, ninguno abre.
+			["y" => 36, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"3421" => ["nombre" => "3-4-2-1", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56, "arco" => "MC", "roles" => ["MC", "MC", "MC", "MC"]],
+			["y" => 36, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"41212" => ["nombre" => "4-1-2-1-2 (rombo)", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 62, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 45, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 30, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 14, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"4222" => ["nombre" => "4-2-2-2", "filas" => [
+			["y" => 77, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 56, "arco" => "MC", "roles" => ["MC", "MC"]],
+			/* Los dos de la tercera línea son MEDIOS y no extremos: se escribió
+			   al revés a mano y los tres diagramas del catálogo que dibujan
+			   esta forma —Ocean Dive, Sandstorm y Zero— la leen como dos
+			   medios por delante del doble pivote. Manda el dato. */
+			["y" => 36, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+
+		/* ------------------------------------------------------------------
+		   LAS FORMACIONES DE `img/Formaciones`, LEÍDAS DE LOS DIAGRAMAS
+		
+		   Salen de los 197 diagramas de los seis juegos. El REPARTO de
+		   jugadores por línea y el ROL de cada uno se han leído de la imagen;
+		   el detalle de cómo, en db/pruebas/probar_formaciones.php.
+		
+		   ⚠️ LAS ALTURAS SE REPARTEN A PARTES IGUALES entre la línea de fondo
+		      (77) y la punta (16), y NO se copian las del diagrama. Se probó
+		      a copiarlas para conservar los onces escalonados y el resultado
+		      fue que en móvil los retratos se pisaban: medido en el navegador
+		      a 270 px de campo, dos filas del 3-2-2-2-1 quedaban a 56 px y
+		      el hueco mide 58. Repartidas por igual, la separación es siempre
+		      la mayor posible y ninguna formación puede solaparse.
+		   ------------------------------------------------------------------ */
+		"55" => ["nombre" => "5-5", "filas" => [   // Supernova
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF", "DF"]],
+			["y" => 16.0, "arco" => "MC", "roles" => ["MC", "MC", "DC", "MC", "MC"]],
+		]],
+		"235" => ["nombre" => "2-3-5", "filas" => [   // Gamma
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "MC", "DC", "MC", "DC"]],
+		]],
+		"244" => ["nombre" => "2-4-4", "filas" => [   // Thousand
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC", "MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC", "DC"]],
+		]],
+		"514" => ["nombre" => "5-1-4", "filas" => [   // Iron Shell
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC", "DC"]],
+		]],
+		"631" => ["nombre" => "6-3-1", "filas" => [   // Legacy
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF", "DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"1351" => ["nombre" => "1-3-5-1", "filas" => [   // Predator
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "DF", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["DC", "MC", "MC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"1513" => ["nombre" => "1-5-1-3", "filas" => [   // Phoenix
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["DF", "MC", "MC", "MC", "DF"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC"]],
+		]],
+		"2224" => ["nombre" => "2-2-2-4", "filas" => [   // Lost Wing
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["MC", "DC", "DC", "MC"]],
+		]],
+		"2233" => ["nombre" => "2-2-3-3", "filas" => [   // Dark Knights
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 56.7, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC"]],
+		]],
+		"2332" => ["nombre" => "2-3-3-2", "filas" => [   // Neo Death Zone
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 56.7, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"2341" => ["nombre" => "2-3-4-1", "filas" => [   // Mamori no Jinkei
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"2611" => ["nombre" => "2-6-1-1", "filas" => [   // Albatross
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC", "MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"3223" => ["nombre" => "3-2-2-3", "filas" => [   // Pakuchi Smell
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "MC", "roles" => ["MC", "DC", "MC"]],
+		]],
+		"3232" => ["nombre" => "3-2-3-2", "filas" => [   // Chaos Flower, Dot Prison, Marine Snow…
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"3313" => ["nombre" => "3-3-1-3", "filas" => [   // Beta, Bow & Arrow
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC"]],
+		]],
+		"3322" => ["nombre" => "3-3-2-2", "filas" => [   // Giru, Lagoon, Shika no Tsuno
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"3331" => ["nombre" => "3-3-3-1", "filas" => [   // Obius, Terracotta, Zan
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"3412" => ["nombre" => "3-4-1-2", "filas" => [   // Middle Block
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC", "MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"4132" => ["nombre" => "4-1-3-2", "filas" => [   // Bread, Butterfly, Lightning…
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"4213" => ["nombre" => "4-2-1-3", "filas" => [   // Resistance
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 36.3, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC"]],
+		]],
+		"5131" => ["nombre" => "5-1-3-1", "filas" => [   // Big Bang
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF", "DF", "DF"]],
+			["y" => 56.7, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 36.3, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"12142" => ["nombre" => "1-2-1-4-2", "filas" => [   // Blue Leaf
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 31.2, "arco" => "DC", "roles" => ["DC", "MC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"21214" => ["nombre" => "2-1-2-1-4", "filas" => [   // Sacred
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC", "DC"]],
+		]],
+		"22123" => ["nombre" => "2-2-1-2-3", "filas" => [   // Omni
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "MC", "roles" => ["MC", "DC", "MC"]],
+		]],
+		"22132" => ["nombre" => "2-2-1-3-2", "filas" => [   // Raimon
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 31.2, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"22213" => ["nombre" => "2-2-2-1-3", "filas" => [   // Moonlight
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC", "DC"]],
+		]],
+		"22222" => ["nombre" => "2-2-2-2-2", "filas" => [   // Assassin, Basic, Big Wave…
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"22231" => ["nombre" => "2-2-2-3-1", "filas" => [   // Ancient
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 31.2, "arco" => "DC", "roles" => ["DC", "MC", "DC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"22321" => ["nombre" => "2-2-3-2-1", "filas" => [   // Soft Rime
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF"]],
+			["y" => 61.8, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC", "MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
+		"32122" => ["nombre" => "3-2-1-2-2", "filas" => [   // Perfect
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 61.8, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC", "DC"]],
+		]],
+		"32221" => ["nombre" => "3-2-2-2-1", "filas" => [   // Neo Cloud
+			["y" => 77.0, "arco" => "DF", "roles" => ["DF", "DF", "DF"]],
+			["y" => 61.8, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 46.5, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 31.2, "arco" => "MC", "roles" => ["MC", "MC"]],
+			["y" => 16.0, "arco" => "DC", "roles" => ["DC"]],
+		]],
 	];
 
 	/** La de siempre. Es la que se asume cuando no consta ninguna. */
@@ -2807,7 +3372,7 @@ class Tcg
 
 	/**
 	 * Reparto horizontal de una línea según cuántos jugadores tenga, en % del
-	 * ancho del campo. Los valores de 2 y 4 son los que ya tenía el 1-4-4-2
+	 * ancho del campo. Los valores de 2 y 4 son los que ya tenía el 4-4-2
 	 * escritos a mano en el CSS, así que esa formación se sigue pintando
 	 * exactamente igual que antes de existir las demás.
 	 */
@@ -2831,7 +3396,7 @@ class Tcg
 	 *
 	 * El arco no es decorativo: la defensa se comba hacia adelante por las
 	 * bandas (los laterales suben) y el medio se comba hacia adelante por el
-	 * centro (los interiores pisan área). Es lo que hace que un 1-5-3-2 se lea
+	 * centro (los interiores pisan área). Es lo que hace que un 5-3-2 se lea
 	 * como una defensa de cinco y no como una fila recta de cinco puntos.
 	 */
 	const LINEA_Y = [
@@ -2841,14 +3406,58 @@ class Tcg
 		"DC"  => [16, 0, 0],
 	];
 
+	/**
+	 * Las FILAS de una formación, ya normalizadas: una lista de
+	 *   ["y" => %, "arco" => "DF"|"MC"|"DC", "roles" => ["DF","MC",…]]
+	 * SIN contar al portero, que siempre es uno y siempre va en el mismo sitio.
+	 *
+	 * ⚠️ DOS FORMAS DE DECLARAR UNA FORMACIÓN, Y NO ES DUPLICIDAD.
+	 *
+	 *    `lineas` => [nº DF, nº MC, nº DC] es el modelo viejo: tres filas, una
+	 *    por rol. Se conserva —y se traduce aquí— porque las ocho formaciones
+	 *    que ya existían tienen MAZOS GUARDADOS y DUELOS CONGELADOS colgando
+	 *    de él. `mazo_cartas.hueco` es un índice dentro de esta lista: si el
+	 *    orden o las coordenadas cambiaran aunque fuera un punto, todos los
+	 *    onces montados hasta hoy quedarían recolocados solos. Traduciéndolo
+	 *    en vez de reescribirlo, esas ocho salen EXACTAMENTE igual que antes.
+	 *
+	 *    `filas` es el modelo nuevo, y existe porque el viejo no sabía decir
+	 *    lo que hacía falta: en un 4-2-3-1 la fila de tres tiene dos
+	 *    extremos que puntúan como ATAQUE y un mediapunta que puntúa como
+	 *    MEDIO. Con una fila por rol eso es inexpresable — o los tres eran
+	 *    medios o los tres eran delanteros—, y ahí se acababan las formaciones
+	 *    de cuatro líneas. Con `filas`, el rol va POR HUECO y la fila solo
+	 *    dice dónde se dibuja.
+	 *
+	 * El orden de los huecos que sale de aquí es el mismo en los dos casos
+	 * —portero, luego las filas de atrás hacia adelante—, así que el hueco 0
+	 * sigue siendo el portero y el 1 el primer defensa en todas.
+	 */
+	public static function filasDe($formacion) {
+		$f = self::FORMACIONES[$formacion] ?? self::FORMACIONES[self::FORMACION_BASE];
+
+		if (isset($f["filas"])) { return $f["filas"]; }
+
+		$filas = [];
+		foreach (["DF", "MC", "DC"] as $i => $rol) {
+			$n = $f["lineas"][$i] ?? 0;
+			if ($n <= 0) { continue; }
+			$filas[] = [
+				// La `y` y el arco salen de LINEA_Y, que es de donde salían
+				// antes: por eso estas ocho no se mueven ni un punto.
+				"y"     => self::LINEA_Y[$rol][0],
+				"arco"  => $rol,
+				"roles" => array_fill(0, $n, $rol),
+			];
+		}
+		return $filas;
+	}
+
 	/** Línea de cada hueco. El índice del array ES `mazo_cartas.hueco`. */
 	public static function huecosDe($formacion) {
-		$lineas = self::FORMACIONES[$formacion]["lineas"]
-			?? self::FORMACIONES[self::FORMACION_BASE]["lineas"];
-
 		$huecos = ["POR"];
-		foreach (["DF", "MC", "DC"] as $i => $linea) {
-			$huecos = array_merge($huecos, array_fill(0, $lineas[$i], $linea));
+		foreach (self::filasDe($formacion) as $fila) {
+			$huecos = array_merge($huecos, $fila["roles"]);
 		}
 		return $huecos;
 	}
@@ -2863,23 +3472,34 @@ class Tcg
 	 * una línea en FORMACIONES y nada más.
 	 */
 	public static function coordenadasDe($formacion) {
-		$huecos = self::huecosDe($formacion);
-
-		$porLinea = [];
-		foreach ($huecos as $i => $linea) { $porLinea[$linea][] = $i; }
-
+		/* ⚠️ SE AGRUPA POR FILA, NO POR ROL. Antes se agrupaba por rol, y con
+		   tres filas —una por rol— daba igual. Con `filas` deja de darlo: en un
+		   4-2-3-1 hay DC en la fila de tres (los extremos) y DC en la de
+		   arriba (el punta), y agrupando por rol los tres extremos y el punta
+		   habrían caído todos en la misma altura, amontonados, con la fila de
+		   tres vacía. Las ocho de siempre no notan el cambio, porque en ellas
+		   una fila ES un rol. */
 		$coords = [];
-		foreach ($porLinea as $linea => $indices) {
-			$xs = self::REPARTO_X[count($indices)] ?? self::REPARTO_X[4];
-			[$base, $a, $b] = self::LINEA_Y[$linea];
+		$hueco  = 0;
 
-			foreach ($indices as $n => $hueco) {
+		// El portero, siempre el hueco 0 y siempre en el mismo sitio.
+		[$baseP, , ] = self::LINEA_Y["POR"];
+		$coords[$hueco++] = ["x" => 50, "y" => round($baseP, 1)];
+
+		foreach (self::filasDe($formacion) as $fila) {
+			$roles = $fila["roles"];
+			$xs = self::REPARTO_X[count($roles)] ?? self::REPARTO_X[4];
+
+			// El arco lo declara la fila; las traducidas de `lineas` heredan el
+			// de su rol, así que siguen combando igual que siempre.
+			[, $a, $b] = self::LINEA_Y[$fila["arco"] ?? "MC"];
+
+			foreach ($roles as $n => $rol) {
 				$x = $xs[$n];
 				$d = abs($x - 50) / 40;
-				$coords[$hueco] = ["x" => $x, "y" => round($base + $a * $d + $b, 1)];
+				$coords[$hueco++] = ["x" => $x, "y" => round($fila["y"] + $a * $d + $b, 1)];
 			}
 		}
-		ksort($coords);
 		return $coords;
 	}
 
@@ -2921,7 +3541,7 @@ class Tcg
 	 * necesidad de prohibir nada.
 	 *
 	 * La formación se pasa explícitamente y no se adivina de las cartas: el
-	 * mismo hueco 7 es medio en un 1-4-4-2 y delantero en un 1-3-4-3, así que
+	 * mismo hueco 7 es medio en un 4-4-2 y delantero en un 3-4-3, así que
 	 * dar por supuesta la formación equivocada daría un total plausible pero
 	 * falso, del tipo que no revienta y por eso no se detecta.
 	 */
@@ -3890,17 +4510,76 @@ class Tcg
 	 * pero deja de ser determinista, así que se marca `por_defecto` para poder
 	 * distinguir después una elección real de una automática.
 	 */
+	/**
+	 * Minutos que un partido de CADENA puede quedarse en la fase de aumento
+	 * antes de darlo por abandonado y elegir por quien falte.
+	 *
+	 * Generoso a propósito: es tiempo para pensar sin reloj a la vista, no una
+	 * cuenta atrás. Solo actúa cuando alguien vuelve a cargar el duelo.
+	 */
+	const AUMENTO_ABANDONO_MIN = 60;
+
 	public function aplicarFallbackAumentos($id_duelo) {
+		/* ⚠️ EL SEGUNDO CASO —`abandonado`— ES LO QUE DESATASCA LAS CADENAS.
+		   Antes solo se miraba `aumento_vence`, y un partido de cadena SE CREA
+		   SIN VENCIMIENTO a propósito (§ no hay nadie esperando al otro lado a
+		   quien hacer esperar). Con `aumento_vence` a NULL la condición nunca
+		   era cierta, así que el repesca no entraba nunca: el bot elegía por su
+		   cuenta en `desatascarAumentoBot()`, y si la persona cerraba la
+		   pestaña sin elegir el duelo se quedaba en `aumento_pendiente` PARA
+		   SIEMPRE.
+
+		   Medido sobre la base real: 31 de 131 duelos —una cuarta parte—
+		   colgados así, todos de cadena, todos con `aumento_vence` NULL y
+		   todos con el aumento elegido por el bot y no por la persona. Y como
+		   el jugador volvía, veía que no pasaba nada y le daba otra vez a
+		   jugar, se creaban más: hay ocho duelos del mismo par creados en
+		   catorce segundos.
+
+		   Un partido sin vencimiento se da por abandonado pasados
+		   `AUMENTO_ABANDONO_MIN` minutos desde que se creó. No mete prisa a
+		   nadie —no hay reloj en pantalla y son quince minutos—, pero deja de
+		   haber duelos que no terminan nunca. */
 		$stmt = $this->pdo->prepare("
-			SELECT id_creador, id_rival, estado, aumento_vence,
-			       (aumento_vence IS NOT NULL AND NOW() >= aumento_vence) AS vencido
+			SELECT id_creador, id_rival, estado, aumento_vence, dificultad,
+			       (aumento_vence IS NOT NULL AND NOW() >= aumento_vence) AS vencido,
+			       (aumento_vence IS NULL
+			        AND creado < DATE_SUB(NOW(), INTERVAL :minutos MINUTE)) AS abandonado
 			FROM duelos WHERE id_duelo = :d
 		");
-		$stmt->execute([":d" => $id_duelo]);
+		$stmt->execute([":d" => $id_duelo, ":minutos" => self::AUMENTO_ABANDONO_MIN]);
 		$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
 
-		if (!$duelo || $duelo["estado"] !== "aumento_pendiente" || !$duelo["vencido"]) {
+		if (!$duelo || $duelo["estado"] !== "aumento_pendiente"
+			|| (!$duelo["vencido"] && !$duelo["abandonado"])) {
 			return false;
+		}
+
+		/* ⚠️ UN PARTIDO ABANDONADO SE CANCELA, NO SE JUEGA POR TI.
+		   Los dos casos no son el mismo y no pueden resolverse igual:
+
+		   · VENCIDO es PvP. Hay una persona esperando al otro lado con su
+		     reloj a la vista, así que elegir por quien no eligió y seguir es lo
+		     correcto — es la regla de siempre (§1.5) y no se toca.
+
+		   · ABANDONADO es una cadena, donde no hay reloj ni nadie esperando.
+		     Elegir al azar y resolver significaría que alguien vuelve al día
+		     siguiente y se encuentra un partido ya jugado, con un aumento que
+		     no eligió y probablemente perdido. Eso es inventarle un resultado.
+		     Cancelarlo no le quita nada —una cadena no apuesta cartas ni
+		     monedas— y deja el nodo tal y como estaba, listo para volver a
+		     jugarlo cuando quiera.
+
+		   Y no hace falta más: desde que `crearPartidoCadena()` reanuda el
+		   partido a medias en vez de crear otro, quien vuelve dentro de la hora
+		   se encuentra SUS aumentos y los elige. Esto solo barre lo que nadie
+		   ha vuelto a mirar. */
+		if (!$duelo["vencido"] && $duelo["abandonado"]) {
+			$this->pdo->prepare("
+				UPDATE duelos SET estado = 'cancelado'
+				WHERE id_duelo = :d AND estado = 'aumento_pendiente'
+			")->execute([":d" => $id_duelo]);
+			return true;
 		}
 
 		foreach ([$duelo["id_creador"], $duelo["id_rival"]] as $idJugador) {
@@ -7523,6 +8202,26 @@ class Tcg
 				// Qué mapa dibujar en la primitiva "zona". Vacío en las demás.
 				"lienzo"    => $mj["lienzo"] ?? null,
 				"plazo"     => $plazo,
+
+				/* QUÉ HAY EN JUEGO. Se declara en el catálogo desde el principio
+				   pero no llegaba al cliente, así que en pantalla los tres pesos
+				   se veían exactamente igual: la decisión que solo puntúa tu
+				   actuación y la que amplía el presupuesto del resto del partido
+				   pedían lo mismo con la misma cara y los mismos nueve segundos.
+
+				   No filtra nada. `impacto` dice CUÁNTO pesa la decisión, no qué
+				   opción es mejor ni contra qué gana cada una — eso sigue sin
+				   salir de aquí. Es exactamente el tipo de dato que hace falta
+				   para decidir bien y que no se puede deducir mirando.
+
+				   `cambia_marcador` es distinto de `impacto`: un minijuego de
+				   impacto "jugada" solo mueve el resultado si a este jugador le
+				   queda presupuesto (se acaba de descontar arriba). Enseñar
+				   "puede cambiar el marcador" cuando ya no quedan goles libres
+				   sería mentir. */
+				"impacto"   => $mj["impacto"] ?? "ninguno",
+				"efecto"    => $mj["efecto"] ?? null,
+				"cambia_marcador" => $cambiaMarcador,
 				/* La pista habla de la TENDENCIA de la carta rival implicada,
 				   nunca del dato concreto: ese no viaja al cliente ni aquí ni en
 				   ningún sitio, o bastaría con mirar la respuesta de red.
@@ -8909,6 +9608,93 @@ class Tcg
 	}
 
 	/**
+	 * Enciende o apaga UNA TRAMPA del rival en TODOS los nodos de la cadena.
+	 *
+	 * Las trampas (`sin_malus`, `compos_libres`) ya se podían poner nodo a
+	 * nodo desde el editor, pero solo así: para dejar una cadena de veinte
+	 * partidos en "jefe final" había que abrir veinte modales, ir a la pestaña
+	 * de dificultad y tocar dos desplegables en cada uno, cinco veces —una por
+	 * dificultad—. Doscientas interacciones para una decisión que se toma una
+	 * vez, y por eso en la práctica no se usaba.
+	 *
+	 * @param $valor 1 = con trampa · 0 = sin ella · null = "como el general",
+	 *               que es el tercer estado que ya tienen los desplegables del
+	 *               editor y que aquí también hay que poder poner.
+	 *
+	 * ⚠️ SOLO TOCA LA COLUMNA QUE SE LE PIDE. Mismo criterio que
+	 *    `activarDificultadCadena()`: quien haya afinado a mano la fuerza o la
+	 *    alineación de un nodo no la pierde por marcar una trampa en toda la
+	 *    cadena.
+	 *
+	 * Devuelve cuántos nodos se han tocado.
+	 */
+	public function trampaCadena($id_cadena, $dificultad, $columna, $valor) {
+		if (!in_array($dificultad, self::DIFICULTADES, true)) { return 0; }
+		// Lista blanca: la columna entra en el SQL y no puede venir de fuera.
+		if (!in_array($columna, ["sin_malus", "compos_libres"], true)) { return 0; }
+
+		$nodos = $this->pdo->prepare(
+			"SELECT id_nodo FROM cadena_nodos WHERE id_cadena = :c AND tipo = 'partido'"
+		);
+		$nodos->execute([":c" => (int) $id_cadena]);
+		$ids = $nodos->fetchAll(PDO::FETCH_COLUMN);
+		if (!$ids) { return 0; }
+
+		$v = ($valor === null || $valor === "") ? null : (((int) $valor) === 1 ? 1 : 0);
+
+		$stmt = $this->pdo->prepare("
+			INSERT INTO cadena_nodo_dificultad (id_nodo, dificultad, $columna)
+			VALUES (:n, :d, :v)
+			ON DUPLICATE KEY UPDATE $columna = VALUES($columna)
+		");
+		foreach ($ids as $idNodo) {
+			unset($this->nodoDificultadCache[$idNodo . "|" . $dificultad]);
+			$stmt->execute([":n" => (int) $idNodo, ":d" => $dificultad, ":v" => $v]);
+		}
+		return count($ids);
+	}
+
+	/**
+	 * Cómo está cada trampa en una cadena: cuántos nodos la tienen puesta,
+	 * quitada o a "general". Es lo que permite pintar el control sin mentir
+	 * cuando los nodos no coinciden entre sí.
+	 */
+	public function trampasCadena($id_cadena) {
+		$stmt = $this->pdo->prepare("
+			SELECT d.dificultad,
+			       SUM(d.sin_malus = 1)     AS malus_si,
+			       SUM(d.sin_malus = 0)     AS malus_no,
+			       SUM(d.compos_libres = 1) AS libres_si,
+			       SUM(d.compos_libres = 0) AS libres_no,
+			       COUNT(*)                 AS filas
+			FROM cadena_nodo_dificultad d
+			INNER JOIN cadena_nodos n ON n.id_nodo = d.id_nodo
+			WHERE n.id_cadena = :c AND n.tipo = 'partido'
+			GROUP BY d.dificultad
+		");
+		$stmt->execute([":c" => (int) $id_cadena]);
+
+		$total = $this->pdo->prepare(
+			"SELECT COUNT(*) FROM cadena_nodos WHERE id_cadena = :c AND tipo = 'partido'"
+		);
+		$total->execute([":c" => (int) $id_cadena]);
+		$nNodos = (int) $total->fetchColumn();
+
+		$out = [];
+		foreach (self::DIFICULTADES as $d) {
+			$out[$d] = ["total" => $nNodos, "malus_si" => 0, "libres_si" => 0];
+		}
+		foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $f) {
+			$out[$f["dificultad"]] = [
+				"total"     => $nNodos,
+				"malus_si"  => (int) $f["malus_si"],
+				"libres_si" => (int) $f["libres_si"],
+			];
+		}
+		return $out;
+	}
+
+	/**
 	 * Qué dificultades están activas en una cadena, para pintar el panel.
 	 *
 	 * Una dificultad cuenta como activa si lo está en ALGÚN nodo: es lo que
@@ -9200,6 +9986,28 @@ class Tcg
 		}
 
 		$id_rival = (int) $nodo["id_rival"];
+
+		/* ⚠️ SI YA HAY UNO SIN TERMINAR EN ESTE NODO, SE VUELVE A ÉL.
+		   No había ninguna guardia: cada pulsación de «jugar» creaba un duelo
+		   nuevo. Y como un partido de cadena atascado en la fase de aumento no
+		   se movía (ver `aplicarFallbackAumentos`), la persona volvía, veía que
+		   no pasaba nada, le daba otra vez... y sembraba duelos colgados. En la
+		   base real hay ocho del mismo par creados en catorce segundos.
+
+		   Devolver el que ya existe es además lo correcto aunque no hubiera
+		   ningún atasco: recargar la página o pulsar dos veces seguidas no
+		   debería empezar dos partidos, sino continuar el que hay. */
+		$abierto = $this->pdo->prepare("
+			SELECT id_duelo FROM duelos
+			WHERE id_creador = :u AND id_nodo = :n AND dificultad = :dif
+			  AND estado NOT IN ('resuelto', 'cancelado')
+			ORDER BY id_duelo DESC LIMIT 1
+		");
+		$abierto->execute([":u" => $id_usuario, ":n" => $id_nodo, ":dif" => $dificultad]);
+		$yaHay = $abierto->fetchColumn();
+		if ($yaHay) {
+			return ["ok" => true, "id_duelo" => (int) $yaHay, "reanudado" => true];
+		}
 
 		try {
 			$this->pdo->beginTransaction();
@@ -9812,9 +10620,20 @@ class Tcg
 	 * el primero termine y entonces ve el cupo ya a cero.
 	 */
 	private function otorgarCromoLimitado($id_usuario, $id_cromo) {
-		$cromo = $this->pdo->prepare("SELECT cupo_numerado FROM cromos WHERE id_cromo = :c FOR UPDATE");
+		$cromo = $this->pdo->prepare("SELECT cupo_numerado, id_rareza FROM cromos WHERE id_cromo = :c FOR UPDATE");
 		$cromo->execute([":c" => $id_cromo]);
-		$cupo = (int) $cromo->fetchColumn();
+		$fila = $cromo->fetch(PDO::FETCH_ASSOC);
+		if (!$fila) { return null; }
+
+		/* Numerada la hace la RAREZA, no la columna. Devolver null es el mismo
+		   camino que «cupo agotado», que los dos llamantes ya saben andar: el
+		   sobre entrega la carta sin número —para él es una carta normal, y de
+		   hecho ni llega aquí porque el bombo ya le neutraliza el cupo—, y un
+		   premio de cadena `cromo_limitado` mal configurado se queda en tirada
+		   sin premio en vez de inventar una serie que no existe. */
+		if ((int) $fila["id_rareza"] !== self::RAREZA_NUMERADA) { return null; }
+
+		$cupo = (int) $fila["cupo_numerado"];
 		if ($cupo <= 0) { return null; }   // no está configurada como limitada
 
 		$emitidas = $this->pdo->prepare("SELECT COUNT(*) FROM cadena_numeracion WHERE id_cromo = :c");
@@ -10730,7 +11549,7 @@ class Tcg
 		// Se compara la media POR JUGADOR, no el total de la línea. Sumar sin
 		// normalizar comparaba dos delanteros contra cinco defensas, así que el
 		// cociente salía bajo siempre y casi todos los partidos acababan 1-0.
-		// Además hace la cifra independiente de la formación: un 1-3-6-1 no
+		// Además hace la cifra independiente de la formación: un 3-6-1 no
 		// marca menos por tener un delantero, marca según lo bueno que sea.
 		$ataqueGanador  = $this->mediaLinea($fuerzaGanador,  $formGanador,  ["DC"]);
 		$ataquePerdedor = $this->mediaLinea($fuerzaPerdedor, $formPerdedor, ["DC"]);
@@ -11151,53 +11970,70 @@ class Tcg
 		return $mapa;
 	}
 
-	// Tabla real de Rangos_estadisticas_SRF.csv (24 filas: rarezas 1-6 x POR/DF/MC/DC). Ver §15.10.
+	/* Baremos de estadísticas por rareza y posición. 28 filas: las 7 rarezas
+	   (Común -> Numerada) x POR/DF/MC/DC.
+
+	   ⚠️ TABLA NUEVA DESDE EL 2026-08-23, entregada por Alejandro. Sustituye a
+	   la del `Rangos_estadisticas_SRF.csv` original, que tenía rangos de 15
+	   puntos y arrancaba mucho más abajo (un portero Común iba de 23 a 37 de
+	   ataque; ahora, de 55 a 59). Dos consecuencias medidas que conviene tener
+	   presentes antes de volver a tocar esto:
+
+	   · Los rangos son AHORA DE 5 PUNTOS, no de 15. Dos cartas de la misma
+	     rareza y posición se parecen mucho más entre sí que antes.
+	   · APLANA LA ESCALERA DE RAREZAS. Un once 4-4-2 entero de la rareza
+	     máxima valía x1,56 uno de Comunes; ahora vale x1,39 — la ventaja de la
+	     rareza alta cae un 31 %. Los Comunes suben un 13 % de fuerza y los
+	     Legendarios bajan un 3 %. Es deliberado, no un efecto secundario.
+
+	   La tabla que entregó Alejandro separaba "medio ofensivo" y "medio
+	   defensivo", pero MC es POSICIÓN ÚNICA en el proyecto (decisión suya al
+	   verlo). Las filas de MC de aquí abajo son la media de las dos: como eran
+	   espejo una de otra —ataque y defensa intercambiados, técnica idéntica—,
+	   la media sale simétrica en ATA/DEF y conserva la técnica alta que
+	   caracteriza al centro del campo. */
 	private const IMPORT_RANGOS_STATS = [
-		1 => [
-			'POR' => ['ataque' => [23, 37], 'defensa' => [62, 76], 'tecnica' => [52, 66]],
-			'DF'  => ['ataque' => [37, 51], 'defensa' => [57, 71], 'tecnica' => [47, 61]],
-			'MC'  => ['ataque' => [48, 62], 'defensa' => [49, 63], 'tecnica' => [56, 70]],
-			'DC'  => ['ataque' => [63, 77], 'defensa' => [37, 51], 'tecnica' => [50, 64]],
+		1 => [   // Común
+			'POR' => ['ataque' => [55, 59], 'defensa' => [70, 74], 'tecnica' => [66, 70]],
+			'DF'  => ['ataque' => [55, 59], 'defensa' => [70, 74], 'tecnica' => [66, 70]],
+			'MC'  => ['ataque' => [61, 65], 'defensa' => [61, 65], 'tecnica' => [70, 74]],
+			'DC'  => ['ataque' => [70, 74], 'defensa' => [55, 59], 'tecnica' => [66, 70]],
 		],
-		2 => [
-			'POR' => ['ataque' => [31, 45], 'defensa' => [68, 82], 'tecnica' => [59, 73]],
-			'DF'  => ['ataque' => [43, 57], 'defensa' => [65, 79], 'tecnica' => [53, 67]],
-			'MC'  => ['ataque' => [56, 70], 'defensa' => [57, 71], 'tecnica' => [65, 79]],
-			'DC'  => ['ataque' => [69, 83], 'defensa' => [45, 59], 'tecnica' => [58, 72]],
+		2 => [   // Poco común
+			'POR' => ['ataque' => [60, 64], 'defensa' => [75, 78], 'tecnica' => [71, 75]],
+			'DF'  => ['ataque' => [60, 64], 'defensa' => [75, 78], 'tecnica' => [71, 75]],
+			'MC'  => ['ataque' => [66, 70], 'defensa' => [66, 70], 'tecnica' => [75, 78]],
+			'DC'  => ['ataque' => [75, 78], 'defensa' => [60, 64], 'tecnica' => [71, 75]],
 		],
-		3 => [
-			'POR' => ['ataque' => [39, 53], 'defensa' => [74, 88], 'tecnica' => [65, 79]],
-			'DF'  => ['ataque' => [50, 64], 'defensa' => [72, 86], 'tecnica' => [60, 74]],
-			'MC'  => ['ataque' => [64, 78], 'defensa' => [65, 79], 'tecnica' => [73, 87]],
-			'DC'  => ['ataque' => [76, 90], 'defensa' => [53, 67], 'tecnica' => [66, 80]],
+		3 => [   // Raro
+			'POR' => ['ataque' => [64, 68], 'defensa' => [79, 83], 'tecnica' => [75, 79]],
+			'DF'  => ['ataque' => [64, 68], 'defensa' => [79, 83], 'tecnica' => [75, 79]],
+			'MC'  => ['ataque' => [70, 74], 'defensa' => [70, 74], 'tecnica' => [79, 83]],
+			'DC'  => ['ataque' => [79, 83], 'defensa' => [64, 68], 'tecnica' => [75, 79]],
 		],
-		4 => [
-			'POR' => ['ataque' => [47, 61], 'defensa' => [80, 94], 'tecnica' => [72, 86]],
-			'DF'  => ['ataque' => [56, 70], 'defensa' => [79, 93], 'tecnica' => [66, 80]],
-			'MC'  => ['ataque' => [72, 86], 'defensa' => [73, 87], 'tecnica' => [81, 95]],
-			'DC'  => ['ataque' => [82, 96], 'defensa' => [60, 74], 'tecnica' => [74, 88]],
+		4 => [   // Épico
+			'POR' => ['ataque' => [69, 73], 'defensa' => [84, 87], 'tecnica' => [80, 84]],
+			'DF'  => ['ataque' => [69, 73], 'defensa' => [84, 87], 'tecnica' => [80, 84]],
+			'MC'  => ['ataque' => [75, 79], 'defensa' => [75, 79], 'tecnica' => [84, 87]],
+			'DC'  => ['ataque' => [84, 87], 'defensa' => [69, 73], 'tecnica' => [80, 84]],
 		],
-		5 => [
-			'POR' => ['ataque' => [55, 69], 'defensa' => [86, 99], 'tecnica' => [79, 93]],
-			'DF'  => ['ataque' => [63, 77], 'defensa' => [86, 99], 'tecnica' => [73, 87]],
-			'MC'  => ['ataque' => [80, 94], 'defensa' => [81, 95], 'tecnica' => [90, 99]],
-			'DC'  => ['ataque' => [89, 99], 'defensa' => [68, 82], 'tecnica' => [83, 97]],
+		5 => [   // Legendario
+			'POR' => ['ataque' => [73, 77], 'defensa' => [88, 92], 'tecnica' => [84, 88]],
+			'DF'  => ['ataque' => [73, 77], 'defensa' => [88, 92], 'tecnica' => [84, 88]],
+			'MC'  => ['ataque' => [79, 83], 'defensa' => [79, 83], 'tecnica' => [88, 92]],
+			'DC'  => ['ataque' => [88, 92], 'defensa' => [73, 77], 'tecnica' => [84, 88]],
 		],
-		6 => [
-			'POR' => ['ataque' => [63, 77], 'defensa' => [92, 99], 'tecnica' => [86, 99]],
-			'DF'  => ['ataque' => [69, 83], 'defensa' => [92, 99], 'tecnica' => [79, 93]],
-			'MC'  => ['ataque' => [88, 99], 'defensa' => [89, 99], 'tecnica' => [92, 99]],
-			'DC'  => ['ataque' => [92, 99], 'defensa' => [76, 90], 'tecnica' => [91, 99]],
+		6 => [   // SRF
+			'POR' => ['ataque' => [78, 82], 'defensa' => [93, 96], 'tecnica' => [89, 93]],
+			'DF'  => ['ataque' => [78, 82], 'defensa' => [93, 96], 'tecnica' => [89, 93]],
+			'MC'  => ['ataque' => [84, 88], 'defensa' => [84, 88], 'tecnica' => [93, 96]],
+			'DC'  => ['ataque' => [93, 96], 'defensa' => [78, 82], 'tecnica' => [89, 93]],
 		],
-		/* La Numerada (`038`) es posterior al CSV, así que no venía en él.
-		   Va un escalón por encima de la SRF, que es lo que la hace valer la
-		   pena siendo de tirada limitada. Sin esta fila, aleatorizar una
-		   numerada devolvía 0/0/0 y había que escribirle las tres a mano. */
-		7 => [
-			'POR' => ['ataque' => [66, 80], 'defensa' => [94, 99], 'tecnica' => [89, 99]],
-			'DF'  => ['ataque' => [72, 86], 'defensa' => [94, 99], 'tecnica' => [82, 96]],
-			'MC'  => ['ataque' => [91, 99], 'defensa' => [92, 99], 'tecnica' => [94, 99]],
-			'DC'  => ['ataque' => [94, 99], 'defensa' => [79, 93], 'tecnica' => [94, 99]],
+		7 => [   // Numerada — la de tirada limitada, un escalón por encima de SRF
+			'POR' => ['ataque' => [82, 86], 'defensa' => [97, 99], 'tecnica' => [93, 97]],
+			'DF'  => ['ataque' => [82, 86], 'defensa' => [97, 99], 'tecnica' => [93, 97]],
+			'MC'  => ['ataque' => [88, 92], 'defensa' => [88, 92], 'tecnica' => [97, 99]],
+			'DC'  => ['ataque' => [97, 99], 'defensa' => [82, 86], 'tecnica' => [93, 97]],
 		],
 	];
 

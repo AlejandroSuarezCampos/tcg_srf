@@ -62,9 +62,20 @@ afirmar(!isset($rareza['eqA|Suplente']), 'jugador sin goles no se promociona');
 
 $statsEnt = $db->statsBaseImportacion('ENT', 5);
 afirmar($statsEnt === ['ataque' => 0, 'defensa' => 0, 'tecnica' => 0], 'entrenador siempre 0/0/0');
+
+// Baremos del 2026-08-23 (ver IMPORT_RANGOS_STATS). Si estos tres fallan tras
+// tocar la tabla, es que se cambió la constante y no la prueba.
 $statsDC = $db->statsBaseImportacion('DC', 4);
-afirmar($statsDC['ataque'] >= 82 && $statsDC['ataque'] <= 96, 'delantero épico tiene ataque en rango real 82-96');
+afirmar($statsDC['ataque'] >= 84 && $statsDC['ataque'] <= 87, 'delantero épico tiene ataque en rango real 84-87');
 $statsPor = $db->statsBaseImportacion('POR', 1);
-afirmar($statsPor['ataque'] >= 23 && $statsPor['ataque'] <= 37, 'portero común tiene ataque en rango real 23-37');
+afirmar($statsPor['ataque'] >= 55 && $statsPor['ataque'] <= 59, 'portero común tiene ataque en rango real 55-59');
+
+// MC es posición única: su fila es la media de medio ofensivo y defensivo, así
+// que ataque y defensa comparten rango. Es lo que distingue esta tabla de la
+// que entregó Alejandro, y conviene que quede fijado por una prueba.
+$statsMC = $db->statsBaseImportacion('MC', 6);
+afirmar($statsMC['ataque']  >= 84 && $statsMC['ataque']  <= 88, 'medio SRF tiene ataque en 84-88');
+afirmar($statsMC['defensa'] >= 84 && $statsMC['defensa'] <= 88, 'y defensa en el MISMO rango (medio único)');
+afirmar($statsMC['tecnica'] >= 93 && $statsMC['tecnica'] <= 96, 'y técnica más alta, en 93-96');
 
 echo "\nTodas las comprobaciones pasaron.\n";

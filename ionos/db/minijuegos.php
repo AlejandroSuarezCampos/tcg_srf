@@ -225,9 +225,9 @@ return [
            es un segundo que el rival pasa mirando. En una cadena juegas solo y
            puedes pensarte lo que quieras. */
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -290,9 +290,9 @@ return [
 
         // Mismo criterio que Muralla Humana: en PvP el rival espera contigo.
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -341,9 +341,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -382,9 +382,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -420,9 +420,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -466,9 +466,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
         // Ida y vuelta de la aguja. Un mano a mano es rápido, pero no tanto
         // como una volea: queda por debajo de El Golpe de Primeras.
@@ -541,9 +541,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -584,9 +584,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -626,9 +626,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -668,9 +668,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
         // La más rápida del catálogo: una volea a la primera no da tiempo.
         "velocidad" => [
@@ -715,9 +715,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -755,9 +755,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,   // a primer toque se decide antes: la prisa es el tema
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,   // a primer toque se decide antes: la prisa es el tema
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -797,9 +797,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -839,9 +839,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -897,9 +897,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -939,9 +939,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -978,9 +978,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -1018,9 +1018,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -1061,9 +1061,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
         "velocidad" => [
             "pvp" => 1800,
@@ -1108,9 +1108,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
         "velocidad" => [
             "pvp" => 2000,
@@ -1154,9 +1154,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -1199,9 +1199,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -1241,9 +1241,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -1298,9 +1298,9 @@ return [
         "plazo" => [
             // Un balón parado se piensa: no hay prisa real en el campo y el
             // plazo puede ser más largo que en una ocasión en movimiento.
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -1336,9 +1336,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -1374,9 +1374,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -1412,9 +1412,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -1466,9 +1466,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -1508,9 +1508,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -1555,9 +1555,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
         // El más lento: una falta directa se piensa, no se caza.
         "velocidad" => [
@@ -1602,9 +1602,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -1641,9 +1641,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -1692,9 +1692,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 4,
-            "facil" => 8, "medio" => 6, "dificil" => 5,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 7,
+            "facil" => 11, "medio" => 9, "dificil" => 8,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -1740,9 +1740,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -1786,9 +1786,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -1832,9 +1832,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -1909,9 +1909,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -1956,9 +1956,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -2004,9 +2004,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -2046,7 +2046,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 7, "facil" => 12, "medio" => 10, "dificil" => 8, "muy_dificil" => 6, "extremo" => 5],
+        "plazo" => ["pvp" => 10, "facil" => 15, "medio" => 13, "dificil" => 11, "muy_dificil" => 9, "extremo" => 8],
     ],
 
     /* La Relajación Peligrosa (Biblia §2.4): "tras ir ganando por diferencia
@@ -2085,7 +2085,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 7, "facil" => 12, "medio" => 10, "dificil" => 8, "muy_dificil" => 6, "extremo" => 5],
+        "plazo" => ["pvp" => 10, "facil" => 15, "medio" => 13, "dificil" => 11, "muy_dificil" => 9, "extremo" => 8],
     ],
 
     /* Crisis en el Vestuario (Biblia §2.4): "dos cartas con afinidades
@@ -2123,7 +2123,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 6, "facil" => 11, "medio" => 9, "dificil" => 7, "muy_dificil" => 5, "extremo" => 4],
+        "plazo" => ["pvp" => 9, "facil" => 14, "medio" => 12, "dificil" => 10, "muy_dificil" => 8, "extremo" => 7],
     ],
 
     /* Abrir o Cerrar el Juego (Biblia §2.4): "la versión simple del cambio de
@@ -2161,7 +2161,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 6, "facil" => 11, "medio" => 9, "dificil" => 7, "muy_dificil" => 5, "extremo" => 4],
+        "plazo" => ["pvp" => 9, "facil" => 14, "medio" => 12, "dificil" => 10, "muy_dificil" => 8, "extremo" => 7],
     ],
 
     /* La Furia del Clima (Biblia §2.4, familia Narrativa): "viento, campo
@@ -2199,7 +2199,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 7, "facil" => 12, "medio" => 10, "dificil" => 8, "muy_dificil" => 6, "extremo" => 5],
+        "plazo" => ["pvp" => 10, "facil" => 15, "medio" => 13, "dificil" => 11, "muy_dificil" => 9, "extremo" => 8],
     ],
 
     /* El Milagro Imposible (Biblia §2.4): "reservado a Extremo y a un marcador muy
@@ -2238,7 +2238,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 6, "facil" => 11, "medio" => 9, "dificil" => 7, "muy_dificil" => 5, "extremo" => 4],
+        "plazo" => ["pvp" => 9, "facil" => 14, "medio" => 12, "dificil" => 10, "muy_dificil" => 8, "extremo" => 7],
     ],
 
     /* El Cambio de Flanco (Biblia §2.4, Lectura del Rival): "si el rival defiende
@@ -2276,7 +2276,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 6, "facil" => 11, "medio" => 9, "dificil" => 7, "muy_dificil" => 5, "extremo" => 4],
+        "plazo" => ["pvp" => 9, "facil" => 14, "medio" => 12, "dificil" => 10, "muy_dificil" => 8, "extremo" => 7],
     ],
 
     /* El Detective del Área (Biblia §2.4): "el único del grupo que recompensa la
@@ -2316,7 +2316,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 7, "facil" => 12, "medio" => 10, "dificil" => 8, "muy_dificil" => 6, "extremo" => 5],
+        "plazo" => ["pvp" => 10, "facil" => 15, "medio" => 13, "dificil" => 11, "muy_dificil" => 9, "extremo" => 8],
     ],
 
     /* La Última Trinchera (Biblia §2.4): "riesgo máximo, reservado al contexto más
@@ -2355,7 +2355,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 5, "facil" => 9, "medio" => 8, "dificil" => 6, "muy_dificil" => 4, "extremo" => 3],
+        "plazo" => ["pvp" => 8, "facil" => 12, "medio" => 11, "dificil" => 9, "muy_dificil" => 7, "extremo" => 6],
     ],
 
     /* El Segundo Definitivo (Biblia §2.4): "en un descuento ya avanzado se añade un
@@ -2395,7 +2395,7 @@ return [
                 "segura" => true,
             ],
         ],
-        "plazo" => ["pvp" => 8, "facil" => 13, "medio" => 11, "dificil" => 9, "muy_dificil" => 7, "extremo" => 5],
+        "plazo" => ["pvp" => 11, "facil" => 16, "medio" => 14, "dificil" => 12, "muy_dificil" => 10, "extremo" => 8],
     ],
 
     /* #####################################################################
@@ -2459,9 +2459,9 @@ return [
         // Un penalti se piensa: es el plazo más largo del catálogo junto al de
         // las faltas directas. La Biblia insiste en que aquí hay TIEMPO.
         "plazo" => [
-            "pvp" => 9,
-            "facil" => 15, "medio" => 13, "dificil" => 10,
-            "muy_dificil" => 8, "extremo" => 6,
+            "pvp" => 12,
+            "facil" => 18, "medio" => 16, "dificil" => 13,
+            "muy_dificil" => 11, "extremo" => 9,
         ],
     ],
 
@@ -2505,9 +2505,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 9,
-            "facil" => 15, "medio" => 13, "dificil" => 10,
-            "muy_dificil" => 8, "extremo" => 6,
+            "pvp" => 12,
+            "facil" => 18, "medio" => 16, "dificil" => 13,
+            "muy_dificil" => 11, "extremo" => 9,
         ],
     ],
 
@@ -2554,9 +2554,9 @@ return [
         ],
         // La Biblia le da a Ojo de Halcón "una ventana de tiempo corta".
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -2596,9 +2596,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 14, "medio" => 12, "dificil" => 10,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 17, "medio" => 15, "dificil" => 13,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -2655,9 +2655,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -2699,9 +2699,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -2745,9 +2745,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -2789,9 +2789,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -2839,9 +2839,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -2908,9 +2908,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -2948,9 +2948,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -2989,9 +2989,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 8,
-            "facil" => 13, "medio" => 11, "dificil" => 9,
-            "muy_dificil" => 7, "extremo" => 5,
+            "pvp" => 11,
+            "facil" => 16, "medio" => 14, "dificil" => 12,
+            "muy_dificil" => 10, "extremo" => 8,
         ],
     ],
 
@@ -3033,9 +3033,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3075,9 +3075,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3146,9 +3146,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3188,9 +3188,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -3230,9 +3230,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 8, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 11, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -3273,9 +3273,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
         "velocidad" => [
             "pvp" => 1900,
@@ -3319,9 +3319,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 
@@ -3361,9 +3361,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3403,9 +3403,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3445,9 +3445,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 5,
-            "facil" => 9, "medio" => 7, "dificil" => 6,
-            "muy_dificil" => 4, "extremo" => 3,
+            "pvp" => 8,
+            "facil" => 12, "medio" => 10, "dificil" => 9,
+            "muy_dificil" => 7, "extremo" => 6,
         ],
     ],
 
@@ -3486,9 +3486,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3528,9 +3528,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 10, "medio" => 8, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 13, "medio" => 11, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3569,9 +3569,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 6,
-            "facil" => 11, "medio" => 9, "dificil" => 7,
-            "muy_dificil" => 5, "extremo" => 4,
+            "pvp" => 9,
+            "facil" => 14, "medio" => 12, "dificil" => 10,
+            "muy_dificil" => 8, "extremo" => 7,
         ],
     ],
 
@@ -3609,9 +3609,9 @@ return [
             ],
         ],
         "plazo" => [
-            "pvp" => 7,
-            "facil" => 12, "medio" => 10, "dificil" => 8,
-            "muy_dificil" => 6, "extremo" => 5,
+            "pvp" => 10,
+            "facil" => 15, "medio" => 13, "dificil" => 11,
+            "muy_dificil" => 9, "extremo" => 8,
         ],
     ],
 ];
