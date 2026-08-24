@@ -1854,6 +1854,78 @@ class Tcg
 		return $resultado ?: null;
 	}
 
+	/* ======================================================================
+	   PERFILES PÚBLICOS
+	   ----------------------------------------------------------------------
+	   Ver la colección de otro: sus mejores cartas y lo último que ha sacado.
+
+	   ⚠️ NO SE USA `obtenerUsuario()` PARA ESTO, NUNCA. Esa hace `SELECT *`, y
+	      en `usuarios` hay `password_hash`. Vale para la propia sesión, donde
+	      el array no sale de PHP; para una pantalla que ve otra persona hace
+	      falta una lista de columnas escrita a mano, que es lo que hay abajo.
+	      Tampoco salen las MONEDAS: el saldo ajeno no es asunto de nadie y
+	      enseñarlo invita a fijarse objetivos de robo en el mercado.
+	   ====================================================================== */
+
+	/** Los datos de un usuario que SÍ puede ver cualquiera. Null si no existe. */
+	public function perfilPublico($id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT id_usuario, nombre, foto, fecha_registro, dictador
+			FROM usuarios WHERE id_usuario = :id
+		");
+		$stmt->execute([":id" => (int) $id_usuario]);
+		return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+	}
+
+	/**
+	 * Las cartas DESTACADAS de un usuario: las mejores que tiene.
+	 *
+	 * «Mejor» es rareza primero y poder después, que es como se mira una
+	 * colección: primero cuántas SRF tienes y luego cuál de ellas es la buena.
+	 * Se agrupa por cromo para no llenar la vitrina con cinco copias del mismo.
+	 */
+	public function destacadasUsuario($id_usuario, $limite = 6) {
+		$limite = max(1, min((int) $limite, 24));
+		$sql = "
+			SELECT MIN(col.id_coleccion) AS id_coleccion,
+			       c.id_cromo, c.nombre, c.imagen, c.posicion, c.universo,
+			       c.ataque, c.defensa, c.tecnica, c.cupo_numerado,
+			       eq.nombre AS equipo,
+			       r.id_rareza, r.nombre AS rareza,
+			       COUNT(*) AS copias
+			FROM coleccion col
+			INNER JOIN cromos c   ON c.id_cromo = col.id_cromo
+			INNER JOIN equipos eq ON eq.id_equipo = c.id_equipo
+			INNER JOIN rarezas r  ON r.id_rareza = c.id_rareza
+			WHERE col.id_usuario = :u
+			GROUP BY c.id_cromo
+			ORDER BY c.id_rareza DESC, (c.ataque + c.defensa + c.tecnica) DESC, c.nombre ASC
+			LIMIT $limite
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([":u" => (int) $id_usuario]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	/**
+	 * Un resumen de la colección ajena por rareza: cuántas distintas tiene de
+	 * cada tier. Es lo que de verdad se compara entre dos colecciones, y no
+	 * expone ni el saldo ni qué copias concretas hay.
+	 */
+	public function resumenRarezasUsuario($id_usuario) {
+		$stmt = $this->pdo->prepare("
+			SELECT r.id_rareza, r.nombre, COUNT(DISTINCT c.id_cromo) AS distintas
+			FROM coleccion col
+			INNER JOIN cromos c  ON c.id_cromo = col.id_cromo
+			INNER JOIN rarezas r ON r.id_rareza = c.id_rareza
+			WHERE col.id_usuario = :u
+			GROUP BY r.id_rareza
+			ORDER BY r.id_rareza DESC
+		");
+		$stmt->execute([":u" => (int) $id_usuario]);
+		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
 	// Nº de expansiones (activas) de las que el usuario tiene TODOS los cromos
 	public function contarExpansionesCompletas($id_usuario) {
 		$sql = "
@@ -2056,6 +2128,29 @@ class Tcg
 			return false;
 		}
 
+		/* ⚠️ EL PRECIO SE VALIDA AQUÍ, EN EL SERVIDOR.
+
+		   Antes no se validaba en ningún sitio: `publicarAnuncio()` guardaba el
+		   número que le llegara. Con eso, dos cuentas de la misma persona se
+		   pasan lo que quieran en un paso —publicar un Común a 10.000.000 y
+		   comprárselo desde la otra— y una SRF a 2 monedas se la lleva quien
+		   esté mirando la lista en ese segundo. El `min="1"` del formulario no
+		   sirve de nada: es HTML, se salta con una petición a mano.
+
+		   La horquilla sale de `valorCarta()`, que la calcula a partir de lo
+		   que cuesta conseguir esa rareza y de lo buena que es la carta dentro
+		   de su tier. Publicar fuera de rango no se corrige en silencio: se
+		   rechaza, porque un precio distinto del que se escribió sorprende más
+		   que un aviso. */
+		$carta = $this->cartaDeCopia($id_coleccion, $id_usuario);
+		if (!$carta) { return false; }
+
+		$tasa = $this->valorCarta($carta);
+		$precio = (int) $precio;
+		if ($precio < $tasa["min"] || $precio > $tasa["max"]) {
+			return false;
+		}
+
 		$sql = "
 			INSERT INTO mercado (id_coleccion, precio, activa, fecha_publicacion)
 			VALUES (:id_coleccion, :precio, 1, NOW())
@@ -2067,6 +2162,150 @@ class Tcg
 			":precio" => $precio,
 		]);
 	}
+
+	/* ======================================================================
+	   DESCARTE DE REPETIDAS  (la venta rápida)
+	   ----------------------------------------------------------------------
+	   La venta rápida: cambiar copias que sobran por monedas sin pasar por el
+	   mercado. El precio es FIJO POR RAREZA (`valorCarta()["descarte"]`) y
+	   deliberadamente malo — es comodidad, no un negocio: quien quiera sacarle
+	   valor a una carta que la publique.
+
+	   ⚠️ SOLO REPETIDAS, Y NUNCA LA ÚLTIMA COPIA. El álbum y la colección se
+	      construyen sobre "tengo esta carta"; dejar descartar la única copia
+	      convierte un botón de limpieza en una forma de borrarse el progreso de
+	      un toque. Se cuenta cuántas copias hay de ese cromo y se protege
+	      siempre una.
+	   ====================================================================== */
+
+	/**
+	 * Copias repetidas y descartables del usuario, agrupadas por cromo.
+	 *
+	 * Descartable = repetida, no bloqueada, no publicada, no puesta en ningún
+	 * mazo y no comprometida en un duelo. Son los mismos cuatro filtros que
+	 * usa el selector de venta, por el mismo motivo: si se puede perder de
+	 * vista, no puede estar en un mazo ni en juego.
+	 */
+	public function repetidasDescartables($id_usuario) {
+		$sql = "
+			SELECT c.id_cromo, c.nombre, c.imagen, c.id_rareza, r.nombre AS rareza,
+			       c.ataque, c.defensa, c.tecnica,
+			       COUNT(*)                       AS copias,
+			       COUNT(*) - 1                   AS sobran,
+			       GROUP_CONCAT(col.id_coleccion ORDER BY col.obtenida DESC) AS ids
+			FROM coleccion col
+			INNER JOIN cromos c  ON c.id_cromo = col.id_cromo
+			INNER JOIN rarezas r ON r.id_rareza = c.id_rareza
+			WHERE col.id_usuario = :u
+			  AND col.bloqueada = 0
+			  AND col.id_coleccion NOT IN (SELECT id_coleccion FROM mercado WHERE activa = 1)
+			  AND col.id_coleccion NOT IN (SELECT id_coleccion FROM mazo_cartas)
+			  AND col.id_coleccion NOT IN (" . self::SQL_COPIAS_EN_DUELO . ")
+			GROUP BY c.id_cromo
+			HAVING copias > 1
+			ORDER BY c.id_rareza DESC, c.nombre ASC
+		";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([":u" => (int) $id_usuario]);
+		$filas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		foreach ($filas as &$f) {
+			$tasa = $this->valorCarta($f);
+			$f["precio_unidad"] = $tasa["descarte"];
+			$f["total"]         = $tasa["descarte"] * (int) $f["sobran"];
+			// La copia más ANTIGUA se queda; se descartan las recientes. Da
+			// igual a efectos de juego (son idénticas), pero conservar la
+			// primera respeta el "la tengo desde…" que enseña la colección.
+			$ids = array_map("intval", explode(",", $f["ids"]));
+			$f["descartables"] = array_slice($ids, 0, (int) $f["sobran"]);
+			unset($f["ids"]);
+		}
+		unset($f);
+
+		return $filas;
+	}
+
+	/**
+	 * Descarta copias concretas. Devuelve ["ok", "descartadas", "monedas",
+	 * "ganadas", "error"].
+	 *
+	 * Todo en una transacción: si algo falla a mitad, ni se borran cartas ni se
+	 * pagan monedas. Y se revalida copia a copia dentro —que sea tuya, que
+	 * sobre, que no esté comprometida— porque la lista de ids llega del
+	 * navegador y entre que se pintó la pantalla y se pulsó el botón la carta
+	 * pudo entrar en un mazo o venderse.
+	 */
+	public function descartarCopias(array $ids, $id_usuario) {
+		$ids = array_values(array_unique(array_map("intval", $ids)));
+		if (!$ids) {
+			return ["ok" => false, "error" => "No has elegido ninguna carta.",
+			        "descartadas" => 0, "ganadas" => 0, "monedas" => null];
+		}
+		if (count($ids) > self::DESCARTE_MAX_POR_TANDA) {
+			return ["ok" => false, "descartadas" => 0, "ganadas" => 0, "monedas" => null,
+			        "error" => "Son demasiadas de golpe: máximo "
+			                   . self::DESCARTE_MAX_POR_TANDA . " por tanda."];
+		}
+
+		try {
+			$this->pdo->beginTransaction();
+
+			$permitidas = [];
+			foreach ($this->repetidasDescartables($id_usuario) as $grupo) {
+				foreach ($grupo["descartables"] as $idCol) {
+					$permitidas[$idCol] = $grupo["precio_unidad"];
+				}
+			}
+
+			$ganadas = 0;
+			$borrar  = [];
+			foreach ($ids as $idCol) {
+				if (!isset($permitidas[$idCol])) { continue; }
+				$ganadas += $permitidas[$idCol];
+				$borrar[] = $idCol;
+			}
+
+			if (!$borrar) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "descartadas" => 0, "ganadas" => 0, "monedas" => null,
+				        "error" => "Ninguna de esas copias se puede descartar ahora mismo."];
+			}
+
+			$marcas = implode(",", array_fill(0, count($borrar), "?"));
+			$del = $this->pdo->prepare(
+				"DELETE FROM coleccion WHERE id_usuario = ? AND id_coleccion IN ($marcas)");
+			$del->execute(array_merge([(int) $id_usuario], $borrar));
+
+			// Se paga lo que se ha borrado DE VERDAD, no lo que se pidió.
+			$borradas = $del->rowCount();
+			if ($borradas !== count($borrar)) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "descartadas" => 0, "ganadas" => 0, "monedas" => null,
+				        "error" => "Algo cambió mientras descartabas. No se ha tocado nada."];
+			}
+
+			$this->pdo->prepare(
+				"UPDATE usuarios SET monedas = monedas + :m WHERE id_usuario = :u")
+				->execute([":m" => $ganadas, ":u" => (int) $id_usuario]);
+
+			$saldo = $this->pdo->prepare("SELECT monedas FROM usuarios WHERE id_usuario = :u");
+			$saldo->execute([":u" => (int) $id_usuario]);
+			$monedas = (int) $saldo->fetchColumn();
+
+			$this->pdo->commit();
+
+			return ["ok" => true, "error" => null, "descartadas" => $borradas,
+			        "ganadas" => $ganadas, "monedas" => $monedas];
+
+		} catch (Exception $e) {
+			if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
+			return ["ok" => false, "descartadas" => 0, "ganadas" => 0, "monedas" => null,
+			        "error" => "No se ha podido completar el descarte."];
+		}
+	}
+
+	/** Tope por tanda: evita un DELETE gigante y un clic irreversible enorme. */
+	const DESCARTE_MAX_POR_TANDA = 200;
 
 	// Retira (desactiva) un anuncio propio
 	public function retirarAnuncio($id_anuncio, $id_usuario) {
@@ -2457,6 +2696,20 @@ class Tcg
 	const RAREZA_NUMERADA = 7;
 
 	/**
+	 * Tamaño de sobre al que se refieren los números de `rarezas.probabilidad`.
+	 *
+	 * Un sobre de este tamaño tiene EXACTAMENTE la probabilidad que dice la
+	 * tabla; uno mayor o menor la tiene en proporción, de forma que la
+	 * probabilidad POR CARTA no depende del sobre que compres. Con 5:
+	 *
+	 *     SRF        0,2000 %  →  1 cada   500 sobres  →  1 cada 2.500 cartas
+	 *     Legendario 0,3333 %  →  1 cada   300 sobres  →  1 cada 1.500 cartas
+	 *     Épico      1,0000 %  →  1 cada   100 sobres  →  1 cada   500 cartas
+	 *     Numerada   0,1000 %  →  1 cada 1.000 sobres  →  1 cada 5.000 cartas
+	 */
+	const SOBRE_REFERENCIA = 5;
+
+	/**
 	 * Elige $cantidad cartas para un sobre.
 	 *
 	 * ⚠️ UNA TIRADA POR SOBRE, NO UNA POR CARTA. Antes se sorteaba la rareza
@@ -2519,7 +2772,7 @@ class Tcg
 
 		// La tirada del sobre. Devuelve null la inmensa mayoría de las veces:
 		// entonces el sobre es todo relleno, que es lo que ya hay montado.
-		$destacada = self::sortearPremio($porRareza);
+		$destacada = self::sortearPremio($porRareza, $cantidad);
 		if ($destacada !== null && $cantidad > 0) {
 			$elegidas[random_int(0, $cantidad - 1)] = self::sacarDe([$destacada => $porRareza[$destacada]]);
 		}
@@ -2537,14 +2790,31 @@ class Tcg
 	 * opciones, pero eso ya sería una tabla en la que el 100 % de los sobres
 	 * lleva premium: no hay nada sensato que hacer ahí y no merece código.
 	 */
-	private static function sortearPremio(array $porRareza) {
+	private static function sortearPremio(array $porRareza, $cantidad = self::SOBRE_REFERENCIA) {
 		$premium = array_filter($porRareza, fn($r) => $r >= self::RAREZA_PREMIUM, ARRAY_FILTER_USE_KEY);
 		if (!$premium) { return null; }
+
+		/* ⚠️ LA TIRADA ESCALA CON EL TAMAÑO DEL SOBRE.
+
+		   `rarezas.probabilidad` es el porcentaje para un sobre de
+		   `SOBRE_REFERENCIA` cartas. Sin escalar, el «Sobre Doble» (10 cartas,
+		   50 monedas) tenía la MISMA probabilidad de premio que el «Sobre
+		   Básico» (5 cartas, 25 monedas): el doble de precio, el doble de
+		   cartas y el mismo premio, o sea la mitad de valor por moneda. Nadie
+		   debería comprar el grande.
+
+		   Escalando, lo que queda constante es la probabilidad POR CARTA, que
+		   es como se lee de verdad: un SRF al 0,20 % en sobres de cinco es uno
+		   cada 2.500 cartas, y sigue siendo uno cada 2.500 cartas en sobres de
+		   diez (donde toca el 0,40 % por sobre, uno cada 250). El sorteo sigue
+		   siendo ÚNICO por sobre, así que un sobre no puede traer dos premium
+		   por muchas cartas que tenga. */
+		$escala = max(1, (int) $cantidad) / self::SOBRE_REFERENCIA;
 
 		$tirada    = mt_rand() / mt_getrandmax() * 100.0;
 		$acumulado = 0.0;
 		foreach ($premium as $idRareza => $grupo) {
-			$acumulado += (float) $grupo["probabilidad"];
+			$acumulado += (float) $grupo["probabilidad"] * $escala;
 			if ($tirada < $acumulado) { return (int) $idRareza; }
 		}
 		return null;
@@ -8828,6 +9098,237 @@ class Tcg
 	}
 
 	/* ======================================================================
+	   CUÁNTO VALE UNA CARTA
+	   ----------------------------------------------------------------------
+	   Hacía falta porque el mercado no comprobaba NADA: `publicarAnuncio()`
+	   aceptaba el precio que le llegara. Con eso, dos cuentas de la misma
+	   persona se pasan lo que quieran en un paso —poner un Común a 10.000.000
+	   y comprárselo— y una SRF a 2 monedas es un regalo a quien esté mirando la
+	   lista en ese segundo. Ninguna de las dos cosas es un mercado.
+
+	   EL VALOR NO SE INVENTA: SALE DE LO QUE CUESTA CONSEGUIR LA CARTA.
+
+	   Un sobre de referencia son `SOBRE_REFERENCIA` cartas por
+	   `PRECIO_SOBRE_REFERENCIA` monedas, así que cada carta que sale de un sobre
+	   cuesta `PRECIO_CARTA`. Si una rareza aparece con probabilidad `p` por
+	   carta, conseguir UNA cuesta de media `PRECIO_CARTA / p` monedas. Eso es el
+	   coste esperado de obtención, y es el suelo natural de lo que vale:
+
+	       SRF        1 de cada 2.500 cartas  →  5 / 0,0004  = 12.500 monedas
+	       Legendario 1 de cada 1.500         →  5 / 0,00067 =  7.500
+	       Épico      1 de cada   500         →  5 / 0,002   =  2.500
+	       Raro       ~1 de cada 9,5          →  5 / 0,105   =     47
+
+	   Se multiplica por `MERCADO_LIQUIDEZ` porque un mercado de segunda mano
+	   paga por debajo del coste de obtención: si pagara igual o más, abrir
+	   sobres sería gratis y el precio se dispararía solo.
+
+	   Y LUEGO MANDAN LAS ESTADÍSTICAS, PERO DENTRO DE SU RAREZA.
+
+	   Comparar el poder (ataque+defensa+técnica) en bruto entre rarezas no dice
+	   nada: un Común de 188 no vale más que un Épico de 230. Lo que importa es
+	   si la carta es buena PARA SU RAREZA, y eso es exactamente una puntuación
+	   z: cuántas desviaciones típicas se separa de la media de su tier. La media
+	   y la desviación se miden sobre las cartas que hay de verdad
+	   (`estadisticasRareza()`), así que el modelo se recalibra solo cuando entra
+	   una expansión nueva.
+
+	   La z se convierte en multiplicador con `2 ^ (z · SENSIBILIDAD)`: es
+	   exponencial y no lineal porque el valor percibido de una carta también lo
+	   es —la diferencia entre buena y excelente se paga mucho más que entre
+	   mala y mediana—, y con `SENSIBILIDAD = 0,5` una carta a +2σ vale el doble
+	   que la media de su tier y una a −2σ, la mitad. Se recorta a
+	   `VALOR_TOPE_Z` para que un dato raro no dispare el precio.
+
+	   ⚠️ HAY CARTAS CON LAS ESTADÍSTICAS A CERO. Medido sobre la base de hoy: de
+	      46 legendarias, la mayoría están a 0/0/0. No es un caso hipotético, así
+	      que la media y la desviación se calculan IGNORANDO las que están a
+	      cero, y una carta sin estadísticas se queda en el valor base de su
+	      rareza en vez de hundirse a la mitad por un dato que falta.
+	   ====================================================================== */
+
+	/** Monedas y cartas del sobre con el que se ancla toda la economía. */
+	const PRECIO_SOBRE_REFERENCIA = 25;
+
+	/** Lo que el mercado paga respecto al coste esperado de obtención. */
+	const MERCADO_LIQUIDEZ = 0.60;
+
+	/** Horquilla permitida al publicar, sobre el valor estimado. */
+	const MERCADO_MIN_FACTOR = 0.40;
+	const MERCADO_MAX_FACTOR = 2.50;
+
+	/** Lo que paga el descarte rápido. Es malo a propósito: es comodidad. */
+	const DESCARTE_FACTOR = 0.20;
+
+	/** Cuánto mueve el precio una desviación típica de poder, y su recorte. */
+	const VALOR_SENSIBILIDAD = 0.5;
+	const VALOR_TOPE_Z       = 3.0;
+
+	/** Techo del ajuste por estadísticas: la rareza tiene que seguir mandando. */
+	const VALOR_MULT_MIN = 0.60;
+	const VALOR_MULT_MAX = 1.80;
+
+	/** @var array|null media y desviación de poder por rareza, una vez por petición */
+	private $cacheEstadisticasRareza = null;
+
+	/** @var array|null probabilidad por carta de cada rareza, una vez por petición */
+	private $cacheProbabilidadCarta = null;
+
+	/**
+	 * Media y desviación típica del poder (ataque+defensa+técnica) de cada
+	 * rareza, medidas sobre las cartas reales.
+	 *
+	 * Una sola consulta agrupada y se guarda en memoria: una pantalla de
+	 * mercado valora cincuenta cartas y sería absurdo preguntarlo cincuenta
+	 * veces. No se cachea entre peticiones a propósito — es una consulta
+	 * agrupada sobre una tabla pequeña, y así una carta nueva cuenta desde ya.
+	 */
+	private function estadisticasRareza() {
+		if ($this->cacheEstadisticasRareza !== null) {
+			return $this->cacheEstadisticasRareza;
+		}
+
+		// `> 0` deja fuera las cartas sin estadísticas cargadas: si entraran,
+		// arrastrarían la media de su tier hasta un número que no describe a
+		// ninguna carta de verdad.
+		$filas = $this->pdo->query("
+			SELECT id_rareza,
+			       COUNT(*)                                    AS n,
+			       AVG(ataque + defensa + tecnica)             AS media,
+			       STDDEV_POP(ataque + defensa + tecnica)      AS desv
+			FROM cromos
+			WHERE (ataque + defensa + tecnica) > 0
+			GROUP BY id_rareza
+		")->fetchAll(PDO::FETCH_ASSOC);
+
+		$out = [];
+		foreach ($filas as $f) {
+			$desv = (float) $f["desv"];
+			$out[(int) $f["id_rareza"]] = [
+				"n"     => (int) $f["n"],
+				"media" => (float) $f["media"],
+				// Con una sola carta en un tier la desviación es 0 y la z sería
+				// una división por cero. Un suelo de 1 la deja en 0 y el valor
+				// se queda en el base, que es lo correcto: sin dispersión no hay
+				// nada que distinga a esa carta de la media de su tier.
+				"desv"  => $desv > 1.0 ? $desv : 1.0,
+			];
+		}
+
+		$this->cacheEstadisticasRareza = $out;
+		return $out;
+	}
+
+	/**
+	 * Probabilidad POR CARTA de cada rareza, leída de la tabla `rarezas`.
+	 *
+	 * Las premium salen de la tirada única del sobre, así que su probabilidad
+	 * por carta es la del sobre repartida entre las cartas que trae. Las de
+	 * relleno se reparten lo que queda, normalizadas entre ellas — que es
+	 * exactamente lo que hace `sortearRareza()` con la tabla base.
+	 */
+	private function probabilidadPorCarta() {
+		/* Se cachea por la misma razón que las estadísticas: `valorCarta()` la
+		   pide en CADA carta, y una pantalla de mercado tasa cincuenta. Sin
+		   esto eran cincuenta consultas idénticas por carga. */
+		if ($this->cacheProbabilidadCarta !== null) {
+			return $this->cacheProbabilidadCarta;
+		}
+
+		$filas = $this->pdo->query("SELECT id_rareza, probabilidad FROM rarezas")
+		                   ->fetchAll(PDO::FETCH_ASSOC);
+
+		$relleno = 0.0;
+		foreach ($filas as $f) {
+			if ((int) $f["id_rareza"] < self::RAREZA_PREMIUM) {
+				$relleno += (float) $f["probabilidad"];
+			}
+		}
+
+		$out = [];
+		foreach ($filas as $f) {
+			$id = (int) $f["id_rareza"];
+			$p  = (float) $f["probabilidad"];
+
+			if ($id >= self::RAREZA_PREMIUM) {
+				// premium: una tirada por sobre, repartida entre sus cartas
+				$out[$id] = ($p / 100) / self::SOBRE_REFERENCIA;
+			} else {
+				// relleno: su peso entre los rellenos, que es lo que sortea
+				// `sortearRareza()` sobre la tabla base
+				$out[$id] = $relleno > 0 ? $p / $relleno : 0.0;
+			}
+		}
+
+		$this->cacheProbabilidadCarta = $out;
+		return $out;
+	}
+
+	/**
+	 * Lo que vale una carta y entre qué precios se puede publicar.
+	 *
+	 * Devuelve ["valor", "min", "max", "descarte"], todo en monedas enteras.
+	 * `$carta` necesita `id_rareza` y, si se quiere el ajuste por
+	 * estadísticas, `ataque`, `defensa` y `tecnica`.
+	 */
+	public function valorCarta(array $carta) {
+		$rareza = (int) ($carta["id_rareza"] ?? 1);
+
+		$probs = $this->probabilidadPorCarta();
+		$p = $probs[$rareza] ?? 0.5;
+
+		$precioCarta = self::PRECIO_SOBRE_REFERENCIA / self::SOBRE_REFERENCIA;
+		$costeObtener = $p > 0 ? $precioCarta / $p : $precioCarta;
+		$base = $costeObtener * self::MERCADO_LIQUIDEZ;
+
+		// --- ajuste por estadísticas, dentro de la propia rareza -------------
+		$poder = (int) ($carta["ataque"] ?? 0) + (int) ($carta["defensa"] ?? 0)
+		       + (int) ($carta["tecnica"] ?? 0);
+
+		$mult = 1.0;
+		$stats = $this->estadisticasRareza();
+		if ($poder > 0 && isset($stats[$rareza])) {
+			$z = ($poder - $stats[$rareza]["media"]) / $stats[$rareza]["desv"];
+			$z = max(-self::VALOR_TOPE_Z, min(self::VALOR_TOPE_Z, $z));
+			$mult = pow(2, $z * self::VALOR_SENSIBILIDAD);
+			$mult = max(self::VALOR_MULT_MIN, min(self::VALOR_MULT_MAX, $mult));
+		}
+
+		$valor = (int) max(1, round($base * $mult));
+
+		return [
+			"valor"    => $valor,
+			"min"      => (int) max(1, floor($valor * self::MERCADO_MIN_FACTOR)),
+			"max"      => (int) max(2, ceil($valor * self::MERCADO_MAX_FACTOR)),
+			// El descarte NO depende de las estadísticas: es un precio fijo por
+			// rareza, como la venta rápida de FIFA. Que sea predecible es la
+			// mitad de su utilidad — se vacía la colección sin mirar carta por
+			// carta— y evita además que se use para tasar.
+			"descarte" => (int) max(1, round($base * self::DESCARTE_FACTOR)),
+		];
+	}
+
+	/**
+	 * La carta de una copia concreta de la colección, con lo que hace falta
+	 * para tasarla. Devuelve null si la copia no es de quien dice.
+	 */
+	public function cartaDeCopia($id_coleccion, $id_usuario = null) {
+		$sql = "SELECT c.id_cromo, c.nombre, c.id_rareza, c.ataque, c.defensa, c.tecnica,
+		               col.id_usuario, col.bloqueada
+		        FROM coleccion col
+		        INNER JOIN cromos c ON c.id_cromo = col.id_cromo
+		        WHERE col.id_coleccion = :id";
+		$stmt = $this->pdo->prepare($sql);
+		$stmt->execute([":id" => (int) $id_coleccion]);
+		$fila = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$fila) { return null; }
+		if ($id_usuario !== null && (int) $fila["id_usuario"] !== (int) $id_usuario) {
+			return null;
+		}
+		return $fila;
+	}
+
+	/* ======================================================================
 	   CALIBRACIÓN DE DIFICULTAD PvE  (migración `033`)
 	   ----------------------------------------------------------------------
 	   El panel elige un PORCENTAJE DE VICTORIAS por dificultad y aquí se busca
@@ -8845,19 +9346,31 @@ class Tcg
 	/**
 	 * Objetivo de victorias del jugador por preset y dificultad.
 	 *
-	 * El ancla la puso Alejandro: en Extremo, el preset más blando deja ganar
-	 * un 7 % y el más duro un 1 %. Todo lo demás cuelga de ahí, y las cinco
-	 * columnas bajan siempre de forma monótona — un preset más duro nunca
-	 * puede dejar ganar más en ninguna dificultad.
+	 * EL ANCLA ES EL PRESET `normal`, y lo fijó Alejandro en números redondos:
+	 * 80 / 60 / 40 / 20 / 10. Uno por dificultad, bajando de veinte en veinte.
+	 *
+	 * Antes bajaba mucho más rápido —78 / 55 / 32 / 14 / 4,5— y las dos últimas
+	 * dificultades eran de adorno: un 4,5 % en Extremo son veintidós intentos
+	 * por victoria, así que nadie las jugaba dos veces. Con un 10 %, Extremo
+	 * sigue siendo un muro pero se puede pasar; Muy difícil pasa de "una de
+	 * cada siete" a "una de cada cinco".
+	 *
+	 * Los otros tres presets se recolocan alrededor manteniendo la regla de
+	 * siempre: las columnas bajan de forma monótona, así que un preset más duro
+	 * NUNCA deja ganar más en ninguna dificultad.
+	 *
+	 * ⚠️ ESTO SON OBJETIVOS, NO MULTIPLICADORES. El multiplicador de fuerza que
+	 *    produce cada porcentaje lo busca la calibración midiendo partidos de
+	 *    verdad; cambiar un número de aquí recalcula los niveles del rival solo.
 	 *
 	 * Vive en PHP y no en `configuracion` a propósito: son objetivos de diseño
 	 * del juego, no ajustes que nadie vaya a tocar fila a fila.
 	 */
 	const PRESETS_PVE = [
-		"mas_facil" => ["facil" => 0.85, "medio" => 0.65, "dificil" => 0.42, "muy_dificil" => 0.20, "extremo" => 0.07],
-		"normal"    => ["facil" => 0.78, "medio" => 0.55, "dificil" => 0.32, "muy_dificil" => 0.14, "extremo" => 0.045],
-		"dificil"   => ["facil" => 0.70, "medio" => 0.45, "dificil" => 0.24, "muy_dificil" => 0.09, "extremo" => 0.025],
-		"extremo"   => ["facil" => 0.60, "medio" => 0.35, "dificil" => 0.16, "muy_dificil" => 0.05, "extremo" => 0.01],
+		"mas_facil" => ["facil" => 0.88, "medio" => 0.70, "dificil" => 0.50, "muy_dificil" => 0.28, "extremo" => 0.16],
+		"normal"    => ["facil" => 0.80, "medio" => 0.60, "dificil" => 0.40, "muy_dificil" => 0.20, "extremo" => 0.10],
+		"dificil"   => ["facil" => 0.72, "medio" => 0.50, "dificil" => 0.31, "muy_dificil" => 0.14, "extremo" => 0.06],
+		"extremo"   => ["facil" => 0.62, "medio" => 0.40, "dificil" => 0.22, "muy_dificil" => 0.09, "extremo" => 0.03],
 	];
 
 	const ETIQUETAS_PRESET_PVE = [
@@ -11232,7 +11745,11 @@ class Tcg
 		// Se arma ANTES del bucle de abajo porque el requisito `rango_previos` de
 		// un nodo de bloqueo recorre los ancestros para resolverse.
 		$entrantes = [];
-		foreach ($aristas as $a) { $entrantes[(int) $a["id_destino"]][] = (int) $a["id_origen"]; }
+		$salientes = [];
+		foreach ($aristas as $a) {
+			$entrantes[(int) $a["id_destino"]][] = (int) $a["id_origen"];
+			$salientes[(int) $a["id_origen"]][]  = (int) $a["id_destino"];
+		}
 
 		/* superado = ganado alguna vez (partido), cofre ya abierto, la propia
 		   casilla de SALIDA —que no se juega: está superada por definición y
@@ -11280,6 +11797,33 @@ class Tcg
 			$disponible = $n["tipo"] === "inicio" ? true : (!$previos && !$hayInicio);
 			foreach ($previos as $p) {
 				if (!empty($superado[$p])) { $disponible = true; break; }
+			}
+
+			/* ⚠️ TAMBIÉN SE ABRE POR DETRÁS: SI YA SUPERASTE LO QUE VIENE DESPUÉS.
+
+			   Faltaba esta regla y dejaba nodos muertos. El caso real: una
+			   cadena en la que ya te habías pasado China, y después se añade
+			   Haití POR DELANTE de China. Haití se queda sin aristas de entrada
+			   —o con una que aún no está superada— así que por la regla de
+			   arriba no se abre nunca: candado permanente sobre un nodo que
+			   está en un tramo del mapa por el que YA HAS PASADO, y que además
+			   no puedes saltarte porque lo siguiente ya lo tienes hecho.
+
+			   El progreso en una cadena solo avanza, así que tener superado un
+			   nodo demuestra que llegaste hasta él: todo lo que desemboca ahí
+			   queda por detrás de donde estás y no tiene sentido que te lo
+			   cierre nada. Se mira un solo salto y no los ancestros enteros —
+			   basta para el caso, y recorrer el grafo aquí sería pagar un
+			   recorrido en cada carga del mapa por un nodo insertado a mano de
+			   vez en cuando.
+
+			   No toca `superado`: el nodo se abre para poder jugarlo, no se da
+			   por ganado. Sigue haciendo falta jugarlo para llevarse su rango y
+			   su botín. */
+			if (!$disponible) {
+				foreach ($salientes[$id] ?? [] as $siguiente) {
+					if (!empty($superado[$siguiente])) { $disponible = true; break; }
+				}
 			}
 
 			$n["superado"]   = $superado[$id];
