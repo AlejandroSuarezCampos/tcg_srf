@@ -21,7 +21,7 @@ include __DIR__ . '/navbar.php';
     <div class="linea-campo" aria-hidden="true"></div>
 
     <div class="wrap hero-contenido">
-      <a class="eyebrow" href="https://superligafrontier.es">Temporada 02 · Ya disponible</a>
+      <a class="eyebrow" href="https://superligafrontier.es">Temporada 03 · Ya disponible</a>
 
       <h1 class="t-display">El registro coleccionable<br>de los Super Ruinosos Fronteras</h1>
 
