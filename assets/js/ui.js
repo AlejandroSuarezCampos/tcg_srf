@@ -289,6 +289,95 @@
       if (burger.getAttribute('aria-expanded') !== 'true') return;
       if (!menu.contains(e.target) && !burger.contains(e.target)) cerrar();
     });
+
+    ajustarModoNav();
+    var esperando = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(esperando);
+      esperando = setTimeout(ajustarModoNav, 120);
+    });
+    /* La tipografía de respaldo mide distinto que la definitiva, así que el
+       primer cálculo puede decir que cabe cuando luego no cabe. Se rehace al
+       terminar de cargarla. */
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(ajustarModoNav);
+    }
+  }
+
+  /* ------------------------------------------------------------------------
+     BARRA COMPLETA O HAMBURGUESA — se decide MIDIENDO, no por un umbral
+
+     Aquí vivía «Más», un desplegable que recogía los destinos que no cabían.
+     Se ha quitado entero, y no por gusto: falló en cuatro sitios a la vez y
+     ninguno era arreglable sin volver a pelearse con el siguiente.
+
+       · El desplegable salía vacío. Es `position:absolute` dentro de
+         `.nav-menu`, que en escritorio lleva `overflow:hidden` para que un
+         fotograma de desbordamiento no empuje la página. Un descendiente
+         absoluto SÍ lo recorta su ancestro con overflow cuando está en su
+         cadena de contención, y como el panel se abre POR DEBAJO de la barra,
+         quedaba fuera de la caja y se recortaba del todo. Invisible siempre.
+       · Al cambiar de pestaña, los destinos aparecían sueltos fuera del
+         desplegable: cada carga rehacía el reparto y, según cuándo llegara la
+         tipografía, unos se quedaban en la barra y otros no.
+       · «Más» desaparecía solo, por lo mismo.
+       · Y la tira nunca acababa centrada, porque `.esta-centrada` solo se
+         ponía en la rama en la que todo cabía.
+
+     En su lugar, EN ESCRITORIO SE VEN TODOS LOS ENLACES. Lo que cede es el
+     tamaño, no la cantidad: la dieta de `layout.css` deja la barra completa en
+     1.095 px con las once entradas, así que cabe entera en cualquier
+     resolución de PC de uso corriente. La hamburguesa vuelve a ser lo que
+     tenía que ser, cosa de móvil.
+
+     Lo que queda aquí es UNA pregunta —¿se sale la tira de su caja?— y UNA
+     clase, como red por si aun así no cupiera. Sin mover nodos, sin
+     desplegable que recortar y sin nada que centrar a mano: en modo ancho lo
+     centra el grid de `.nav-interior`.
+
+     ⚠️ SE MIDE, NO SE ADIVINA. El ancho que pide la barra depende del rótulo,
+        de la tipografía que acabe cargando, del saldo de monedas (un millón
+        ocupa 48 px más que 500) y de si la cuenta es administradora, que suma
+        «Panel». Medido con la fuente cargada y la dieta puesta: 161 del
+        logotipo + 701 de los enlaces + 150 del chip + 72 de márgenes y huecos.
+        Un umbral fijo acierta en la pantalla donde se probó y falla en las
+        demás — y aquí las variables son cuatro.
+     ------------------------------------------------------------------------ */
+  function ajustarModoNav() {
+    var barra = document.querySelector('.nav');
+    var lista = barra && barra.querySelector('.nav-lista');
+    if (!lista) return;
+
+    /* Por debajo de esto es siempre compacta: no se mide, porque el modo ancho
+       ni siquiera cabría en la pantalla. El valor coincide con el que usa el
+       CSS de arranque en navbar.php, para que no haya un fotograma en el que
+       uno diga una cosa y el otro la contraria. */
+    if (!window.matchMedia('(min-width: 901px)').matches) {
+      barra.classList.add('es-compacta');
+      return;
+    }
+
+    /* Para medir hay que estar en modo ancho: en compacto la tira es una
+       columna dentro de un panel plegado y su ancho no dice nada. */
+    var estabaCompacta = barra.classList.contains('es-compacta');
+    barra.classList.remove('es-compacta');
+
+    /* `scrollWidth > clientWidth` es la misma medida contra sí misma: dos
+       enteros del mismo elemento, cierto solo mientras de verdad sobresale
+       algo. Se intentó calcular el hueco restando el logotipo y el chip al
+       ancho de la barra y no converge, porque `.nav-lista` RELLENA a su
+       contenedor y su ancho se queda clavado en el disponible. */
+    if (lista.scrollWidth > lista.clientWidth) {
+      barra.classList.add('es-compacta');
+    } else if (estabaCompacta) {
+      /* Se ha pasado de compacta a ancha: si el panel estaba desplegado, se
+         cierra, o se quedaría abierto y flotando sobre una barra que ya
+         enseña los mismos enlaces en fila. */
+      var burger = barra.querySelector('.nav-burger');
+      var menu = barra.querySelector('.nav-menu');
+      if (burger) burger.setAttribute('aria-expanded', 'false');
+      if (menu) menu.classList.remove('is-abierto');
+    }
   }
 
   /* ------------------------------------------------------------------------
@@ -364,12 +453,53 @@
      ------------------------------------------------------------------------ */
   var confirmarPendiente = null;
 
-  function confirmar(texto, alAceptar) {
+  /**
+   * Confirmación compartida.
+   *
+   * `opciones` es opcional y no cambia nada de lo de siempre si no se pasa:
+   *   · aceptar        texto del botón principal (por defecto, "Confirmar")
+   *   · extra          { texto, alPulsar, desactivado, titulo } → segunda
+   *                    acción. Para cuando la pregunta no es sí/no sino "de
+   *                    una manera o de la otra": abrir un sobre o abrir diez.
+   *
+   * El botón extra se REPONE en cada llamada (texto, estado y manejador) y se
+   * esconde cuando no se pide. Sin eso, una confirmación normal posterior
+   * heredaría el botón de la anterior y ofrecería una acción que no viene a
+   * cuento — el mismo fallo que ya evita `confirmarPendiente = null` al
+   * cancelar.
+   */
+  function confirmar(texto, alAceptar, opciones) {
     var modal = document.getElementById('modalConfirmar');
     if (!modal) { alAceptar(); return; }   // sin modal no se bloquea la acción
+    opciones = opciones || {};
 
     var parrafo = document.getElementById('confirmarTexto');
     if (parrafo) parrafo.textContent = texto || '¿Confirmas esta acción?';
+
+    var btnSi = document.getElementById('confirmarSi');
+    if (btnSi) btnSi.textContent = opciones.aceptar || 'Confirmar';
+
+    var btnExtra = document.getElementById('confirmarExtra');
+    if (btnExtra) {
+      /* Se clona para tirar los manejadores de la confirmación anterior: son
+         cierres sobre otra compra, y dejarlos puestos haría que "Abrir 10"
+         abriera diez del sobre de antes. */
+      var limpio = btnExtra.cloneNode(false);
+      btnExtra.parentNode.replaceChild(limpio, btnExtra);
+      btnExtra = limpio;
+
+      btnExtra.hidden = !opciones.extra;
+      if (opciones.extra) {
+        btnExtra.textContent = opciones.extra.texto || '';
+        btnExtra.disabled = !!opciones.extra.desactivado;
+        btnExtra.title = opciones.extra.titulo || '';
+        btnExtra.addEventListener('click', function () {
+          confirmarPendiente = null;
+          cerrarModal(document.getElementById('modalConfirmar'));
+          opciones.extra.alPulsar();
+        });
+      }
+    }
 
     confirmarPendiente = alAceptar;
     abrirModal(modal);

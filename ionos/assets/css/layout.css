@@ -37,19 +37,58 @@
   backdrop-filter: blur(12px);
 }
 .nav-interior {
-  display: flex;
+  /* GRID DE TRES COLUMNAS, Y LAS DOS DE LOS LADOS MIDEN LO MISMO.
+     Esto es lo que centra los enlaces DE VERDAD, con más destinos o con
+     menos. Antes era un flex con `margin-left:auto` en el chip, así que la
+     tira quedaba pegada al logotipo con todo el aire suelto a la derecha; se
+     intentó parchear con una clase `.esta-centrada` que ponía
+     `justify-content:center`, pero eso centra dentro del HUECO SOBRANTE, y
+     como el logotipo (205 px) y el chip (145–193 px) no miden lo mismo, el
+     centro del hueco no es el centro de la barra. Se veía torcido siempre.
+
+     Con `1fr auto 1fr` las dos columnas de los lados se reparten el resto a
+     partes iguales y crecen hasta la más ancha de las dos, así que la del
+     medio cae en el eje real de la barra. Y no hay nada que calcular en JS:
+     el navegador lo recentra solo cuando cambia el número de enlaces, cuando
+     entra «Panel» por ser cuenta administradora o cuando el saldo pasa de
+     500 a 1.250.000. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: 100%;
-  max-width: var(--wrap);
+  /* ⚠️ LA BARRA NO SE CIÑE A `--wrap`, Y ESA ERA LA MITAD DEL PROBLEMA.
+     `--wrap` es el ancho de LECTURA del contenido —1280/1440/1680 según la
+     pantalla—, y encorsetar ahí la navegación tiraba sitio a la basura: en una
+     ventana de 1680 px la barra solo podía usar 1440 (`--wrap` no sube a 1680
+     hasta los 1920), así que sobraban 240 px vacíos a los lados mientras los
+     enlaces se cortaban por la derecha. La barra ocupa el ancho de la ventana
+     y se para en un tope generoso, que es lo que hace una barra de navegación.
+
+     El tope existe para que en una pantalla ultrapanorámica el logotipo y el
+     chip no queden a un palmo de distancia. */
+  max-width: min(100%, 1760px);
   min-height: var(--nav-h);
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  /* Menos margen lateral que el resto de la página (`--gutter` son 32 px en
+     escritorio): son 24 px que se le devuelven a la tira de enlaces, y en una
+     barra pegada al borde superior no se echan de menos. */
+  padding-inline: var(--space-5);
 }
+/* SIN `min-width: 0` A PROPÓSITO. Con él, cuando la barra no cabe el grid
+   encoge las columnas de los lados por debajo de su contenido: el logotipo se
+   recortaba sin avisar y, peor, la tira SEGUÍA CABIENDO en su columna, así que
+   `ajustarModoNav()` medía «cabe» y no pasaba nunca al panel — solo se veía
+   descentrado. Dejándolas a su tamaño, lo que se desborda es la columna de en
+   medio, que sí tiene `min-width: 0`, y entonces la medida dice la verdad. */
+.nav-interior .logo { grid-column: 1; justify-self: start; }
+.nav-menu            { grid-column: 2; min-width: 0; }
+.nav-derecha         { grid-column: 3; justify-self: end; }
 
 .nav-lista {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
   list-style: none;
 }
@@ -75,36 +114,89 @@
 .nav-sep {
   width: 1px;
   height: 18px;
-  margin-inline: var(--space-2);
+  margin-inline: var(--space-1);
   background: var(--line);
 }
-/* los títulos de grupo y los iconos solo existen en el panel móvil */
+/* los títulos de grupo y los iconos solo existen en el panel compacto */
 .nav-grupo-titulo, .nav-ico { display: none; }
 
-.nav-derecha { display: flex; align-items: center; gap: var(--space-3); margin-left: auto; }
+.nav-derecha { display: flex; align-items: center; gap: var(--space-3); }
 
 /* --------------------------------------------------------------------------
-   Con Duelos, Misiones, Cadenas y Panel, la nav pasó a tener 12 destinos: el
-   logo (265px) + todos los enlaces en una fila (926px) + el chip de usuario
-   (176px) necesitan de verdad ~1460px sin recortar nada. Entre los 901px del
-   fin del panel móvil y ese ancho, algo tiene que ceder.
-   No es el logo (es el nombre del sitio) ni el chip (ya está reducido a
-   icono+número+icono, no hay más que quitarle sin perder la salida rápida).
-   Cede la tira de enlaces: se vuelve deslizable horizontalmente, mismo
-   patrón que .tabs. min-width:0 es lo que permite que .nav-menu se
-   encoja por debajo de los 926px de su contenido en vez de forzar el
-   desbordamiento de toda la fila — y con ella, de la página entera. */
-@media (min-width: 901px) {
-  .nav-interior .logo,
-  .nav-derecha { flex-shrink: 0; }
+   LA DIETA DE LA BARRA ANCHA
 
-  .nav-menu {
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .nav-menu::-webkit-scrollbar { display: none; }
+   Once destinos, el logotipo y el chip de monedas piden 1.525 px a tamaño
+   normal (medido con la fuente cargada: logotipo 271 + enlaces 997 + chip 145
+   + 112 de márgenes y huecos). En un portátil de 1.280 no caben, y cortarlos
+   por la derecha sin avisar es como estaba antes.
+
+   Antes esto se resolvía recogiendo lo que sobraba en un desplegable «Más».
+   Se ha quitado: el desplegable salía siempre vacío —lo recortaba el
+   `overflow:hidden` de `.nav-menu`, que es su ancestro con overflow— y al
+   cambiar de página los destinos aparecían sueltos por la barra. La decisión
+   es que en escritorio se ven TODOS los enlaces, así que lo que cede es el
+   tamaño, no la cantidad.
+
+   Cuentas, con la dieta puesta: logotipo 205, enlaces 827, chip 145–193.
+   Como las columnas laterales del grid se igualan a la más ancha,
+   2 × 205 + 827 + 40 de márgenes + 24 de huecos = 1.301 px. Cabe de 1.320
+   para arriba con holgura, y los separadores solo vuelven a partir de 1.560,
+   donde ya sobra sitio para el aire que dan.
+   -------------------------------------------------------------------------- */
+.nav:not(.es-compacta) .logo {
+  font-size: .875rem;
+  letter-spacing: .02em;
 }
+.nav:not(.es-compacta) .nav-lista { gap: 2px; }
+.nav:not(.es-compacta) .nav-enlace {
+  padding-inline: 5px;
+  font-size: var(--fs-caption);
+}
+/* «Inicio» no se enseña: el logotipo de la izquierda lleva al mismo sitio y es
+   la convención de toda la web. En el panel compacto sí sigue, porque allí el
+   logotipo no se lee como un enlace y hay sitio de sobra. */
+.nav:not(.es-compacta) .nav-inicio { display: none; }
+/* Los separadores son lo primero que cae: son tres, se llevan 27 px y lo que
+   separan se sigue leyendo por los grupos. Vuelven cuando hay sitio. */
+.nav:not(.es-compacta) .nav-sep { display: none; }
+
+/* Un punto más de dieta para el portátil pequeño. Con la talla de arriba la
+   barra pide 1.258 px, así que un 1.152 se iría a la hamburguesa — y la
+   hamburguesa es de móvil. Apretando aquí baja a 1.095 y la barra completa
+   aguanta hasta los 1.100, que cubre todas las resoluciones de PC de uso
+   corriente. Por debajo ya es una tableta y ahí sí manda el panel. */
+@media (max-width: 1279px) {
+  .nav:not(.es-compacta) .logo { font-size: .6875rem; }
+  .nav:not(.es-compacta) .nav-enlace { font-size: .75rem; padding-inline: 3px; }
+  /* El avatar del chip también cae aquí, igual que en móvil. Son 34 px, y con
+     un saldo de siete cifras el chip llega a 194 —más ancho que el logotipo—,
+     así que es ÉL el que fija las dos columnas de los lados y decide si cabe.
+     Quitándolo, la barra completa aguanta a 1.100 con la hucha llena. Quién
+     eres ya lo sabes; las monedas son el dato que hay que ver. */
+  .chip-usuario .avatar { display: none; }
+}
+@media (min-width: 1560px) {
+  .nav:not(.es-compacta) .nav-sep { display: block; }
+  .nav:not(.es-compacta) .nav-enlace { padding-inline: var(--space-2); }
+  .nav:not(.es-compacta) .logo { font-size: 1rem; }
+}
+/* Por encima del tope de la barra ya no hay nada que apretar: se vuelve al
+   tamaño de siempre. */
+@media (min-width: 1800px) {
+  .nav:not(.es-compacta) .logo { font-size: 1.125rem; letter-spacing: .04em; }
+  .nav:not(.es-compacta) .nav-enlace { font-size: var(--fs-body-sm); }
+  .nav:not(.es-compacta) .nav-lista { gap: var(--space-1); }
+}
+
+/* `overflow: hidden` y NO `auto`: es la red de seguridad de un fotograma.
+   Entre que la tipografía de respaldo cede el sitio a la definitiva y que
+   `ajustarModoNav()` vuelve a medir, una barra pasada de rosca empujaría la
+   página entera de lado. Con `auto` volveríamos al problema original:
+   contenido cortado sin ninguna señal de que hubiera más. */
+.nav:not(.es-compacta) .nav-menu { overflow: hidden; }
+.nav:not(.es-compacta) .nav-burger { display: none; }
+.nav:not(.es-compacta) .solo-movil { display: none; }
+
 .nav-salir {
   display: grid;
   place-items: center;
@@ -128,7 +220,6 @@
      a 20px de ancho y se quedaba por debajo del objetivo táctil mínimo */
   flex-shrink: 0;
   width: 44px; height: 44px;
-  margin-left: auto;
   padding: 0 10px;
   border: 0;
   border-radius: var(--radius-sm);
@@ -146,77 +237,92 @@
 .nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
 .nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
-@media (max-width: 900px) {
-  /* El orden visual en móvil es logo · chip de usuario · hamburguesa.
-     El `margin-left:auto` tiene que vivir en el chip, no en la hamburguesa:
-     si lo lleva la hamburguesa, empuja el chip fuera del viewport y la página
-     se puede deslizar de lado. */
-  .nav-burger { display: flex; order: 3; margin-left: var(--space-2); }
-  .nav-derecha { order: 2; margin-left: auto; min-width: 0; }
-  .nav-interior { gap: var(--space-2); }
+/* --------------------------------------------------------------------------
+   MODO COMPACTO — la hamburguesa
 
-  /* En 375px no caben logo + chip completo + hamburguesa: el chip se queda
-     solo con las monedas, que es el dato que hay que tener siempre a la vista.
-     El avatar es redundante (el usuario sabe quién es) y la salida se mueve
-     al menú desplegable. */
+   ES DE MÓVIL, no de escritorio: la barra ancha enseña los once destinos y no
+   esconde ninguno. `.es-compacta` la pone `ajustarModoNav()` en ui.js, y la
+   pone por debajo de 901 px sin mirar nada más; por encima solo si la tira se
+   sale de su caja de verdad, que con la dieta de arriba pide una ventana por
+   debajo de ~1.320 px. Es una red, no el modo normal de un PC.
+
+   La clase la escribe también un script en línea dentro de navbar.php, antes
+   de pintar: si esperásemos a ui.js, un móvil enseñaría los once enlaces en
+   fila durante un fotograma.
+   -------------------------------------------------------------------------- */
+.nav.es-compacta .nav-interior {
+  /* El orden visual es logo · chip de usuario · hamburguesa. El `auto` del
+     medio se lo lleva el chip y la hamburguesa se queda pegada al borde. */
+  display: flex;
+  gap: var(--space-2);
+  padding-inline: var(--gutter);
+}
+.nav.es-compacta .nav-burger { display: flex; order: 3; margin-left: var(--space-2); }
+.nav.es-compacta .nav-derecha { order: 2; margin-left: auto; min-width: 0; }
+
+/* En 375px no caben logo + chip completo + hamburguesa: el chip se queda solo
+   con las monedas, que es el dato que hay que tener siempre a la vista. El
+   avatar es redundante (el usuario sabe quién es) y la salida se mueve al
+   menú desplegable. */
+@media (max-width: 900px) {
   .chip-usuario { padding: 5px var(--space-3); min-width: 0; }
   .chip-usuario .avatar,
   .chip-usuario .nav-salir { display: none; }
-
-  /* el logotipo cede espacio antes que nada y nunca fuerza desbordamiento */
-  .nav-interior .logo {
-    min-width: 0;
-    font-size: .8125rem;
-    letter-spacing: .02em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
 }
 
-/* enlaces que solo existen en el menú móvil */
-.solo-movil { display: none; }
-@media (max-width: 900px) {
-  .solo-movil { display: block; }
-
-  .nav-menu {
-    position: absolute;
-    top: 100%;
-    left: 0; right: 0;
-    max-height: 0;
-    overflow: hidden;
-    border-bottom: 1px solid transparent;
-    background: rgba(11, 12, 16, .98);
-    backdrop-filter: blur(12px);
-    transition: max-height var(--t-media) var(--ease);
-  }
-  .nav-menu.is-abierto {
-    max-height: min(70vh, 560px);
-    overflow-y: auto;
-    border-bottom-color: var(--line);
-  }
-
-  .nav-lista {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: var(--space-3) var(--gutter) var(--space-5);
-  }
-  .nav-enlace { min-height: 48px; font-size: var(--fs-body); padding-inline: var(--space-2); }
-
-  /* en móvil los clústeres sí se etiquetan */
-  .nav-grupo-titulo {
-    display: block;
-    margin-top: var(--space-4);
-    padding: 0 var(--space-2) var(--space-2);
-    font-size: var(--fs-caption-sm);
-    font-weight: var(--fw-semibold);
-    letter-spacing: var(--tracking-caption);
-    text-transform: uppercase;
-    color: var(--frost-dim);
-  }
-  .nav-ico { display: inline-block; width: 20px; font-size: 18px; }
-  .nav-sep { display: none; }
+/* el logotipo cede espacio antes que nada y nunca fuerza desbordamiento */
+.nav.es-compacta .logo {
+  min-width: 0;
+  font-size: .8125rem;
+  letter-spacing: .02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+.nav.es-compacta .nav-menu {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  max-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid transparent;
+  background: rgba(11, 12, 16, .98);
+  backdrop-filter: blur(12px);
+  transition: max-height var(--t-media) var(--ease);
+}
+.nav.es-compacta .nav-menu.is-abierto {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  border-bottom-color: var(--line);
+}
+
+.nav.es-compacta .nav-lista {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding: var(--space-3) var(--gutter) var(--space-5);
+}
+.nav.es-compacta .nav-enlace {
+  min-height: 48px;
+  padding-inline: var(--space-2);
+  font-size: var(--fs-body);
+}
+
+/* en el panel compacto los clústeres sí se etiquetan */
+.nav.es-compacta .nav-grupo-titulo {
+  display: block;
+  margin-top: var(--space-4);
+  padding: 0 var(--space-2) var(--space-2);
+  font-size: var(--fs-caption-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-caption);
+  text-transform: uppercase;
+  color: var(--frost-dim);
+}
+.nav.es-compacta .nav-ico { display: inline-block; width: 20px; font-size: 18px; }
+.nav.es-compacta .nav-sep { display: none; }
+.nav.es-compacta .solo-movil { display: block; }
 
 /* --------------------------------------------------------------------------
    CABECERA DE PÁGINA INTERNA
@@ -327,7 +433,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* ⚠️ `svh` ADEMÁS DE `vh`, POR LA BARRA DEL NAVEGADOR MÓVIL. `100vh` es el
+     viewport GRANDE —el de la barra ya retraída—, así que en cuanto se carga
+     la pantalla de acceso con la barra visible el bloque mide más que lo que
+     se ve y aparece scroll en una página que cabía de sobra. `svh` es el
+     viewport pequeño, el que de verdad hay al llegar. El `vh` se queda debajo
+     como respaldo para navegadores que no conozcan la unidad. */
   min-height: 100vh;
+  min-height: 100svh;
   padding: var(--space-6) var(--gutter);
   overflow: hidden;
   background:
@@ -471,7 +584,11 @@
   .filtros {
     position: sticky;
     top: calc(var(--nav-h) + var(--space-4));
+    /* `dvh`: aquí el alto se recalcula mientras la barra del navegador se
+       encoge y se estira, que es justo lo que queremos en un panel pegajoso
+       con scroll propio. */
     max-height: calc(100vh - var(--nav-h) - var(--space-6));
+    max-height: calc(100dvh - var(--nav-h) - var(--space-6));
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -609,6 +726,7 @@
     /* El panel nunca es más alto que la ventana: lo que sobra se desplaza
        DENTRO de la lista, no arrastrando la página entera. */
     max-height: calc(100vh - 108px);
+    max-height: calc(100dvh - 108px);
     display: flex;
     flex-direction: column;
   }
@@ -634,6 +752,10 @@
   border-bottom: 1px solid var(--line);
 }
 .mazo-filtros-fila { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+/* Un control que ocupa la fila entera en vez de media. Lo usa "Ordenar por":
+   sus opciones son largas ("Ataque · de mayor a menor") y a media columna se
+   cortan justo donde está el dato que importa. */
+.mazo-filtros-fila .campo-ancho { grid-column: 1 / -1; }
 .mazo-filtros-pie {
   display: flex;
   align-items: center;
@@ -657,6 +779,91 @@
 .mazo-taller-campo .compos { margin-block: var(--space-5) 0; }
 
 .mazo-acciones { margin-bottom: var(--space-5); }
+
+/* --------------------------------------------------------------------------
+   CÓMO FUNCIONA UN MAZO — el manual, plegado bajo el taller.
+
+   `<details>` nativo y no un acordeón propio: trae gratis el plegado, el
+   teclado, la semántica y la búsqueda del navegador (Ctrl+F encuentra dentro
+   de un details cerrado en los navegadores modernos). Un acordeón a mano
+   habría sido más código para perder tres de esas cuatro cosas.
+   -------------------------------------------------------------------------- */
+.ayuda-mazos {
+  margin-block: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+.ayuda-mazos > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  font-weight: var(--fw-semibold);
+  border-radius: var(--radius-lg);
+  /* El triángulo por defecto se queda: es la señal de "esto se abre" que la
+     gente ya conoce, y sustituirlo por un icono propio es trabajo para empatar. */
+}
+.ayuda-mazos > summary:hover { color: var(--amber-light); }
+.ayuda-mazos > summary > .t-caption { margin-left: auto; }
+.ayuda-mazos[open] > summary { border-bottom: 1px solid var(--line); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+
+.ayuda-cuerpo {
+  display: grid;
+  /* Dos columnas cuando cabe: son seis bloques independientes y en una sola
+     columna el manual mide media pantalla de scroll. */
+  /* `min(320px, 100%)` y no `320px` a secas: en una pantalla de 320 px, una
+     pista de 320 px más el padding del contenedor ya no cabe, y la rejilla
+     desborda a lo ancho arrastrando la página entera. Con el `min()`, la
+     columna nunca pide más de lo que hay. */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--space-5);
+  padding: var(--space-5);
+}
+.ayuda-bloque { display: flex; flex-direction: column; gap: var(--space-3); }
+.ayuda-bloque h3 { font-size: var(--fs-body); color: var(--amber-light); }
+.ayuda-sub { font-size: var(--fs-body-sm); font-weight: var(--fw-semibold); margin-top: var(--space-2); }
+.ayuda-bloque p { margin: 0; }
+
+/* La columna de la estadística que manda en esa línea. Nunca es la única
+   pista: el número también es el más alto de su fila. */
+.ayuda-mazos .es-dueña { color: var(--amber-light); font-weight: var(--fw-semibold); }
+
+/* `.tabla` impone `min-width: 520px` porque son tablas de datos que se leen
+   desplazándolas. Las del manual son de cinco columnas cortas y caben en un
+   móvil sin desplazar nada: obligarlas a 520 px era condenar a la persona a
+   arrastrar cada tabla de la ayuda de lado. */
+.tabla-compacta { min-width: 0; }
+.tabla-compacta th, .tabla-compacta td { padding: 6px 10px; font-size: var(--fs-caption); }
+
+.ayuda-aviso {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--amber-line);
+  background: var(--amber-soft);
+  font-size: var(--fs-body-sm);
+}
+.ayuda-aviso > i { color: var(--amber-light); flex-shrink: 0; margin-top: 2px; }
+
+.ayuda-ciclo { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; }
+.ayuda-ciclo li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-caption);
+}
+.ayuda-ciclo i { color: var(--frost-dim); }
+.ayuda-ciclo span { color: var(--frost-dim); }
+
+.ayuda-pasos { margin: 0; padding-left: var(--space-5); font-size: var(--fs-body-sm); color: var(--frost-dim); }
+.ayuda-pasos li + li { margin-top: var(--space-2); }
 
 .mazo-pie {
   display: flex;
@@ -709,12 +916,17 @@
   margin: 0 auto var(--space-6);
   aspect-ratio: 5 / 7;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  /* Sin esquinas redondeadas y con las líneas a sangre: un campo de fútbol no
+     tiene las esquinas romas, y el rectángulo exterior del dibujo ES la banda,
+     así que tiene que coincidir con el borde del lienzo. Antes el SVG dejaba
+     dos unidades de margen por dentro y se veía una franja de césped muerta
+     alrededor de todo el campo. */
+  border-radius: 0;
   overflow: hidden;
   background-color: #0E1710;
   background-image:
     repeating-linear-gradient(180deg, rgba(255,255,255,.025) 0 10%, transparent 10% 20%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='2' y='2' width='96' height='136'/%3E%3Cline x1='2' y1='70' x2='98' y2='70'/%3E%3Ccircle cx='50' cy='70' r='14'/%3E%3Crect x='20' y='2' width='60' height='24'/%3E%3Crect x='35' y='2' width='30' height='10'/%3E%3Crect x='20' y='112' width='60' height='24'/%3E%3Crect x='35' y='128' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='70' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='.3' y='.3' width='99.4' height='139.4'/%3E%3Cline x1='0' y1='70' x2='100' y2='70'/%3E%3Ccircle cx='50' cy='70' r='14'/%3E%3Crect x='20' y='.3' width='60' height='24'/%3E%3Crect x='35' y='.3' width='30' height='10'/%3E%3Crect x='20' y='115.7' width='60' height='24'/%3E%3Crect x='35' y='129.7' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='70' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
   background-size: 100% 100%, 100% 100%;
 }
 
@@ -855,8 +1067,130 @@
 }
 .hueco-quitar:hover { color: var(--frost); border-color: var(--frost-dim); }
 
-@media (max-width: 480px) {
-  .hueco-nombre { font-size: 9px; }
+/* --------------------------------------------------------------------------
+   EL CAMPO EN MÓVIL: MÁS ALTO Y CON LOS HUECOS MÁS COMPACTOS.
+
+   ⚠️ ESTO NO ES ESTÉTICA, ES QUE LAS FILAS SE PISABAN. Medido en el navegador
+      a 270 px de campo: el hueco mide 66 px de alto (40 de retrato + el
+      nombre) y las filas quedan a 45-53 px unas de otras, así que el portero y
+      la defensa se solapaban 20 px — el nombre de uno encima del retrato del
+      otro. Ya pasaba con el 1-4-4-2 de siempre, y con las formaciones de cinco
+      y seis líneas que ahora existen se multiplica: siete filas repartidas
+      entre el 91 % y el 16 % del campo caen a 12,5 % una de otra.
+
+      Se arregla por los dos lados a la vez, porque ninguno basta solo: el
+      campo se estira (5/8 en vez de 5/7, que a 270 px son 54 px más de alto) y
+      el hueco adelgaza hasta unos 49 px. Con eso caben siete filas sin
+      tocarse. Solo en móvil: en pantalla grande el campo ya tiene sitio de
+      sobra y el retrato grande se ve mejor.
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  /* 5/9: con siete filas (portero + seis de campo) repartidas entre el 91 % y
+     el 16 %, los huecos caen a 12,5 % unos de otros. A 5/8 eso eran 54 px con
+     un hueco de 58 y seguían pisándose; a 5/9 son 60 px y ya no. */
+  .alineacion {
+    aspect-ratio: 5 / 9;
+    /* ⚠️ SU PROPIO DIBUJO, no el de escritorio estirado. `background-size:
+       100% 100%` deforma lo que le echen: con el SVG de 100x140 metido en un
+       lienzo 5/9, el círculo central salía ovalado y las áreas un 29 % más
+       profundas de lo que tocan. Este es el mismo campo con viewBox 100x180,
+       así que una unidad vuelve a medir igual en los dos ejes. */
+    background-image:
+      repeating-linear-gradient(180deg, rgba(255,255,255,.025) 0 10%, transparent 10% 20%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 180'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='.3' y='.3' width='99.4' height='179.4'/%3E%3Cline x1='0' y1='90' x2='100' y2='90'/%3E%3Ccircle cx='50' cy='90' r='14'/%3E%3Crect x='20' y='.3' width='60' height='24'/%3E%3Crect x='35' y='.3' width='30' height='10'/%3E%3Crect x='20' y='155.7' width='60' height='24'/%3E%3Crect x='35' y='169.7' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='90' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
+  }
+  .hueco { width: clamp(48px, 17%, 68px); gap: 2px; }
+  .hueco-avatar { width: clamp(30px, 9vw, 38px); }
+  .hueco-nombre { font-size: 8.5px; line-height: 1.15; }
+  /* El aspa de quitar también encoge, o se come el retrato al que cuelga. */
+  .hueco-quitar { width: 20px; height: 20px; }
+}
+
+/* --------------------------------------------------------------------------
+   FICHA AL VUELO DEL TITULAR
+   Lo que sale al pasar el ratón (o tabular) por un hueco ocupado.
+
+   ⚠️ VIVE DENTRO DE .alineacion, QUE TIENE overflow:hidden. Eso es a
+      propósito: el recorte es lo que mantiene el campo limpio, y la ficha se
+      diseña para caber dentro en vez de escaparse. Sacarla a position:fixed
+      obligaría a medir el hueco con getBoundingClientRect en cada hover y a
+      recalcular al hacer scroll; anclándola en % sobre el mismo campo que
+      coloca los huecos, no hay nada que medir y sigue cuadrando a cualquier
+      tamaño. Las variantes de abajo son las que evitan que se salga por un
+      borde: por arriba (`es-abajo`) y por las bandas.
+   -------------------------------------------------------------------------- */
+.hueco-ficha {
+  position: absolute;
+  z-index: 6;                      /* por encima de los huecos (z-index: 2) */
+  transform: translate(-50%, calc(-100% - 46px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: min(230px, 78%);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--panel-2) 94%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;            /* nunca se interpone al clic del hueco */
+  font-size: var(--fs-caption); line-height: 1.3;
+  line-height: 1.35;
+}
+/* El hueco está en la mitad de arriba: la ficha cae por debajo. */
+.hueco-ficha.es-abajo { transform: translate(-50%, 46px); }
+/* Pegada a una banda, se ancla por su borde para no salirse de lado. */
+.hueco-ficha.es-izquierda { transform: translate(-14%, calc(-100% - 46px)); }
+.hueco-ficha.es-derecha   { transform: translate(-86%, calc(-100% - 46px)); }
+.hueco-ficha.es-izquierda.es-abajo { transform: translate(-14%, 46px); }
+.hueco-ficha.es-derecha.es-abajo   { transform: translate(-86%, 46px); }
+
+/* Un filo del color de la rareza: la misma señal que ya llevan el avatar del
+   hueco y el marco de la carta. Nunca es la ÚNICA pista — la pastilla de
+   rareza va escrita justo debajo. */
+.hueco-ficha[data-rareza="1"] { border-top: 2px solid var(--rz1); }
+.hueco-ficha[data-rareza="2"] { border-top: 2px solid var(--rz2); }
+.hueco-ficha[data-rareza="3"] { border-top: 2px solid var(--rz3); }
+.hueco-ficha[data-rareza="4"] { border-top: 2px solid var(--rz4); }
+.hueco-ficha[data-rareza="5"] { border-top: 2px solid var(--rz5); }
+.hueco-ficha[data-rareza="6"] { border-top: 2px solid var(--rz6); }
+.hueco-ficha[data-rareza="7"] { border-top: 2px solid var(--rz7); }
+
+.hf-nombre { font-size: var(--fs-body-sm); font-weight: var(--fw-semibold); color: var(--frost); }
+.hf-meta   { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.hf-pos {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  color: var(--frost-dim);
+}
+.hf-equipo { color: var(--frost-dim); }
+.hf-afinidad { display: flex; align-items: center; gap: 5px; color: var(--frost-dim); }
+.hf-afinidad .carta-afinidad { width: 18px; height: 20px; }
+
+.hf-stats { display: flex; gap: var(--space-3); }
+.hf-stat  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.hf-stat b { font-size: 15px; color: var(--frost); }
+.hf-stat-et { color: var(--frost-dim); font-size: 9px; letter-spacing: .06em; }
+/* El peso de la línea, que es lo que explica el total de abajo. */
+.hf-stat-peso { color: var(--frost-faint); font-size: 9px; opacity: .8; }
+
+.hf-aporte {
+  padding-top: 5px;
+  border-top: 1px solid var(--line);
+  color: var(--frost-dim);
+}
+.hf-aporte b { color: var(--amber); font-size: 14px; }
+
+.hf-aviso { display: flex; align-items: center; gap: 4px; color: var(--amber-light); }
+.hf-rasgo { display: flex; align-items: center; gap: 4px; color: var(--frost-dim); }
+
+/* En táctil no hay hover y el toque abre el selector: la ficha no llega a
+   verse nunca, así que no se pinta. `hover: none` es la consulta correcta
+   —no el ancho—: un portátil estrecho sí tiene ratón y sí debe verla. */
+@media (hover: none) {
+  .hueco-ficha { display: none; }
 }
 
 /* --------------------------------------------------------------------------
@@ -1890,7 +2224,17 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* ⚠️ `safe center` Y NO `center` A SECAS, MÁS SCROLL PROPIO.
+     Este panel es `position:absolute; inset:0` sobre el partido, así que su
+     alto es el del partido y no crece. Con `center` puro, un minijuego más
+     alto que ese hueco se centra y se sale POR LOS DOS LADOS: lo que se
+     recortaba era el final —la tercera opción y el botón—, y se ha visto
+     tanto en móvil como en un PC. `safe center` centra cuando cabe y se
+     alinea arriba cuando no, que es lo que evita perder contenido; el
+     `overflow-y` remata dejando alcanzable lo que sobresalga. */
+  justify-content: safe center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   gap: var(--space-3);
   padding: var(--space-5) var(--space-4);
   border: 0;
@@ -1904,7 +2248,10 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
 }
 /* El contenido del minijuego se centra en una columna estrecha aunque el velo
    ocupe todo: leer un enunciado a 900 px de ancho es peor, no mejor. */
-.sim-minijuego:not([hidden]) > * { width: 100%; max-width: 440px; }
+/* 520 y no 440: con tres opciones en fila, a 440 px cada una se quedaba en
+   ~140 y el texto de la pista se partía en cuatro líneas, que es lo que hacía
+   crecer el bloque a lo alto hasta salirse. */
+.sim-minijuego:not([hidden]) > * { width: 100%; max-width: 520px; }
 
 /* Si el panel es MUY bajo (móvil apaisado), el minijuego puede desplazarse por
    dentro sin arrastrar la página. */
@@ -1921,6 +2268,23 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   text-transform: uppercase;
   color: var(--amber-light);
 }
+/* QUÉ HAY EN JUEGO. Va entre el título y la pregunta porque es el contexto con
+   el que se lee la pregunta, no una nota al pie. Discreto a propósito: informa
+   sin competir con el enunciado, que es lo que hay que leer primero. El de
+   "partido" sí levanta la voz — es el único que arrastra más allá de la
+   jugada, y confundirlo con los otros dos es el error caro. */
+.sim-mj-juego {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-caption);
+  color: var(--frost-dim);
+  text-wrap: balance;
+}
+.sim-mj-juego[data-impacto="partido"] {
+  color: var(--amber-light);
+  font-weight: var(--fw-semibold);
+}
+
 .sim-mj-enunciado {
   margin: 0;
   text-align: center;
@@ -1968,15 +2332,55 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
    con la propiedad `hidden`, y una regla de display de autor le gana siempre.
    Sin esto se verían los dos a la vez y parecería que el JS no se ejecuta —
    la misma trampa que ya mordió en cinco sitios más del proyecto. */
+/* QUÉ PASA SI NO DECIDES. El servidor aplica la opción conservadora al agotarse
+   el plazo; ese dato ya viajaba y no se enseñaba en ninguna parte. */
+.sim-mj-defecto {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-caption);
+  color: var(--frost-faint);
+}
+
+/* LA OPCIÓN POR DEFECTO, marcada allá donde se pinte: botones, zonas del
+   medidor y zonas del mapa. El borde discontinuo NO es la única señal —el
+   texto de arriba la nombra y el `aria-label` la anuncia—, porque una pista
+   que solo existe como estilo de borde no la ve todo el mundo. */
+.sim-mj-opcion.es-segura,
+.sim-mj-zona.es-segura,
+.sim-mj-zona-btn.es-segura {
+  border-style: dashed;
+  border-color: var(--amber-line);
+}
+
+/* ⚠️ REJILLA, NO `flex-wrap`. Con `flex: 1 1 150px` y tres opciones, en cuanto
+   el ancho no daba para las tres se partían en 2 + 1: dos arriba y una sola
+   abajo ocupando toda la fila. Además de feo, es el reparto que más alto
+   ocupa, y es lo que empujaba la tercera opción fuera del panel. Con
+   `auto-fit` van las tres en fila cuando caben y las tres en columna cuando no
+   — nunca a medias. */
 .sim-mj-opciones:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* Por defecto, EN COLUMNA. */
+  grid-template-columns: 1fr;
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
 }
+/* ⚠️ TRES O UNA, NUNCA DOS — y por eso no vale `auto-fit`.
+   Con `repeat(auto-fit, minmax(160px, 1fr))` el navegador mete las que quepan,
+   y con tres opciones eso cae en 2 + 1 en un rango ancho de tamaños: dos
+   arriba y una suelta abajo ocupando toda la fila. Medido en el panel real
+   (463 px) pasaba exactamente eso, y ese reparto es el que más alto ocupa —
+   dos filas de botones en vez de una— y el que empujaba la tercera opción
+   fuera del panel.
+   La consulta es de CONTENEDOR y no de ventana: el minijuego vive dentro del
+   panel del partido, cuyo ancho no tiene por qué ser el de la pantalla. */
+.sim-minijuego { container-type: inline-size; }
+@container (min-width: 400px) {
+  .sim-mj-opciones:not([hidden]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .sim-mj-opcion {
-  flex: 1 1 150px;
+  min-width: 0;
   /* 56 y no 44: se pulsa con prisa y con el pulgar. El mínimo táctil es el
      suelo, no el objetivo, y aquí fallar el botón cuesta el partido. */
   min-height: 56px;
@@ -2389,7 +2793,9 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
    -------------------------------------------------------------------------- */
 .ajustes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* Ver la nota de `.ayuda-cuerpo`: sin el `min()`, la columna desborda en
+     las pantallas más estrechas. */
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: var(--space-5);
   align-items: start;
 }
@@ -2501,10 +2907,46 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
    -------------------------------------------------------------------------- */
 .dificultades-cadena {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
+
+/* --------------------------------------------------------------------------
+   TRAMPAS DEL RIVAL, PARA TODA LA CADENA
+   Una fila por dificultad, con los dos desplegables de tres estados. Mismo
+   aspecto que el bloque de dificultades de arriba: son hermanos y se leen
+   seguidos.
+   -------------------------------------------------------------------------- */
+.trampas-cadena {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.trampa-fila {
+  display: grid;
+  /* La dificultad manda a la izquierda y los dos controles reparten el resto.
+     `min()` en el minmax porque este bloque vive dentro de un modal, que en un
+     portátil no es ancho: sin él la rejilla desborda y saca scroll lateral. */
+  grid-template-columns: minmax(90px, 130px) repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--void-2);
+}
+.trampa-dif { font-weight: var(--fw-semibold); }
+.trampa-campo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+.trampa-nombre { font-size: var(--fs-caption); color: var(--frost-dim); white-space: nowrap; }
+.trampa-campo select { min-width: 92px; }
 .dificultad-cadena {
   display: flex;
   align-items: center;

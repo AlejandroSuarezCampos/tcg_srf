@@ -68,7 +68,7 @@ $navGrupos = [
 	],
 ];
 ?>
-<header class="nav">
+<header class="nav" id="nav-barra">
   <div class="nav-interior">
 
     <a class="logo" href="<?= $base ?>landing.php">
@@ -82,9 +82,17 @@ $navGrupos = [
 
     <nav class="nav-menu" id="nav-menu" aria-label="Navegación principal">
       <ul class="nav-lista">
-        <li>
+        <?php /* «Inicio» solo en el panel móvil (`nav-inicio` lo esconde en
+                 escritorio): el logotipo de la izquierda va al mismo sitio y es
+                 la convención de toda la web, así que en la barra era un
+                 destino repetido ocupando ancho del que no sobraba. En el panel
+                 desplegable sí se enseña, porque allí el logotipo queda fuera
+                 de la lista y no se lee como enlace. */ ?>
+        <li class="nav-inicio">
           <a href="<?= $base ?>landing.php" class="nav-enlace<?= $activePage === 'landing' ? ' is-activo' : '' ?>"
-             <?= $activePage === 'landing' ? 'aria-current="page"' : '' ?>>Inicio</a>
+             <?= $activePage === 'landing' ? 'aria-current="page"' : '' ?>>
+            <i class="ph ph-house nav-ico" aria-hidden="true"></i>Inicio
+          </a>
         </li>
 
         <?php foreach ($navGrupos as $grupo => $destinos): ?>
@@ -124,6 +132,7 @@ $navGrupos = [
             </a>
           </li>
         <?php endif; ?>
+
       </ul>
     </nav>
 
@@ -153,5 +162,19 @@ $navGrupos = [
 
   </div>
 </header>
+<?php /* ARRANQUE DEL MODO COMPACTO, ANTES DE PINTAR.
+
+         La clase `es-compacta` la lleva ui.js, que se carga al final del
+         <body>: si esperáramos a él, un móvil enseñaría los once enlaces en
+         fila durante un fotograma antes de plegarlos. Este script va aquí
+         mismo, en línea y sin `defer`, así que corre con la barra ya en el
+         árbol y antes del primer pintado.
+
+         Solo mira el ancho de ventana, que es lo único que se puede saber sin
+         haber medido nada todavía. El ajuste fino —¿se sale la tira de su
+         caja?— lo hace después ajustarModoNav(), que además vuelve a mirarlo
+         al cambiar el tamaño y al terminar de cargar la tipografía. */ ?>
+<script>(function(){var n=document.getElementById('nav-barra');
+if(n&&!window.matchMedia('(min-width: 901px)').matches){n.classList.add('es-compacta');}})();</script>
 
 <?= assetScript($base ?? '', 'assets/async/js/scriptsAsync.js') ?>

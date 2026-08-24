@@ -23,6 +23,14 @@
     <p class="t-body-sm t-dim" id="confirmarTexto"></p>
     <div class="modal-pie">
       <button type="button" class="btn btn-ghost" data-cerrar-modal>Cancelar</button>
+      <?php /* Segunda acción OPCIONAL, para las confirmaciones que no son
+               sí/no sino "de una manera o de la otra" — hoy, abrir un sobre o
+               abrir diez. Nace oculto y solo lo enseña SRF.confirmar() cuando
+               se le pasa `opciones.extra`, así que las confirmaciones de
+               siempre siguen viéndose con dos botones exactamente igual.
+               Va ANTES del principal: el orden de lectura deja a la derecha la
+               acción por defecto, que es la que se pulsa sin mirar. */ ?>
+      <button type="button" class="btn btn-ghost" id="confirmarExtra" hidden></button>
       <button type="button" class="btn btn-primary" id="confirmarSi">Confirmar</button>
     </div>
   </div>

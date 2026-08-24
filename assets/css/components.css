@@ -123,6 +123,29 @@
 }
 .campo textarea { min-height: 96px; resize: vertical; line-height: var(--lh-body); }
 
+/* ⚠️ 16 PX EN TÁCTIL, Y NO ES UN CAPRICHO DE TAMAÑO.
+   Safari en iOS HACE ZOOM a la página entera en cuanto enfocas un campo cuyo
+   tipo mide menos de 16 px. Con los 15 px de arriba pasaba en todos: tocabas
+   el buscador de mazos, la página daba un salto y se quedaba ampliada —porque
+   el zoom no se deshace solo al salir del campo—, y a partir de ahí se
+   navegaba con la interfaz descuadrada y con scroll horizontal. Es el origen
+   de buena parte de "en móvil se ve todo mal".
+
+   La consulta es `pointer: coarse` y NO un ancho: lo que dispara el zoom es el
+   navegador táctil, no la pantalla estrecha. Un portátil de 1280 px con ratón
+   conserva sus 15 px, que es el tamaño elegido para el sistema. */
+@media (pointer: coarse) {
+  .campo input[type="text"],
+  .campo input[type="password"],
+  .campo input[type="number"],
+  .campo input[type="search"],
+  .campo input[type="file"],
+  .campo textarea,
+  .campo select {
+    font-size: 16px;
+  }
+}
+
 .campo input::placeholder, .campo textarea::placeholder { color: rgba(147, 149, 159, .7); }
 
 .campo input:hover, .campo select:hover, .campo textarea:hover { border-color: var(--line-strong); }
@@ -1710,6 +1733,63 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    tamaño que sea, es alcanzable. */
 .ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
+/* ---------------------------------------------------------------------------
+   RECUENTO DEL BOTÍN — la tira de "qué me ha tocado" sobre la mesa.
+
+   Va FUERA de .ceremonia-mesa a propósito: la mesa tiene scroll propio (regla
+   de arriba) y un resumen metido dentro se iría con el scroll justo cuando más
+   se consulta, que es tras bajar a ver las últimas cartas. Aquí se queda fijo
+   entre la cabecera y las cartas.
+
+   `flex-shrink: 0` porque .modal-caja es un flex en columna con overflow
+   oculto: sin esto, una tanda de diez sobres aplastaba la tira hasta dejarla
+   en una raya.
+   --------------------------------------------------------------------------- */
+.cer-recuento:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  margin-bottom: var(--space-4);
+}
+.cer-recuento-total {
+  font-size: var(--fs-caption); line-height: 1.3;
+  color: var(--frost-dim);
+  margin-right: var(--space-1);
+}
+.cer-recuento-rz {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-caption); line-height: 1.3;
+  /* El mismo color que ya identifica a la rareza en el marco de la carta y en
+     el aura de la ranura: se reconoce sin leer la palabra. */
+  color: var(--aura-color, var(--frost));
+  border: 1px solid color-mix(in srgb, var(--aura-color, var(--frost)) 45%, transparent);
+  background: color-mix(in srgb, var(--aura-color, var(--frost)) 12%, transparent);
+}
+.cer-recuento-rz[data-rareza="1"] { --aura-color: var(--rz1); }
+.cer-recuento-rz[data-rareza="2"] { --aura-color: var(--rz2); }
+.cer-recuento-rz[data-rareza="3"] { --aura-color: var(--rz3); }
+.cer-recuento-rz[data-rareza="4"] { --aura-color: var(--rz4); }
+.cer-recuento-rz[data-rareza="5"] { --aura-color: var(--rz5); }
+.cer-recuento-rz[data-rareza="6"] { --aura-color: var(--rz6); }
+.cer-recuento-rz[data-rareza="7"] { --aura-color: var(--rz7, var(--rz6)); }
+
+/* Los dos grupos del pie (saltar / reabrir) ocupan el mismo sitio y solo hay
+   uno visible a la vez, así que se comportan como si no existieran: sin esto,
+   un contenedor vacío seguía metiendo su gap y "Continuar" quedaba descolgado
+   del borde. */
+.cer-pie-grupo { display: contents; }
+/* ⚠️ IMPRESCINDIBLE, y no es redundante con el atributo. `[hidden]` lo pone
+   la hoja del NAVEGADOR, y cualquier regla de autor —incluida la de arriba—
+   le gana. Sin esta línea, `display: contents` dejaba los botones de saltar a
+   la vista durante el resumen, que es justo lo que se quería quitar. */
+.cer-pie-grupo[hidden] { display: none; }
+
 /* Resumen del cofre: monedas y bonus (camino perfecto, formación), por
    encima de las cartas si trae alguna. Un cofre solo-monedas no tiene mesa
    que enseñar, así que este es el único rastro visible del botín — tiene
@@ -3205,6 +3285,17 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
     transform: none;
     max-height: 46vh;
   }
+  /* LA HOJA SE VA ARRIBA cuando lo señalado ha quedado en la mitad de abajo y
+     la hoja se le pondría encima. Pasa con todo lo que vive al final del
+     documento: ahí el scroll ya no puede subir más el objetivo, así que el que
+     se aparta es el globo. Lo decide tutorial.js midiendo, no una suposición
+     sobre dónde está el objetivo. */
+  .tutorial-globo.es-arriba,
+  .tutorial-globo.esta-centrado.es-arriba {
+    bottom: auto;
+    top: calc(var(--nav-h) + 12px) !important;
+  }
+
   .tutorial-botones { gap: var(--space-2); }
   .tutorial-globo .btn { min-height: 44px; }
   .tutorial-accion { min-height: 44px; }

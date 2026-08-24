@@ -32,6 +32,29 @@ html {
      destino por teclado deja el elemento enfocado bajo la barra */
   scroll-padding-top: calc(var(--nav-h) + var(--space-4));
   -webkit-text-size-adjust: 100%;
+
+  /* ⚠️ EL RECUADRO AZUL DE LOS MÓVILES. Al tocar cualquier cosa pulsable, los
+     navegadores WebKit/Blink pintan encima un rectángulo azul translúcido —su
+     color por defecto— que no respeta ni el radio ni la forma del control: en
+     una carta redondeada salía un cuadrado azul, y en los sobres 3D salía
+     sobre una cara girada. No es un estado del sistema de diseño, es un
+     resto del navegador.
+
+     Se apaga aquí y no control por control porque afecta a TODO lo pulsable, y
+     dejarlo puesto en un sitio y quitado en otro es peor que no quitarlo.
+     La respuesta al toque no se pierde: cada componente ya tiene su `:active`
+     propio, que es la señal buena —respeta la forma y el color del sitio—. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ⚠️ Y LA SELECCIÓN DE TEXTO AL MANTENER PULSADO. En táctil, dejar el dedo un
+   momento sobre un botón selecciona su rótulo y saca la lupa y el menú de
+   copiar: pasaba al arrastrar en los minijuegos y al pulsar un sobre.
+   Solo se apaga en los CONTROLES, nunca en el contenido: seleccionar y copiar
+   un texto de la página tiene que seguir funcionando. */
+button, .btn, [role="button"], summary, .hueco, .pack3d-sobre, .nodo-boton {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 body {
@@ -50,6 +73,42 @@ body {
 }
 
 img, svg, video { display: block; max-width: 100%; }
+
+/* --------------------------------------------------------------------------
+   CÓMO PARTE EL TEXTO
+
+   En una pantalla estrecha el navegador reparte las líneas de forma
+   codiciosa: llena cada una hasta el borde y lo que sobra baja. Con títulos
+   cortos eso deja renglones muy desiguales, y con párrafos deja huérfanas —
+   una sola palabra sola en la última línea. Se veía en el marcador del
+   partido, en el relato de los minijuegos y en el modal de confirmación de los
+   sobres, y es lo que hace que la interfaz parezca descuidada.
+
+   Son dos propiedades distintas y cada una va donde toca:
+     · `balance` iguala el largo de las líneas. Para TÍTULOS, que son cortos —
+       el navegador solo lo aplica a bloques de pocas líneas, así que ponerlo
+       en un párrafo largo no hace nada.
+     · `pretty` no iguala nada: solo evita la huérfana del final. Para TEXTO
+       corrido, que es donde molesta.
+
+   Los navegadores que no las conozcan las ignoran y se quedan como estaban.
+   -------------------------------------------------------------------------- */
+h1, h2, h3, h4, .t-h1, .t-h2, .t-h3 { text-wrap: balance; }
+p, li, dd, figcaption { text-wrap: pretty; }
+
+/* ⚠️ LOS NOMBRES QUE ESCRIBE LA GENTE NO SE PUEDEN PARTIR POR SÍLABAS, pero sí
+   tienen que poder partirse. Un usuario puede llamarse
+   `follandocabritillas04` de una tirada: sin esto, esa palabra no cabe en
+   375 px, no parte por ningún sitio y ESTIRA su contenedor, sacando scroll
+   lateral a la página entera o desbordando la tarjeta.
+   `anywhere` y no `break-word`: `break-word` no reduce el ancho mínimo
+   intrínseco del elemento, así que en una rejilla o en un flex la columna
+   sigue reservando el ancho de la palabra completa y el desbordamiento
+   persiste. */
+.nombre-usuario, .sim-nombre, .carta-nombre, .hueco-nombre,
+.mazo-nombre, .cadena-nodo-nombre, .vitrina-item-nombre {
+  overflow-wrap: anywhere;
+}
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
