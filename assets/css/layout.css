@@ -2078,6 +2078,26 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
    tragaperras. El marcador y la barra reutilizan .partido-marcador y
    .progreso ya existentes; aquí solo lo que es nuevo de verdad.
    -------------------------------------------------------------------------- */
+/* ⚠️ LA CAJA DEL PARTIDO SE ESTIRA, Y ES LO QUE ARREGLA EL MINIJUEGO CORTADO.
+
+   El minijuego se superpone al cuerpo con `position:absolute; inset:0`, así que
+   SU alto es exactamente el del cuerpo. Y el cuerpo medía lo que midiera su
+   contenido, con un mínimo de 340 px: en un móvil eso deja al minijuego una
+   franja de 340 px para título, enunciado, tres opciones y botón, aunque la
+   pantalla tenga 800. Cabía por dentro con scroll propio, pero un scroll dentro
+   de un panel que ya está dentro de un modal no lo encuentra nadie con el reloj
+   de decisión corriendo: se ve como «el minijuego sale cortado».
+
+   Con la caja en columna y alto fijo, el cuerpo se lleva TODO lo que sobra
+   (`flex: 1`) y el minijuego hereda ese alto. En un móvil pasa de 340 px a casi
+   la pantalla entera. El `safe center` y el `overflow-y` de abajo siguen ahí de
+   red, pero ya casi nunca tienen que actuar. */
+.modal.simulacion .modal-caja {
+  display: flex;
+  flex-direction: column;
+  height: 88vh;
+}
+
 .simulacion-cuerpo {
   position: relative;
   display: flex;
@@ -2086,10 +2106,9 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
   gap: var(--space-4);
   padding: var(--space-5) 0 var(--space-2);
   overflow: hidden;
-  /* Alto mínimo para que el minijuego, que se superpone con `inset: 0`, tenga
-     una caja contra la que centrarse desde el primer evento: sin esto, en los
-     primeros segundos el cuerpo mide lo que mide el marcador y la decisión
-     salía comprimida en una franja. */
+  /* Se lleva el alto que sobre tras el marcador y el reloj. El mínimo se queda
+     como suelo para pantallas muy bajas. */
+  flex: 1 1 auto;
   min-height: 340px;
 }
 .simulacion-cuerpo .linea-campo { opacity: .5; }
@@ -2260,6 +2279,25 @@ a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
     justify-content: flex-start;
     overflow-y: auto;
   }
+}
+
+/* En móvil se le devuelve al partido todo el sitio que se pueda: el modal
+   apenas deja margen, la caja sube al 94 % del alto y el relleno se aprieta.
+   Son ~120 px más para la decisión, que es justo lo que faltaba para que las
+   tres opciones y el botón entren sin desplazar. */
+@media (max-width: 600px) {
+  .modal.simulacion { padding: var(--space-2); }
+  .modal.simulacion .modal-caja {
+    height: 94vh;
+    max-height: 94vh;
+    padding: var(--space-4) var(--space-3);
+  }
+  .simulacion-cuerpo {
+    /* que mande el hueco disponible, no un mínimo pensado para escritorio */
+    min-height: 0;
+    padding-top: var(--space-3);
+  }
+  .sim-minijuego:not([hidden]) { padding: var(--space-4) var(--space-2); }
 }
 .sim-mj-titulo {
   margin: 0;

@@ -96,6 +96,36 @@ img, svg, video { display: block; max-width: 100%; }
 h1, h2, h3, h4, .t-h1, .t-h2, .t-h3 { text-wrap: balance; }
 p, li, dd, figcaption { text-wrap: pretty; }
 
+/* ⚠️ EN MÓVIL, ADEMÁS, SE PARTEN LAS PALABRAS.
+
+   `text-wrap: pretty` reparte mejor las líneas pero no puede partir una
+   palabra, y en castellano las palabras largas son el problema: en una columna
+   de 320 px, «Recompensa», «Coleccionista» o «República Democrática del Congo»
+   dejan un hueco enorme al final de la línea anterior o se van solas a una
+   línea propia. Eso es lo que se ve como saltos de línea feos.
+
+   `hyphens: auto` usa el diccionario del idioma —de ahí que `<html lang="es">`
+   sea obligatorio, y lo es— y parte por sílabas con guion. Solo por debajo de
+   700 px: en escritorio hay ancho de sobra y un guion donde no hace falta se
+   lee peor.
+
+   Va en los contenedores de PROSA, no en todo: partir un nombre de usuario, un
+   precio o el rótulo de un botón sería peor que el hueco que evita. */
+@media (max-width: 700px) {
+  p, li, dd, figcaption,
+  .t-body, .t-body-sm, .ayuda-texto {
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+}
+
+/* Un hijo de flex no baja de su `min-content` por defecto, así que una palabra
+   larga ensancha la caja entera en vez de partirse: es lo que empujaba las
+   filas de estadísticas y los rótulos del minijuego fuera de la pantalla. */
+.sim-mj-opcion, .sim-mj-texto, .hueco-ficha, .carta-nombre {
+  min-width: 0;
+}
+
 /* ⚠️ LOS NOMBRES QUE ESCRIBE LA GENTE NO SE PUEDEN PARTIR POR SÍLABAS, pero sí
    tienen que poder partirse. Un usuario puede llamarse
    `follandocabritillas04` de una tirada: sin esto, esa palabra no cabe en
