@@ -101,6 +101,16 @@ include __DIR__ . '/navbar.php';
       </div>
       <div class="dato"><b><?= $porcentaje ?> %</b><span>Completado</span></div>
     </div>
+    <?php /* El descarte tiene pantalla propia y no un botón por carta aquí: es
+             una acción irreversible en lote, y mezclarla con la pantalla donde
+             se navega y se filtra es cómo alguien vacía media colección con un
+             clic mal dado. */ ?>
+    <div class="fila" style="margin-top:var(--space-3);">
+      <a class="btn btn-ghost btn-sm" href="descartar.php">
+        <i class="ph ph-recycle" aria-hidden="true"></i>
+        Descartar repetidas
+      </a>
+    </div>
   </div>
 </header>
 
