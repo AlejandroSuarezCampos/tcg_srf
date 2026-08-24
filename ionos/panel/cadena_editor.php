@@ -479,6 +479,31 @@ $activeAdmin = 'cadenas';
         <div class="dificultades-cadena" id="fn_dif_cadena"></div>
       </div>
 
+      <?php /* LAS TRAMPAS, PARA TODA LA CADENA DE GOLPE.
+
+               Ya se podían poner nodo a nodo en la tabla de abajo (columnas
+               «Sin malus» y «Compos libres»), pero solo así: dejar una cadena
+               de veinte partidos en modo jefe final eran veinte modales por
+               cinco dificultades, tocando dos desplegables en cada uno. En la
+               práctica no se usaba, que es lo mismo que no existir.
+
+               Las dos son reglas de equilibrio ENTRE PERSONAS: que nadie apile
+               compos sin límite y que un mazo carísimo sin coherencia pague
+               por ello. A un rival de cadena, que no compite por nada ni sube
+               en ninguna clasificación, solo le impedían ser un jefe final. */ ?>
+      <div class="editor-bloque">
+        <h3 class="t-h3">Trampas del rival en TODA la cadena</h3>
+        <p class="t-caption t-dim">
+          <b>Sin malus</b>: el rival no paga el malus de coherencia, así que
+          puede llevar once legendarias sin castigo.
+          <b>Compos libres</b>: se salta el tope de bonus por línea y puede
+          apilar compos sin techo.
+          Se aplican a todos los partidos de la cadena; «general» devuelve cada
+          uno a lo que diga la configuración global.
+        </p>
+        <div class="trampas-cadena" id="fn_trampas_cadena"></div>
+      </div>
+
       <div class="tabla-wrap">
         <table class="tabla tabla-dificultad">
           <thead>

@@ -598,6 +598,7 @@
     }
 
     cargarDificultadesCadena();
+    cargarTrampasCadena();
     post('listar_ajustes_nodo', { id_nodo: idNodo }).then(function (r) {
       pintarDificultades(idNodo, (r && r.ajustes) || {});
     });
@@ -723,6 +724,82 @@
             cargarDificultadesCadena();
             if (estado.nodoActual) { cargarDificultades(estado.nodoActual.id_nodo); }
           });
+        });
+
+        caja.appendChild(fila);
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------------------
+     LAS TRAMPAS DEL RIVAL, PARA TODA LA CADENA
+
+     Las mismas dos columnas que la tabla de abajo tiene por nodo, pero
+     aplicadas de una vez a todos los partidos de la cadena. Sin esto había que
+     abrir veinte modales y tocar dos desplegables en cada uno por cada
+     dificultad: existía, pero no se usaba.
+
+     Tres estados, como en la tabla: sí / no / "como el general". El tercero no
+     es relleno — dejar un nodo sin opinión para que mande la configuración
+     global es lo normal, y un interruptor de dos no sabe decirlo.
+     ------------------------------------------------------------------------ */
+  var TRAMPAS = [
+    { columna: 'sin_malus',     titulo: 'Sin malus',     clave: 'malus_si' },
+    { columna: 'compos_libres', titulo: 'Compos libres', clave: 'libres_si' },
+  ];
+
+  function cargarTrampasCadena() {
+    var caja = document.getElementById('fn_trampas_cadena');
+    if (!caja || !estado.idCadena) { return; }
+
+    post('trampas_cadena', { id_cadena: estado.idCadena }).then(function (r) {
+      if (!r.ok) { return; }
+      caja.innerHTML = '';
+
+      (estado.dificultades || []).forEach(function (dif) {
+        var e = r.estado[dif] || { total: 0 };
+
+        var fila = document.createElement('div');
+        fila.className = 'trampa-fila';
+        fila.innerHTML = '<span class="trampa-dif">'
+          + (ETIQUETA_DIFICULTAD[dif] || dif) + '</span>';
+
+        TRAMPAS.forEach(function (t) {
+          var puestos = Number(e[t.clave] || 0);
+          var total = Number(e.total || 0);
+          /* Se dice en cuántos nodos está puesta, no un sí/no que mentiría
+             cuando los nodos no coinciden entre sí. */
+          var resumen = total === 0 ? 'sin partidos'
+                      : (puestos === 0 ? 'en ninguno'
+                      : (puestos === total ? 'en los ' + total : puestos + ' de ' + total));
+
+          var campo = document.createElement('label');
+          campo.className = 'trampa-campo';
+          campo.innerHTML = '<span class="trampa-nombre">' + t.titulo + '</span>'
+            + '<select class="campo-inline">'
+            + '<option value="">general</option>'
+            + '<option value="1">sí</option>'
+            + '<option value="0">no</option>'
+            + '</select>'
+            + '<span class="t-caption t-dim">' + resumen + '</span>';
+
+          campo.querySelector('select').addEventListener('change', function () {
+            var valor = this.value;
+            post('trampa_cadena', {
+              id_cadena: estado.idCadena, dificultad: dif,
+              columna: t.columna, valor: valor,
+            }).then(function (res) {
+              if (!res.ok) { SRF.toast(res.error || 'No se pudo cambiar.', 'danger'); }
+              else {
+                SRF.toast(t.titulo + ': ' + (valor === '' ? 'general' : (valor === '1' ? 'sí' : 'no'))
+                  + ' en ' + res.nodos + ' partidos.', 'success');
+              }
+              cargarTrampasCadena();
+              if (estado.nodoActual) { cargarDificultades(estado.nodoActual.id_nodo); }
+            });
+          });
+
+          fila.appendChild(campo);
         });
 
         caja.appendChild(fila);

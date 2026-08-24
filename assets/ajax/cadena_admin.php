@@ -89,11 +89,26 @@ switch ($accion) {
         break;
 
     case 'actualizar_nodo':
+        /* ⚠️ `!empty` Y NO `isset`, QUE ES LO QUE MARCABA TODOS LOS NODOS COMO
+           FINALES. Esto no es un formulario HTML, donde una casilla sin marcar
+           simplemente no viaja: lo manda `fetch` con `URLSearchParams`, y el
+           editor incluye SIEMPRE la clave —`es_final: n.es_final ? 1 : ''`—.
+           Con la casilla desmarcada llegaba `es_final=`, o sea la cadena
+           vacía, y `isset()` de una cadena vacía es `true`: cada vez que se
+           guardaba un nodo se le ponía la bandera de final de cadena.
+
+           El síntoma que se veía era el de después: abrir cualquier nodo y
+           encontrarse la casilla marcada sin haberla tocado, en todos. Y no
+           era solo cosmético — `cofreFinalCadena()` busca por `es_final = 1`,
+           así que la recompensa de formación colgaba del nodo equivocado.
+
+           `!empty` es además lo que ya usaba la línea de abajo para
+           `id_rival`: ahora las dos leen igual. */
         $db->actualizarNodo(
             (int) $_POST['id_nodo'],
             in_array($_POST['tipo'] ?? '', ['cofre', 'inicio', 'bloqueo'], true) ? $_POST['tipo'] : 'partido',
             trim($_POST['nombre'] ?? '') ?: null,
-            isset($_POST['es_final']) ? 1 : 0,
+            !empty($_POST['es_final']) ? 1 : 0,
             !empty($_POST['id_rival']) ? (int) $_POST['id_rival'] : null
         );
         echo json_encode(['ok' => true]);
@@ -178,6 +193,25 @@ switch ($accion) {
         );
         echo json_encode(['ok' => $n > 0, 'nodos' => $n,
             'error' => $n > 0 ? null : 'Esa cadena no tiene nodos de partido.']);
+        break;
+
+    /* Encender o apagar una TRAMPA del rival en toda la cadena. Es lo que
+       permite dejar una cadena entera en modo "jefe final" sin abrir los
+       veinte nodos uno a uno. */
+    case 'trampa_cadena':
+        $n = $db->trampaCadena(
+            (int) $_POST['id_cadena'],
+            $_POST['dificultad'] ?? '',
+            $_POST['columna'] ?? '',
+            // '' se manda a propósito para decir "como el general"
+            ($_POST['valor'] ?? '') === '' ? null : $_POST['valor']
+        );
+        echo json_encode(['ok' => $n > 0, 'nodos' => $n,
+            'error' => $n > 0 ? null : 'Esa cadena no tiene nodos de partido, o la columna no es válida.']);
+        break;
+
+    case 'trampas_cadena':
+        echo json_encode(['ok' => true, 'estado' => $db->trampasCadena((int) $_POST['id_cadena'])]);
         break;
 
     case 'dificultades_cadena':
