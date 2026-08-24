@@ -86,6 +86,16 @@ $bodyClass    = $bodyClass    ?? '';
 <!-- Geist autoalojada: sin dependencia de terceros para la tipografía -->
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<?php /* Las de iconos también, LAS TRES. Sin el preload el navegador no se
+         entera de que existen hasta haber descargado y analizado `iconos.css`,
+         y como esas fuentes van con `font-display: block` el hueco del icono
+         se queda EN BLANCO mientras tanto — que es exactamente el "los iconos
+         desaparecen" que se ve en un móvil con la conexión regular.
+         Pesan 9,2 + 0,5 + 1,8 KB: precargar las tres cuesta menos que un
+         icono suelto de los de antes. */ ?>
+<link rel="preload" href="<?= $base ?>assets/fonts/iconos-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?= $base ?>assets/fonts/iconos-fill.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?= $base ?>assets/fonts/iconos-bold.woff2" as="font" type="font/woff2" crossorigin>
 
 <link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/tokens.css') ?>">
 <link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/base.css') ?>">
@@ -95,9 +105,19 @@ $bodyClass    = $bodyClass    ?? '';
 <link rel="stylesheet" href="<?= htmlspecialchars(assetUrl($base, $hoja)) ?>">
 <?php endforeach; ?>
 
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<?php /* ⚠️ ICONOS PROPIOS, NO unpkg.com. Aquí había TRES hojas de
+         @phosphor-icons servidas desde unpkg, y cada una arrastra su fuente.
+         Medido: 250 KB de CSS + 429 KB de fuentes = 679 KB EN CADA CARGA, de
+         un tercero (con su DNS y su TLS aparte) y con las tres hojas
+         bloqueando el primer pintado. Todo eso para usar 93 iconos de los
+         ~1.500 que trae el paquete.
+
+         `assets/css/iconos.css` lleva solo esos 93, y las fuentes están
+         subseteadas a sus glifos: 17,9 KB en total, del propio dominio y
+         cacheables para siempre. Lo genera un script a partir de los
+         `ph-loquesea` que aparecen en el código; si añades un icono nuevo y
+         no se ve, hay que volver a pasarlo. */ ?>
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/iconos.css') ?>">
 </head>
 <body<?= $bodyClass !== '' ? ' class="' . htmlspecialchars($bodyClass) . '"' : '' ?>>
 
