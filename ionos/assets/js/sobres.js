@@ -229,6 +229,25 @@
     var portal = encontrarPortal(envelopeTypeId);
     if (!portal) return;
 
+    /* ⚠️ EL BUCLE DE LA CAJA SE CORTA AQUÍ, NO EN LOS SOBRES.
+
+       Los sobres ya estaban protegidos (`engancharSobre` mira
+       `.esta-animando`), pero el bucle no venía de pulsar un sobre: venía de
+       pulsar DONDE TODAVÍA NO HAY NINGUNO. Mientras la caja se abre y los
+       sobres aún no han subido, ese trozo de pantalla sigue siendo la caja, y
+       el clic caía en este manejador — que mata la animación en curso y vuelve
+       a montarla entera desde el principio. Pulsando mientras se abre, la
+       apertura se reiniciaba una y otra vez y la caja no llegaba nunca a
+       terminar: el bucle que se veía.
+
+       Con la caja ya abierta o abriéndose, volver a pulsarla no significa
+       nada, así que no se hace nada. Cerrar sigue siendo cosa del botón de
+       cerrar, que llama a `cerrarPortal()` y sí levanta el candado. */
+    if (portal.classList.contains('esta-animando') ||
+        portal.classList.contains('esta-abierta')) {
+      return;
+    }
+
     // Se corta lo que estuviera corriendo antes de montar la siguiente.
     if (animacionApertura) { animacionApertura.kill(); animacionApertura = null; }
     portalAbierto = portal;
