@@ -21,3 +21,9 @@ _tmp_sesion.php
 
 # Restos de pruebas
 _tut.txt
+
+# Node / Playwright
+node_modules/
+package-lock.json
+test-results/
+playwright-report/
