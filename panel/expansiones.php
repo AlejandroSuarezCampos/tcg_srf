@@ -73,7 +73,7 @@ $activeAdmin = 'expansiones';
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'cartas_en_uso'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
     </div>
@@ -137,13 +137,13 @@ $activeAdmin = 'expansiones';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($expansiones)): ?>
-          <tr><td colspan="5" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron expansiones con ese nombre.</td></tr>
+          <tr><td colspan="5" style="text-align:center; color:var(--ceniza); padding:40px;">No se encontraron expansiones con ese nombre.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($expansiones) ?></b> expansiones mostradas</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($expansiones) ?></b> expansiones mostradas</p>
   </main>
 </div>
 

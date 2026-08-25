@@ -23,58 +23,58 @@
 .admin-sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: var(--panel);
-  border-right: 1px solid var(--line);
-  padding: var(--space-6) var(--space-5);
+  background: var(--carbon);
+  border-right: 1px solid var(--linea);
+  padding: var(--e-6) var(--e-5);
   position: sticky;
   top: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
-.admin-sidebar .logo { font-size: var(--fs-body); margin-bottom: var(--space-1); }
+.admin-sidebar .logo { font-size: var(--fs-body); margin-bottom: var(--e-1); }
 .admin-tag {
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption-sm);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: var(--amber-light);
-  margin-bottom: var(--space-7);
+  color: var(--brasa-alta);
+  margin-bottom: var(--e-7);
   display: block;
 }
 
-.admin-nav { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; }
+.admin-nav { display: flex; flex-direction: column; gap: var(--e-1); flex: 1; }
 .admin-nav a {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
-  border-radius: var(--radius-sm);
-  color: var(--frost-dim);
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-3);
+  border-radius: var(--r-chip);
+  color: var(--ceniza);
   text-decoration: none;
   font-size: var(--fs-body-sm);
-  transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease);
+  transition: background var(--t-toque) var(--curva), color var(--t-toque) var(--curva);
 }
 .admin-nav a i { font-size: 17px; width: 20px; text-align: center; flex-shrink: 0; }
-.admin-nav a:hover { background: rgba(255, 255, 255, .04); color: var(--frost); }
+.admin-nav a:hover { background: rgba(255, 255, 255, .04); color: var(--hueso); }
 .admin-nav a.is-activo {
-  background: var(--amber-soft);
-  color: var(--frost);
-  border: 1px solid var(--amber-line);
+  background: var(--brasa-velo);
+  color: var(--hueso);
+  border: 1px solid var(--brasa-borde);
 }
 
 .admin-volver {
   margin-top: auto;
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--line);
-  color: var(--frost-dim);
+  padding-top: var(--e-5);
+  border-top: 1px solid var(--linea);
+  color: var(--ceniza);
   text-decoration: none;
-  font-size: var(--fs-caption);
+  font-size: var(--fs-label);
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
 }
-.admin-volver:hover { color: var(--frost); }
+.admin-volver:hover { color: var(--hueso); }
 
 /* ---------- menú en móvil: reutiliza el toggle de assets/js/ui.js
    (.nav-burger + #nav-menu + aria-expanded), solo que aquí colapsa un
@@ -85,10 +85,23 @@
   .admin-shell { flex-direction: column; }
   .admin-sidebar {
     width: 100%; height: auto; position: relative; top: auto;
-    padding: var(--space-4) var(--space-5);
+    padding: var(--e-4) var(--e-5);
   }
   .admin-sidebar-top { display: flex; }
-  .admin-tag { margin: var(--space-2) 0 0; }
+  /* FALLO PREEXISTENTE, no del rediseño: `.nav-burger` traía `display:none`
+     de layout.css sin que nada lo reactivara para `.admin-sidebar` —solo
+     `.nav.es-compacta .nav-burger`, y el panel nunca lleva la clase `.nav`.
+     El botón era invisible e inalcanzable a mano en móvil desde antes de
+     tocar este código; se rescató fielmente el bug al mover las reglas aquí
+     en el bloque 7d. Se corrige aquí, con el resto de la respuesta a este
+     breakpoint. */
+  /* `.admin-sidebar-top .nav-burger`, no `.nav-burger` a secas: la regla
+     rescatada de layout.css (`.nav-burger { display:none }`) tiene la MISMA
+     especificidad y va DESPUÉS en el fichero, así que gana por orden de
+     cascada. Un ancestro extra en el selector sube la especificidad y hace
+     que esto gane siempre, sin depender de dónde caiga cada regla. */
+  .admin-sidebar-top .nav-burger { display: flex; }
+  .admin-tag { margin: var(--e-2) 0 0; }
 
   /* ⚠️ NO se anima con max-height. .admin-nav lleva `flex:1` para el layout
      de escritorio (empuja "Volver al sitio" al fondo con margin-top:auto en
@@ -97,108 +110,108 @@
      navegador de prueba. display:none/flex es robusto y no pelea con flex:1;
      lo que se pierde es la transición suave, que además ya se apaga con
      movimiento reducido en el resto del sitio. */
-  #nav-menu.admin-nav { display: none; margin-top: var(--space-4); }
+  #nav-menu.admin-nav { display: none; margin-top: var(--e-4); }
   #nav-menu.admin-nav.is-abierto { display: flex; }
 
-  .admin-volver { margin-top: var(--space-4); padding-top: var(--space-4); }
+  .admin-volver { margin-top: var(--e-4); padding-top: var(--e-4); }
 }
 
 /* ---------- contenido ---------- */
-.admin-main { flex: 1; padding: var(--space-7) var(--space-7); min-width: 0; }
-@media (max-width: 900px) { .admin-main { padding: var(--space-5) var(--space-4); } }
+.admin-main { flex: 1; padding: var(--e-7) var(--e-7); min-width: 0; }
+@media (max-width: 900px) { .admin-main { padding: var(--e-5) var(--e-4); } }
 
 .admin-head {
   display: flex; justify-content: space-between; align-items: flex-end;
-  margin-bottom: var(--space-6); flex-wrap: wrap; gap: var(--space-4);
+  margin-bottom: var(--e-6); flex-wrap: wrap; gap: var(--e-4);
 }
 .admin-head h1 { font-size: var(--fs-h2); }
 .admin-head h1.admin-subhead { font-size: var(--fs-h3); }
-.admin-head p { color: var(--frost-dim); font-size: var(--fs-body-sm); margin-top: var(--space-2); }
-.admin-section-gap { margin-top: var(--space-7); }
+.admin-head p { color: var(--ceniza); font-size: var(--fs-body-sm); margin-top: var(--e-2); }
+.admin-section-gap { margin-top: var(--e-7); }
 
 /* ---------- panel de control (panel/index.php) ---------- */
-.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-5); }
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--e-5); }
 .dashboard-card {
-  display: flex; flex-direction: column; gap: var(--space-2);
-  border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-5);
-  background: var(--panel); text-decoration: none; color: var(--frost);
-  transition: transform var(--t-media) var(--ease), border-color var(--t-media) var(--ease), box-shadow var(--t-media) var(--ease);
+  display: flex; flex-direction: column; gap: var(--e-2);
+  border: 1px solid var(--linea); border-radius: var(--r-carta); padding: var(--e-5);
+  background: var(--carbon); text-decoration: none; color: var(--hueso);
+  transition: transform var(--t-estado) var(--curva), border-color var(--t-estado) var(--curva), box-shadow var(--t-estado) var(--curva);
 }
-.dashboard-card:hover { transform: translateY(-4px); border-color: var(--amber-line); box-shadow: var(--shadow-md); }
-.dashboard-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
-.dashboard-ico { font-size: 26px; color: var(--amber-light); }
-.dashboard-arrow { color: var(--frost-dim); font-size: var(--fs-body-sm); }
+.dashboard-card:hover { transform: translateY(-4px); border-color: var(--brasa-borde); box-shadow: var(--elev-2); }
+.dashboard-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--e-2); }
+.dashboard-ico { font-size: 26px; color: var(--brasa-alta); }
+.dashboard-arrow { color: var(--ceniza); font-size: var(--fs-body-sm); }
 .dashboard-number { font-size: var(--fs-h1); line-height: 1; }
 .dashboard-label {
-  font-family: var(--font-mono); font-size: var(--fs-caption-sm);
-  letter-spacing: .06em; color: var(--frost-dim); text-transform: uppercase;
+  font-family: var(--tipo-display); font-size: var(--fs-micro);
+  letter-spacing: .06em; color: var(--ceniza); text-transform: uppercase;
 }
 
-.quick-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.quick-actions { display: flex; gap: var(--e-3); flex-wrap: wrap; }
 .quick-actions .btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* ==========================================================================
    FILAS DE TABLA — lo que .tabla (components.css) no cubre porque es
    genérico. Miniatura + título + subtítulo, acciones en icono, estado on/off.
    ========================================================================== */
-.admin-row-main { display: flex; align-items: center; gap: var(--space-3); }
+.admin-row-main { display: flex; align-items: center; gap: var(--e-3); }
 .admin-thumb {
-  width: 42px; height: 42px; border-radius: var(--radius-sm); object-fit: cover;
-  background: var(--void-2); border: 1px solid var(--line); flex-shrink: 0; display: block;
+  width: 42px; height: 42px; border-radius: var(--r-chip); object-fit: cover;
+  background: var(--pozo); border: 1px solid var(--linea); flex-shrink: 0; display: block;
 }
-.admin-cell-title { font-weight: var(--fw-semibold); font-size: var(--fs-body-sm); color: var(--frost); }
-.admin-cell-sub { font-size: var(--fs-caption-sm); color: var(--frost-dim); margin-top: 2px; }
+.admin-cell-title { font-weight: var(--fw-semibold); font-size: var(--fs-body-sm); color: var(--hueso); }
+.admin-cell-sub { font-size: var(--fs-micro); color: var(--ceniza); margin-top: 2px; }
 
-.row-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+.row-actions { display: flex; gap: var(--e-2); justify-content: flex-end; }
 .icon-btn {
-  width: 36px; height: 36px; border-radius: var(--radius-sm); border: 1px solid var(--line);
-  background: transparent; color: var(--frost-dim); cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--r-chip); border: 1px solid var(--linea);
+  background: transparent; color: var(--ceniza); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
-  transition: background var(--t-micro) var(--ease), color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+  transition: background var(--t-toque) var(--curva), color var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
 }
-.icon-btn:hover { border-color: var(--amber-line); color: var(--frost); background: var(--amber-soft); }
-.icon-btn.es-peligro:hover { border-color: var(--danger-line); color: var(--danger-text); background: var(--danger-bg); }
+.icon-btn:hover { border-color: var(--brasa-borde); color: var(--hueso); background: var(--brasa-velo); }
+.icon-btn.es-peligro:hover { border-color: var(--roja-borde); color: var(--roja-txt); background: var(--roja-velo); }
 
 .status-pill {
-  font-size: var(--fs-caption-sm); letter-spacing: .06em; text-transform: uppercase;
-  padding: 4px 10px; border-radius: var(--radius-pill); display: inline-block; border: 1px solid transparent;
+  font-size: var(--fs-micro); letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: var(--r-pill); display: inline-block; border: 1px solid transparent;
 }
-.status-pill.esta-activo { background: var(--success-bg); color: var(--success-text); border-color: var(--success-line); }
-.status-pill.esta-inactivo { background: rgba(255, 255, 255, .06); color: var(--frost-dim); border-color: var(--line-strong); }
+.status-pill.esta-activo { background: var(--cesped-velo); color: var(--cesped-txt); border-color: var(--cesped-borde); }
+.status-pill.esta-inactivo { background: rgba(255, 255, 255, .06); color: var(--ceniza); border-color: var(--linea-viva); }
 
 /* ---------- imagen + ruta, en los formularios de creación/edición ---------- */
 .thumb-upload {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-3); border: 1px dashed var(--line); border-radius: var(--radius-md); background: var(--void-2);
+  display: flex; align-items: center; gap: var(--e-4);
+  padding: var(--e-3); border: 1px dashed var(--linea); border-radius: var(--r-alerta); background: var(--pozo);
 }
 .thumb-upload .admin-thumb { width: 56px; height: 56px; }
-.thumb-upload-text { font-size: var(--fs-caption-sm); color: var(--frost-dim); }
-.thumb-upload-text b { display: block; color: var(--frost); font-size: var(--fs-caption); margin-bottom: 2px; }
+.thumb-upload-text { font-size: var(--fs-micro); color: var(--ceniza); }
+.thumb-upload-text b { display: block; color: var(--hueso); font-size: var(--fs-label); margin-bottom: 2px; }
 
 /* ---------- formulario a dos columnas, dentro de un modal ---------- */
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4) var(--space-4); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-4) var(--e-4); }
 .form-grid .campo-full { grid-column: 1 / -1; }
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
 
 /* ---------- interruptor on/off, para los toggles "activo" ---------- */
 .fila-interruptor {
   display: flex; align-items: center; justify-content: space-between;
-  padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--void-2);
+  padding: var(--e-3); border: 1px solid var(--linea); border-radius: var(--r-alerta); background: var(--pozo);
 }
-.fila-interruptor span { font-size: var(--fs-body-sm); color: var(--frost); }
+.fila-interruptor span { font-size: var(--fs-body-sm); color: var(--hueso); }
 .interruptor { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
 .interruptor input { opacity: 0; width: 0; height: 0; position: absolute; }
 .interruptor-riel {
-  position: absolute; inset: 0; background: rgba(255, 255, 255, .12); border-radius: var(--radius-pill);
-  cursor: pointer; transition: background var(--t-micro) var(--ease);
+  position: absolute; inset: 0; background: rgba(255, 255, 255, .12); border-radius: var(--r-pill);
+  cursor: pointer; transition: background var(--t-toque) var(--curva);
 }
 .interruptor-riel::before {
   content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
-  background: #fff; border-radius: 50%; transition: transform var(--t-micro) var(--ease-out);
+  background: #fff; border-radius: 50%; transition: transform var(--t-toque) var(--curva-masa);
 }
-.interruptor input:checked + .interruptor-riel { background: var(--amber); }
+.interruptor input:checked + .interruptor-riel { background: var(--brasa); }
 .interruptor input:checked + .interruptor-riel::before { transform: translateX(20px); }
-.interruptor input:focus-visible + .interruptor-riel { outline: 2px solid var(--amber-light); outline-offset: 3px; }
+.interruptor input:focus-visible + .interruptor-riel { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
 
 @media (max-width: 480px) {
   .admin-thumb { width: 34px; height: 34px; }
@@ -214,20 +227,20 @@
    $cssExtra y es el mismo patrón que el resto del panel.
    ========================================================================== */
 .plantillas-expansion {
-  border: 1px solid var(--line); border-radius: var(--radius-lg);
-  padding: var(--space-5); margin-bottom: var(--space-6);
+  border: 1px solid var(--linea); border-radius: var(--r-carta);
+  padding: var(--e-5); margin-bottom: var(--e-6);
 }
-.plantillas-fila { display: flex; flex-wrap: wrap; gap: var(--space-6); margin-top: var(--space-4); }
+.plantillas-fila { display: flex; flex-wrap: wrap; gap: var(--e-6); margin-top: var(--e-4); }
 .plantillas-item {
-  display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4);
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: rgba(255, 255, 255, .02);
+  display: flex; flex-direction: column; gap: var(--e-3); padding: var(--e-4);
+  border: 1px solid var(--linea); border-radius: var(--r-alerta); background: rgba(255, 255, 255, .02);
   min-width: 240px;
 }
 .plantillas-item h4 { margin: 0; font-size: var(--fs-body-sm); }
-.plantillas-item .preview { display: flex; justify-content: center; padding: var(--space-3) 0; }
-.plantillas-acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
-.plantillas-acciones input[type="file"] { max-width: 190px; font-size: var(--fs-caption-sm); color: var(--frost-dim); }
-.plantillas-form-subida { display: flex; gap: var(--space-2); align-items: center; }
+.plantillas-item .preview { display: flex; justify-content: center; padding: var(--e-3) 0; }
+.plantillas-acciones { display: flex; flex-wrap: wrap; gap: var(--e-2); align-items: center; }
+.plantillas-acciones input[type="file"] { max-width: 190px; font-size: var(--fs-micro); color: var(--ceniza); }
+.plantillas-form-subida { display: flex; gap: var(--e-2); align-items: center; }
 
 /* ==========================================================================
    EDITOR VISUAL DE CADENAS (panel/cadena_editor.php) — layout propio de esta
@@ -236,54 +249,54 @@
    Todo el arrastre lo lleva scriptCadenaEditor.js; aquí solo el aspecto.
    ========================================================================== */
 .cadena-editor-lienzo-wrap {
-  border: 1px solid var(--line); border-radius: var(--radius-lg);
-  background: var(--void-2); overflow: auto; max-height: 72vh;
+  border: 1px solid var(--linea); border-radius: var(--r-carta);
+  background: var(--pozo); overflow: auto; max-height: 72vh;
 }
 .cadena-editor-lienzo { position: relative; }
 .cadena-editor-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
-.cadena-editor-linea { stroke: var(--frost-dim); stroke-width: 2; }
-.cadena-editor-linea--temporal { stroke: var(--amber); stroke-dasharray: 6 4; }
+.cadena-editor-linea { stroke: var(--ceniza); stroke-width: 2; }
+.cadena-editor-linea--temporal { stroke: var(--brasa); stroke-dasharray: 6 4; }
 .cadena-editor-linea-golpe {
   stroke: transparent; stroke-width: 14; cursor: pointer; pointer-events: stroke;
 }
 .cadena-editor-linea-golpe:hover + .cadena-editor-linea,
-.cadena-editor-linea-golpe:hover { stroke: var(--danger); }
+.cadena-editor-linea-golpe:hover { stroke: var(--roja); }
 
 .cadena-nodo {
   position: absolute; width: 150px; min-height: 64px;
-  background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3); cursor: grab; user-select: none;
-  box-shadow: var(--shadow-sm);
+  background: var(--carbon); border: 1px solid var(--linea-viva); border-radius: var(--r-alerta);
+  padding: var(--e-2) var(--e-3); cursor: grab; user-select: none;
+  box-shadow: var(--elev-1);
 }
 .cadena-nodo:active { cursor: grabbing; }
-.cadena-nodo--cofre { border-color: var(--amber-line); background: var(--amber-soft); }
-.cadena-nodo--final { box-shadow: 0 0 0 2px var(--amber), var(--shadow-md); }
+.cadena-nodo--cofre { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+.cadena-nodo--final { box-shadow: 0 0 0 2px var(--brasa), var(--elev-2); }
 
 /* LA CASILLA DE SALIDA (migración `044`). Verde y con su propio contorno: no
    es un partido ni un cofre, es el punto por el que se entra al mapa, y tiene
    que distinguirse de un vistazo entre veinte nodos. */
 .cadena-nodo--inicio {
-  border-color: var(--success-line);
-  background: var(--success-bg);
-  box-shadow: 0 0 0 2px var(--success-line), var(--shadow-md);
+  border-color: var(--cesped-borde);
+  background: var(--cesped-velo);
+  box-shadow: 0 0 0 2px var(--cesped-borde), var(--elev-2);
 }
-.cadena-nodo--inicio .cadena-nodo-cabeza { color: var(--success-text); }
+.cadena-nodo--inicio .cadena-nodo-cabeza { color: var(--cesped-txt); }
 .cadena-nodo--inicio .cadena-nodo-nombre { letter-spacing: .12em; }
-.cadena-nodo-cabeza { display: flex; align-items: center; justify-content: space-between; color: var(--amber-light); }
-.cadena-nodo-cabeza .ph-star { color: var(--amber); font-size: 14px; }
-.cadena-nodo-nombre { font-size: var(--fs-body-sm); font-weight: 600; margin-top: var(--space-1); }
-.cadena-nodo-rival { font-size: var(--fs-caption-sm); color: var(--frost-dim); margin-top: 2px; }
+.cadena-nodo-cabeza { display: flex; align-items: center; justify-content: space-between; color: var(--brasa-alta); }
+.cadena-nodo-cabeza .ph-star { color: var(--brasa); font-size: 14px; }
+.cadena-nodo-nombre { font-size: var(--fs-body-sm); font-weight: 600; margin-top: var(--e-1); }
+.cadena-nodo-rival { font-size: var(--fs-micro); color: var(--ceniza); margin-top: 2px; }
 .cadena-nodo-anilla {
   position: absolute; right: -8px; top: 50%; transform: translateY(-50%);
   width: 16px; height: 16px; border-radius: 50%;
-  background: var(--void); border: 2px solid var(--amber); cursor: crosshair;
+  background: var(--negro); border: 2px solid var(--brasa); cursor: crosshair;
 }
-.cadena-nodo-anilla:hover { background: var(--amber); }
+.cadena-nodo-anilla:hover { background: var(--brasa); }
 
 .cadena-editor-bloque {
-  border-top: 1px solid var(--line); margin-top: var(--space-5); padding-top: var(--space-5);
+  border-top: 1px solid var(--linea); margin-top: var(--e-5); padding-top: var(--e-5);
 }
-.cadena-editor-bloque h3 { margin: 0 0 var(--space-3); font-size: var(--fs-body-sm); color: var(--frost-dim); }
+.cadena-editor-bloque h3 { margin: 0 0 var(--e-3); font-size: var(--fs-body-sm); color: var(--ceniza); }
 
 /* ---------------------------------------------------------------------------
    Selector de cromo del botín (#fl_lista_cromos, dentro del bloque de arriba).
@@ -318,8 +331,8 @@
    --------------------------------------------------------------------------- */
 .editor-alineacion {
   display: grid;
-  gap: var(--space-5);
-  margin-top: var(--space-4);
+  gap: var(--e-5);
+  margin-top: var(--e-4);
 }
 @media (min-width: 1000px) {
   .editor-alineacion {
@@ -330,31 +343,31 @@
 .editor-alineacion-campo { min-width: 0; }
 .editor-alineacion-selector {
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--void-2);
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--pozo);
 }
 /* La lista tiene su propio scroll: con el catálogo entero, dejarla crecer
    convertiría el modal en una página infinita. */
 .editor-cromos-lista {
   max-height: 46vh;
   overflow-y: auto;
-  padding-right: var(--space-2);
+  padding-right: var(--e-2);
 }
 .editor-cromos-aviso {
-  padding: var(--space-4);
+  padding: var(--e-4);
   text-align: center;
-  color: var(--frost-dim);
-  font-size: var(--fs-caption);
+  color: var(--ceniza);
+  font-size: var(--fs-label);
 }
 
 /* Señales de arrastre. El hueco destino se ilumina al pasar por encima —sin
    eso no hay forma de saber dónde vas a soltar— y la fila que se arrastra se
    apaga para que se vea que ha salido de la lista. */
 .hueco.es-destino .hueco-avatar {
-  --rz-borde: var(--amber);
-  box-shadow: 0 0 0 4px var(--amber-soft);
+  --rz-borde: var(--brasa);
+  box-shadow: 0 0 0 4px var(--brasa-velo);
 }
 .carta-fila.se-arrastra { opacity: .4; }
 .carta-fila--accion[draggable="true"] .carta-fila-interior { cursor: grab; }
@@ -364,7 +377,7 @@
    scroll lateral en un portátil. */
 .tabla-dificultad .campo-inline { width: 100%; min-width: 70px; }
 .tabla-dificultad th[scope="row"] { white-space: nowrap; }
-.tabla-dificultad .row-actions { display: flex; gap: var(--space-2); }
+.tabla-dificultad .row-actions { display: flex; gap: var(--e-2); }
 /* El marcador de "este nodo tiene ajuste propio" no puede depender solo del
    color: lleva la palabra escrita. */
 .tabla-dificultad .pastilla-warn { font-size: 10px; }
@@ -380,61 +393,61 @@
    funcionan sin una línea de JavaScript. */
 .opciones-visibilidad {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--e-3);
 }
 @media (min-width: 640px) {
   .opciones-visibilidad { grid-template-columns: 1fr 1fr; }
 }
 .opcion-visibilidad {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--e-3);
   align-items: flex-start;
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
   cursor: pointer;
-  transition: border-color var(--t-rapido) var(--ease), background var(--t-rapido) var(--ease);
+  transition: border-color var(--t-instante) var(--curva), background var(--t-instante) var(--curva);
 }
-.opcion-visibilidad:hover { border-color: var(--line-strong); }
+.opcion-visibilidad:hover { border-color: var(--linea-viva); }
 .opcion-visibilidad > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 /* `:has()` y no una clase puesta por JavaScript: el estado ya lo sabe el
    propio radio, y duplicarlo en una clase abre la puerta a que se desincronice
    —por ejemplo al restablecer el formulario, que no dispara ningún evento. */
 .opcion-visibilidad:has(input:checked) {
-  border-color: var(--amber-line);
-  background: var(--amber-soft);
+  border-color: var(--brasa-borde);
+  background: var(--brasa-velo);
 }
-.opcion-visibilidad:focus-within { outline: 2px solid var(--amber-light); outline-offset: 2px; }
+.opcion-visibilidad:focus-within { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
 
 /* La lista de invitados. Alta limitada con scroll propio: con muchas cuentas,
    sin tope, el botón de guardar acaba fuera de la pantalla. */
 .lista-invitados {
   list-style: none;
   margin: 0;
-  padding: var(--space-2);
+  padding: var(--e-2);
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--void-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--pozo);
 }
 .lista-invitados li { margin: 0; }
 .lista-invitados label {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
   /* 44px de alto: es un objetivo táctil, no una fila de tabla. */
   min-height: 44px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-md);
+  padding: 0 var(--e-2);
+  border-radius: var(--r-alerta);
   cursor: pointer;
 }
-.lista-invitados label:hover { background: var(--panel); }
-.lista-invitados input { width: 18px; height: 18px; accent-color: var(--amber); }
+.lista-invitados label:hover { background: var(--carbon); }
+.lista-invitados input { width: 18px; height: 18px; accent-color: var(--brasa); }
 
 /* Cero invitados en una cadena restringida = no la ve nadie. Es válido, pero
    nunca puede pasar desapercibido. */
-#fc_invitados_resumen.es-aviso { color: var(--warning-text); }
+#fc_invitados_resumen.es-aviso { color: var(--amarilla-txt); }
 
 /* ==========================================================================
    EDITOR DE NODO — pestañas
@@ -462,7 +475,7 @@
 }
 .editor-nodo .modal-head,
 .editor-nodo .modal-pie { flex: 0 0 auto; }
-.editor-nodo .modal-pie { margin-top: var(--space-5); }
+.editor-nodo .modal-pie { margin-top: var(--e-5); }
 
 .editor-pestanas {
   display: flex;
@@ -487,40 +500,40 @@
      nunca scrollee de lado. */
   overflow-x: auto;
   overflow-y: hidden;
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--e-5);
   padding-bottom: 2px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--linea);
   scrollbar-width: thin;
 }
 .editor-pestana {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   flex: 0 0 auto;
   /* 44px: objetivo táctil mínimo. */
   min-height: 44px;
-  padding: 0 var(--space-4);
+  padding: 0 var(--e-4);
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
-  color: var(--frost-dim);
+  color: var(--ceniza);
   font: inherit;
   font-size: var(--fs-body-sm);
   font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+  transition: color var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
 }
-.editor-pestana:hover:not(:disabled) { color: var(--frost); }
+.editor-pestana:hover:not(:disabled) { color: var(--hueso); }
 .editor-pestana[aria-selected="true"] {
-  color: var(--amber-light);
-  border-bottom-color: var(--amber);
+  color: var(--brasa-alta);
+  border-bottom-color: var(--brasa);
 }
 /* Un cofre no se juega: sus pestañas de partido se apagan, no se esconden.
    Una pestaña que desaparece se lee como un fallo; una apagada, no —y el
    `title` dice por qué. */
 .editor-pestana:disabled { opacity: .35; cursor: not-allowed; }
-.editor-pestana:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.editor-pestana:focus-visible { outline: 2px solid var(--brasa); outline-offset: -2px; }
 
 /* El panel es lo ÚNICO que scrollea. `min-height: 0` es obligatorio: sin él un
    hijo flex se niega a encoger por debajo de su contenido y el scroll se lo
@@ -528,56 +541,56 @@
 .editor-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--e-5);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   /* hueco para que el contenido no quede pegado a la barra de scroll */
-  padding-right: var(--space-2);
+  padding-right: var(--e-2);
 }
 .editor-panel[hidden] { display: none; }
 .editor-panel-pie { display: flex; justify-content: flex-end; }
 
 /* Requisitos de un nodo de BLOQUEO (`045`). Lista corta y de una sola línea por
    fila: son frases ya redactadas por el JS, no una tabla de campos. */
-.editor-lista-requisitos { display: flex; flex-direction: column; gap: var(--space-2); }
+.editor-lista-requisitos { display: flex; flex-direction: column; gap: var(--e-2); }
 .editor-requisito {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
   border-radius: var(--r-sm, 6px);
-  background: var(--void);
+  background: var(--negro);
 }
 
 /* Aviso dentro de un panel: "elige antes un rival", y parecidos. */
 .editor-aviso {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
-  color: var(--frost-dim);
+  gap: var(--e-3);
+  padding: var(--e-4);
+  border: 1px dashed var(--linea-viva);
+  border-radius: var(--r-carta);
+  color: var(--ceniza);
   font-size: var(--fs-body-sm);
 }
-.editor-aviso i { color: var(--amber-light); flex: 0 0 auto; }
+.editor-aviso i { color: var(--brasa-alta); flex: 0 0 auto; }
 
 /* La ficha del rival: los MISMOS campos sirven para crear uno nuevo y para
    editar el que está elegido. Antes eran dos formularios distintos. */
 .editor-ficha-rival {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--void-2);
+  gap: var(--e-4);
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--pozo);
 }
-.editor-escudo { display: flex; gap: var(--space-4); align-items: flex-start; }
-.editor-escudo-campos { display: flex; flex-direction: column; gap: var(--space-2); flex: 1; min-width: 0; }
+.editor-escudo { display: flex; gap: var(--e-4); align-items: flex-start; }
+.editor-escudo-campos { display: flex; flex-direction: column; gap: var(--e-2); flex: 1; min-width: 0; }
 /* Vista previa del escudo: se ve lo que se está guardando en vez de fiarse de
    una ruta escrita a mano. */
 .editor-escudo-vista {
@@ -586,10 +599,10 @@
   flex: 0 0 auto;
   width: 64px;
   height: 64px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  color: var(--frost-dim);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  color: var(--ceniza);
   font-size: 26px;
   overflow: hidden;
 }
@@ -601,12 +614,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--e-4);
   flex-wrap: wrap;
-  padding: var(--space-4);
-  border: 1px solid var(--danger-line);
-  border-radius: var(--radius-lg);
-  background: var(--danger-bg);
+  padding: var(--e-4);
+  border: 1px solid var(--roja-borde);
+  border-radius: var(--r-carta);
+  background: var(--roja-velo);
 }
 
 /* ==========================================================================
@@ -617,18 +630,18 @@
 .panel-calibracion {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-  padding: var(--space-5);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
+  gap: var(--e-4);
+  margin-bottom: var(--e-6);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
 }
 .panel-calibracion h2 { font-size: var(--fs-h3); }
 
 .calibracion-presets {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--e-3);
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 .calibracion-preset {
@@ -637,23 +650,23 @@
   gap: 2px;
   /* 44px de alto mínimo: es un objetivo táctil, no una fila de tabla. */
   min-height: 44px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
   cursor: pointer;
-  transition: border-color var(--t-rapido) var(--ease), background var(--t-rapido) var(--ease);
+  transition: border-color var(--t-instante) var(--curva), background var(--t-instante) var(--curva);
 }
-.calibracion-preset:hover { border-color: var(--line-strong); }
+.calibracion-preset:hover { border-color: var(--linea-viva); }
 .calibracion-preset.esta-elegido {
-  border-color: var(--amber-line);
-  background: var(--amber-soft);
+  border-color: var(--brasa-borde);
+  background: var(--brasa-velo);
 }
-.calibracion-preset:focus-within { outline: 2px solid var(--amber-light); outline-offset: 2px; }
+.calibracion-preset:focus-within { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
 
 .calibracion-pie {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--e-4);
   flex-wrap: wrap;
 }
 
@@ -661,10 +674,10 @@
    un nodo sin alineación rival no se puede medir, y callárselo dejaría
    agujeros de dificultad sin que nadie se entere. */
 .calibracion-saltados {
-  margin: var(--space-2) 0 0;
-  padding-left: var(--space-5);
-  color: var(--warning-text);
-  font-size: var(--fs-caption);
+  margin: var(--e-2) 0 0;
+  padding-left: var(--e-5);
+  color: var(--amarilla-txt);
+  font-size: var(--fs-label);
 }
 
 /* El selector de preset dentro de la pestaña de dificultad de un nodo. Va
@@ -673,22 +686,22 @@
 .editor-calibracion-nodo {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line);
+  gap: var(--e-4);
+  padding-bottom: var(--e-4);
+  border-bottom: 1px solid var(--linea);
 }
 
 /* Fila de equipo en el listado del panel: escudo y nombre juntos. */
-.equipo-celda { display: flex; align-items: center; gap: var(--space-3); }
+.equipo-celda { display: flex; align-items: center; gap: var(--e-3); }
 .equipo-escudo {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   width: 38px; height: 38px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--void-2);
-  color: var(--frost-dim);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--pozo);
+  color: var(--ceniza);
   overflow: hidden;
 }
 .equipo-escudo img { width: 100%; height: 100%; object-fit: contain; }
@@ -696,14 +709,14 @@
 /* Alta rápida de equipo dentro de un formulario de cromo. El recuadro
    punteado dice que esto es un desvío, no un campo más del cromo. */
 .equipo-alta {
-  padding: var(--space-3);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--void-2);
+  padding: var(--e-3);
+  border: 1px dashed var(--linea-viva);
+  border-radius: var(--r-carta);
+  background: var(--pozo);
 }
 .equipo-alta-fila {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--e-2);
   grid-template-columns: 1fr;
 }
 @media (min-width: 640px) {
@@ -721,8 +734,8 @@
 .fila-filtros {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: var(--e-2);
+  margin-bottom: var(--e-2);
 }
 .fila-filtros > * { flex: 1 1 140px; min-width: 0; }
 
@@ -731,9 +744,9 @@
 .lista-cromos {
   width: 100%;
   min-height: 190px;
-  font-family: var(--font-ui);
+  font-family: var(--tipo-texto);
 }
-.lista-cromos option { padding: var(--space-2) var(--space-3); }
+.lista-cromos option { padding: var(--e-2) var(--e-3); }
 .lista-cromos option[hidden] { display: none; }
 
 /* ==========================================================================
@@ -747,28 +760,28 @@
    que contesta "¿esto reparte mucho?".
    ========================================================================== */
 .loot-resumen {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--amber-line);
-  border-radius: var(--radius-md);
-  background: var(--amber-soft);
+  margin-bottom: var(--e-4);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-alerta);
+  background: var(--brasa-velo);
 }
 .loot-resumen-titulo {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-caption-sm);
-  letter-spacing: var(--tracking-caption);
+  margin: 0 0 var(--e-2);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
-.loot-resumen-filas { display: grid; gap: var(--space-2); }
+.loot-resumen-filas { display: grid; gap: var(--e-2); }
 .loot-resumen-rango {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: var(--fs-caption);
+  gap: var(--e-3);
+  font-size: var(--fs-label);
 }
-.loot-resumen-dato b { font-family: var(--font-mono); color: var(--frost); }
+.loot-resumen-dato b { font-family: var(--tipo-display); color: var(--hueso); }
 
 /* La letra del rango: círculo, no texto suelto. Se distingue por forma y
    posición además de por color. */
@@ -778,35 +791,35 @@
   place-items: center;
   width: 26px; height: 26px;
   border-radius: 50%;
-  border: 1px solid var(--line-strong);
-  background: var(--void-2);
+  border: 1px solid var(--linea-viva);
+  background: var(--pozo);
   font-weight: var(--fw-bold);
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
 }
-.loot-rango-S { border-color: var(--amber);   color: var(--amber-light); }
-.loot-rango-A { border-color: var(--info);    color: var(--info-text); }
-.loot-rango-B { border-color: var(--line-strong); color: var(--frost-dim); }
+.loot-rango-S { border-color: var(--brasa);   color: var(--brasa-alta); }
+.loot-rango-A { border-color: var(--var);    color: var(--var-txt); }
+.loot-rango-B { border-color: var(--linea-viva); color: var(--ceniza); }
 
 /* ---- una fila por premio ---- */
 .loot-fila {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 150px 36px;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--void-2);
-  margin-bottom: var(--space-2);
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  margin-bottom: var(--e-2);
 }
 .loot-fila-ico {
   display: grid;
   place-items: center;
   width: 40px; height: 40px;
-  border-radius: var(--radius-sm);
-  background: var(--panel);
+  border-radius: var(--r-chip);
+  background: var(--carbon);
   font-size: 20px;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 .loot-fila-texto { min-width: 0; }
 .loot-fila-que {
@@ -814,19 +827,19 @@
   font-weight: var(--fw-semibold);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.loot-fila-cuando { margin: 2px 0 0; font-size: var(--fs-caption); color: var(--frost-dim); }
+.loot-fila-cuando { margin: 2px 0 0; font-size: var(--fs-label); color: var(--ceniza); }
 
 /* La barra dice de un vistazo lo raro que es un premio; el número al lado da
    el dato exacto. Sin la barra hay que comparar decimales a ojo. */
-.loot-fila-prob { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-caption); }
+.loot-fila-prob { display: flex; align-items: center; gap: var(--e-2); font-size: var(--fs-label); }
 .loot-prob-barra {
   flex: 1;
   height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--line);
+  border-radius: var(--r-pill);
+  background: var(--linea);
   overflow: hidden;
 }
-.loot-prob-barra > span { display: block; height: 100%; background: var(--amber); }
+.loot-prob-barra > span { display: block; height: 100%; background: var(--brasa); }
 
 @media (max-width: 720px) {
   .loot-fila { grid-template-columns: 40px minmax(0, 1fr) 36px; }
@@ -840,20 +853,20 @@
    primero lo que haría y solo entonces deja ejecutar, así que la pantalla es
    básicamente: explicación → dos botones → informe.
    ========================================================================== */
-.mantenimiento-tarea { margin-bottom: var(--space-6); }
+.mantenimiento-tarea { margin-bottom: var(--e-6); }
 
 .mantenimiento-botones {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: var(--e-3);
+  margin-top: var(--e-4);
 }
 
 .mantenimiento-salida:empty { display: none; }
 .mantenimiento-salida {
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--line);
+  margin-top: var(--e-4);
+  padding-top: var(--e-4);
+  border-top: 1px solid var(--linea);
 }
 
 /* Los tres estados del informe. Cada uno lleva su icono además del color: un
@@ -864,17 +877,17 @@
 .mantenimiento-cargando {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
+  gap: var(--e-2);
+  margin: 0 0 var(--e-3);
+  padding: var(--e-3);
+  border-radius: var(--r-alerta);
+  border: 1px solid var(--linea);
   font-size: var(--fs-body-sm);
 }
-.mantenimiento-ok     { border-color: var(--success-line); background: var(--success-bg); color: var(--success-text); }
-.mantenimiento-aviso  { border-color: var(--warning-line); background: var(--warning-bg); color: var(--warning-text); }
-.mantenimiento-error  { border-color: var(--danger-line);  background: var(--danger-bg);  color: var(--danger-text); }
-.mantenimiento-cargando { color: var(--frost-dim); }
+.mantenimiento-ok     { border-color: var(--cesped-borde); background: var(--cesped-velo); color: var(--cesped-txt); }
+.mantenimiento-aviso  { border-color: var(--amarilla-borde); background: var(--amarilla-velo); color: var(--amarilla-txt); }
+.mantenimiento-error  { border-color: var(--roja-borde);  background: var(--roja-velo);  color: var(--roja-txt); }
+.mantenimiento-cargando { color: var(--ceniza); }
 .mantenimiento-cargando i { animation: girar 1s linear infinite; }
 @keyframes girar { to { transform: rotate(360deg); } }
 :root[data-motion="reduce"] .mantenimiento-cargando i { animation: none; }
@@ -882,15 +895,15 @@
 /* Las cifras del informe: lo que se mira antes de leer la tabla. */
 .mantenimiento-cifras {
   list-style: none;
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--e-3);
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--e-4);
   font-size: var(--fs-body-sm);
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
-.mantenimiento-cifras b { color: var(--frost); font-family: var(--font-mono); }
+.mantenimiento-cifras b { color: var(--hueso); font-family: var(--tipo-display); }
 
 /* La tabla del informe puede ser larga: se desplaza dentro de su caja en vez
    de estirar la página. */
@@ -911,7 +924,7 @@
   position: absolute;
   z-index: 3;
   pointer-events: none;      /* jamás se interponen en el arrastre */
-  background: var(--info);
+  background: var(--var);
 }
 .cadena-guia[hidden] { display: none; }
 
@@ -929,4 +942,89 @@
 .cadena-guia--h.es-centro {
   border-top: 1px dashed #E85AD0;
   box-shadow: 0 0 6px rgba(232, 90, 208, .55);
+}
+
+
+/* ==========================================================================
+   HAMBURGUESA DEL PANEL
+   --------------------------------------------------------------------------
+   Rescatada de `layout.css` en el bloque 7d, al borrar la navegación vieja del
+   sitio público. El panel es el ÚNICO que sigue usando este patrón, y con
+   razón: son veintitantos destinos internos y ahí una lista desplegable es lo
+   correcto. Su sitio es esta hoja, que solo carga el panel.
+   ========================================================================== */
+.nav-menu            { grid-column: 2; min-width: 0; }
+/* --------------------------------------------------------------------------
+   LA DIETA DE LA BARRA ANCHA
+
+   Once destinos, el logotipo y el chip de monedas piden 1.525 px a tamaño
+   normal (medido con la fuente cargada: logotipo 271 + enlaces 997 + chip 145
+   + 112 de márgenes y huecos). En un portátil de 1.280 no caben, y cortarlos
+   por la derecha sin avisar es como estaba antes.
+
+   Antes esto se resolvía recogiendo lo que sobraba en un desplegable «Más».
+   Se ha quitado: el desplegable salía siempre vacío —lo recortaba el
+   `overflow:hidden` de `.nav-menu`, que es su ancestro con overflow— y al
+   cambiar de página los destinos aparecían sueltos por la barra. La decisión
+   es que en escritorio se ven TODOS los enlaces, así que lo que cede es el
+   tamaño, no la cantidad.
+
+   Cuentas, con la dieta puesta: logotipo 205, enlaces 827, chip 145–193.
+   Como las columnas laterales del grid se igualan a la más ancha,
+   2 × 205 + 827 + 40 de márgenes + 24 de huecos = 1.301 px. Cabe de 1.320
+   para arriba con holgura, y los separadores solo vuelven a partir de 1.560,
+   donde ya sobra sitio para el aire que dan.
+   -------------------------------------------------------------------------- */
+.nav:not(.es-compacta) .logo {
+  font-size: .875rem;
+  letter-spacing: .02em;
+}
+/* `overflow: hidden` y NO `auto`: es la red de seguridad de un fotograma.
+   Entre que la tipografía de respaldo cede el sitio a la definitiva y que
+   `ajustarModoNav()` vuelve a medir, una barra pasada de rosca empujaría la
+   página entera de lado. Con `auto` volveríamos al problema original:
+   contenido cortado sin ninguna señal de que hubiera más. */
+.nav:not(.es-compacta) .nav-menu { overflow: hidden; }
+.nav:not(.es-compacta) .nav-burger { display: none; }
+.nav-burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  /* flex-shrink:0 es necesario: dentro de la barra flex el botón se comprimía
+     a 20px de ancho y se quedaba por debajo del objetivo táctil mínimo */
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: none;
+  cursor: pointer;
+}
+.nav-burger span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--hueso);
+  transition: transform var(--t-estado) var(--curva), opacity var(--t-toque) var(--curva);
+}
+.nav-burger[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.nav-burger[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+.nav.es-compacta .nav-burger { display: flex; order: 3; margin-left: var(--e-2); }
+.nav.es-compacta .nav-menu {
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  max-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid transparent;
+  background: rgba(11, 12, 16, .98);
+  backdrop-filter: blur(12px);
+  transition: max-height var(--t-estado) var(--curva);
+}
+.nav.es-compacta .nav-menu.is-abierto {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  border-bottom-color: var(--linea);
 }

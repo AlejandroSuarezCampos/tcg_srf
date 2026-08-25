@@ -66,7 +66,7 @@ $activeAdmin = 'importar';
     </div>
 
     <?php if ($error): ?>
-      <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+      <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
         <i class="ph ph-warning-circle" aria-hidden="true"></i>
         <span><?= htmlspecialchars($error) ?></span>
       </div>
@@ -74,7 +74,7 @@ $activeAdmin = 'importar';
 
     <?php if (isset($_GET['importados_borrados'])): ?>
       <?php $nBorradas = (int) ($_GET['n'] ?? 0); $nRetenidas = (int) ($_GET['retenidas'] ?? 0); ?>
-      <div class="alerta <?= $nRetenidas > 0 ? 'alerta-warning' : 'alerta-success' ?>" role="status" style="margin-bottom:var(--space-5);">
+      <div class="alerta <?= $nRetenidas > 0 ? 'alerta-warning' : 'alerta-success' ?>" role="status" style="margin-bottom:var(--e-5);">
         <i class="ph <?= $nRetenidas > 0 ? 'ph-warning' : 'ph-check-circle' ?>" aria-hidden="true"></i>
         <span>
           <?= $nBorradas ?> cartas importadas borradas.
@@ -89,7 +89,7 @@ $activeAdmin = 'importar';
       <form method="POST" id="formPrevisualizacion">
         <?= csrfCampo() ?>
         <h2 class="t-h3">Previsualización</h2>
-        <ul class="t-body-sm" style="margin:var(--space-3) 0 var(--space-5); padding-left:1.2em;">
+        <ul class="t-body-sm" style="margin:var(--e-3) 0 var(--e-5); padding-left:1.2em;">
           <li><?= $previsualizacion['jugadores_a_crear'] ?> jugadores a crear</li>
           <li><?= $previsualizacion['jugadores_omitidos'] ?> jugadores omitidos (ya existen en esta expansión)</li>
           <li><?= $previsualizacion['equipos_exactos'] ?> equipos ya reconocidos</li>
@@ -102,12 +102,12 @@ $activeAdmin = 'importar';
         </ul>
 
         <?php if (!empty($previsualizacion['equipos_ambiguos'])): ?>
-        <h3 class="t-h3" style="margin-bottom:var(--space-2);">Confirma el nombre correcto de estos equipos</h3>
-        <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+        <h3 class="t-h3" style="margin-bottom:var(--e-2);">Confirma el nombre correcto de estos equipos</h3>
+        <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
           Los datos oficiales traen el nombre de este equipo escrito de forma distinta a como ya está en el catálogo
           — probablemente una errata en uno de los dos sitios. ¿Cuál es el nombre correcto?
         </p>
-        <div class="tabla-wrap" style="margin-bottom:var(--space-5);">
+        <div class="tabla-wrap" style="margin-bottom:var(--e-5);">
           <table class="tabla">
             <thead><tr><th scope="col">Equipo</th><th scope="col">¿Cuál es el nombre correcto?</th></tr></thead>
             <tbody>
@@ -130,18 +130,18 @@ $activeAdmin = 'importar';
         </div>
         <?php endif; ?>
 
-        <div style="display:flex; gap:var(--space-3); justify-content:flex-end;">
+        <div style="display:flex; gap:var(--e-3); justify-content:flex-end;">
           <button type="submit" name="cancelar" value="1" class="btn btn-ghost">Cancelar</button>
           <button type="button" id="btnConfirmarImportacion" class="btn btn-primary">Crear cartas</button>
         </div>
       </form>
 
-      <div id="importacionProgreso" style="display:none; margin-top:var(--space-5);">
+      <div id="importacionProgreso" style="display:none; margin-top:var(--e-5);">
         <progress id="importacionProgresoBarra" value="0" max="1" style="width:100%"></progress>
-        <p id="importacionProgresoTexto" class="t-caption t-dim" style="margin-top:var(--space-2);">Importando…</p>
+        <p id="importacionProgresoTexto" class="t-caption t-dim" style="margin-top:var(--e-2);">Importando…</p>
       </div>
 
-      <div id="importacionResultado" style="display:none; margin-top:var(--space-5);"></div>
+      <div id="importacionResultado" style="display:none; margin-top:var(--e-5);"></div>
 
     <?php else: ?>
       <form method="POST" enctype="multipart/form-data">
@@ -165,7 +165,7 @@ $activeAdmin = 'importar';
 
       <?php if (!empty($expansionesImportadas)): ?>
       <div class="admin-section-gap">
-        <h3 class="t-h3" style="margin-bottom:var(--space-4);">Cartas importadas por expansión</h3>
+        <h3 class="t-h3" style="margin-bottom:var(--e-4);">Cartas importadas por expansión</h3>
         <div class="tabla-wrap">
           <table class="tabla">
             <thead><tr><th scope="col">Expansión</th><th scope="col" class="num">Cartas importadas</th><th scope="col"></th></tr></thead>

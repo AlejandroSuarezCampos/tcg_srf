@@ -79,7 +79,7 @@ $activeAdmin = 'codigos';
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'codigo_duplicado'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>Ya existe un código con ese texto (no se distinguen mayúsculas de minúsculas).</span>
     </div>
@@ -131,13 +131,13 @@ $activeAdmin = 'codigos';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($codigos)): ?>
-          <tr><td colspan="6" style="text-align:center; color:var(--frost-dim); padding:40px;">Todavía no hay ningún código. Crea el primero con el botón de arriba.</td></tr>
+          <tr><td colspan="6" style="text-align:center; color:var(--ceniza); padding:40px;">Todavía no hay ningún código. Crea el primero con el botón de arriba.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($codigos) ?></b> códigos</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($codigos) ?></b> códigos</p>
   </main>
 </div>
 
@@ -216,7 +216,7 @@ $activeAdmin = 'codigos';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($canjes)): ?>
-          <tr><td colspan="2" style="text-align:center; color:var(--frost-dim);">Nadie lo ha canjeado todavía.</td></tr>
+          <tr><td colspan="2" style="text-align:center; color:var(--ceniza);">Nadie lo ha canjeado todavía.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>

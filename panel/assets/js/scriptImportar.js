@@ -62,7 +62,7 @@
 
       var lista = document.createElement('ul');
       lista.className = 't-body-sm';
-      lista.style.margin = 'var(--space-3) 0 var(--space-4)';
+      lista.style.margin = 'var(--e-3) 0 var(--e-4)';
       lista.style.paddingLeft = '1.2em';
       var liOmitidos = document.createElement('li');
       liOmitidos.textContent = resultado.omitidos + ' omitidas (ya existían)';

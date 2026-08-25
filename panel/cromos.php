@@ -174,17 +174,17 @@ $activeAdmin = 'cromos';
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'cromo_en_uso'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
     </div>
     <?php elseif (($_GET['error'] ?? '') === 'csrf'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>La página ha caducado, inténtalo de nuevo.</span>
     </div>
     <?php elseif (!empty($_GET['error'])): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span><?= htmlspecialchars($_GET['error']) ?></span>
     </div>
@@ -271,13 +271,13 @@ $activeAdmin = 'cromos';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($cromos)): ?>
-          <tr><td colspan="8" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron cromos con esos filtros.</td></tr>
+          <tr><td colspan="8" style="text-align:center; color:var(--ceniza); padding:40px;">No se encontraron cromos con esos filtros.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($cromos) ?></b> cromos mostrados</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($cromos) ?></b> cromos mostrados</p>
   </main>
 </div>
 
@@ -310,8 +310,8 @@ $activeAdmin = 'cromos';
               <code>./assets/img/Cromos/...</code>
             </div>
           </div>
-          <input type="file" name="imagen_archivo" id="f_imagen_archivo" accept="image/png,image/jpeg,image/webp" style="margin-top:var(--space-2);">
-          <input type="text" name="imagen" id="f_imagen" placeholder="./assets/img/Cromos/..." style="margin-top:var(--space-2);">
+          <input type="file" name="imagen_archivo" id="f_imagen_archivo" accept="image/png,image/jpeg,image/webp" style="margin-top:var(--e-2);">
+          <input type="text" name="imagen" id="f_imagen" placeholder="./assets/img/Cromos/..." style="margin-top:var(--e-2);">
           <span class="campo-hint">Si eliges un archivo, se guarda en <code>assets/img/Cromos/&lt;expansión&gt;/</code> y sustituye a la ruta de abajo.</span>
         </div>
 

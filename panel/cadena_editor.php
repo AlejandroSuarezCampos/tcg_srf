@@ -100,7 +100,7 @@ $activeAdmin = 'cadenas';
         <h1><?= htmlspecialchars($cadena['nombre']) ?></h1>
         <p>Arrastra los nodos para moverlos. Tira de la anilla de un nodo hasta otro para conectarlos. Clic en un nodo para editarlo.</p>
       </div>
-      <div class="row-actions" style="gap:var(--space-3);">
+      <div class="row-actions" style="gap:var(--e-3);">
         <?php /* Calibrar la cadena ENTERA de una vez. Era la petición: sin esto
                  hay que abrir nodo por nodo y escribir cinco multiplicadores en
                  cada uno, y encima a ojo. */ ?>
@@ -131,7 +131,7 @@ $activeAdmin = 'cadenas';
       </div>
     </div>
 
-    <p class="t-caption t-dim" style="margin:0 0 var(--space-2);">
+    <p class="t-caption t-dim" style="margin:0 0 var(--e-2);">
       Arrastra los nodos donde quieras: se pegan a una rejilla de 10&nbsp;px, y
       con <kbd>Shift</kbd> pulsado se colocan al píxel. Arrastra desde la anilla
       de un nodo hasta otro para conectarlos.
@@ -870,7 +870,7 @@ $activeAdmin = 'cadenas';
       <?php endforeach; ?>
     </div>
 
-    <p class="alerta alerta-warning" role="status" style="margin-top:var(--space-4);">
+    <p class="alerta alerta-warning" role="status" style="margin-top:var(--e-4);">
       <i class="ph ph-warning" aria-hidden="true"></i>
       <span>
         Pisa el multiplicador de fuerza de <b>todos</b> los nodos de partido de esta cadena.

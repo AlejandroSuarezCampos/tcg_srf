@@ -55,14 +55,14 @@ $activeAdmin = 'mantenimiento';
       <div class="panel-head">
         <div>
           <h2 class="panel-titulo"><i class="ph ph-image" aria-hidden="true"></i> Pasar las imágenes a WebP</h2>
-          <p class="t-body-sm t-dim" style="margin-top:var(--space-2);">
+          <p class="t-body-sm t-dim" style="margin-top:var(--e-2);">
             Convierte a WebP los PNG y JPG que queden en <span class="mono">assets/img</span> y
             arregla las rutas guardadas en la base. Un arte de carta en PNG ronda 1,5&nbsp;MB
             y en WebP se queda en 200&nbsp;KB sin diferencia a la vista; multiplicado por las
             cartas de una pantalla de colección, es la diferencia entre que un móvil de gama
             baja cargue el mercado o se quede pensando.
           </p>
-          <p class="t-caption t-dim" style="margin-top:var(--space-2);">
+          <p class="t-caption t-dim" style="margin-top:var(--e-2);">
             No se tocan los iconos de Apple ni los favicon —iOS no acepta WebP ahí— ni los
             originales de las plantillas 3D, que son la fuente de la que se recorta.
             Las subidas nuevas ya nacen en WebP; esto es solo para lo viejo.
@@ -89,13 +89,13 @@ $activeAdmin = 'mantenimiento';
       <div class="panel-head">
         <div>
           <h2 class="panel-titulo"><i class="ph ph-puzzle-piece" aria-hidden="true"></i> Asignar las compos que falten</h2>
-          <p class="t-body-sm t-dim" style="margin-top:var(--space-2);">
+          <p class="t-body-sm t-dim" style="margin-top:var(--e-2);">
             Busca las cartas jugables sin rasgo de configuración —sin contraataque, brecha,
             vínculo ni justicia— y les asigna el que les toca por posición&nbsp;×&nbsp;afinidad.
             Una carta sin compo no aporta nada a las compos de la alineación en la que juega,
             y eso no se ve al mirarla: solo se nota cuando ya está jugando.
           </p>
-          <p class="t-caption t-dim" style="margin-top:var(--space-2);">
+          <p class="t-caption t-dim" style="margin-top:var(--e-2);">
             No pisa las compos puestas a mano desde el alta de cromos. Se puede pasar las
             veces que haga falta: la segunda no cambia nada.
           </p>

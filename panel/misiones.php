@@ -82,13 +82,13 @@ $activeAdmin = 'misiones';
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'ya_reclamada'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
     </div>
     <?php endif; ?>
     <?php if (($_GET['error'] ?? '') === 'tipo_no_valido'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>Combinación no válida: «Expansiones completadas» no puede ser diaria ni semanal (es un hito de estado, no tiene una fecha de la que partir para contar solo el periodo actual).</span>
     </div>
@@ -143,13 +143,13 @@ $activeAdmin = 'misiones';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($misiones)): ?>
-          <tr><td colspan="7" style="text-align:center; color:var(--frost-dim); padding:40px;">Todavía no hay ninguna misión. Crea la primera con el botón de arriba.</td></tr>
+          <tr><td colspan="7" style="text-align:center; color:var(--ceniza); padding:40px;">Todavía no hay ninguna misión. Crea la primera con el botón de arriba.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($misiones) ?></b> misiones</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($misiones) ?></b> misiones</p>
   </main>
 </div>
 
@@ -202,7 +202,7 @@ $activeAdmin = 'misiones';
             <option value="diaria">Diaria — se reinicia cada día a medianoche (hora del servidor)</option>
             <option value="semanal">Semanal — se reinicia cada lunes a medianoche (hora del servidor)</option>
           </select>
-          <p class="t-caption t-dim" style="margin-top:var(--space-2);">
+          <p class="t-caption t-dim" style="margin-top:var(--e-2);">
             En diaria/semanal el progreso solo cuenta lo ocurrido DENTRO del periodo actual (hoy, o desde el lunes), no de toda la vida — por eso «Expansiones completadas» no está disponible aquí: es un hito de estado, no tiene una fecha de la que partir.
           </p>
         </div>

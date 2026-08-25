@@ -144,13 +144,13 @@ $activeAdmin = 'sobres';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($sobres)): ?>
-          <tr><td colspan="6" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron sobres con ese nombre.</td></tr>
+          <tr><td colspan="6" style="text-align:center; color:var(--ceniza); padding:40px;">No se encontraron sobres con ese nombre.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($sobres) ?></b> sobres mostrados</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($sobres) ?></b> sobres mostrados</p>
   </main>
 </div>
 
@@ -183,7 +183,7 @@ $activeAdmin = 'sobres';
               Igual que en el resto del proyecto: <code>./assets/img/Sobres/...</code>
             </div>
           </div>
-          <input type="text" name="imagen" id="fs_imagen" placeholder="./assets/img/Sobres/..." style="margin-top:var(--space-2);">
+          <input type="text" name="imagen" id="fs_imagen" placeholder="./assets/img/Sobres/..." style="margin-top:var(--e-2);">
         </div>
 
         <div class="campo">

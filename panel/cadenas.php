@@ -158,7 +158,7 @@ $activeAdmin = 'cadenas';
     </div>
 
     <?php if (($_GET['error'] ?? '') === 'progreso_en_uso'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>No se pudo eliminar por un error inesperado. Inténtalo de nuevo.</span>
     </div>
@@ -301,13 +301,13 @@ $activeAdmin = 'cadenas';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($cadenas)): ?>
-          <tr><td colspan="7" style="text-align:center; color:var(--frost-dim); padding:40px;">Todavía no hay ninguna cadena. Crea la primera con el botón de arriba.</td></tr>
+          <tr><td colspan="7" style="text-align:center; color:var(--ceniza); padding:40px;">Todavía no hay ninguna cadena. Crea la primera con el botón de arriba.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($cadenas) ?></b> cadenas</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($cadenas) ?></b> cadenas</p>
   </main>
 </div>
 
@@ -438,7 +438,7 @@ $activeAdmin = 'cadenas';
 
     <?php if ($cadenaRequisitos): ?>
     <?php if (($_GET['error'] ?? '') === 'ciclo_requisito'): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-4);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-4);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>Ese requisito cerraría un ciclo: esa cadena (directa o indirectamente) ya exige completar esta. Ninguna de las dos se podría empezar nunca.</span>
     </div>
@@ -474,13 +474,13 @@ $activeAdmin = 'cadenas';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($requisitos)): ?>
-          <tr><td colspan="3" style="text-align:center; color:var(--frost-dim);">Sin requisitos: se puede entrar libremente.</td></tr>
+          <tr><td colspan="3" style="text-align:center; color:var(--ceniza);">Sin requisitos: se puede entrar libremente.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <form method="POST" action="cadenas.php" class="form-grid" style="margin-top:var(--space-4);">
+    <form method="POST" action="cadenas.php" class="form-grid" style="margin-top:var(--e-4);">
       <?= csrfCampo() ?>
       <input type="hidden" name="nuevo_requisito" value="1">
       <input type="hidden" name="id_cadena" value="<?= (int) $cadenaRequisitos['id_cadena'] ?>">

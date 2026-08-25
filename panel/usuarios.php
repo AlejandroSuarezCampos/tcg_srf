@@ -154,13 +154,13 @@ $activeAdmin = 'usuarios';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($usuarios)): ?>
-          <tr><td colspan="5" style="text-align:center; color:var(--frost-dim); padding:40px;">No se encontraron usuarios con ese nombre.</td></tr>
+          <tr><td colspan="5" style="text-align:center; color:var(--ceniza); padding:40px;">No se encontraron usuarios con ese nombre.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);"><b class="mono"><?= count($usuarios) ?></b> usuarios mostrados</p>
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);"><b class="mono"><?= count($usuarios) ?></b> usuarios mostrados</p>
   </main>
 </div>
 
@@ -206,7 +206,7 @@ $activeAdmin = 'usuarios';
         </div>
       </div>
 
-      <div class="modal-pie" id="fu_reset_footer" style="display:none; justify-content:flex-start; margin-top:0; margin-bottom:var(--space-5);">
+      <div class="modal-pie" id="fu_reset_footer" style="display:none; justify-content:flex-start; margin-top:0; margin-bottom:var(--e-5);">
         <button type="button" class="btn btn-ghost btn-sm" onclick="abrirResetPassword()">Restablecer contraseña</button>
       </div>
 

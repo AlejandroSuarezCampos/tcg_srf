@@ -102,7 +102,7 @@ $activeAdmin = 'plantillas';
     </div>
 
     <?php if ($mensaje): ?>
-    <div class="alerta alerta-<?= htmlspecialchars($mensajeTipo) ?>" role="<?= $mensajeTipo === 'danger' ? 'alert' : 'status' ?>" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-<?= htmlspecialchars($mensajeTipo) ?>" role="<?= $mensajeTipo === 'danger' ? 'alert' : 'status' ?>" style="margin-bottom:var(--e-5);">
       <i class="ph <?= $mensajeTipo === 'danger' ? 'ph-warning-circle' : 'ph-check-circle' ?>" aria-hidden="true"></i>
       <span><?= htmlspecialchars($mensaje) ?></span>
     </div>
@@ -116,7 +116,7 @@ $activeAdmin = 'plantillas';
     ?>
     <section class="plantillas-expansion">
       <h2 class="t-h3" style="margin:0;"><?= htmlspecialchars($ex['nombre']) ?></h2>
-      <p class="t-caption t-dim" style="margin:var(--space-1) 0 0;">
+      <p class="t-caption t-dim" style="margin:var(--e-1) 0 0;">
         Caja de la expansión (<?= $lienzoCaja['w'] ?>×<?= $lienzoCaja['h'] ?>px) y, por cada sobre, su caja pequeña
         y el propio sobre (<?= $lienzoSobre['w'] ?>×<?= $lienzoSobre['h'] ?>px).
       </p>

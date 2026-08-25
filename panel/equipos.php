@@ -98,7 +98,7 @@ $activeAdmin = 'equipos';
     </div>
 
     <?php if (!empty($_GET['error'])): ?>
-    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span><?= htmlspecialchars($_GET['error'] === 'csrf' ? 'La página había caducado. Inténtalo otra vez.' : $_GET['error']) ?></span>
     </div>
@@ -154,7 +154,7 @@ $activeAdmin = 'equipos';
           </tr>
           <?php endforeach; ?>
           <?php if (empty($equipos)): ?>
-          <tr><td colspan="3" style="text-align:center; color:var(--frost-dim); padding:40px;">
+          <tr><td colspan="3" style="text-align:center; color:var(--ceniza); padding:40px;">
             Todavía no hay ningún equipo. Crea el primero con el botón de arriba.
           </td></tr>
           <?php endif; ?>
@@ -162,7 +162,7 @@ $activeAdmin = 'equipos';
       </table>
     </div>
 
-    <p class="t-caption t-dim" style="margin-top:var(--space-4);">
+    <p class="t-caption t-dim" style="margin-top:var(--e-4);">
       <b class="mono"><?= count($equipos) ?></b> equipos
     </p>
   </main>
