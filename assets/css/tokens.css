@@ -1,259 +1,293 @@
 /* ==========================================================================
-   SUPERLIGA FRONTIER TCG — TOKENS DE DISEÑO
+   TCG FRONTIER — SISTEMA "ASCUA"
    --------------------------------------------------------------------------
    Fuente única de verdad del sistema visual. Ningún componente define un
-   color, un tamaño o una duración a mano: todo sale de aquí.
+   color, un tamaño ni una duración a mano: todo sale de aquí.
 
-   Referencia: Brand Identity Briefing, secciones 18–19 y 23–27.
+   Especificación completa: design-system/tcg-frontier/MASTER.md
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   TIPOGRAFÍA — Geist autoalojada (variable, 100–900 en un solo fichero)
-   Fallback a Inter y, si tampoco carga, a la pila del sistema.
+   TIPOGRAFÍA — dos familias, autoalojadas y variables.
+
+   Display / títulos / etiquetas / botones → Space Grotesk
+   Cuerpo / UI / cifras                    → Inter
+
+   No hay mono: las etiquetas micro se resuelven con caja alta y tracking
+   abierto (--fs-label). Es una renuncia consciente frente a las referencias
+   visuales, que sí la usan — la tercera fuente no se paga sola en IONOS.
    -------------------------------------------------------------------------- */
 @font-face {
-  font-family: 'Geist';
+  font-family: 'Space Grotesk';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 300 700;
   font-display: swap;
-  src: url('../fonts/geist-latin.woff2') format('woff2');
+  src: url('../fonts/space-grotesk-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Geist';
+  font-family: 'Space Grotesk';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 300 700;
   font-display: swap;
-  src: url('../fonts/geist-latin-ext.woff2') format('woff2');
+  src: url('../fonts/space-grotesk-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
     U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'Geist Mono';
+  font-family: 'Inter';
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url('../fonts/geist-mono-latin.woff2') format('woff2');
+  src: url('../fonts/inter-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
     U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Geist Mono';
+  font-family: 'Inter';
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url('../fonts/geist-mono-latin-ext.woff2') format('woff2');
+  src: url('../fonts/inter-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
     U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
+  color-scheme: dark;
+
   /* ======================================================================
-     COLOR — base
+     COLOR — base y superficies
+     Un estadio de noche: el foco sobre el césped, el resto en negro.
      ====================================================================== */
-  --void: #0B0C10;         /* fondo principal de toda la interfaz */
-  --void-2: #101218;       /* fondo hundido: inputs, celdas, pozos */
-  --panel: #16181D;        /* tarjetas, paneles, superficies elevadas */
-  --panel-2: #1D2027;      /* superficie sobre superficie: modal, popover */
-  --line: rgba(255, 255, 255, .08);
-  --line-strong: rgba(255, 255, 255, .16);
+  --negro: #08070A;        /* fondo de página. Único. */
+  --carbon: #121114;       /* superficie: tarjetas, paneles, celdas */
+  --carbon-alto: #1A181D;  /* superficie sobre superficie: modal, popover */
+  --pozo: #050406;         /* hundido: inputs, tablas, tracks de progreso */
+  --linea: rgba(255, 255, 255, .07);
+  --linea-viva: rgba(255, 255, 255, .16);
 
-  --frost: #EDEEF1;        /* texto principal */
-  --frost-dim: #93959F;    /* texto secundario, metadatos */
-  --frost-faint: rgba(255, 255, 255, .40); /* solo decorativo, nunca texto */
+  /* ---- texto. Los ratios son cálculos WCAG sobre --negro, no estimaciones */
+  --hueso: #F5F3F0;        /* 18,2:1 — texto principal, cifras */
+  --ceniza: #A09CA6;       /*  7,5:1 — texto secundario, metadatos, ayuda */
+  --humo: rgba(255, 255, 255, .34);  /* decorativo. NUNCA texto. */
 
-  /* ---- acento único de firma: ámbar de trofeo, no naranja neón ---- */
-  --amber: #E8752A;
-  --amber-light: #FFB168;
-  --amber-ink: #2B1204;    /* texto sobre fondo ámbar (contraste AA) */
-  --amber-soft: rgba(232, 117, 42, .12);
-  --amber-line: rgba(232, 117, 42, .35);
+  /* ---- acento único de firma: la brasa ----
+     Frente al ámbar anterior (#E8752A), que a 400 nits al sol se desatura
+     hasta parecer marrón. Este aguanta el brillo alto y el degradado hacia
+     rojo sin ensuciarse. */
+  --brasa: #FF5C1A;        /* 6,5:1 — CTA primario, foco, activo */
+  --brasa-alta: #FF8A3D;   /* 8,6:1 — hover, enlace sobre negro */
+  --brasa-honda: #C42D00;  /* :active, extremo oscuro del degradado */
+  --brasa-tinta: #140600;  /* 6,1:1 sobre --brasa — texto sobre fondo brasa */
+  --brasa-velo: rgba(255, 92, 26, .10);
+  --brasa-borde: rgba(255, 92, 26, .38);
 
-  /* ---- semánticos: los colores del propio reglamento de fútbol ---- */
-  --success: #3DDC9B;
-  --success-text: #8FF3D2;   /* variante legible sobre fondo oscuro (AA) */
-  --success-bg: rgba(61, 220, 155, .12);
-  --success-line: rgba(61, 220, 155, .38);
+  --fuego: linear-gradient(147deg, #FF8A3D 0%, #FF5C1A 46%, #C42D00 100%);
 
-  --warning: #F2B134;       /* tarjeta amarilla */
-  --warning-text: #FFD98A;
-  --warning-bg: rgba(242, 177, 52, .12);
-  --warning-line: rgba(242, 177, 52, .38);
+  /* ---- semánticos: los colores del propio reglamento de fútbol ----
+     El color NUNCA va solo: siempre icono + etiqueta. Nadie tiene que
+     distinguir verde de rojo para entender un estado. */
+  --cesped: #2FD97E;
+  --cesped-txt: #87F7C0;
+  --cesped-velo: rgba(47, 217, 126, .10);
+  --cesped-borde: rgba(47, 217, 126, .36);
 
-  --danger: #F0554A;        /* tarjeta roja */
-  --danger-text: #FFA79E;
-  --danger-bg: rgba(240, 85, 74, .12);
-  --danger-line: rgba(240, 85, 74, .35);
+  --amarilla: #FFC53D;     /* tarjeta amarilla: aviso, acción reversible */
+  --amarilla-txt: #FFE0A0;
+  --amarilla-velo: rgba(255, 197, 61, .10);
+  --amarilla-borde: rgba(255, 197, 61, .36);
 
-  --info: #5B96F2;
-  --info-text: #AFC9FA;
-  --info-bg: rgba(91, 150, 242, .12);
-  --info-line: rgba(91, 150, 242, .32);
+  --roja: #FF4438;         /* tarjeta roja: error, destructivo, derrota */
+  --roja-txt: #FFA69E;
+  --roja-velo: rgba(255, 68, 56, .10);
+  --roja-borde: rgba(255, 68, 56, .36);
+
+  --var: #4D9BFF;          /* el VAR: informativo, neutro, tutorial */
+  --var-txt: #B3D2FF;
+  --var-velo: rgba(77, 155, 255, .10);
+  --var-borde: rgba(77, 155, 255, .36);
 
   /* ---- las tres estadísticas de un jugador ----
-     Alias sobre los semánticos, no colores nuevos: ataque verde, defensa roja,
-     técnica ámbar. Se declaran aparte porque el significado NO es el de las
-     tarjetas arbitrales — una defensa alta es buena, no un error—, y porque
-     así el día que se retoquen no arrastran a alertas y validaciones.
-     Los `-text` son las variantes ya auditadas AA sobre fondo oscuro; el
-     número de una estadística nunca usa el tono puro.
-     El color va SIEMPRE acompañado de icono y etiqueta (§7): nadie tiene que
-     distinguir verde de rojo para saber qué está leyendo. */
-  --stat-ata: var(--success);
-  --stat-ata-text: var(--success-text);
-  --stat-def: var(--danger);
-  --stat-def-text: var(--danger-text);
-  --stat-tec: var(--amber);
-  --stat-tec-text: var(--amber-light);
+     Alias sobre los semánticos, no colores nuevos. Se declaran aparte porque
+     el significado NO es el arbitral —una defensa alta es buena, no un
+     error— y para que retocarlos no arrastre a alertas y validaciones. */
+  --ata: var(--cesped);      --ata-txt: var(--cesped-txt);
+  --def: var(--roja);        --def-txt: var(--roja-txt);
+  --tec: var(--brasa-alta);  --tec-txt: var(--brasa-alta);
 
   /* ======================================================================
      COLOR — rarezas
-     Cada nivel define color de etiqueta, halo de la placa de arte y borde
-     del marco. La marca NO cromática (chevrones, corona, patrón) la pone
-     el componente de carta, no estos tokens.
+     Cada nivel define color de etiqueta, halo de la placa de arte y tinta
+     legible. La marca NO cromática (chevrones, corona, patrón) la pone el
+     componente de carta, no estos tokens.
      ====================================================================== */
-  --rz1: #9CA0AC;  --rz1-halo: rgba(156, 160, 172, .16);  --rz1-ink: #C9CCD4;
-  --rz2: #3DDC9B;  --rz2-halo: rgba(61, 220, 155, .16);   --rz2-ink: #8FF3D2;
-  --rz3: #5B96F2;  --rz3-halo: rgba(91, 150, 242, .18);   --rz3-ink: #AFC9FA;
-  --rz4: #A47BFF;  --rz4-halo: rgba(164, 123, 255, .20);  --rz4-ink: #CDB8FF;
-  --rz5: #FFB168;  --rz5-halo: rgba(255, 138, 62, .22);   --rz5-ink: #FFD3A8;
+  --rz1: #8E92A0;  --rz1-halo: rgba(142, 146, 160, .16);  --rz1-ink: #C4C7D0;
+  --rz2: #2FD97E;  --rz2-halo: rgba(47, 217, 126, .16);   --rz2-ink: #87F7C0;
+  --rz3: #4D9BFF;  --rz3-halo: rgba(77, 155, 255, .18);   --rz3-ink: #B3D2FF;
+  --rz4: #A06BFF;  --rz4-halo: rgba(160, 107, 255, .20);  --rz4-ink: #CDB8FF;
+  --rz5: #FF8A3D;  --rz5-halo: rgba(255, 92, 26, .24);    --rz5-ink: #FFD3A8;
   --rz6: #FFFFFF;  --rz6-halo: rgba(255, 255, 255, .18);  --rz6-ink: #FFFFFF;
 
-  /* 7 — NUMERADA. Platino frío, a propósito lejos del ámbar de la legendaria
-     y del arcoíris de la SRF: una numerada no es "más rara" que ellas, es otra
-     cosa (existen N copias y cada una lleva su número). Si compartiera paleta
-     con las cumbre se leería como un peldaño más de la misma escalera. */
+  /* 7 — NUMERADA. Platino frío, a propósito lejos de la brasa de la
+     legendaria y del iris de la SRF: una numerada no es "más rara" que ellas,
+     es OTRA COSA (existen N copias y cada una lleva su número). Si
+     compartiera paleta con las cumbre se leería como un peldaño más de la
+     misma escalera. */
   --rz7: #B8C4D9;  --rz7-halo: rgba(184, 196, 217, .20);  --rz7-ink: #DDE5F2;
 
-  /* degradados de las rarezas con acabado propio */
-  --rz5-grad: linear-gradient(100deg, #F2B134, #E8752A 55%, #FF8A3E);
-  --rz6-grad: linear-gradient(100deg, #E8752A, #F2B134, #3DDC9B, #5B96F2, #A47BFF, #E8752A);
+  --rz5-grad: var(--fuego);
+  --rz6-grad: linear-gradient(100deg, #FF5C1A, #FFC53D, #2FD97E, #4D9BFF, #A06BFF, #FF5C1A);
   /* metal pulido: el brillo de una placa grabada, sin animación */
-  --rz7-grad: linear-gradient(115deg, #6E7A8F, #DDE5F2 42%, #8E9BB0 58%, #C7D2E4);
+  --rz7-grad: linear-gradient(115deg, #5F6A7D, #DDE5F2 42%, #828FA5 58%, #C7D2E4);
 
   /* ======================================================================
      TIPOGRAFÍA
      ====================================================================== */
-  --font-ui: 'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono', 'SFMono-Regular', 'Consolas', ui-monospace, monospace;
+  --tipo-display: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --tipo-texto: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
-  /* escala fluida: el valor mínimo es el de móvil, el máximo el de escritorio */
-  --fs-display: clamp(3.5rem, 2rem + 7vw, 6rem);      /* 56 → 96px */
-  --fs-h1: clamp(2.5rem, 1.9rem + 2.4vw, 3rem);       /* 40 → 48px */
-  --fs-h2: clamp(1.75rem, 1.5rem + 1vw, 2rem);        /* 28 → 32px */
-  --fs-h3: clamp(1.25rem, 1.18rem + .3vw, 1.375rem);  /* 20 → 22px */
-  --fs-body: 1rem;                                     /* 16px */
-  --fs-body-sm: .9375rem;                              /* 15px */
-  --fs-caption: .8125rem;                              /* 13px */
-  --fs-caption-sm: .75rem;                             /* 12px */
+  /* escala fluida: el valor mínimo es el de móvil (360px), el máximo el de
+     escritorio (≥1024px) */
+  --fs-display: clamp(2.75rem, 1.2rem + 7vw, 6rem);        /* 44 → 96px */
+  --fs-h1: clamp(2rem, 1.3rem + 3.2vw, 3.5rem);            /* 32 → 56px */
+  --fs-h2: clamp(1.5rem, 1.3rem + .9vw, 2.125rem);         /* 24 → 34px */
+  --fs-h3: clamp(1.1875rem, 1.15rem + .18vw, 1.3125rem);   /* 19 → 21px */
+  --fs-body: 1rem;             /* 16px — MÍNIMO del cuerpo, nunca por debajo */
+  --fs-body-sm: .90625rem;     /* 14,5px */
+  --fs-label: .75rem;          /* 12px, caja alta, +.14em */
+  --fs-micro: .6875rem;        /* 11px, caja alta, +.10em */
 
-  --lh-tight: 1.05;   /* display y H1 */
-  --lh-heading: 1.2;  /* H2, H3 */
-  --lh-body: 1.55;    /* texto de lectura */
+  --lh-display: .92;
+  --lh-h1: 1;
+  --lh-h2: 1.08;
+  --lh-h3: 1.2;
+  --lh-body: 1.55;
+  --lh-label: 1.2;
 
-  --tracking-display: -.02em;
-  --tracking-caption: .08em;  /* caption va en mayúsculas con este tracking */
+  --track-display: -.035em;
+  --track-h1: -.03em;
+  --track-h2: -.02em;
+  --track-label: .14em;
+  --track-micro: .10em;
 
   --fw-regular: 400;
   --fw-medium: 500;
   --fw-semibold: 600;
   --fw-bold: 700;
 
+  /* ancho máximo de un párrafo de lectura */
+  --medida: 64ch;
+
   /* ======================================================================
-     ESPACIADO — escala de 8 pasos en base 4px
-     1–4 dentro de componentes densos · 5–8 entre bloques y secciones
+     ESPACIADO — base 4
+     1–4 dentro de componentes · 5–7 entre bloques · 8–10 entre secciones
      ====================================================================== */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-7: 48px;
-  --space-8: 64px;
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 24px;
+  --e-6: 32px;
+  --e-7: 48px;
+  --e-8: 64px;
+  --e-9: 96px;
+  --e-10: 128px;
 
   /* ======================================================================
-     RADIO — mayor en contenedores grandes, menor en controles
+     RADIO
      ====================================================================== */
-  --radius-sm: 8px;   /* botones, inputs, chips */
-  --radius-md: 12px;  /* paneles pequeños, alertas */
-  --radius-lg: 16px;  /* paneles, tarjetas de sobre */
-  --radius-xl: 22px;  /* tarjeta de carta y modales */
-  --radius-pill: 999px;
+  --r-input: 6px;    /* inputs, selects, checkbox */
+  --r-chip: 10px;    /* chips, insignias, botones pequeños */
+  --r-alerta: 14px;  /* alertas y paneles pequeños */
+  --r-carta: 18px;   /* tarjeta de carta, celda de bento */
+  --r-panel: 28px;   /* panel, modal, bloque de hero */
+  --r-pill: 999px;   /* botones, filtros, avatar */
 
   /* ======================================================================
-     SOMBRA — luz cenital (desplazamiento en Y, nunca centrada)
-     El nivel lg se reserva a elementos que flotan sobre el flujo:
-     modal, hover de carta, celebración de sobre.
+     ELEVACIÓN — 3 niveles + 1 halo
+     --elev-3 se reserva a lo que flota sobre el flujo: modal, carta en
+     hover, ceremonia. --halo marca UNA SOLA COSA por pantalla: la acción
+     primaria, o la carta recién obtenida.
      ====================================================================== */
-  --shadow-sm: 0 2px 6px -2px rgba(0, 0, 0, .5);
-  --shadow-md: 0 12px 28px -14px rgba(0, 0, 0, .65);
-  --shadow-lg: 0 28px 60px -22px rgba(0, 0, 0, .78);
+  --elev-1: inset 0 1px 0 rgba(255, 255, 255, .05), 0 2px 8px -4px rgba(0, 0, 0, .8);
+  --elev-2: inset 0 1px 0 rgba(255, 255, 255, .05), 0 16px 40px -20px rgba(0, 0, 0, .9);
+  --elev-3: 0 40px 90px -30px rgba(0, 0, 0, .95);
+  --halo: 0 0 0 1px rgba(255, 92, 26, .35), 0 18px 50px -22px rgba(255, 92, 26, .5);
 
   /* ======================================================================
-     MOTION — una sola curva para toda la interfaz
+     MOVIMIENTO
+     Solo se animan `transform` y `opacity`. Jamás width/height/top/left/
+     box-shadow/filter en bucle. Ver §5.4 de MASTER.md.
      ====================================================================== */
-  --ease: cubic-bezier(.2, .8, .2, 1);      /* entrada firme, salida suave */
-  --ease-out: cubic-bezier(.16, 1, .3, 1);  /* solo para salidas de ceremonia */
+  --curva: cubic-bezier(.2, .8, .2, 1);        /* casi todo */
+  --curva-sale: cubic-bezier(.4, 0, 1, 1);     /* salidas: más rápidas */
+  --curva-brio: cubic-bezier(.34, 1.4, .5, 1); /* rebote: SOLO recompensa */
+  --curva-masa: cubic-bezier(.16, 1, .3, 1);   /* revelados con peso */
 
-  --t-micro: 160ms;      /* hover, focus, pulsación */
-  --t-media: 380ms;      /* cambios de estado, apertura de modal */
-  --t-ceremonia: 700ms;  /* SOLO apertura de sobre y duelo */
+  --t-instante: 100ms;  /* :active */
+  --t-toque: 140ms;     /* hover, focus */
+  --t-estado: 240ms;    /* cambio de estado, filtro, pestaña */
+  --t-panel: 320ms;     /* modal, hoja inferior, menú */
+  --t-revelado: 620ms;  /* entrada de bloque al hacer scroll */
+  --t-fiesta: 900ms;    /* SOLO apertura de sobre y presentación de duelo */
+
+  --escalon: 70ms;      /* retardo entre hermanos en una entrada escalonada */
 
   /* ======================================================================
-     LAYOUT — mobile-first
-     Puntos de corte (no pueden ser variables dentro de @media, se documentan
+     LAYOUT — móvil primero.
+     Puntos de corte (no pueden ser variables dentro de @media: se documentan
      aquí y se repiten literalmente en las media queries del sistema):
-       480px   · fin de 1 columna
-       1024px  · fin de tablet (grid de 8)
-       1440px  · fin de escritorio (grid de 12, contenido 1280px)
-       1920px  · fin de panorámico (contenido 1440px)
-       >1920px · ultra panorámico (contenido 1680px)
+       480px  · fin de 1 columna
+       768px  · tablet, grid de 8
+       1024px · escritorio, grid de 12, contenido 1200px
+       1440px · contenido 1360px
+       1920px · panorámico, contenido 1560px
      ====================================================================== */
-  --wrap: 100%;      /* ancho máximo del contenido, se sube por breakpoint */
-  --gutter: 16px;    /* margen lateral de página */
-  --cols: 1;         /* columnas del grid de página */
-  --gap: var(--space-4);
+  --wrap: 100%;
+  --canal: 16px;        /* margen lateral de página */
+  --cols: 4;
+  --gap: var(--e-4);
+
+  /* altura de la barra fija: la usa scroll-padding para que el foco de
+     teclado nunca quede tapado (WCAG 2.2 SC 2.4.11) */
+  --nav-h: 60px;
+  /* barra inferior de 5 destinos en móvil + hueco seguro del dispositivo */
+  --tabbar-h: 64px;
+  --seguro-abajo: env(safe-area-inset-bottom, 0px);
 
   /* ======================================================================
      CAPAS
      ====================================================================== */
   --z-nav: 50;
-  --z-backdrop: 90;
+  --z-tabbar: 60;
+  --z-fondo-modal: 90;
   --z-modal: 100;
   --z-toast: 120;
-
-  /* altura de la nav fija: usada por scroll-padding para que el foco de
-     teclado nunca quede tapado (WCAG 2.2 SC 2.4.11) */
-  --nav-h: 64px;
 }
 
 @media (min-width: 480px) {
-  :root {
-    --gutter: 24px;
-    --cols: 8;
-    --gap: var(--space-5);
-  }
+  :root { --canal: 20px; --gap: var(--e-5); }
+}
+
+@media (min-width: 768px) {
+  :root { --canal: 28px; --cols: 8; }
 }
 
 @media (min-width: 1024px) {
   :root {
-    --gutter: 32px;
+    --canal: 32px;
     --cols: 12;
-    --wrap: 1280px;
+    --wrap: 1200px;
     --nav-h: 72px;
+    --tabbar-h: 0px;   /* en escritorio la barra sube a cabecera */
   }
 }
 
-@media (min-width: 1440px) {
-  :root { --wrap: 1440px; }
-}
-
-@media (min-width: 1920px) {
-  :root { --wrap: 1680px; }
-}
+@media (min-width: 1440px) { :root { --canal: 40px; --wrap: 1360px; } }
+@media (min-width: 1920px) { :root { --canal: 48px; --wrap: 1560px; } }

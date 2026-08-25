@@ -33,20 +33,28 @@ $bodyClass    = $bodyClass    ?? '';
 <meta name="csrf-token" content="<?= htmlspecialchars(csrfToken()) ?>">
 <link rel="icon" type="image/png" href="<?= $base ?>assets/img/iconos/favicon.ico">
 
-<!-- PREFERENCIA DE MOVIMIENTO — va INLINE y lo primero de todo, a propósito.
+<!-- MOTOR DE MOVIMIENTO — va INLINE y lo primero de todo, a propósito.
      · Inline: un fichero .js aparte podría servirse cacheado y dejar la
        página con el modo equivocado (ya pasó con ui.js).
      · Lo primero: fija data-motion en <html> ANTES del primer pintado, así no
        se ve un fotograma con las animaciones del modo que no toca.
-     Todo el CSS del sitio cuelga de :root[data-motion="reduce"] en vez de
+
+     TRES NIVELES, no un interruptor (MASTER.md §5.1). Más animación y móviles
+     de gama baja son objetivos en conflicto, y no se resuelve animando menos:
+     se resuelve animando DISTINTO según el aparato.
+       full   · todo: revelados, inclinación 3D, rescoldo latiendo, ceremonias
+       lite   · solo opacidad y desplazamientos cortos. Sin 3D ni latido
+       reduce · fundidos de 120 ms y nada más
+
+     Todo el CSS cuelga de :root[data-motion="…"] en vez de
      @media (prefers-reduced-motion), porque una media query la decide el
      sistema y NO se puede sobrescribir desde JavaScript: con ella, activar las
      animaciones en la web dejaba las ceremonias en display:none y la pantalla
-     muerta. La preferencia propia manda sobre la del sistema. -->
+     muerta. La elección del jugador manda SIEMPRE sobre la detección. -->
 <script>
 (function () {
   var SRF = (window.SRF = window.SRF || {});
-  var CLAVE = 'srf-animaciones';   // 'si' | 'no' | ausente = automático
+  var CLAVE = 'srf-animaciones';   // 'full' | 'lite' | 'reduce' | ausente = automático
 
   // Token CSRF de la sesión, leído del <meta> de esta misma página. Todo
   // fetch/sendBeacon que mute estado lo añade a su payload como 'csrf'.
@@ -55,37 +63,82 @@ $bodyClass    = $bodyClass    ?? '';
     return meta ? meta.content : '';
   };
 
-  SRF.preferenciaMovimiento = function () {
-    try { return localStorage.getItem(CLAVE); } catch (e) { return null; }
+  /* Respaldo para cuando localStorage no está disponible (modo privado, o
+     cookies de terceros bloqueadas en un iframe). Sin esto, el jugador elige
+     un nivel y no pasa nada: se guarda en ningún sitio y al releer vuelve la
+     detección automática. Con esto, al menos la elección vale para la página
+     en la que está — que es todo lo que se puede prometer sin almacenamiento. */
+  var enMemoria = null;
+
+  function leer() {
+    try { return localStorage.getItem(CLAVE); } catch (e) { return enMemoria; }
+  }
+
+  /* Valores del sistema anterior, que solo tenía dos estados. Se traducen al
+     vuelo para que nadie pierda su preferencia al desplegar. */
+  var VIEJOS = { si: 'full', no: 'reduce' };
+
+  var NIVELES = { full: 1, lite: 1, reduce: 1 };
+
+  /** Lo que pide el aparato, ignorando lo que haya elegido el jugador. */
+  SRF.nivelDetectado = function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'reduce';
+    // `deviceMemory` solo existe en Chromium; en el resto no penalizamos.
+    var nucleos = navigator.hardwareConcurrency || 8;
+    var memoria = navigator.deviceMemory || 8;
+    return (nucleos <= 4 || memoria <= 4) ? 'lite' : 'full';
   };
-  SRF.movimientoReducido = function () {
-    var p = SRF.preferenciaMovimiento();
-    if (p === 'si') return false;
-    if (p === 'no') return true;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /** El nivel que se está aplicando ahora mismo. */
+  SRF.nivelMovimiento = function () {
+    var guardado = VIEJOS[leer()] || leer();
+    return NIVELES[guardado] ? guardado : SRF.nivelDetectado();
   };
+
   SRF.aplicarMovimiento = function () {
-    document.documentElement.dataset.motion = SRF.movimientoReducido() ? 'reduce' : 'full';
+    document.documentElement.dataset.motion = SRF.nivelMovimiento();
+  };
+
+  /** null = automático (vuelve a hacer caso al aparato y al sistema). */
+  SRF.fijarNivelMovimiento = function (nivel) {
+    var valido = (nivel !== null && NIVELES[nivel]) ? nivel : null;
+    enMemoria = valido;
+    try {
+      if (valido === null) localStorage.removeItem(CLAVE);
+      else localStorage.setItem(CLAVE, valido);
+    } catch (e) { /* sin almacenamiento: vale el respaldo en memoria */ }
+    SRF.aplicarMovimiento();
+  };
+
+  /* ---- Compatibilidad con el interruptor de dos estados ----
+     Lo usan ceremonia.js, ceremonia_cofre.js, duelo.js, presentacion.js y
+     configuracion.js. Se mantiene hasta que esas cinco pantallas se migren. */
+  SRF.movimientoReducido = function () { return SRF.nivelMovimiento() === 'reduce'; };
+  SRF.preferenciaMovimiento = function () {
+    var v = leer();
+    return VIEJOS[v] || (NIVELES[v] ? v : null);
   };
   SRF.fijarPreferenciaMovimiento = function (valor) {
-    try {
-      if (valor === null) localStorage.removeItem(CLAVE);
-      else localStorage.setItem(CLAVE, valor);
-    } catch (e) { /* modo privado: se queda en automático */ }
-    SRF.aplicarMovimiento();
+    SRF.fijarNivelMovimiento(valor === null ? null : (VIEJOS[valor] || valor));
   };
 
   SRF.aplicarMovimiento();
   // si el jugador cambia la preferencia del SISTEMA con la página abierta y
-  // aquí está en automático, el modo se actualiza solo
+  // aquí está en automático, el nivel se actualiza solo
   var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (mq.addEventListener) mq.addEventListener('change', SRF.aplicarMovimiento);
 })();
 </script>
 
-<!-- Geist autoalojada: sin dependencia de terceros para la tipografía -->
-<link rel="preload" href="<?= $base ?>assets/fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="<?= $base ?>assets/fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+<?php /* Tipografía autoalojada: sin dependencia de terceros, ni siquiera de
+         Google Fonts (un host más = un DNS y un TLS más antes del primer
+         pintado, y en IONOS eso se nota).
+         Inter variable para el cuerpo, Space Grotesk variable para display y
+         etiquetas. Solo se precargan los subconjuntos `latin`: los `-ext` los
+         pide el navegador únicamente si la página trae caracteres que los
+         necesiten, y para castellano casi nunca ocurre. */ ?>
+<link rel="preload" href="<?= $base ?>assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?= $base ?>assets/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <?php /* Las de iconos también, LAS TRES. Sin el preload el navegador no se
          entera de que existen hasta haber descargado y analizado `iconos.css`,
          y como esas fuentes van con `font-display: block` el hueco del icono
@@ -101,6 +154,10 @@ $bodyClass    = $bodyClass    ?? '';
 <link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/base.css') ?>">
 <link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/components.css') ?>">
 <link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/layout.css') ?>">
+<?php /* Sistema nuevo: va DESPUÉS de las hojas antiguas para poder ganarles
+         mientras dure la migración. Trae los ocho dispositivos visuales y las
+         primitivas de movimiento. */ ?>
+<link rel="stylesheet" href="<?= assetUrl($base, 'assets/css/ascua.css') ?>">
 <?php foreach ($cssExtra as $hoja): ?>
 <link rel="stylesheet" href="<?= htmlspecialchars(assetUrl($base, $hoja)) ?>">
 <?php endforeach; ?>

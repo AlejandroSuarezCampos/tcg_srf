@@ -30,7 +30,7 @@ html {
   scroll-behavior: smooth;
   /* el ancla de scroll deja hueco para la nav fija: sin esto, saltar a un
      destino por teclado deja el elemento enfocado bajo la barra */
-  scroll-padding-top: calc(var(--nav-h) + var(--space-4));
+  scroll-padding-top: calc(var(--nav-h) + var(--e-4));
   -webkit-text-size-adjust: 100%;
 
   /* ⚠️ EL RECUADRO AZUL DE LOS MÓVILES. Al tocar cualquier cosa pulsable, los
@@ -58,9 +58,9 @@ button, .btn, [role="button"], summary, .hueco, .pack3d-sobre, .nodo-boton {
 }
 
 body {
-  background: var(--void);
-  color: var(--frost);
-  font-family: var(--font-ui);
+  background: var(--negro);
+  color: var(--hueso);
+  font-family: var(--tipo-texto);
   font-size: var(--fs-body);
   font-weight: var(--fw-regular);
   line-height: var(--lh-body);
@@ -154,23 +154,23 @@ legend { padding: 0; }
 
 a { color: inherit; }
 
-::selection { background: var(--amber); color: var(--amber-ink); }
+::selection { background: var(--brasa); color: var(--brasa-tinta); }
 
 /* --------------------------------------------------------------------------
    TIPOGRAFÍA
    -------------------------------------------------------------------------- */
-h1, h2, h3, h4 { font-weight: var(--fw-bold); line-height: var(--lh-heading); }
+h1, h2, h3, h4 { font-weight: var(--fw-bold); line-height: var(--lh-h2); }
 
 .t-display {
   font-size: var(--fs-display);
   font-weight: var(--fw-bold);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--tracking-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--track-display);
 }
 
 h1, .t-h1 {
   font-size: var(--fs-h1);
-  line-height: var(--lh-tight);
+  line-height: var(--lh-display);
   letter-spacing: -.015em;
 }
 
@@ -183,20 +183,20 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
 
 /* caption / meta: la etiqueta pequeña en mayúsculas del sistema */
 .t-caption {
-  font-size: var(--fs-caption);
+  font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
   line-height: 1.3;
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
 }
-.t-caption-sm { font-size: var(--fs-caption-sm); }
+.t-caption-sm { font-size: var(--fs-micro); }
 
-.t-dim { color: var(--frost-dim); }
+.t-dim { color: var(--ceniza); }
 
 /* mono: SOLO datos — monedas, estadísticas, contadores, timestamps.
    Nunca texto editorial. */
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--tipo-display);
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
@@ -206,9 +206,9 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
    (WCAG 2.2 SC 2.4.11 / 2.4.13)
    -------------------------------------------------------------------------- */
 :focus-visible {
-  outline: 2px solid var(--amber-light);
+  outline: 2px solid var(--brasa-alta);
   outline-offset: 3px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-chip);
 }
 
 /* quitamos el outline por defecto solo cuando NO es navegación por teclado */
@@ -217,17 +217,17 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
 /* enlace de salto: primer tabulable de cada página */
 .skip-link {
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
+  top: var(--e-2);
+  left: var(--e-2);
   z-index: calc(var(--z-toast) + 1);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  background: var(--amber);
-  color: var(--amber-ink);
+  padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-chip);
+  background: var(--brasa);
+  color: var(--brasa-tinta);
   font-weight: var(--fw-semibold);
   text-decoration: none;
   transform: translateY(-150%);
-  transition: transform var(--t-micro) var(--ease);
+  transition: transform var(--t-toque) var(--curva);
 }
 .skip-link:focus-visible { transform: translateY(0); }
 
@@ -264,12 +264,12 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
   width: 100%;
   max-width: var(--wrap);
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  padding-inline: var(--canal);
 }
 
 /* sección estándar: aire vertical entre bloques */
-.seccion { padding-block: var(--space-7); }
-@media (min-width: 1024px) { .seccion { padding-block: var(--space-8); } }
+.seccion { padding-block: var(--e-7); }
+@media (min-width: 1024px) { .seccion { padding-block: var(--e-8); } }
 
 /* grid de página: 1 / 8 / 12 columnas según breakpoint */
 .grid {
@@ -284,16 +284,16 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
    .stack entero más allá de su columna asignada, y con él se lleva a toda
    la página a desbordar. Mismo patrón que .rz-texto, .partido-nombre, etc. */
 .stack { display: flex; flex-direction: column; min-width: 0; }
-.stack-2 { gap: var(--space-2); }
-.stack-3 { gap: var(--space-3); }
-.stack-4 { gap: var(--space-4); }
-.stack-5 { gap: var(--space-5); }
-.stack-6 { gap: var(--space-6); }
+.stack-2 { gap: var(--e-2); }
+.stack-3 { gap: var(--e-3); }
+.stack-4 { gap: var(--e-4); }
+.stack-5 { gap: var(--e-5); }
+.stack-6 { gap: var(--e-6); }
 
 .fila {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
   flex-wrap: wrap;
 }
 .fila-entre { justify-content: space-between; }
@@ -304,21 +304,21 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
   align-items: flex-end;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  gap: var(--e-4);
+  margin-bottom: var(--e-6);
 }
 .seccion-tag {
   display: block;
-  margin-bottom: var(--space-2);
-  color: var(--amber-light);
-  font-size: var(--fs-caption);
+  margin-bottom: var(--e-2);
+  color: var(--brasa-alta);
+  font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
 }
 
 /* separador */
-.hr { height: 1px; background: var(--line); border: 0; }
+.hr { height: 1px; background: var(--linea); border: 0; }
 
 /* --------------------------------------------------------------------------
    REVELADO AL SCROLL — decorativo y discreto (principio 4)
@@ -326,7 +326,7 @@ h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
 .reveal {
   opacity: 0;
   transform: translateY(20px);
-  transition: opacity var(--t-media) var(--ease), transform var(--t-media) var(--ease);
+  transition: opacity var(--t-estado) var(--curva), transform var(--t-estado) var(--curva);
 }
 .reveal.in { opacity: 1; transform: none; }
 

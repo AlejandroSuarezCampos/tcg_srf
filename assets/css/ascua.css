@@ -1,0 +1,1286 @@
+/* ==========================================================================
+   TCG FRONTIER — CAPA DEL SISTEMA "ASCUA"
+   --------------------------------------------------------------------------
+   La hoja del sistema nuevo. Va DESPUÉS de base/components/layout para poder
+   ganarles mientras dura la migración, y crece a medida que se reescriben
+   pantallas — hasta que las tres antiguas y `puente.css` desaparezcan.
+
+   Ahora mismo contiene:
+     1. Tipografía — el reparto de las dos familias
+     2. Navegación de cinco destinos
+     3. Los ocho dispositivos visuales (MASTER.md §4B)
+     4. Las primitivas de movimiento (§5)
+
+   Todo el movimiento cuelga de :root[data-motion="full|lite|reduce"], que fija
+   el bloque inline de partials/head.php antes del primer pintado.
+
+   REGLA DE ORO (§5.4): solo se animan `transform` y `opacity`. Jamás width,
+   height, top, left, box-shadow ni filter en bucle. `will-change` se pone al
+   empezar la animación y se quita al terminar — nunca fijo en CSS: uno
+   permanente en cincuenta cartas reserva cincuenta capas de GPU, y así es
+   exactamente como se tumba un móvil de gama baja.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. TIPOGRAFÍA — el reparto de las dos familias
+
+   `base.css` solo pone una familia en el <body> y deja que los títulos la
+   hereden: venía del sistema anterior, que usaba Geist para todo. Ascua
+   reparte: Space Grotesk para lo que grita, Inter para lo que se lee.
+
+   Aquí va SOLO familia, peso y tracking. La caja alta de display, H1 y H2 se
+   aplica pantalla a pantalla al migrarla, no de golpe: convertir a mayúsculas
+   los títulos de las diecisiete de una vez alarga cadenas que hoy caben justas,
+   y además es una decisión de copia, no de sistema.
+   ========================================================================== */
+h1, h2, h3, h4,
+.t-display, .t-h1, .t-h2, .t-h3,
+.t-caption, .t-caption-sm, .label,
+.btn, button, .nav-enlace, .logo, th {
+  font-family: var(--tipo-display);
+}
+
+h1, .t-display, .t-h1 { font-weight: var(--fw-bold); letter-spacing: var(--track-h1); }
+h2, .t-h2             { font-weight: var(--fw-bold); letter-spacing: var(--track-h2); }
+h3, h4, .t-h3         { font-weight: var(--fw-semibold); letter-spacing: -.01em; }
+.t-display            { letter-spacing: var(--track-display); line-height: var(--lh-display); }
+
+.t-caption, .t-caption-sm, .label, th {
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.btn, button { font-weight: var(--fw-bold); letter-spacing: .06em; }
+
+/* Cualquier cifra que se compare en columna: sin esto los dígitos tienen
+   anchos distintos y las tablas de estadísticas bailan al actualizarse. */
+.mono, .num, td, .cif { font-variant-numeric: tabular-nums; }
+
+/* Etiqueta micro bajo una cifra: «MONEDAS», «FICHAS», «TUS ANUNCIOS»…
+   Compartida porque la usa `partials/cabecera.php` en OCHO pantallas además
+   de `hoy.php` y `landing.php` — vivía solo en hoy.css y esas ocho la
+   heredaban sin ningún estilo: sin caja alta, sin tracking, con el color de
+   texto por defecto. Es la causa de «las cadenas en minúscula». */
+.rot {
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+
+
+/* ==========================================================================
+   2. NAVEGACIÓN — cinco destinos
+
+   Móvil:      .barra arriba (logotipo y saldo) + .tabbar abajo (los cinco)
+   Escritorio: .barra lo lleva todo y .tabbar desaparece
+
+   Nombres nuevos (.barra, .tabbar, .marca) y no los viejos (.nav, .logo) a
+   propósito: layout.css sigue vivo durante la migración y reutilizar sus
+   clases sería pelearse con su cascada en cada regla.
+   ========================================================================== */
+
+/* ---- barra superior ----
+   `sticky` y no `fixed`: al ocupar sitio en el flujo no puede tapar contenido
+   que tenga el foco puesto (WCAG 2.2 SC 2.4.11), y no hace falta compensar
+   con padding en el body. */
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-nav);
+  border-bottom: 1px solid var(--linea);
+  background: color-mix(in srgb, var(--negro) 88%, transparent);
+  backdrop-filter: blur(14px);
+}
+/* Sin soporte de color-mix (Safari < 16.2) el fondo quedaría transparente y la
+   barra ilegible sobre el contenido: se cae a negro opaco, que es feo pero se
+   lee. */
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .barra { background: var(--negro); }
+}
+
+.barra-interior {
+  display: flex;
+  align-items: center;
+  gap: var(--e-4);
+  min-height: var(--nav-h);
+  padding-inline: var(--canal);
+  max-width: min(100%, 1760px);
+  margin-inline: auto;
+}
+
+/* ---- marca ---- */
+.marca {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: 1.0625rem;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+  color: var(--hueso);
+  text-decoration: none;
+  white-space: nowrap;
+  margin-right: auto;
+  /* el rótulo mide 26 de alto por su tipografía; el enlace se estira a 44
+     para cumplir el mínimo táctil sin tocar el tamaño de la marca */
+  min-height: 44px;
+}
+.marca-tcg { color: var(--brasa); margin-left: .2em; }
+/* La chispa es el único adorno de la barra: un punto de brasa con su halo.
+   No lleva animación — algo latiendo en la esquina de TODAS las pantallas
+   cansa a los diez minutos. */
+.marca-chispa {
+  width: 9px; height: 9px; border-radius: var(--r-pill);
+  background: var(--fuego);
+  box-shadow: 0 0 12px -1px var(--brasa);
+  flex: none;
+}
+
+/* ---- destinos de la barra: solo escritorio ---- */
+.barra-destinos { display: none; }
+
+.barra-derecha {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+}
+/* El «Entrar» de sin-sesión usa `.btn-sm`, que en components.css mide 36 de
+   alto. Aquí es el ÚNICO botón de la barra y el que abre la puerta al juego:
+   se sube al mínimo del sistema. */
+.barra-derecha .btn { min-height: 44px; }
+
+/* ---- saldo ---- */
+.saldo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: 7px var(--e-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--brasa-borde);
+  background: var(--brasa-velo);
+  color: var(--brasa-alta);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.barra-ico,
+.avatar-enlace {
+  display: grid;
+  place-items: center;
+  /* 44 y no 40: es el mínimo del sistema y aquí cabe de sobra —la barra mide
+     60 de alto—, así que no hay motivo para el truco del pseudo-elemento que
+     había antes, que además quedaba descentrado y se salía por la esquina. */
+  width: 44px; height: 44px;
+  border-radius: var(--r-pill);
+  color: var(--ceniza);
+  text-decoration: none;
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+@media (hover: hover) {
+  .barra-ico:hover { color: var(--hueso); background: var(--linea); }
+}
+.barra-ico:focus-visible,
+.avatar-enlace:focus-visible {
+  outline: 2px solid var(--brasa-alta);
+  outline-offset: 3px;
+}
+
+/* ==========================================================================
+   BARRA INFERIOR — el corazón del cambio
+   Cinco destinos, al alcance del pulgar. Ni uno más: es regla dura del
+   sistema, no una preferencia.
+   ========================================================================== */
+.tabbar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: var(--z-tabbar);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--e-1);
+  padding: var(--e-2) var(--e-2) calc(var(--e-2) + var(--seguro-abajo));
+  border-top: 1px solid var(--linea);
+  background: color-mix(in srgb, var(--carbon) 94%, transparent);
+  backdrop-filter: blur(16px);
+}
+@supports not (background: color-mix(in srgb, red 50%, transparent)) {
+  .tabbar { background: var(--carbon); }
+}
+
+/* La barra inferior SÍ flota sobre el contenido, así que el body le devuelve
+   el hueco. Con `--tabbar-h` a 0 en escritorio esto se apaga solo.
+
+   Va condicionado a que la barra exista: `login.php` y `registro.php` no
+   incluyen la navegación, y ahí el hueco serían 64 px de vacío al final por
+   nada. Si el navegador no entiende `:has()` se aplica igual —sobra espacio en
+   dos pantallas, que es mucho mejor que tapar contenido en las quince
+   restantes. */
+body { padding-bottom: calc(var(--tabbar-h) + var(--seguro-abajo)); }
+@supports selector(:has(*)) {
+  body { padding-bottom: 0; }
+  body:has(.tabbar) { padding-bottom: calc(var(--tabbar-h) + var(--seguro-abajo)); }
+}
+
+/* ---- un destino, en cualquiera de las dos barras ---- */
+.nav-destino {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-1);
+  min-height: 48px;
+  padding: var(--e-1) var(--e-1);
+  border: 0;
+  border-radius: var(--r-carta);
+  background: none;
+  color: var(--ceniza);
+  text-decoration: none;
+  cursor: pointer;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.nav-destino-ico { position: relative; display: grid; place-items: center; font-size: 21px; line-height: 1; }
+.nav-destino-txt { line-height: 1.1; }
+
+.nav-destino.es-activo { color: var(--brasa-alta); background: var(--brasa-velo); }
+@media (hover: hover) {
+  .nav-destino:hover { color: var(--hueso); }
+  .nav-destino.es-activo:hover { color: var(--brasa-alta); }
+}
+.nav-destino:active { transform: scale(.94); transition-duration: var(--t-instante); }
+.nav-destino:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: -2px; }
+
+/* ---- insignia de pendientes ----
+   Es el motor de retorno: dice que hay algo esperándote sin que tengas que
+   entrar a mirar. Solo aparece si la pantalla pasa `$navPendientes`. */
+.nav-insignia {
+  position: absolute;
+  top: -5px; left: 52%;
+  min-width: 17px; height: 17px;
+  padding-inline: 5px;
+  border-radius: var(--r-pill);
+  background: var(--brasa);
+  color: var(--brasa-tinta);
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0;
+  display: grid; place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+[data-motion="full"] .nav-insignia,
+[data-motion="lite"] .nav-insignia {
+  animation: insignia-entra var(--t-estado) var(--curva-brio) both;
+}
+@keyframes insignia-entra { from { transform: scale(0); } to { transform: scale(1); } }
+
+/* ==========================================================================
+   HOJA INFERIOR — genérica
+   Sube desde abajo en móvil; cada pantalla decide dónde se coloca en
+   escritorio con su propio modificador (ver .hoja--filtros en plantilla.css).
+   La monta iniciarHojas() en ui.js.
+   ========================================================================== */
+.hoja-velo {
+  position: fixed; inset: 0;
+  z-index: var(--z-fondo-modal);
+  background: rgba(0, 0, 0, .62);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity var(--t-panel) var(--curva);
+}
+.hoja-velo.esta-abierta { opacity: 1; }
+
+.hoja {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-4);
+  padding: var(--e-3) var(--e-4) calc(var(--e-5) + var(--seguro-abajo));
+  border-top: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  transform: translateY(100%);
+  transition: transform var(--t-panel) var(--curva);
+  max-height: 88dvh;
+  overflow-y: auto;
+}
+.hoja.esta-abierta { transform: none; }
+
+.hoja-asa {
+  width: 38px; height: 4px; border-radius: var(--r-pill);
+  background: var(--linea-viva);
+  margin: 0 auto var(--e-1);
+}
+.hoja-titulo {
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  color: var(--ceniza);
+  margin: 0;
+}
+.hoja-cerrar {
+  min-height: 44px;
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ceniza);
+  cursor: pointer;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.hoja-cerrar:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   ESCRITORIO — la barra inferior sube a la de arriba
+   ========================================================================== */
+@media (min-width: 1024px) {
+  .tabbar { display: none; }
+
+  .barra-destinos {
+    display: flex;
+    align-items: center;
+    gap: var(--e-1);
+    margin-inline: auto;
+  }
+
+  .nav-destino {
+    flex-direction: row;
+    gap: var(--e-2);
+    min-height: 44px;
+    padding-inline: var(--e-4);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-label);
+    letter-spacing: var(--track-label);
+  }
+  .nav-destino-ico { font-size: 18px; }
+  .nav-insignia { top: -6px; left: 60%; }
+
+  /* la marca deja de empujar: los destinos ya van centrados por su margen */
+  .marca { margin-right: 0; }
+
+}
+
+/* ---- parche de accesibilidad sobre el pie sin migrar ----
+   Dos objetivos táctiles por debajo del mínimo del sistema (44 px):
+   · los enlaces a Discord/X/Instagram del aviso de beta miden 26 de ancho,
+     porque su rótulo es una sola letra;
+   · el botón de cerrar de la ficha de carta se queda en 43 por un píxel;
+   · los enlaces de las columnas del pie miden 38 de alto.
+
+   NO se toca el enlace suelto dentro de un párrafo («Discord de la liga» en la
+   portada): WCAG 2.5.8 exime expresamente los enlaces en línea dentro de una
+   frase, y estirarlo a 44 partiría el renglón.
+   Los dos pasan el mínimo de WCAG 2.5.8 (24 px), pero incumplen la regla del
+   sistema. Cuatro líneas aquí frente a esperar al bloque 7: la accesibilidad
+   no se aplaza.
+   Se borra cuando se migren partials/footer.php y partials/ficha_carta.php. */
+.pie-beta-canales a,
+.pie-redes a,
+.pie-col ul a,
+.modal-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-2);
+  min-width: 44px;
+  min-height: 44px;
+}
+
+
+/* ==========================================================================
+   HOJA DE «JUGAR» — el contenido de la hoja inferior de la navegación
+
+   Solo se ve en móvil: en escritorio el mismo enlace navega a `jugar.php`.
+   Cada opción es una fila alta y ancha, que en el pulgar se acierta sin mirar.
+   ========================================================================== */
+.hoja--jugar { gap: var(--e-4); }
+
+.hoja-jugar-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--e-4);
+}
+.hoja-jugar-todo {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: 44px;
+  color: var(--brasa-alta);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hoja-jugar-todo:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.hoja-lista { display: flex; flex-direction: column; gap: var(--e-2); }
+
+.hoja-opcion {
+  display: flex;
+  align-items: center;
+  gap: var(--e-4);
+  /* 64 y no 56: es la lista que se toca a ciegas mientras se anda, y aquí el
+     dedo agradece cada píxel. */
+  min-height: 64px;
+  padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-carta);
+  border: 1px solid var(--linea);
+  background: var(--carbon);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: border-color var(--t-toque) var(--curva),
+              transform var(--t-toque) var(--curva);
+}
+.hoja-opcion:active { transform: scale(.985); transition-duration: var(--t-instante); }
+.hoja-opcion:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+.hoja-opcion.es-activo { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+@media (hover: hover) { .hoja-opcion:hover { border-color: var(--linea-viva); } }
+
+.hoja-opcion-ico {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; flex: none;
+  border-radius: var(--r-chip);
+  background: var(--brasa-velo);
+  border: 1px solid var(--brasa-borde);
+  color: var(--brasa-alta);
+  font-size: 22px;
+}
+.hoja-opcion-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hoja-opcion-txt b {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+}
+.hoja-opcion-txt span { font-size: var(--fs-body-sm); color: var(--ceniza); }
+.hoja-opcion-flecha { margin-left: auto; color: var(--humo); flex: none; font-size: 18px; }
+
+/* La cifra sustituye a la flecha cuando hay algo que atender: en el mismo
+   sitio, así la fila no cambia de forma según el estado. */
+.hoja-opcion-cifra {
+  margin-left: auto;
+  flex: none;
+  min-width: 28px; height: 28px;
+  padding-inline: var(--e-2);
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  display: grid; place-items: center;
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   CABECERA DE PANTALLA — la comparten seis pantallas (partials/cabecera.php)
+
+   Va en la hoja del SISTEMA y no en una por pantalla justamente porque la
+   comparten: repetirla seis veces es lo que hacía que cada retoque hubiera que
+   darlo seis veces y siempre se quedara una fuera.
+   ========================================================================== */
+.cab {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-6) var(--e-5);
+  border-bottom: 1px solid var(--linea);
+}
+.cab-cuerpo { position: relative; }
+
+.cab-fila {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--e-4);
+  flex-wrap: wrap;
+}
+.cab-texto { min-width: 0; }
+
+.cab-titulo {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  letter-spacing: var(--track-h1);
+  text-transform: uppercase;
+  margin-block: var(--e-2) 0;
+  overflow-wrap: anywhere;
+}
+.cab-texto-sub {
+  margin-block: var(--e-3) 0;
+  font-size: var(--fs-body);
+  color: var(--ceniza);
+  max-width: 54ch;
+}
+.cab-accion { flex: none; }
+
+/* Avatar a la izquierda del título: lo usan el perfil propio y el de otro
+   jugador. El `align-self` lo sube a la altura del título en vez de dejarlo
+   pegado al fondo, que es donde lo llevaría el `align-items: flex-end` de la
+   fila. */
+.cab-avatar { flex: none; align-self: center; }
+.cab-avatar .avatar { width: 64px; height: 64px; font-size: 1.25rem; }
+
+.cab-pastilla {
+  display: inline-block;
+  margin-top: var(--e-3);
+  padding: 4px var(--e-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--amarilla-borde);
+  background: var(--amarilla-velo);
+  color: var(--amarilla-txt);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+}
+
+.cab-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-5) var(--e-7);
+  margin-block: var(--e-5) 0;
+}
+.cab-dato { display: flex; flex-direction: column-reverse; gap: var(--e-1); min-width: 0; }
+.cab-dato dd { margin: 0; }
+.cab-dato .cif {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2rem);
+  line-height: .95;
+  letter-spacing: -.03em;
+  color: var(--hueso);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1024px) {
+  .cab { padding-block: var(--e-8) var(--e-6); }
+}
+
+/* ==========================================================================
+   3. DISPOSITIVOS VISUALES
+   ========================================================================== */
+
+/* ==========================================================================
+   DISPOSITIVO 3 · RESCOLDO
+   Dos capas superpuestas, una amplia y difusa y otra pequeña e intensa.
+   Ocupa entre un tercio y la mitad del lienzo: en las referencias el halo no
+   es sutil, quema desde detrás del sujeto.
+   UNO POR PANTALLA. Si hay dos, la pantalla se convierte en una mancha.
+   ========================================================================== */
+.rescoldo { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.rescoldo::before,
+.rescoldo::after { content: ''; position: absolute; inset: 0; transform-origin: 50% 12%; }
+.rescoldo::before { background: radial-gradient(62% 58% at 50% 12%, rgba(255, 92, 26, .44), transparent 70%); }
+.rescoldo::after  { background: radial-gradient(26% 20% at 50% 8%,  rgba(255, 178, 105, .55), transparent 72%); }
+
+/* El latido anima la ESCALA de una capa ya pintada, nunca el gradiente ni un
+   filter: blur. Repintar un radial-gradient cada fotograma funde una GPU
+   integrada; transformar una capa compuesta no cuesta nada. */
+[data-motion="full"] .rescoldo::before { animation: rescoldo-latir 7s var(--curva) infinite alternate; }
+[data-motion="full"] .rescoldo::after  { animation: rescoldo-latir 5s var(--curva) infinite alternate-reverse; }
+@keyframes rescoldo-latir {
+  from { transform: scale(1);    opacity: .82; }
+  to   { transform: scale(1.09); opacity: 1; }
+}
+
+/* ==========================================================================
+   DISPOSITIVO 5 · REJILLA TÉCNICA
+   Coste cero: dos linear-gradient repetidos. Solo en hero, hub y duelo.
+   NUNCA bajo una rejilla de cartas: compite con el arte.
+   ========================================================================== */
+.trama {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(85% 70% at 50% 26%, #000, transparent);
+          mask-image: radial-gradient(85% 70% at 50% 26%, #000, transparent);
+}
+
+/* ==========================================================================
+   DISPOSITIVO 1 · TIPOGRAFÍA A SANGRE
+   La palabra se sale del contenedor y la corta el canto de la pantalla.
+   UNA POR PANTALLA, siempre en el hero o en el cierre. Nunca en medio.
+   ========================================================================== */
+.a-sangre { margin-inline: -6vw; max-width: none; }
+
+/* ==========================================================================
+   DISPOSITIVO 2 · TIPO DETRÁS DEL SUJETO
+   Dos capas apiladas, no un 3D: la palabra en hueco y el arte recortado
+   encima. Solo con arte sin fondo (carta, escudo, jugador recortado).
+   ========================================================================== */
+.tipo-fondo {
+  position: absolute; z-index: 0;
+  font-family: var(--tipo-display); font-weight: var(--fw-bold);
+  font-size: clamp(4rem, 14vw, 9rem); letter-spacing: -.05em; text-transform: uppercase;
+  color: transparent; -webkit-text-stroke: 1.5px var(--linea-viva);
+  white-space: nowrap; user-select: none; pointer-events: none;
+}
+
+/* ==========================================================================
+   DISPOSITIVO 6 · FILO BRASA
+   Línea de 2 px desvanecida en los extremos, en el borde superior del panel.
+   SOLO en el bloque «Lo siguiente» y en la celda activa de un bento.
+   ========================================================================== */
+.filo { position: relative; }
+.filo::before {
+  content: ''; position: absolute; top: -1px; left: 22px; right: 22px; height: 2px;
+  border-radius: var(--r-pill); background: var(--fuego);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+
+/* ==========================================================================
+   DISPOSITIVO 7 · METADATOS DE ESQUINA
+   SOLO cuando el dato es real. Un «#04» decorativo es exactamente el tipo de
+   numeración vacía que hay que evitar.
+   ========================================================================== */
+.esquina {
+  position: absolute; top: var(--e-5); right: var(--e-5);
+  font-family: var(--tipo-display); font-size: var(--fs-micro); font-weight: var(--fw-medium);
+  letter-spacing: var(--track-micro); text-transform: uppercase;
+  color: var(--humo); font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   DISPOSITIVO 8 · TIRA EN MARCHA
+   translateX sobre contenido duplicado. De los efectos más baratos que hay.
+   UNA POR PANTALLA, y SOLO con datos reales del jugador: una tira que repite
+   eslóganes es decoración; una que dice cuántos sobres te esperan es
+   navegación.
+   El marcado duplica el grupo y marca la copia con aria-hidden.
+   ========================================================================== */
+.tira {
+  position: relative; overflow: hidden;
+  border-block: 1px solid var(--linea); background: var(--pozo);
+  padding-block: var(--e-3);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.tira-pista { display: flex; width: max-content; }
+[data-motion="full"] .tira-pista,
+[data-motion="lite"] .tira-pista { animation: tira-correr 34s linear infinite; }
+/* se para al pasar por encima y al enfocar con teclado: si no, es imposible
+   leerla o pulsar un enlace de dentro */
+.tira:hover .tira-pista,
+.tira:focus-within .tira-pista { animation-play-state: paused; }
+@keyframes tira-correr { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.tira-grupo {
+  display: flex; align-items: center; gap: var(--e-6);
+  padding-right: var(--e-6); flex: none;
+}
+.tira-grupo > * {
+  font-family: var(--tipo-display); font-size: var(--fs-label); font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label); text-transform: uppercase;
+  color: var(--ceniza); white-space: nowrap;
+}
+.tira-grupo b { color: var(--brasa-alta); font-weight: var(--fw-bold); }
+
+/* ==========================================================================
+   4. PRIMITIVAS DE MOVIMIENTO
+   ========================================================================== */
+
+/* ==========================================================================
+   REVELADO POR PALABRAS
+   Se parte por PALABRAS, no por caracteres: partir por letra multiplica los
+   nodos del DOM por veinte y en un móvil de gama baja se nota.
+   Lo monta motion.js sobre cualquier [data-revela].
+   ========================================================================== */
+.palabra { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .06em; }
+.palabra > i {
+  display: inline-block; font-style: normal; transform: translateY(108%);
+  transition: transform var(--t-revelado) var(--curva-masa);
+}
+.esta-dentro .palabra > i { transform: none; }
+
+/* ==========================================================================
+   ENTRADA ESCALONADA AL HACER SCROLL
+   El retardo por hijo lo pone motion.js, que además deja de observar el
+   bloque en cuanto entra: se dispara UNA VEZ.
+   ========================================================================== */
+.escalona > * ,
+.sube {
+  opacity: 0; transform: translateY(20px);
+  transition: opacity var(--t-revelado) var(--curva-masa),
+              transform var(--t-revelado) var(--curva-masa);
+}
+.escalona.esta-dentro > *,
+.sube.esta-dentro { opacity: 1; transform: none; }
+
+/* ==========================================================================
+   BARRA QUE SE LLENA — scaleX sobre el hijo, nunca `width`
+   ========================================================================== */
+.barra-carril {
+  height: 10px; border-radius: var(--r-pill); overflow: hidden;
+  background: var(--pozo); border: 1px solid var(--linea);
+}
+.barra-carril > i {
+  display: block; height: 100%; border-radius: var(--r-pill); background: var(--fuego);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 1.1s var(--curva-masa);
+}
+.esta-dentro .barra-carril > i,
+.barra-carril.esta-dentro > i { transform: scaleX(var(--parte, 0)); }
+
+/* ==========================================================================
+   ESQUELETO DE CARGA — con la forma exacta del contenido final.
+   Nunca un spinner centrado: un spinner no dice qué está llegando.
+   ========================================================================== */
+.hueso-carga {
+  border-radius: var(--r-pill); background: var(--carbon-alto);
+  position: relative; overflow: hidden; height: 14px;
+}
+.hueso-carga::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .09), transparent);
+  transform: translateX(-100%);
+}
+[data-motion="full"] .hueso-carga::after,
+[data-motion="lite"] .hueso-carga::after { animation: hueso-barrer 1.4s ease-in-out infinite; }
+@keyframes hueso-barrer { to { transform: translateX(100%); } }
+
+/* ==========================================================================
+   CARTA INCLINADA — el ángulo lo escribe motion.js en --gx/--gy.
+   Solo puntero fino y nivel completo: en táctil un hover pegado es un bug.
+   ========================================================================== */
+.inclina {
+  transform: rotateY(var(--gx, 0deg)) rotateX(var(--gy, 0deg));
+  transition: transform var(--t-estado) var(--curva);
+}
+.inclina-escena { perspective: 900px; }
+
+/* ==========================================================================
+   NIVEL LITE — sin 3D, sin latido. Solo opacidad y desplazamientos cortos.
+   ========================================================================== */
+[data-motion="lite"] .inclina { transform: none !important; }
+
+/* ---- degradación de los componentes todavía sin migrar ----
+   components.css solo distingue `reduce`, así que sin esto un aparato
+   detectado como `lite` se llevaría exactamente el mismo trabajo que uno
+   potente — que es justo lo contrario de lo que promete el nivel.
+
+   Lo que se apaga son las animaciones INFINITAS y las capas decorativas: son
+   las que cuestan un fotograma cada fotograma, y ninguna aporta información.
+   Lo que NO se toca es la ceremonia en sí (la escena, las ranuras, el
+   volteo): abrir un sobre es la recompensa del juego, y un móvil justo
+   merece verla igual, solo que sin purpurina alrededor.
+
+   Se borra según se vayan migrando estas pantallas. */
+[data-motion="lite"] .carta[data-rareza="6"] .carta-placa::before,
+[data-motion="lite"] .rz[data-rareza="6"]::after,
+[data-motion="lite"] .ceremonia-fut,
+[data-motion="lite"] .ceremonia-destello,
+[data-motion="lite"] .ranura-aura { display: none; }
+
+[data-motion="lite"] .pack3d-volumen,
+[data-motion="lite"] .ceremonia .modal-caja.es-srf { animation: none; }
+
+/* ==========================================================================
+   NIVEL REDUCE — fundidos de 120 ms y nada más.
+   Nada desaparece: la tira se congela pero SIGUE LEGIBLE, y los bloques que
+   entran con scroll aparecen ya colocados. Se reduce el movimiento, nunca el
+   contenido ni el juego.
+   ========================================================================== */
+[data-motion="reduce"] *,
+[data-motion="reduce"] *::before,
+[data-motion="reduce"] *::after {
+  animation: none !important;
+  transition-duration: 120ms !important;
+  transition-delay: 0ms !important;
+}
+[data-motion="reduce"] .palabra > i,
+[data-motion="reduce"] .escalona > *,
+[data-motion="reduce"] .sube { opacity: 1; transform: none; }
+[data-motion="reduce"] .inclina { transform: none !important; }
+[data-motion="reduce"] .tira-pista { transform: translateX(0); }
+[data-motion="reduce"] .barra-carril > i { transform: scaleX(var(--parte, 0)); }
+
+
+/* ==========================================================================
+   5. BOTONES — versión Ascua
+
+   Sustituyen a los de components.css sin tocar su marcado: mismas clases
+   (.btn, .btn-primary, .btn-ghost…), otro acabado. Así todas las pantallas,
+   migradas o no, los estrenan a la vez.
+
+   Qué los hace parecer premium y no un rectángulo de color:
+   · píldora, como el resto del sistema
+   · relleno de degradado en vez de plano, con un filo claro ARRIBA — la luz
+     viene de arriba en todo el sistema (ver --elev-*), y ese único píxel es
+     lo que hace que un botón se lea como un objeto y no como una mancha
+   · el hover no cambia de color: levanta y enciende un halo. Cambiar el tono
+     al pasar por encima es lo que delata un botón barato
+   · caja alta con tracking, en la tipografía display
+   ========================================================================== */
+.btn {
+  --btn-alto: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-2);
+  min-height: var(--btn-alto);
+  padding-inline: var(--e-5);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--t-toque) var(--curva),
+              box-shadow var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva),
+              background var(--t-toque) var(--curva),
+              color var(--t-toque) var(--curva);
+}
+
+/* ---- primario: la acción de la pantalla ---- */
+.btn-primary {
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  /* el filo claro de arriba y la sombra de contacto abajo, en una sola línea */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35),
+              0 2px 10px -4px rgba(0, 0, 0, .8);
+}
+@media (hover: hover) {
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), var(--halo);
+  }
+}
+
+/* ---- fantasma: la alternativa aceptable ---- */
+.btn-ghost {
+  background: none;
+  color: var(--hueso);
+  border-color: var(--linea-viva);
+}
+@media (hover: hover) {
+  .btn-ghost:hover {
+    transform: translateY(-2px);
+    border-color: var(--brasa-borde);
+    background: var(--brasa-velo);
+    color: var(--brasa-alta);
+  }
+}
+
+/* ---- destructivo: se avisa con el color del reglamento ---- */
+.btn-danger {
+  background: linear-gradient(147deg, #FF6E63 0%, #FF4438 50%, #C41E14 100%);
+  color: #2A0603;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3),
+              0 2px 10px -4px rgba(0, 0, 0, .8);
+}
+@media (hover: hover) {
+  .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4),
+                0 0 0 1px rgba(255, 68, 56, .38), 0 18px 50px -22px rgba(255, 68, 56, .5);
+  }
+}
+
+/* ---- plano: terciario, dentro de tablas y tarjetas ---- */
+.btn-plano {
+  background: none;
+  color: var(--ceniza);
+  padding-inline: var(--e-3);
+}
+@media (hover: hover) { .btn-plano:hover { color: var(--hueso); background: var(--linea); } }
+
+/* Se hunde al pulsar. 100 ms: por encima de eso la pulsación se nota lenta. */
+.btn:active { transform: translateY(0) scale(.97); transition-duration: var(--t-instante); }
+
+.btn:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.btn-sm { --btn-alto: 44px; padding-inline: var(--e-4); font-size: var(--fs-micro); }
+.btn-lg { --btn-alto: 54px; padding-inline: var(--e-6); font-size: var(--fs-body-sm); }
+.btn-bloque { width: 100%; }
+
+.btn:disabled, .btn[aria-disabled="true"] {
+  opacity: .4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* El botón conserva su ancho mientras carga: si encogiera, todo lo que tiene
+   al lado daría un salto justo cuando el jugador acaba de pulsar. */
+.btn.is-cargando { pointer-events: none; color: transparent !important; position: relative; }
+.btn.is-cargando::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--r-pill);
+  color: var(--brasa-tinta);
+  animation: btn-girar .7s linear infinite;
+}
+.btn-ghost.is-cargando::after, .btn-plano.is-cargando::after { color: var(--hueso); }
+@keyframes btn-girar { to { transform: rotate(360deg); } }
+/* Sin movimiento, el giro se sustituye por un latido: sigue diciendo «estoy
+   trabajando» sin nada que gire. */
+[data-motion="reduce"] .btn.is-cargando::after {
+  animation: none;
+  border-top-color: currentColor;
+  opacity: .5;
+}
+
+
+/* ==========================================================================
+   6. MODAL — versión Ascua, y la ficha de jugador
+
+   La ficha es la pantalla donde de verdad se LEE una carta: se abre desde
+   cualquier rejilla del juego y es lo que más veces se mira. Merece el mejor
+   acabado del sistema.
+   ========================================================================== */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--e-4);
+  /* El fondo no es un gris plano: lleva un rescoldo tenue detrás del centro,
+     así la caja parece iluminada por lo que hay dentro y no pegada encima. */
+  background:
+    radial-gradient(60% 50% at 50% 45%, rgba(255, 92, 26, .10), transparent 70%),
+    rgba(4, 4, 6, .80);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--t-panel) var(--curva), visibility 0s linear var(--t-panel);
+}
+.modal.is-abierto {
+  opacity: 1; visibility: visible;
+  transition: opacity var(--t-panel) var(--curva);
+}
+
+.modal-caja {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88dvh;
+  overflow-y: auto;
+  padding: var(--e-6);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  transform: scale(.96) translateY(10px);
+  transition: transform var(--t-panel) var(--curva-brio);
+}
+.modal.is-abierto .modal-caja { transform: none; }
+.modal-caja--ancha { max-width: 780px; }
+
+/* El filo de brasa arriba: el mismo dispositivo que marca «esto importa» en
+   el resto del sistema. Aquí dice que la caja está viva, no superpuesta. */
+.modal-caja::before {
+  content: '';
+  position: absolute;
+  top: -1px; left: 32px; right: 32px; height: 2px;
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.modal-caja { position: relative; }
+
+.modal-cerrar {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ceniza);
+  font-size: 20px;
+  cursor: pointer;
+  transition: color var(--t-toque) var(--curva),
+              background var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) {
+  .modal-cerrar:hover { color: var(--hueso); background: var(--linea); border-color: var(--linea-viva); }
+}
+.modal-cerrar:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+
+/* El título del partido en juego («Partido en juego») es el único
+   `.modal-head` del sitio sin botón de cerrar a su lado —a propósito: el
+   partido no se pausa al cerrar el modal, así que ofrecer un aspa invitaba a
+   perder jugadas creyendo que se guardaba algo. Pero `.modal-head` es una
+   fila `justify-content: space-between` pensada para DOS elementos, y con uno
+   solo se queda anclado a la izquierda mientras todo lo de abajo —marcador,
+   momentum, relato— está centrado. `:only-child` lo detecta sin tocar
+   ningún otro modal del sitio, que sí llevan su botón de cerrar. */
+.modal-head > :only-child { width: 100%; text-align: center; }
+
+/* ---- la ficha de jugador ---- */
+.modal-caja--ficha {
+  max-width: 880px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--e-6);
+  align-items: start;
+  padding: var(--e-6) var(--e-5) var(--e-5);
+}
+.ficha-cerrar { position: absolute; top: var(--e-3); right: var(--e-3); z-index: 2; }
+
+/* El arte, sobre su propio rescoldo. Es el sujeto de la pantalla: se le da
+   fondo propio en vez de dejarlo flotando sobre el panel. */
+.ficha-arte {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: var(--e-5);
+  border-radius: var(--r-carta);
+  /* --pozo (#050406) apagaba casi del todo el rescoldo del 16%: en una
+     pantalla de móvil se leía como una caja negra lisa, justo lo contrario de
+     lo que pedía el sistema para su modal más visto. --carbon como base y el
+     rescoldo más intenso: sigue siendo oscuro, pero se nota que hay luz
+     detrás de la carta. */
+  background:
+    radial-gradient(75% 65% at 50% 25%, rgba(255, 92, 26, .30), transparent 72%),
+    var(--carbon);
+  border: 1px solid var(--linea-viva);
+}
+.ficha-carta-hueco { width: min(240px, 62vw); }
+
+.ficha-datos { display: flex; flex-direction: column; gap: var(--e-5); min-width: 0; }
+
+.ficha-titulo-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.ficha-titulo-fila .t-h2 {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  letter-spacing: var(--track-h2);
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.ficha-meta { margin: calc(var(--e-4) * -1) 0 0; font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+/* ---- las tres estadísticas ----
+   Cifra grande y tabular, barra fina debajo. El color NUNCA va solo: cada una
+   lleva su icono y su etiqueta escrita, así que se distinguen sin depender de
+   ver verde, rojo o ámbar. */
+.ficha-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--e-3);
+}
+.ficha-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  padding: var(--e-4) var(--e-3);
+  border-radius: var(--r-carta);
+  background: var(--pozo);
+  border: 1px solid var(--linea);
+}
+.ficha-stat-cifra { display: flex; align-items: baseline; gap: var(--e-2); margin: 0; }
+.ficha-stat-cifra i { font-size: 16px; }
+.ficha-stat-cifra b {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.ficha-stat-etiqueta {
+  margin: 0;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.ficha-stat-barra {
+  display: block;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--linea);
+  overflow: hidden;
+}
+.ficha-stat-barra i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  transition: width var(--t-panel) var(--curva-masa);
+}
+
+.ficha-statvar(--ata) .ficha-stat-cifra i { color: var(--ata); }
+.ficha-statvar(--ata) .ficha-stat-cifra b { color: var(--ata-txt); }
+.ficha-statvar(--ata) .ficha-stat-barra i { background: var(--ata); }
+.ficha-statvar(--def) .ficha-stat-cifra i { color: var(--def); }
+.ficha-statvar(--def) .ficha-stat-cifra b { color: var(--def-txt); }
+.ficha-statvar(--def) .ficha-stat-barra i { background: var(--def); }
+.ficha-statvar(--tec) .ficha-stat-cifra i { color: var(--tec); }
+.ficha-statvar(--tec) .ficha-stat-cifra b { color: var(--tec-txt); }
+.ficha-statvar(--tec) .ficha-stat-barra i { background: var(--tec); }
+
+.ficha-bloque { display: flex; flex-direction: column; gap: var(--e-2); }
+.ficha-etiqueta {
+  margin: 0;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  color: var(--brasa-alta);
+}
+.ficha-bloque p:last-child { margin: 0; }
+.ficha-afinidad { display: flex; align-items: center; gap: var(--e-2); }
+.ficha-afinidad .carta-afinidad { width: 28px; height: 28px; flex-shrink: 0; }
+
+.ficha-acciones { display: flex; gap: var(--e-3); flex-wrap: wrap; margin-top: auto; }
+.ficha-acciones:empty { display: none; }
+
+@media (min-width: 768px) {
+  .modal-caja--ficha {
+    grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+    padding: var(--e-6);
+  }
+  .ficha-cerrar { top: var(--e-4); right: var(--e-4); }
+}
+
+/* ==========================================================================
+   RESCATE DEL CORTE DEL BLOQUE 7d — footer, filtros y ajustes
+
+   Al partir layout.css por pantalla en el bloque 7d, el tramo que se marcó
+   como «modo narrado» (duelo/cadena) en realidad seguía después con CINCO
+   componentes que no tienen nada que ver con un partido: los ajustes del
+   perfil, la barra de filtros del mercado Y de cuatro pantallas del panel, y
+   el PIE DE PÁGINA ENTERO. Se cortaron a partido.css sin querer, y desde
+   entonces cualquier página que no cargue esa hoja —o sea, casi todas—
+   enseña el pie sin margen ni columnas, y mercado/el panel enseñan su
+   formulario de filtros como una fila de controles sueltos.
+
+   Van aquí porque es donde de verdad viven: se usan en páginas que no tienen
+   nada en común salvo cargar esta hoja del sistema.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   AJUSTES (configuración)
+   -------------------------------------------------------------------------- */
+.ajustes-grid {
+  display: grid;
+  /* Ver la nota de `.ayuda-cuerpo`: sin el `min()`, la columna desborda en
+     las pantallas más estrechas. */
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: var(--e-5);
+  align-items: start;
+}
+.ajustes-foto { display: flex; align-items: center; flex-wrap: wrap; gap: var(--e-4); }
+
+/* --------------------------------------------------------------------------
+   BARRA DE FILTROS HORIZONTAL (mercado)
+   -------------------------------------------------------------------------- */
+.barra-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--e-4);
+  margin-bottom: var(--e-6);
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+@media (min-width: 768px) {
+  .barra-filtros { grid-template-columns: 2fr 1fr 1fr auto; align-items: end; }
+}
+.barra-filtros-acciones { display: flex; gap: var(--e-2); }
+
+/* --------------------------------------------------------------------------
+   PIE
+   -------------------------------------------------------------------------- */
+.pie {
+  margin-top: var(--e-8);
+  padding-block: var(--e-7) var(--e-5);
+  border-top: 1px solid var(--linea);
+  background: var(--pozo);
+}
+.pie-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--e-6);
+  padding-bottom: var(--e-6);
+}
+@media (min-width: 768px) {
+  .pie-grid { grid-template-columns: 2fr 1fr 1fr; gap: var(--e-7); }
+}
+
+.pie-col h2 { margin-bottom: var(--e-3); color: var(--hueso); }
+.pie-col ul { list-style: none; display: flex; flex-direction: column; gap: var(--e-1); }
+.pie-col a {
+  /* el relleno vertical lleva el objetivo táctil por encima del mínimo de
+     24×24 (WCAG 2.2 SC 2.5.8); sin él estos enlaces medían 20px de alto */
+  display: inline-block;
+  padding-block: var(--e-2);
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+  text-decoration: none;
+  transition: color var(--t-toque) var(--curva);
+}
+.pie-col a:hover { color: var(--hueso); text-decoration: underline; }
+
+.pie-redes { display: flex; gap: var(--e-3); }
+.pie-redes a {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border: 1px solid var(--linea);
+  border-radius: 50%;
+  color: var(--ceniza);
+  font-size: 18px;
+  text-decoration: none;
+  transition: color var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
+}
+.pie-redes a:hover { color: var(--hueso); border-color: var(--brasa-borde); }
+
+/* el aviso legal aparece en TODAS las páginas, no solo en la portada */
+.pie-legal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-3);
+  padding-top: var(--e-4);
+  border-top: 1px solid var(--linea);
+}
+.pie-legal p { line-height: 1.5; }
+
+/* ==========================================================================
