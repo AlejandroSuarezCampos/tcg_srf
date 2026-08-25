@@ -169,10 +169,16 @@ count($claves) === count(array_unique($claves))
    perfil el tutorial daba el paso por hecho sin llevar nunca a los ajustes. */
 $descuadres = [];
 foreach (Tcg::TUTORIAL_PASOS as $paso) {
-	if ($paso["pagina"] !== basename($paso["destino"], ".php")) {
+	/* El destino puede llevar `?consulta` o `#ancla` —`plantilla.php?ver=todas`,
+	   `perfil.php#panel-ajustes`—, así que se compara solo el fichero. Sin esto
+	   la prueba daba en rojo por su propia cuenta: `basename()` no recorta el
+	   `.php` cuando detrás hay una cadena de consulta, e `is_file()` buscaba un
+	   fichero llamado literalmente `plantilla.php?ver=todas`. */
+	$fichero = strtok($paso["destino"], "?#");
+	if ($paso["pagina"] !== basename($fichero, ".php")) {
 		$descuadres[] = $paso["clave"] . " (" . $paso["pagina"] . " vs " . $paso["destino"] . ")";
 	}
-	if (!is_file(__DIR__ . "/../../" . $paso["destino"])) {
+	if (!is_file(__DIR__ . "/../../" . $fichero)) {
 		$descuadres[] = $paso["clave"] . ": no existe " . $paso["destino"];
 	}
 }

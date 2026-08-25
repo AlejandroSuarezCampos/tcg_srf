@@ -1869,6 +1869,50 @@ rasgos de configuración se guardan en `cromo_rasgos`.
 
 ### 10.2 Cómo se deriva el rasgo de configuración
 
+> ⚠️ **LA REGLA DE ESTE APARTADO YA NO ES LA QUE CORRE.** Alejandro reportó
+> jugando que el cuadrado latino era determinista de más: "no siempre que cree
+> un defensa de bosque me lo asigne a brecha, quiero que sea aleatorio". Medido
+> sobre el catálogo real (520 cartas jugables con afinidad, más grande que las
+> 38 con las que se verificó esto): las 16 celdas de posición × afinidad tenían
+> **un único arquetipo cada una** — los 33 defensas de Bosque eran los 33
+> Brecha.
+>
+> **La regla nueva** sortea por `md5("compo:" . id_cromo)`, sembrado por el
+> propio id y no por `rand()`: aleatorio, pero **estable por carta** —
+> `panel/cromos.php` llama a `derivarRasgosConfiguracion()` sin argumento en
+> cada guardado, así que con azar de verdad cada edición le habría cambiado el
+> arquetipo a las 520 cartas de golpe—. Resultado medido: las 16 celdas pasan a
+> tener los 4 arquetipos repartidos (defensas de Bosque: 6/7/10/10).
+>
+> ⚠️ **No usar `Tcg::azarSembrado()` para esto.** El primer intento fue
+> sembrarlo con el id y coger el primer valor, y salía
+> justicia/brecha/justicia/brecha en ids consecutivos — el mismo defecto que ya
+> documenta el docblock de `azarDeJugada()` más abajo: un LCG no es una función
+> hash, su primer valor es casi lineal en la semilla. Medido sobre 100.000 ids:
+> `md5` da 25/25/25/25 de reparto y un 25,0 % de coincidencias entre ids
+> consecutivos (lo que hace el azar de verdad); `crc32` reparte igual de bien
+> pero solo choca el 0,4 % — sigue siendo un patrón, aunque no se vea.
+>
+> **Las cartas sin afinidad real ("no-afi") NO llevan arquetipo**, a propósito
+> — con la fórmula vieja se saltaban porque no había cruce que calcular; con el
+> sorteo por id ese motivo ya no existe, pero la regla se mantiene por decisión
+> de Alejandro. Se les borra el automático que arrastren en vez de dejárselo:
+> eran 11 jugables (ids 551–561) con un rasgo puesto por otro camino que
+> ninguna rederivación tocaba nunca.
+>
+> `Tcg::AFINIDADES_REALES` es la constante que decide qué afinidades cuentan —
+> la usan tanto `derivarRasgosConfiguracion()` (a quién le asigna) como
+> `cartasSinCompo()` (a quién echa de menos uno), a propósito la misma
+> constante en los dos sitios: si discrepan, el panel de mantenimiento acaba
+> listando para siempre cartas que la derivación nunca va a tocar.
+>
+> Aplicado y verificado en local (las 6 suites de `correr_todas.php` en verde,
+> estable al rederivar el catálogo entero: 0 cambios). **Migración para
+> producción:** `db/migraciones/051_arquetipos_aleatorios_por_carta.sql` —
+> fotografía en SQL del reparto que produce la función, no toca nada más de la
+> base, probada contra una réplica del volcado de producción antes de
+> escribirse. Pendiente de ejecutar en IONOS.
+
 Alejandro eligió **derivación automática** en vez de curación a mano.
 
 **Se descartó derivar de las estadísticas** (`ataque`/`defensa`/`tecnica`), que

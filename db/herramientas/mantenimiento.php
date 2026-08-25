@@ -133,8 +133,9 @@ function mantenimientoCompos(Tcg $db, bool $aplica = false): array {
         'pendientes' => $pendientes,
         'tocadas'    => $tocadas,
         /* Las que se queden fuera son las que no tienen afinidad real
-           ("No-afi"): sin afinidad no hay cruce posición × afinidad del que
-           derivar nada, y forzarles una sería inventarse una compo. */
+           ("No-afi"): esas NO llevan arquetipo, es decisión de diseño y no
+           una carencia — forzarles una compo sería inventársela. Van a salir
+           SIEMPRE en esta lista y es correcto que salgan. */
         'quedan'     => $db->cartasSinCompo(),
     ];
 }

@@ -3266,6 +3266,18 @@ class Tcg
 	const POSICIONES_JUGABLES = ["POR", "DF", "MC", "DC"];
 
 	/**
+	 * Las afinidades que cuentan como reales. Todo lo demás —hoy solo la fila
+	 * centinela "no-afi"— es una carta SIN afinidad, y esas no llevan compo.
+	 *
+	 * Es una constante y no dos listas sueltas porque la usan dos sitios que
+	 * TIENEN que estar de acuerdo: `derivarRasgosConfiguracion()`, que decide a
+	 * quién le asigna arquetipo, y `cartasSinCompo()`, que decide a quién ECHA
+	 * DE MENOS uno. Si discrepan, el panel de mantenimiento acaba listando para
+	 * siempre cartas que la derivación nunca va a tocar.
+	 */
+	const AFINIDADES_REALES = ["Montaña", "Viento", "Bosque", "Fuego"];
+
+	/**
 	 * Cuánto pesa cada estadística de la carta según la línea donde la pongas.
 	 * Las tres cuentan siempre, con distinto peso según el sitio: un portero
 	 * con buen ataque aporta un poco, pero mucho menos que su defensa.
@@ -5105,14 +5117,21 @@ class Tcg
 	 * se ve al mirar una carta, solo se nota cuando esa carta juega y no
 	 * aporta. Sin una consulta que las liste, una carta sin compo puede pasar
 	 * meses en el catálogo sin que nadie lo note.
+	 *
+	 * NO cuenta las de afinidad "no-afi": esas no llevan arquetipo a propósito
+	 * (ver `derivarRasgosConfiguracion()`), así que no les FALTA nada. Contarlas
+	 * dejaba once pendientes eternos en el panel de mantenimiento, que es la
+	 * forma más rápida de que nadie vuelva a mirar esa lista.
 	 */
 	public function cartasSinCompo() {
 		$marcadores = implode(",", array_fill(0, count(self::POSICIONES_JUGABLES), "?"));
+		$afinidades = implode(",", array_fill(0, count(self::AFINIDADES_REALES), "?"));
 		$stmt = $this->pdo->prepare("
 			SELECT c.id_cromo, c.nombre, c.posicion, af.nombre AS afinidad, c.solo_cadena
 			FROM cromos c
 			INNER JOIN afinidad af ON af.id = c.id_afinidad
 			WHERE c.posicion IN ($marcadores)
+			  AND af.nombre IN ($afinidades)
 			  AND NOT EXISTS (
 				SELECT 1 FROM cromo_rasgos cr
 				INNER JOIN rasgos r ON r.id_rasgo = cr.id_rasgo
@@ -5120,23 +5139,58 @@ class Tcg
 			  )
 			ORDER BY c.id_cromo
 		");
-		$stmt->execute(self::POSICIONES_JUGABLES);
+		$stmt->execute(array_merge(self::POSICIONES_JUGABLES, self::AFINIDADES_REALES));
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
 	/**
-	 * Asigna a cada carta jugable su compo por posición × afinidad.
+	 * Asigna a cada carta jugable su compo (Contraataque/Justicia/Vínculo/Brecha).
 	 *
-	 * `$id_cromo` acota el trabajo a UNA carta. Lo usa el editor de nodos, que
-	 * crea cromos de uno en uno: recorrer el catálogo entero —tres consultas
-	 * por carta, casi mil quinientas— para asignarle la compo a una sola sería
-	 * absurdo. Sin argumento se repasan todas, que es lo que hace el panel de
-	 * cromos y lo que arregla de golpe las que se quedaron sin ninguna.
+	 * ⚠️ YA NO SE DERIVA DE POSICIÓN × AFINIDAD, y ese era justo el problema.
+	 * La regla vieja era `(línea_del_puesto − línea_de_la_afinidad) mod 4`: un
+	 * cuadrado latino perfecto —cada rasgo caía en las 4 posiciones y en las 4
+	 * afinidades, sin correlacionar con la rareza— pero DETERMINISTA por
+	 * construcción. Dos cartas con la misma posición y la misma afinidad
+	 * sacaban SIEMPRE el mismo rasgo, sin excepción: las 16 celdas del
+	 * catálogo tenían un único arquetipo cada una, y con 520 cartas jugables
+	 * eso se nota jugando («todos los defensas de Bosque dan Brecha»).
+	 *
+	 * Ahora el rasgo se sortea, pero SEMBRADO POR EL `id_cromo`, no con
+	 * `rand()`. Esa parte no es un adorno:
+	 *
+	 *   · `panel/cromos.php` llama a esta función SIN argumento cada vez que
+	 *     se guarda un cromo, o sea que hace una pasada completa. Con azar de
+	 *     verdad, cada guardado le cambiaría el arquetipo a TODO el catálogo y
+	 *     las alineaciones de los jugadores bailarían solas.
+	 *   · Sembrado por el id, cada carta tiene SU rasgo y lo conserva para
+	 *     siempre: repasar el catálogo entero no mueve ni una, y crear una
+	 *     carta nueva no toca a ninguna de las que ya estaban.
+	 *
+	 * Y como el sorteo solo mira el id, dos cartas de la misma celda caen en
+	 * rasgos distintos sin que haya ninguna fórmula que sacarle.
+	 *
+	 * Nunca pisa una fila con `manual = 1`: lo curado a mano desde el panel
+	 * manda siempre sobre esto.
+	 *
+	 * ⚠️ UNA CARTA "no-afi" NO LLEVA ARQUETIPO — decisión de Alejandro, y no un
+	 * efecto secundario de cómo se calcula. El sorteo por `id_cromo` no mira la
+	 * afinidad, así que técnicamente se les podría poner uno; NO se hace.
+	 *
+	 * Y no basta con saltarlas: se les BORRA el automático que arrastren. Había
+	 * 11 jugables así (ids 551–561, «Cartas de Cadenas») con un arquetipo puesto
+	 * quién sabe cuándo, del que solo 3 coincidían con lo que les habría tocado,
+	 * y que ninguna rederivación tocaba jamás porque se las saltaba de largo.
+	 * Un `manual = 1` sí se respeta, como en todo lo demás.
+	 *
+	 * También quedan fuera los puestos NO jugables (ESCUDO, GER, ENT,
+	 * PRESIDENTE): esos los filtra el SQL con POSICIONES_JUGABLES y no alinean,
+	 * así que no tienen compo que aportar.
 	 */
 	public function derivarRasgosConfiguracion($id_cromo = null) {
-		$LINEA_POS = ["POR" => 0, "DF" => 1, "MC" => 2, "DC" => 3];
-		$LINEA_AFI = ["Montaña" => 0, "Viento" => 1, "Bosque" => 2, "Fuego" => 3];
-		$POR_RESTO = [0 => "contraataque", 1 => "justicia", 2 => "vinculo", 3 => "brecha"];
+		// Los cuatro rasgos, y nada más: ya no hay líneas que restar. La
+		// afinidad no entra en el sorteo, pero sí decide QUIÉN entra: una carta
+		// "no-afi" no lleva arquetipo (ver el docblock).
+		$RASGOS = ["contraataque", "justicia", "vinculo", "brecha"];
 
 		$idsRasgo = [];
 		foreach ($this->pdo->query("SELECT id_rasgo, clave FROM rasgos WHERE tipo = 'configuracion'") as $fila) {
@@ -5177,17 +5231,30 @@ class Tcg
 		$this->pdo->beginTransaction();
 		try {
 			foreach ($cartas as $carta) {
-				$p = $LINEA_POS[$carta["posicion"]] ?? null;
-				$a = $LINEA_AFI[$carta["afinidad"]] ?? null;
-				// Sin afinidad real (p. ej. "no-afi") no hay cruce que derivar.
-				if ($p === null || $a === null) { continue; }
-
 				$tieneManual->execute(array_merge([$carta["id_cromo"]], $idsConfig));
 				if ((int) $tieneManual->fetchColumn() > 0) { continue; }
 
 				$borrar->execute(array_merge([$carta["id_cromo"]], $idsConfig));
 
-				$clave = $POR_RESTO[(($p - $a) % 4 + 4) % 4];
+				// UNA CARTA "no-afi" NO LLEVA ARQUETIPO. Y ojo a que este corte
+				// va DESPUÉS del borrado y no antes, que es la diferencia entre
+				// "no le pongo uno" y "no tiene": saltándolas de largo se
+				// quedaban con el que arrastrasen de antes y ninguna pasada las
+				// tocaba jamás. Así se van limpias, y si alguna vez recuperan
+				// afinidad real entran solas en el reparto.
+				if (!in_array($carta["afinidad"], self::AFINIDADES_REALES, true)) { continue; }
+
+				// ⚠️ md5 Y NO azarSembrado(), por lo que avisa azarDeJugada()
+				// unos cientos de líneas más abajo: el LCG NO es una función
+				// hash. Su primer valor es casi lineal en la semilla, así que
+				// sembrarlo con el id y coger un valor da ciclos cortos — aquí
+				// salía literalmente justicia/brecha/justicia/brecha en ids
+				// consecutivos, o sea el mismo defecto de antes con otra cara.
+				// Medido sobre 100.000 ids: md5 reparte 25/25/25/25 y dos ids
+				// seguidos coinciden el 25,0 % de las veces, que es lo que hace
+				// el azar de verdad. (crc32 reparte igual de bien pero solo
+				// choca el 0,4 %: sigue siendo un patrón, aunque no se vea.)
+				$clave = $RASGOS[ord(md5("compo:" . $carta["id_cromo"], true)[0]) % 4];
 				$insertar->execute([$carta["id_cromo"], $idsRasgo[$clave]]);
 				$tocadas++;
 			}
