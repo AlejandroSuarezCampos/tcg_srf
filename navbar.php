@@ -1,27 +1,52 @@
 <?php
 /**
- * NAVEGACIÓN PRINCIPAL — compartida por todas las páginas del sitio.
+ * NAVEGACIÓN PRINCIPAL — sistema Ascua, bloque 2.
  *
- * Los destinos se agrupan en tres clústeres (briefing, sección 34) para que la
- * barra siga siendo legible cuando entren Duelos y Misiones en la Fase 2:
- *   Jugar        → Sobres  (+ Duelos, Misiones)
- *   Coleccionar  → Colección, Álbum, Mercado
- *   Cuenta       → Perfil
- * Inicio queda fuera de los grupos, como ancla siempre visible.
+ * Sustituye a la barra de once destinos en hamburguesa. Ahora son CINCO, y en
+ * móvil viven abajo, al alcance del pulgar:
+ *
+ *   HOY · JUGAR · PLANTILLA · MERCADO · PERFIL
+ *
+ * «Jugar» se comporta distinto según el tamaño:
+ *
+ *   móvil       abre una HOJA desde abajo, sin recargar y bajo el pulgar
+ *   escritorio  navega a `jugar.php`, el centro de mando de los cuatro modos
+ *
+ * En el bloque 5 se quitó la hoja argumentando que los toques eran los mismos
+ * que con una pantalla intermedia. El recuento era correcto y el argumento no
+ * venía al caso: en móvil una hoja NO RECARGA y cae donde está el dedo, y eso
+ * se nota aunque sean dos toques igual. Vuelve, y con las cifras que le
+ * faltaban.
+ *
+ * El enlace apunta a `jugar.php` de verdad: sin JavaScript, o en escritorio,
+ * navega. La hoja es una mejora encima, no un requisito.
+ *
+ * ESTRUCTURA
+ *   .barra    fija arriba. En móvil: logotipo y saldo. En escritorio: además
+ *             los cinco destinos y el avatar — la barra inferior desaparece.
+ *   .tabbar   fija abajo, SOLO en móvil.
+ *
+ * La hoja inferior genérica (`.hoja`, `iniciarHojas()` en ui.js) sigue viva:
+ * la usan los filtros de `plantilla.php`.
  *
  * Antes de incluir este archivo, cada página puede definir:
- *   $activePage -> 'landing' | 'sobres' | 'coleccion' | 'mercado' | 'album' | 'perfil'
- *   $base       -> prefijo relativo a la raíz ('' o '../')
- *
- * Ejemplo:
- *   <?php $activePage = 'coleccion'; include __DIR__ . '/navbar.php'; ?>
+ *   $activePage     -> clave de la página (ver $MAPA_TABS más abajo)
+ *   $base           -> prefijo relativo a la raíz ('' o '../')
+ *   $navPendientes  -> int|null, insignia sobre «Jugar». Lo calcula la página
+ *                      que ya tiene ese dato a mano (hoy.php, jugar.php); el
+ *                      resto no paga ninguna consulta extra por una cifra.
+ *   $navEstado      -> array<clave,int>, cifras por modo para la hoja
+ *                      (['sobres'=>1,'duelos'=>2,…]). Mismo criterio: solo la
+ *                      pone quien ya tiene los datos.
  */
 if (session_status() === PHP_SESSION_NONE) {
 	session_start();
 }
 
-$activePage = $activePage ?? '';
-$base       = $base       ?? '';
+$activePage    = $activePage    ?? '';
+$base          = $base          ?? '';
+$navPendientes = $navPendientes ?? null;
+$navEstado     = $navEstado     ?? [];
 
 // Si hay sesión iniciada, refrescamos el saldo real desde la BD (evita que
 // las monedas se queden "congeladas" con el valor que había al hacer login)
@@ -52,129 +77,181 @@ if ($haySesion) {
 	$navTieneFoto = $navFotoWeb !== '' && is_file($navFotoDisco);
 }
 
-/** Grupos de destinos. Añadir Duelos o Misiones es añadir una línea aquí. */
-$navGrupos = [
-	'Jugar' => [
-		['sobres', 'sobres.php', 'Sobres', 'ph-package'],
-		['mazos',  'mazos.php',  'Mazos',  'ph-list-checks'],
-		['duelos', 'duelos.php', 'Duelos', 'ph-sword'],
-		['misiones', 'misiones.php', 'Misiones', 'ph-target'],
-		['cadenas',  'cadenas.php',  'Cadenas',  'ph-path'],
-	],
-	'Coleccionar' => [
-		['coleccion', 'coleccion.php', 'Colección', 'ph-cards'],
-		['album',     'album.php',     'Álbum',     'ph-book-open'],
-		['mercado',   'mercado.php',   'Mercado',   'ph-storefront'],
-	],
+/**
+ * Los cinco destinos.
+ *
+ * `url` apunta HOY a la pantalla que existe; las tres marcadas migran en los
+ * bloques 3–5 y entonces solo cambia esta cadena. Prefiero un destino viejo
+ * explícito y comentado a inventar redirecciones que luego hay que perseguir.
+ */
+/** Lo que abre la hoja de «Jugar» en móvil. La clave `cifra` la rellena
+ *  $navEstado si la pantalla lo trae; si no, la opción sale sin insignia. */
+$navJugar = [
+	['sobres',   'sobres.php',   'Sobres',       'ph-package',     'Ábrelos y mira qué cae'],
+	['duelos',   'duelos.php',   'Duelos',       'ph-sword',       'Reta a alguien o entra en una sala'],
+	['mazos',    'mazos.php',    'Alineaciones', 'ph-list-checks', 'Monta el once que vas a sacar'],
+	['misiones', 'misiones.php', 'Objetivos',    'ph-target',      'Lo que te queda por cerrar'],
+	['cadenas',  'cadenas.php',  'Cadenas',      'ph-path',        'Encadena partidos y sube de nodo'],
 ];
+
+$navTabs = [
+	['hoy',       'hoy.php',       'Hoy',       'ph-house'],
+	['jugar',     'jugar.php',     'Jugar',     'ph-lightning'],
+	['plantilla', 'plantilla.php', 'Plantilla', 'ph-cards'],
+	['mercado',   'mercado.php',   'Mercado',   'ph-storefront'],
+	['perfil',    'perfil.php',    'Perfil',    'ph-user'],
+];
+
+/**
+ * Qué pestaña se ilumina en cada pantalla. Se mapea aquí y no en cada página
+ * para no tener que tocar las diecisiete: siguen declarando el `$activePage`
+ * que ya declaraban.
+ */
+$MAPA_TABS = [
+	'hoy' => 'hoy', 'landing' => 'hoy',
+	'jugar' => 'jugar',
+	'sobres' => 'jugar', 'duelos' => 'jugar', 'duelo' => 'jugar', 'mazos' => 'jugar',
+	'misiones' => 'jugar', 'cadenas' => 'jugar', 'cadena' => 'jugar',
+	'plantilla' => 'plantilla', 'coleccion' => 'plantilla', 'album' => 'plantilla', 'descartar' => 'plantilla',
+	'mercado' => 'mercado',
+	'perfil' => 'perfil', 'configuracion' => 'perfil', 'usuario' => 'perfil',
+];
+$tabActiva = $MAPA_TABS[$activePage] ?? '';
+
+/** Pinta un destino, sea de la barra superior o de la inferior. */
+function nav_destino(array $tab, string $tabActiva, string $base, ?int $pendientes): void {
+	[$clave, $url, $texto, $icono] = $tab;
+	$activo = $tabActiva === $clave;
+	?>
+	<?php /* El de «Jugar» lleva href de verdad Y los ganchos de la hoja: en
+	         escritorio y sin JavaScript navega; en móvil, ui.js lo intercepta. */ ?>
+	<a class="nav-destino<?= $activo ? ' es-activo' : '' ?>"
+	   href="<?= htmlspecialchars($base . $url) ?>"
+	   <?= $clave === 'jugar' ? 'data-abre-hoja-movil="hoja-jugar" aria-controls="hoja-jugar"' : '' ?>
+	   <?= $activo ? 'aria-current="page"' : '' ?>>
+		<span class="nav-destino-ico">
+			<i class="ph <?= $icono ?>" aria-hidden="true"></i>
+			<?php /* La insignia va `aria-hidden` y su lectura se añade DESPUÉS del
+			         rótulo: si no, el nombre accesible sale al revés («3 pendientes
+			         Jugar») porque el orden lo marca el DOM. */ ?>
+			<?php if ($clave === 'jugar' && $pendientes): ?>
+				<span class="nav-insignia" aria-hidden="true"><?= (int) $pendientes ?></span>
+			<?php endif; ?>
+		</span>
+		<span class="nav-destino-txt"><?= htmlspecialchars($texto) ?></span>
+		<?php if ($clave === 'jugar' && $pendientes): ?>
+			<span class="sr-only">, <?= (int) $pendientes ?> pendientes</span>
+		<?php endif; ?>
+	</a>
+	<?php
+}
 ?>
-<header class="nav" id="nav-barra">
-  <div class="nav-interior">
+<header class="barra">
+	<div class="barra-interior">
 
-    <a class="logo" href="<?= $base ?>landing.php">
-      Superliga Frontier<span class="logo-punto">·</span>TCG
-    </a>
+		<?php /* Con sesión el logotipo lleva a tu portada, no a la de captación:
+		         `landing.php` ya solo existe para quien no ha entrado. */ ?>
+		<a class="marca" href="<?= $base . ($haySesion ? 'hoy.php' : 'landing.php') ?>">
+			<span class="marca-chispa" aria-hidden="true"></span>
+			Frontier<span class="marca-tcg">TCG</span>
+		</a>
 
-    <button class="nav-burger" type="button"
-            aria-expanded="false" aria-controls="nav-menu" aria-label="Abrir menú de navegación">
-      <span></span><span></span><span></span>
-    </button>
+		<?php /* Los cinco destinos solo se pintan aquí en escritorio; en móvil
+		         esta lista está en display:none y manda la barra inferior. Va en
+		         el marcado igualmente, sin duplicar: una sola fuente de verdad. */ ?>
+		<?php if ($haySesion): ?>
+		<nav class="barra-destinos" aria-label="Navegación principal">
+			<?php foreach ($navTabs as $tab) nav_destino($tab, $tabActiva, $base, $navPendientes); ?>
+		</nav>
+		<?php endif; ?>
 
-    <nav class="nav-menu" id="nav-menu" aria-label="Navegación principal">
-      <ul class="nav-lista">
-        <?php /* «Inicio» solo en el panel móvil (`nav-inicio` lo esconde en
-                 escritorio): el logotipo de la izquierda va al mismo sitio y es
-                 la convención de toda la web, así que en la barra era un
-                 destino repetido ocupando ancho del que no sobraba. En el panel
-                 desplegable sí se enseña, porque allí el logotipo queda fuera
-                 de la lista y no se lee como enlace. */ ?>
-        <li class="nav-inicio">
-          <a href="<?= $base ?>landing.php" class="nav-enlace<?= $activePage === 'landing' ? ' is-activo' : '' ?>"
-             <?= $activePage === 'landing' ? 'aria-current="page"' : '' ?>>
-            <i class="ph ph-house nav-ico" aria-hidden="true"></i>Inicio
-          </a>
-        </li>
+		<div class="barra-derecha">
+			<?php if ($haySesion): ?>
+				<span class="saldo" title="Tus monedas">
+					<i class="ph-fill ph-coins" aria-hidden="true"></i>
+					<span class="sr-only">Monedas: </span>
+					<?php /* El id lo busca actualizarMonedasNav() en scriptsAsync.js para
+					         repintar el saldo sin recargar tras comprar o vender. */ ?>
+					<span class="saldo-cifra" id="navCoins"><?= number_format($navMonedas, 0, ',', '.') ?></span>
+				</span>
 
-        <?php foreach ($navGrupos as $grupo => $destinos): ?>
-          <li class="nav-sep" aria-hidden="true"></li>
-          <li class="nav-grupo-titulo"><?= htmlspecialchars($grupo) ?></li>
-          <?php foreach ($destinos as [$clave, $url, $texto, $icono]): ?>
-          <li>
-            <a href="<?= $base . $url ?>" class="nav-enlace<?= $activePage === $clave ? ' is-activo' : '' ?>"
-               <?= $activePage === $clave ? 'aria-current="page"' : '' ?>>
-              <i class="ph <?= $icono ?> nav-ico" aria-hidden="true"></i><?= $texto ?>
-            </a>
-          </li>
-          <?php endforeach; ?>
-        <?php endforeach; ?>
+				<?php if (!empty($_SESSION['dictador'])): ?>
+					<a class="barra-ico" href="<?= $base ?>panel/index.php" title="Panel de administración">
+						<i class="ph ph-sliders" aria-hidden="true"></i>
+						<span class="sr-only">Panel de administración</span>
+					</a>
+				<?php endif; ?>
 
-        <?php if ($haySesion): ?>
-          <li class="nav-sep" aria-hidden="true"></li>
-          <li class="nav-grupo-titulo">Cuenta</li>
-          <li>
-            <a href="<?= $base ?>perfil.php" class="nav-enlace<?= $activePage === 'perfil' ? ' is-activo' : '' ?>"
-               <?= $activePage === 'perfil' ? 'aria-current="page"' : '' ?>>
-              <i class="ph ph-user nav-ico" aria-hidden="true"></i>Perfil
-            </a>
-          </li>
-          <?php if (!empty($_SESSION['dictador'])): ?>
-          <li>
-            <a href="<?= $base ?>panel/index.php" class="nav-enlace">
-              <i class="ph ph-sliders nav-ico" aria-hidden="true"></i>Panel
-            </a>
-          </li>
-          <?php endif; ?>
-          <?php /* En móvil el chip se queda sin sitio para el icono de salir,
-                   así que la salida vive aquí dentro. */ ?>
-          <li class="solo-movil">
-            <a href="<?= $base ?>logout.php" class="nav-enlace">
-              <i class="ph ph-sign-out nav-ico" aria-hidden="true"></i>Cerrar sesión
-            </a>
-          </li>
-        <?php endif; ?>
+				<a class="barra-ico" href="<?= $base ?>logout.php" title="Cerrar sesión">
+					<i class="ph ph-sign-out" aria-hidden="true"></i>
+					<span class="sr-only">Cerrar sesión</span>
+				</a>
 
-      </ul>
-    </nav>
+				<a class="avatar-enlace" href="<?= $base ?>perfil.php" title="Tu perfil">
+					<span class="avatar">
+						<?php if ($navTieneFoto): ?>
+							<img src="<?= $base . htmlspecialchars($navFotoWeb) ?>" alt="">
+						<?php else: ?>
+							<?= htmlspecialchars($navIniciales) ?>
+						<?php endif; ?>
+					</span>
+					<span class="sr-only">Tu perfil</span>
+				</a>
+			<?php else: ?>
+				<a class="btn btn-primary btn-sm" href="<?= $base ?>login.php">Entrar</a>
+			<?php endif; ?>
+		</div>
 
-    <div class="nav-derecha">
-      <?php if ($haySesion): ?>
-        <div class="chip-usuario">
-          <span class="avatar">
-            <?php if ($navTieneFoto): ?>
-              <img src="<?= $base . htmlspecialchars($navFotoWeb) ?>" alt="">
-            <?php else: ?>
-              <?= htmlspecialchars($navIniciales) ?>
-            <?php endif; ?>
-          </span>
-          <span class="monedas" id="navCoins">
-            <i class="ph ph-coins" aria-hidden="true"></i>
-            <span class="sr-only">Monedas:</span><?= number_format($navMonedas, 0, ',', '.') ?>
-          </span>
-          <a href="<?= $base ?>logout.php" class="nav-salir" title="Cerrar sesión">
-            <i class="ph ph-sign-out" aria-hidden="true"></i>
-            <span class="sr-only">Cerrar sesión</span>
-          </a>
-        </div>
-      <?php else: ?>
-        <a href="<?= $base ?>login.php" class="btn btn-ghost btn-sm">Entrar</a>
-      <?php endif; ?>
-    </div>
-
-  </div>
+	</div>
 </header>
-<?php /* ARRANQUE DEL MODO COMPACTO, ANTES DE PINTAR.
 
-         La clase `es-compacta` la lleva ui.js, que se carga al final del
-         <body>: si esperáramos a él, un móvil enseñaría los once enlaces en
-         fila durante un fotograma antes de plegarlos. Este script va aquí
-         mismo, en línea y sin `defer`, así que corre con la barra ya en el
-         árbol y antes del primer pintado.
+<?php if ($haySesion): ?>
+<?php /* HOJA DE «JUGAR» — solo se usa en móvil (ui.js la abre por debajo de
+         1024px). En escritorio queda en el árbol sin molestar: el enlace
+         navega antes de que nadie la abra. */ ?>
+<div class="hoja-velo" data-cierra-hoja hidden></div>
+<div class="hoja hoja--jugar" id="hoja-jugar" role="dialog" aria-modal="true"
+     aria-labelledby="hoja-jugar-titulo" hidden>
+	<div class="hoja-asa" aria-hidden="true"></div>
 
-         Solo mira el ancho de ventana, que es lo único que se puede saber sin
-         haber medido nada todavía. El ajuste fino —¿se sale la tira de su
-         caja?— lo hace después ajustarModoNav(), que además vuelve a mirarlo
-         al cambiar el tamaño y al terminar de cargar la tipografía. */ ?>
-<script>(function(){var n=document.getElementById('nav-barra');
-if(n&&!window.matchMedia('(min-width: 901px)').matches){n.classList.add('es-compacta');}})();</script>
+	<div class="hoja-jugar-cab">
+		<h2 class="hoja-titulo" id="hoja-jugar-titulo">A qué juegas</h2>
+		<a class="hoja-jugar-todo" href="<?= $base ?>jugar.php">
+			Ver todo <i class="ph ph-arrow-right" aria-hidden="true"></i>
+		</a>
+	</div>
+
+	<div class="hoja-lista">
+		<?php foreach ($navJugar as [$clave, $url, $texto, $icono, $pie]): ?>
+			<?php $cifra = (int) ($navEstado[$clave] ?? 0); ?>
+			<a class="hoja-opcion<?= $activePage === $clave ? ' es-activo' : '' ?>"
+			   href="<?= htmlspecialchars($base . $url) ?>"
+			   <?= $activePage === $clave ? 'aria-current="page"' : '' ?>>
+				<span class="hoja-opcion-ico"><i class="ph <?= $icono ?>" aria-hidden="true"></i></span>
+				<span class="hoja-opcion-txt">
+					<b><?= htmlspecialchars($texto) ?></b>
+					<span><?= htmlspecialchars($pie) ?></span>
+				</span>
+				<?php /* La cifra solo aparece si la pantalla trajo el dato. Una
+				         insignia que sale siempre —aunque sea un cero— deja de
+				         significar «hay algo aquí». */ ?>
+				<?php if ($cifra > 0): ?>
+					<span class="hoja-opcion-cifra"><?= $cifra ?><span class="sr-only"> pendientes</span></span>
+				<?php else: ?>
+					<i class="ph ph-caret-right hoja-opcion-flecha" aria-hidden="true"></i>
+				<?php endif; ?>
+			</a>
+		<?php endforeach; ?>
+	</div>
+
+	<button class="hoja-cerrar" type="button" data-cierra-hoja>Cerrar</button>
+</div>
+<?php endif; ?>
+
+<?php if ($haySesion): ?>
+<nav class="tabbar" aria-label="Navegación principal">
+	<?php foreach ($navTabs as $tab) nav_destino($tab, $tabActiva, $base, $navPendientes); ?>
+</nav>
+<?php endif; ?>
 
 <?= assetScript($base ?? '', 'assets/async/js/scriptsAsync.js') ?>

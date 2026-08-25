@@ -32,46 +32,57 @@
 })();
 
 /* ==========================================================================
-   Preferencia de animaciones.
+   Nivel de movimiento — tres niveles, no un interruptor.
 
-   Existe porque `prefers-reduced-motion` se activa muchas veces por
-   rendimiento y no por sensibilidad al movimiento: en Windows basta con
-   apagar "Efectos de animación" para que Chrome lo reporte, y entonces el
-   jugador se queda sin ceremonia de sobres sin entender por qué. El valor
-   vive en localStorage (SRF.fijarPreferenciaMovimiento, en ui.js) y por
-   defecto sigue al sistema.
+   Existe por dos motivos que se juntan:
+   · `prefers-reduced-motion` se activa muchas veces por RENDIMIENTO y no por
+     sensibilidad al movimiento (en Windows basta con apagar "Efectos de
+     animación" para que Chrome lo reporte), y entonces el jugador se queda
+     sin ceremonia de sobres sin entender por qué.
+   · Un móvil de gama baja no necesita quedarse sin animaciones: necesita
+     otras. Para eso está el nivel intermedio.
+
+   La detección la hace SRF.nivelDetectado() en el bloque inline de
+   partials/head.php; lo que se elija aquí manda siempre sobre ella.
    ========================================================================== */
 (function () {
   'use strict';
 
   var select = document.getElementById('selectAnimaciones');
   var estado = document.getElementById('animacionesEstado');
-  // SRF.preferenciaMovimiento la define partials/head.php inline, así que a
-  // estas alturas SIEMPRE existe. Si algún día no, es preferible saberlo por
-  // consola que dejar un selector que no guarda nada en silencio.
+  // SRF.nivelMovimiento la define partials/head.php inline, así que a estas
+  // alturas SIEMPRE existe. Si algún día no, es preferible saberlo por consola
+  // que dejar un selector que no guarda nada en silencio.
   if (!select) return;
-  if (!SRF.preferenciaMovimiento) {
-    console.error('SRF.preferenciaMovimiento no está definida: revisa el bloque inline de partials/head.php');
+  if (!SRF.nivelMovimiento) {
+    console.error('SRF.nivelMovimiento no está definida: revisa el bloque inline de partials/head.php');
     return;
   }
 
+  var NOMBRES = { full: 'Completo', lite: 'Ligero', reduce: 'Mínimo' };
+
   function describir() {
-    var delSistema = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var pref = SRF.preferenciaMovimiento();
-    if (pref === 'si') return 'Verás las animaciones completas, aunque tu sistema pida reducirlas.';
-    if (pref === 'no') return 'No verás animaciones.';
-    return delSistema
-      ? 'Tu sistema pide reducir el movimiento, así que ahora mismo NO verás animaciones. ' +
-        'Elige «Activadas siempre» si quieres verlas igualmente.'
-      : 'Tu sistema permite el movimiento, así que verás las animaciones completas.';
+    var elegido   = SRF.preferenciaMovimiento();
+    var detectado = SRF.nivelDetectado();
+
+    if (elegido === 'full')   return 'Verás todos los efectos, aunque tu dispositivo pida menos.';
+    if (elegido === 'lite')   return 'Sin efectos 3D ni fondos animados. Las ceremonias se acortan.';
+    if (elegido === 'reduce') return 'Sin animaciones. No te pierdes nada del juego: solo el movimiento.';
+
+    if (detectado === 'reduce') {
+      return 'Tu sistema pide reducir el movimiento, así que ahora mismo no verás animaciones. ' +
+             'Elige «Completo» si quieres verlas igualmente.';
+    }
+    return 'Automático: hemos elegido el nivel ' + NOMBRES[detectado].toLowerCase() +
+           ' para tu dispositivo. Puedes cambiarlo cuando quieras.';
   }
 
   select.value = SRF.preferenciaMovimiento() || 'auto';
   estado.textContent = describir();
 
   select.addEventListener('change', function () {
-    SRF.fijarPreferenciaMovimiento(select.value === 'auto' ? null : select.value);
+    SRF.fijarNivelMovimiento(select.value === 'auto' ? null : select.value);
     estado.textContent = describir();
-    SRF.toast('Preferencia de animaciones guardada.', 'success');
+    SRF.toast('Nivel de movimiento guardado.', 'success');
   });
 })();

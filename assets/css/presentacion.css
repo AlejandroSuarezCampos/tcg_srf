@@ -24,8 +24,8 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: var(--void);
-  color: var(--frost);
+  background: var(--negro);
+  color: var(--hueso);
   /* `dvh` y no `vh`: en el móvil la barra del navegador se recoge al hacer
      scroll y con `vh` la escena quedaba cortada por abajo justo al empezar. */
   height: 100dvh;
@@ -106,28 +106,28 @@
    -------------------------------------------------------------------------- */
 .pres-saltar {
   position: absolute;
-  top: max(var(--space-4), env(safe-area-inset-top));
-  right: var(--space-4);
+  top: max(var(--e-4), env(safe-area-inset-top));
+  right: var(--e-4);
   z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   /* 44px de alto mínimo: es un control que se pulsa con el pulgar en móvil. */
   min-height: 44px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--line-strong);
+  padding: 0 var(--e-4);
+  border: 1px solid var(--linea-viva);
   border-radius: 999px;
   background: rgba(11, 12, 16, .55);
   backdrop-filter: blur(6px);
-  color: var(--frost-dim);
-  font-size: var(--fs-caption);
-  letter-spacing: var(--tracking-caption);
+  color: var(--ceniza);
+  font-size: var(--fs-label);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   cursor: pointer;
-  transition: color var(--t-micro) ease, border-color var(--t-micro) ease;
+  transition: color var(--t-toque) ease, border-color var(--t-toque) ease;
 }
 .pres-saltar:hover,
-.pres-saltar:focus-visible { color: var(--frost); border-color: var(--amber-line); }
+.pres-saltar:focus-visible { color: var(--hueso); border-color: var(--brasa-borde); }
 
 /* --------------------------------------------------------------------------
    ESCENA DE EQUIPO — HORIZONTAL EN ESCRITORIO
@@ -142,10 +142,10 @@
   display: grid;
   grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
   align-items: center;
-  gap: clamp(var(--space-6), 5vw, var(--space-8));
-  width: min(1180px, 100% - 2 * var(--space-6));
+  gap: clamp(var(--e-6), 5vw, var(--e-8));
+  width: min(1180px, 100% - 2 * var(--e-6));
   max-height: 100dvh;
-  padding-block: var(--space-6);
+  padding-block: var(--e-6);
 }
 .pres-equipo[hidden] { display: none; }
 
@@ -155,37 +155,37 @@
    distingue por color y por la barra lateral, nunca solo por color. */
 .pres-etiqueta {
   display: inline-block;
-  margin: 0 0 var(--space-4);
-  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4);
-  border-left: 3px solid var(--amber);
-  background: linear-gradient(90deg, var(--amber-soft), transparent);
-  font-size: var(--fs-caption);
+  margin: 0 0 var(--e-4);
+  padding: var(--e-1) var(--e-3) var(--e-1) var(--e-4);
+  border-left: 3px solid var(--brasa);
+  background: linear-gradient(90deg, var(--brasa-velo), transparent);
+  font-size: var(--fs-label);
   font-weight: var(--fw-bold);
   letter-spacing: .22em;
   text-transform: uppercase;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 .pres[data-lado="visitante"] .pres-etiqueta {
-  border-left-color: var(--info);
-  background: linear-gradient(90deg, var(--info-bg), transparent);
-  color: var(--info-text);
+  border-left-color: var(--var);
+  background: linear-gradient(90deg, var(--var-velo), transparent);
+  color: var(--var-txt);
 }
 
 .pres-retrato {
   position: relative;
   width: clamp(96px, 12vw, 132px);
   aspect-ratio: 1;
-  margin-bottom: var(--space-4);
-  border: 2px solid var(--amber-line);
+  margin-bottom: var(--e-4);
+  border: 2px solid var(--brasa-borde);
   border-radius: 50%;
-  background: var(--panel);
+  background: var(--carbon);
   display: grid;
   place-items: center;
   overflow: hidden;
   box-shadow: 0 0 0 6px rgba(232, 117, 42, .08), 0 18px 44px rgba(0, 0, 0, .6);
 }
 .pres[data-lado="visitante"] .pres-retrato {
-  border-color: var(--info-line);
+  border-color: var(--var-borde);
   box-shadow: 0 0 0 6px rgba(91, 150, 242, .08), 0 18px 44px rgba(0, 0, 0, .6);
 }
 .pres-retrato-img { width: 100%; height: 100%; object-fit: cover; }
@@ -193,18 +193,18 @@
 /* El escudo de la máquina NO se recorta como una foto de perfil: es un icono y
    necesita su aire. */
 .pres-retrato--ia .pres-retrato-img { width: 62%; height: 62%; object-fit: contain; }
-.pres-retrato--ia { background: var(--void-2); }
+.pres-retrato--ia { background: var(--pozo); }
 
 /* Sin foto (o con una foto que ya no está en el servidor) el hueco no se queda
    roto: se cae a la silueta. */
-.pres-retrato-vacio { font-size: 44px; color: var(--frost-faint); }
+.pres-retrato-vacio { font-size: 44px; color: var(--humo); }
 .pres-retrato-vacio[hidden] { display: none; }
 
 .pres-nombre {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--e-4);
   font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--tracking-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--track-display);
   font-weight: var(--fw-bold);
   /* Un nombre largo no puede romper la escena: parte por donde sea antes que
      desbordar, y a partir de tres líneas se corta. */
@@ -216,17 +216,17 @@
 }
 
 .pres-datos {
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--e-5);
   display: grid;
-  gap: var(--space-3);
+  gap: var(--e-3);
 }
 .pres-dato { margin: 0; }
 .pres-dato[hidden] { display: none; }
 .pres-dato dt {
-  font-size: var(--fs-caption-sm);
-  letter-spacing: var(--tracking-caption);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .pres-dato dd {
   margin: 2px 0 0;
@@ -244,10 +244,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--amber-line);
-  border-radius: var(--radius-lg);
+  gap: var(--e-3);
+  padding: var(--e-4);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-carta);
   background: linear-gradient(120deg, rgba(232, 117, 42, .16), rgba(232, 117, 42, .04));
   overflow: hidden;
 }
@@ -268,29 +268,29 @@
   display: grid;
   place-items: center;
   width: 44px; height: 44px;
-  border-radius: var(--radius-md);
+  border-radius: var(--r-alerta);
   background: rgba(11, 12, 16, .5);
   font-size: 24px;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 .pres-aumento-texto { min-width: 0; }
 .pres-aumento-titulo {
   margin: 0;
-  font-size: var(--fs-caption-sm);
-  letter-spacing: var(--tracking-caption);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 .pres-aumento-nombre {
   margin: 2px 0 0;
   font-size: var(--fs-h3);
   font-weight: var(--fw-bold);
 }
-.pres-aumento-nombre b { font-family: var(--font-mono); }
+.pres-aumento-nombre b { font-family: var(--tipo-display); }
 .pres-aumento-desc {
   margin: 2px 0 0;
-  font-size: var(--fs-caption);
-  color: var(--frost-dim);
+  font-size: var(--fs-label);
+  color: var(--ceniza);
 }
 
 /* --------------------------------------------------------------------------
@@ -298,25 +298,25 @@
    -------------------------------------------------------------------------- */
 .pres-alineacion { min-width: 0; }
 .pres-alineacion-titulo {
-  margin: 0 0 var(--space-3);
-  font-size: var(--fs-caption);
+  margin: 0 0 var(--e-3);
+  font-size: var(--fs-label);
   letter-spacing: .22em;
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
-.pres-lineas { display: grid; gap: var(--space-3); }
+.pres-lineas { display: grid; gap: var(--e-3); }
 
 .pres-linea {
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
 }
 .pres-linea-nombre {
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--frost-faint);
+  color: var(--humo);
   text-align: right;
 }
 /* ⚠️ ANCHO DE PLACA FIJO, NO `1fr`.
@@ -337,7 +337,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, var(--pres-placa));
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
 }
 
 /* Las unidades SON cartas de verdad: `render_carta()` en modo arte, el mismo
@@ -359,27 +359,27 @@
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: clamp(var(--space-5), 6vw, var(--space-8));
-  width: min(1000px, 100% - 2 * var(--space-5));
+  gap: clamp(var(--e-5), 6vw, var(--e-8));
+  width: min(1000px, 100% - 2 * var(--e-5));
   text-align: center;
 }
 .pres-vs[hidden] { display: none; }
 
-.pres-vs-lado { display: grid; justify-items: center; gap: var(--space-3); min-width: 0; }
+.pres-vs-lado { display: grid; justify-items: center; gap: var(--e-3); min-width: 0; }
 .pres-vs-escudo {
   display: grid;
   place-items: center;
   width: clamp(72px, 9vw, 104px);
   aspect-ratio: 1;
   border-radius: 50%;
-  border: 2px solid var(--line-strong);
-  background: var(--panel);
+  border: 2px solid var(--linea-viva);
+  background: var(--carbon);
   overflow: hidden;
 }
 .pres-vs-escudo img { width: 100%; height: 100%; object-fit: cover; }
 .pres-vs-escudo img.es-icono { width: 62%; height: 62%; object-fit: contain; }
-.pres-vs-lado--local .pres-vs-escudo { border-color: var(--amber-line); }
-.pres-vs-lado--visitante .pres-vs-escudo { border-color: var(--info-line); }
+.pres-vs-lado--local .pres-vs-escudo { border-color: var(--brasa-borde); }
+.pres-vs-lado--visitante .pres-vs-escudo { border-color: var(--var-borde); }
 
 .pres-vs-nombre {
   font-size: clamp(1rem, .8rem + .9vw, 1.5rem);
@@ -391,7 +391,7 @@
   font-weight: var(--fw-bold);
   letter-spacing: -.04em;
   line-height: 1;
-  background: linear-gradient(120deg, var(--amber-light), var(--amber) 55%, var(--info));
+  background: linear-gradient(120deg, var(--brasa-alta), var(--brasa) 55%, var(--var));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -404,16 +404,16 @@
   position: relative;
   z-index: 2;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--e-4);
   justify-items: center;
   text-align: center;
-  padding-inline: var(--space-5);
+  padding-inline: var(--e-5);
 }
 .pres-arranque[hidden] { display: none; }
 .pres-arranque-linea {
   width: min(420px, 70vw);
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--amber), transparent);
+  background: linear-gradient(90deg, transparent, var(--brasa), transparent);
 }
 .pres-arranque-texto {
   margin: 0;
@@ -434,15 +434,15 @@
   .pres-equipo {
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: var(--space-5);
+    gap: var(--e-5);
     width: 100%;
     height: 100dvh;
     /* El hueco de arriba lo manda el botón de Saltar, que va fijo en esa
        esquina: 44 px de botón + 16 de margen + aire. Medido con 56 px la
        etiqueta LOCAL se le metía debajo por 4 px. */
-    padding: max(var(--space-8), calc(env(safe-area-inset-top) + 72px))
-             var(--space-4)
-             max(var(--space-5), env(safe-area-inset-bottom));
+    padding: max(var(--e-8), calc(env(safe-area-inset-top) + 72px))
+             var(--e-4)
+             max(var(--e-5), env(safe-area-inset-bottom));
     /* La escena no hace scroll: cabe entera o se ajusta. Un scroll a mitad de
        una animación de cuatro segundos no lo usa nadie. */
     overflow: hidden;
@@ -454,14 +454,14 @@
      alineación no se puede cortar. Medido a 375x812: con el retrato grande la
      última línea acababa a 6 px del borde, que es lo que se sale en cuanto un
      nombre ocupa un renglón más. */
-  .pres-retrato { width: 84px; margin-bottom: var(--space-3); }
-  .pres-nombre { -webkit-line-clamp: 2; margin-bottom: var(--space-3); }
+  .pres-retrato { width: 84px; margin-bottom: var(--e-3); }
+  .pres-nombre { -webkit-line-clamp: 2; margin-bottom: var(--e-3); }
 
   .pres-datos {
     grid-auto-flow: column;
     justify-content: center;
-    gap: var(--space-5);
-    margin-bottom: var(--space-4);
+    gap: var(--e-5);
+    margin-bottom: var(--e-4);
   }
   .pres-dato { text-align: center; }
   .pres-dato dd { max-width: 42vw; }
@@ -469,7 +469,7 @@
   .pres-aumento { width: 100%; }
 
   .pres-alineacion-titulo { text-align: center; }
-  .pres-linea { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .pres-linea { grid-template-columns: minmax(0, 1fr); gap: var(--e-1); }
   .pres-linea-nombre { text-align: center; }
   .pres-unidades {
     /* En vertical la carta se estrecha, pero NO se esconde: es una carta de
@@ -479,19 +479,19 @@
        cortar. Con 40 sobra sitio. */
     --pres-placa: clamp(34px, 11vw, 42px);
     grid-template-columns: repeat(auto-fit, var(--pres-placa));
-    gap: var(--space-1);
+    gap: var(--e-1);
   }
 
   /* La placa del aumento también se aprieta: en vertical compite por el mismo
      alto que la alineación. */
-  .pres-aumento { padding: var(--space-2) var(--space-3); gap: var(--space-2); }
+  .pres-aumento { padding: var(--e-2) var(--e-3); gap: var(--e-2); }
   .pres-aumento-ico { width: 36px; height: 36px; font-size: 20px; }
   .pres-aumento-desc { display: none; }
 
 
   .pres-vs {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
+    gap: var(--e-4);
     justify-items: center;
   }
   .pres-vs-marca { font-size: clamp(2.5rem, 12vw, 4rem); }
@@ -501,7 +501,7 @@
    contenido. */
 @media (max-height: 520px) {
   .pres-retrato { width: 72px; }
-  .pres-aumento { padding: var(--space-2) var(--space-3); }
+  .pres-aumento { padding: var(--e-2) var(--e-3); }
   .pres-unidades { --pres-placa: clamp(34px, 9vh, 52px); }
 }
 

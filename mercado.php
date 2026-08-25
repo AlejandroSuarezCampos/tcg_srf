@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
@@ -151,7 +152,7 @@ $hayFiltros = $filtroNombre !== '' || $filtroRareza !== '' || $orden !== '';
 // no a mirar el arte. La rejilla sigue a un clic.
 $vista = vista_actual('lista');
 
-$paginaTitulo = 'Mercado';
+$paginaTitulo = 'Mercado de fichajes';
 $paginaDesc   = 'Compra y vende cromos con el resto de participantes de la liga.';
 include __DIR__ . '/partials/head.php';
 
@@ -159,36 +160,29 @@ $activePage = 'mercado';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <div class="fila fila-entre" style="align-items:flex-end;">
-      <div>
-        <h1>Mercado</h1>
-        <p>Compra y vende cromos con el resto de participantes de la liga.</p>
-      </div>
-      <button class="btn btn-primary" data-abrir-modal="modalVender">
-        <i class="ph ph-tag" aria-hidden="true"></i> Vender una carta
-      </button>
-    </div>
-    <div class="cabecera-datos">
-      <div class="dato"><b><?= number_format($monedasActuales, 0, ',', '.') ?></b><span>Tus monedas</span></div>
-      <div class="dato"><b><?= count($anuncios) ?></b><span>Anuncios activos</span></div>
-    </div>
-  </div>
-</header>
+<?php cabecera([
+  'rotulo' => 'Coleccionar',
+  'titulo' => 'Mercado de fichajes',
+  'texto'  => 'Compra y vende fichas con el resto de la liga.',
+  'accion' => '<button class="btn btn-primary" data-abrir-modal="modalVender">'
+            . '<i class="ph ph-tag" aria-hidden="true"></i> Vender una carta</button>',
+  'datos'  => [
+    [number_format($monedasActuales, 0, ',', '.'), 'Tus monedas'],
+    [count($anuncios), count($anuncios) === 1 ? 'anuncio activo' : 'anuncios activos'],
+  ],
+]); ?>
 
 <main id="contenido" class="seccion wrap">
 
   <?php if ($mensaje): ?>
-  <div class="alerta alerta-success" role="status" style="margin-bottom:var(--space-5);">
+  <div class="alerta alerta-success" role="status" style="margin-bottom:var(--e-5);">
     <i class="ph ph-check-circle" aria-hidden="true"></i>
     <span><?= htmlspecialchars($mensaje) ?></span>
   </div>
   <?php endif; ?>
 
   <?php if ($error): ?>
-  <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+  <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
     <i class="ph ph-warning-circle" aria-hidden="true"></i>
     <span><?= htmlspecialchars($error) ?></span>
   </div>
@@ -233,9 +227,9 @@ include __DIR__ . '/navbar.php';
   </form>
 
   <?php if (!empty($anuncios)): ?>
-    <div class="fila fila-entre" style="margin-bottom:var(--space-4);">
+    <div class="fila fila-entre" style="margin-bottom:var(--e-4);">
       <p class="t-body-sm t-dim">
-        <b class="mono" style="color:var(--frost);"><?= count($anuncios) ?></b>
+        <b class="mono" style="color:var(--hueso);"><?= count($anuncios) ?></b>
         <?= count($anuncios) === 1 ? 'carta a la venta' : 'cartas a la venta' ?>
       </p>
       <?php render_vista_conmutador($vista); ?>
@@ -347,7 +341,7 @@ include __DIR__ . '/navbar.php';
         <span class="vacio-ico"><i class="ph ph-lock-simple" aria-hidden="true"></i></span>
         <h3>No tienes cartas disponibles</h3>
         <p>Puede que estén protegidas o ya publicadas. Puedes revisarlo en tu colección.</p>
-        <a class="btn btn-ghost" href="coleccion.php">Ir a la colección</a>
+        <a class="btn btn-ghost" href="plantilla.php">Ir a tu plantilla</a>
       </div>
     <?php else: ?>
       <form method="POST" action="mercado.php" class="stack stack-5" id="formVender">

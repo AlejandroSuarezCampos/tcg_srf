@@ -12,9 +12,9 @@
 
   function pintar(mensaje, tipo) {
     aviso.textContent = mensaje;
-    aviso.style.color = tipo === 'ok' ? 'var(--success-text)'
-      : tipo === 'error' ? 'var(--danger-text)'
-      : 'var(--frost-dim)';
+    aviso.style.color = tipo === 'ok' ? 'var(--cesped-txt)'
+      : tipo === 'error' ? 'var(--roja-txt)'
+      : 'var(--ceniza)';
   }
 
   form.addEventListener('submit', async function (e) {

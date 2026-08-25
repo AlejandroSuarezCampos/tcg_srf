@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
@@ -115,20 +116,20 @@ $activePage = 'duelos';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <h1>Duelos</h1>
-    <p>Se juega con tu mazo titular. La alineación se congela al entrar: lo que cambies después no afecta al duelo.</p>
-    <div class="cabecera-datos">
-      <div class="dato"><b class="mono"><?= number_format($saldo, 0, ',', '.') ?></b><span>Monedas</span></div>
-      <?php if ($fuerzaTitular): ?>
-        <div class="dato"><b class="mono"><?= (int) round($fuerzaTitular['total']) ?></b><span>Fuerza titular</span></div>
-      <?php endif; ?>
-      <div class="dato"><b class="mono"><?= count($abiertos) ?></b><span>Salas abiertas</span></div>
-    </div>
-  </div>
-</header>
+<?php
+$datosDuelos = [[number_format($saldo, 0, ',', '.'), 'monedas']];
+if ($fuerzaTitular) {
+  $datosDuelos[] = [(int) round($fuerzaTitular['total']), 'fuerza de tu once'];
+}
+$datosDuelos[] = [count($abiertos), count($abiertos) === 1 ? 'sala abierta' : 'salas abiertas'];
+
+cabecera([
+  'rotulo' => 'Jugar',
+  'titulo' => 'Duelos',
+  'texto'  => 'Se juega con tu alineación titular. Se congela al entrar: lo que cambies después no afecta al duelo.',
+  'datos'  => $datosDuelos,
+]);
+?>
 
 <main id="contenido" class="seccion wrap">
 
@@ -149,13 +150,13 @@ include __DIR__ . '/navbar.php';
     <?php /* Sin borde: el panel ya se distingue por su fondo, y el marco
              alrededor de un formulario largo era justo lo que hacía que la
              pantalla se leyera como "un formulario" y no como parte del juego. */ ?>
-    <section class="panel panel--sin-borde" style="margin-bottom:var(--space-6);">
+    <section class="panel panel--sin-borde" style="margin-bottom:var(--e-6);">
       <div class="panel-head">
         <h2 class="panel-titulo">Abrir una sala</h2>
         <span class="pastilla pastilla-titular"><?= htmlspecialchars($titular['nombre']) ?></span>
       </div>
 
-      <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+      <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
         Al abrirla te quedas dentro esperando rival. Si sales de la sala, se cancela y recuperas lo apostado.
       </p>
 
@@ -286,8 +287,8 @@ include __DIR__ . '/navbar.php';
       </form>
     </section>
 
-    <section style="margin-bottom:var(--space-6);">
-      <h2 class="t-h3" style="margin-bottom:var(--space-4);">Salas abiertas</h2>
+    <section style="margin-bottom:var(--e-6);">
+      <h2 class="t-h3" style="margin-bottom:var(--e-4);">Salas abiertas</h2>
 
       <?php if (empty($abiertos)): ?>
         <div class="vacio">
@@ -381,7 +382,7 @@ include __DIR__ . '/navbar.php';
     </section>
 
     <section>
-      <h2 class="t-h3" style="margin-bottom:var(--space-4);">Tus duelos</h2>
+      <h2 class="t-h3" style="margin-bottom:var(--e-4);">Tus duelos</h2>
 
       <?php if (empty($misDuelos)): ?>
         <p class="t-body-sm t-dim">Todavía no has disputado ninguno.</p>

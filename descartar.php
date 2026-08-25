@@ -15,6 +15,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
@@ -50,25 +51,20 @@ foreach ($grupos as $g) {
     $totalMonedas += (int) $g['total'];
 }
 
-$paginaTitulo = 'Descartar repetidas';
+$paginaTitulo = 'Cortar del equipo';
 $paginaDesc   = 'Cambia las copias que te sobran por monedas.';
 include __DIR__ . '/partials/head.php';
 
-$activePage = 'coleccion';
+$activePage = 'descartar';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <h1>Descartar repetidas</h1>
-    <p>
-      Las copias que te sobran, cambiadas por monedas al instante. El precio es
-      fijo por rareza y está por debajo de lo que sacarías vendiéndolas en el
-      mercado: esto es comodidad, no negocio.
-    </p>
-  </div>
-</header>
+<?php cabecera([
+  'rotulo' => 'Plantilla',
+  'titulo' => 'Cortar del equipo',
+  'texto'  => 'Las copias que te sobran, cambiadas por monedas al instante. El precio es fijo por '
+            . 'rareza y está por debajo de lo que sacarías en el mercado: esto es comodidad, no negocio.',
+]); ?>
 
 <main class="wrap seccion">
 
@@ -99,7 +95,7 @@ include __DIR__ . '/navbar.php';
         última copia de cada cromo nunca se puede descartar: es la que sostiene
         tu álbum.
       </p>
-      <a class="btn btn-primario" href="coleccion.php">Volver a la colección</a>
+      <a class="btn btn-primario" href="plantilla.php">Volver a tu plantilla</a>
     </div>
   <?php else: ?>
 

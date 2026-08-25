@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/partials/cabecera.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -39,21 +40,26 @@ foreach ($cadenas as $c) {
     ];
 }
 
-$paginaTitulo = 'Cadenas de Partido';
+$paginaTitulo = 'Cadenas';
 $paginaDesc   = 'Rutas de partidos contra rivales del sistema.';
+/* `.cadena-tarjeta`, `.lista-cadenas` y `.cadena-cabecera` viven en
+   assets/css/cadena.css: el bloque 7d partió `layout.css` por pantalla, y esta
+   lista (cadenas.php) y el mapa de una cadena (cadena.php) compartían el mismo
+   tramo contiguo del fichero viejo. Se cortó entero pensando que era solo del
+   mapa, y esta lista se quedó sin su hoja: las tarjetas salían sin borde, sin
+   fondo ni relleno, como una lista de texto plano. */
+$cssExtra     = ['assets/css/cadena.css'];
 include __DIR__ . '/partials/head.php';
 
 $activePage = 'cadenas';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <h1>Cadenas de Partido</h1>
-    <p>Rutas de partidos contra rivales del sistema. Se juega con tu mazo titular y no se apuesta nada.</p>
-  </div>
-</header>
+<?php cabecera([
+  'rotulo' => 'Jugar',
+  'titulo' => 'Cadenas',
+  'texto'  => 'Encadena partidos contra la máquina. Cada nodo que ganas abre el siguiente.',
+]); ?>
 
 <main id="contenido" class="seccion wrap">
 
@@ -83,7 +89,7 @@ include __DIR__ . '/navbar.php';
         ?>
         <article class="cadena-tarjeta<?= $bloqueada ? ' es-bloqueada' : '' ?>">
           <div class="cadena-cabecera">
-            <h2 class="t-h3"><?= htmlspecialchars($c['nombre']) ?></h2>
+            <h2 class="cadena-nombre"><?= htmlspecialchars($c['nombre']) ?></h2>
             <?php if ($e['completada']): ?>
               <span class="pastilla pastilla-on">Completada</span>
             <?php elseif ($bloqueada): ?>

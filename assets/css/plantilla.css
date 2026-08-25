@@ -1,0 +1,273 @@
+/* ==========================================================================
+   PANTALLA: PLANTILLA
+   --------------------------------------------------------------------------
+   La fusión de Colección y Álbum. Móvil primero: todo se escribe para 360 px y
+   se AÑADE hacia arriba con `min-width`.
+   ========================================================================== */
+
+/* ==========================================================================
+   CABECERA DE PROGRESO
+   La cifra primero y grande: es el motor del coleccionismo, y en la pantalla
+   vieja estaba al final de un bloque de metadatos con el mismo peso que todo
+   lo demás.
+   ========================================================================== */
+.pl-cabecera {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-6) var(--e-5);
+  border-bottom: 1px solid var(--linea);
+}
+.pl-cabecera-cuerpo { position: relative; }
+
+.pl-titulo {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  letter-spacing: var(--track-h1);
+  text-transform: uppercase;
+  margin: var(--e-2) 0 var(--e-4);
+}
+
+.pl-progreso-cifra {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  margin: 0 0 var(--e-3);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: -.03em;
+  line-height: 1;
+  font-size: clamp(2rem, 1.4rem + 2.6vw, 3rem);
+  font-variant-numeric: tabular-nums;
+}
+.pl-progreso-de {
+  font-size: .5em;
+  color: var(--ceniza);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+}
+.pl-progreso-pct {
+  margin-left: auto;
+  font-size: .6em;
+  color: var(--brasa-alta);
+}
+.pl-barra { max-width: 640px; }
+
+.pl-intro { color: var(--ceniza); font-size: var(--fs-body); }
+
+/* ==========================================================================
+   BARRA SUPERIOR — conmutador, filtros, conteo
+   En móvil se apila en dos filas; en escritorio va todo en una.
+   ========================================================================== */
+.pl-cuerpo { padding-block: var(--e-5) var(--e-8); }
+
+.pl-barra-superior {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--e-3);
+  margin-bottom: var(--e-5);
+}
+
+/* ---- el conmutador Mías / Todas ----
+   ESTE es el arreglo de la pantalla: dos pantallas gemelas pasan a ser dos
+   posiciones de un interruptor, y se ve de un vistazo en cuál estás. */
+.conmutador {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--linea);
+  background: var(--pozo);
+}
+.conmutador-op {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 44 y no 38: es el mínimo táctil del sistema, y este control es de los
+     que más se tocan de la pantalla. */
+  min-height: 44px;
+  padding-inline: var(--e-5);
+  border-radius: var(--r-pill);
+  color: var(--ceniza);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.conmutador-op.es-activo { background: var(--fuego); color: var(--brasa-tinta); }
+@media (hover: hover) {
+  .conmutador-op:hover { color: var(--hueso); }
+  .conmutador-op.es-activo:hover { color: var(--brasa-tinta); }
+}
+.conmutador-op:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ---- botón de filtros ---- */
+.pl-filtrar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 44px;
+  padding-inline: var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--hueso);
+  cursor: pointer;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@media (hover: hover) { .pl-filtrar:hover { border-color: var(--brasa-borde); } }
+.pl-filtrar:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* Punto de brasa cuando hay filtros puestos: sin él, se filtra, se navega y al
+   volver no hay forma de saber por qué faltan cartas. */
+.pl-filtrar-punto {
+  width: 7px; height: 7px; border-radius: var(--r-pill);
+  background: var(--brasa);
+  box-shadow: 0 0 8px -1px var(--brasa);
+}
+
+.pl-conteo {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+}
+.pl-conteo .num { color: var(--hueso); font-weight: var(--fw-semibold); }
+
+.pl-cortar {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 44px;
+  color: var(--ceniza);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+@media (hover: hover) { .pl-cortar:hover { color: var(--brasa-alta); } }
+.pl-cortar:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   REJILLA
+   2 columnas en 360 px → 6 en escritorio. `minmax(0, 1fr)` y no `auto`: sin el
+   cero, una carta con un nombre largo ensancha su columna y descuadra la fila
+   entera.
+   ========================================================================== */
+.pl-rejilla {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-3);
+}
+
+/* ==========================================================================
+   AGRUPACIÓN POR EXPANSIÓN — solo en el modo «todas»
+   ========================================================================== */
+.pl-expansion { margin-bottom: var(--e-7); }
+
+.pl-expansion-cab {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--e-2) var(--e-4);
+  margin-bottom: var(--e-4);
+  padding-bottom: var(--e-3);
+  border-bottom: 1px solid var(--linea);
+}
+.pl-expansion-nombre {
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.pl-expansion-pct {
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-label);
+  color: var(--brasa-alta);
+  white-space: nowrap;
+}
+.pl-expansion-barra { grid-column: 1 / -1; max-width: 340px; }
+
+/* ==========================================================================
+   HOJA DE FILTROS
+   En móvil sube desde abajo. Antes era un `<details>` que se desplegaba en
+   línea y empujaba la rejilla media pantalla hacia abajo — se filtraba a
+   ciegas, sin ver ni una carta.
+   ========================================================================== */
+.hoja--filtros { gap: var(--e-4); }
+.hoja--filtros .campo { display: flex; flex-direction: column; gap: var(--e-2); }
+
+/* `auto-fit`/`minmax` y no un número fijo de columnas: con columnas fijas,
+   cualquier sitio donde este panel acabe siendo más estrecho de lo previsto
+   (el propio salto de breakpoint, un idioma con nombres más largos) corta la
+   última casilla contra el borde en vez de bajarla de línea. Así se reparte
+   solo, sin depender de adivinar el ancho exacto en cada media query. */
+.pl-rarezas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--e-2);
+}
+.pl-rarezas .casilla { min-height: 44px; display: flex; align-items: center; gap: var(--e-2); }
+
+.hoja-acciones { display: flex; flex-direction: column; gap: var(--e-2); }
+
+/* ==========================================================================
+   ESCRITORIO
+   ========================================================================== */
+@media (min-width: 768px) {
+  .pl-rejilla { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-4); }
+
+  .pl-barra-superior {
+    grid-template-columns: auto auto 1fr auto;
+    gap: var(--e-4);
+  }
+  .pl-conteo, .pl-cortar { grid-column: auto; }
+  .pl-conteo { justify-self: start; }
+
+  .pl-expansion-cab { grid-template-columns: 1fr auto auto; }
+  .pl-expansion-barra { grid-column: auto; width: 200px; }
+
+}
+
+@media (min-width: 1024px) {
+  .pl-cabecera { padding-block: var(--e-8) var(--e-6); }
+  .pl-rejilla { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+  /* La hoja de filtros deja de subir desde abajo y se planta a la izquierda,
+     pegada mientras se hace scroll: en escritorio hay ancho de sobra y filtrar
+     sin perder la rejilla de vista es la mitad de la gracia. */
+  .hoja--filtros {
+    left: auto; right: auto; bottom: auto;
+    top: calc(var(--nav-h) + var(--e-4));
+    left: max(var(--e-4), calc(50vw - 700px));
+    width: 300px;
+    max-height: calc(100dvh - var(--nav-h) - var(--e-8));
+    border: 1px solid var(--linea-viva);
+    border-radius: var(--r-panel);
+    transform: translateX(-16px);
+    opacity: 0;
+    transition: transform var(--t-panel) var(--curva), opacity var(--t-panel) var(--curva);
+  }
+  .hoja--filtros.esta-abierta { transform: none; opacity: 1; }
+  .hoja--filtros .hoja-asa { display: none; }
+}
+
+/* Las copias son un dato secundario del conteo: se ven, pero no compiten con
+   el número de fichas, que es lo que se está mirando. */
+.pl-conteo-copias { color: var(--humo); }

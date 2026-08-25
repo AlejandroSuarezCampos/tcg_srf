@@ -41,8 +41,8 @@ $pieCompleto = $pieCompleto ?? false;
       <nav class="pie-col" aria-label="Coleccionar">
         <h2 class="t-caption">Coleccionar</h2>
         <ul>
-          <li><a href="<?= $base ?>album.php">Álbum</a></li>
-          <li><a href="<?= $base ?>coleccion.php">Colección</a></li>
+          <li><a href="<?= $base ?>plantilla.php?ver=todas">Todas las fichas</a></li>
+          <li><a href="<?= $base ?>plantilla.php">Tu plantilla</a></li>
           <li><a href="<?= $base ?>mercado.php">Mercado</a></li>
         </ul>
       </nav>
@@ -100,6 +100,10 @@ $pieCompleto = $pieCompleto ?? false;
 </footer>
 
 <?= assetScript($base, 'assets/js/ui.js') ?>
+<?php /* Primitivas de movimiento del sistema Ascua. Va después de ui.js porque
+         comparte el objeto SRF, y al final del body porque nada de lo que hace
+         es urgente: si no llegara, todo queda visible y colocado igual. */ ?>
+<?= assetScript($base, 'assets/js/motion.js') ?>
 
 <?php /* El tutorial de bienvenida (migración `036`). Va aquí y no en cada
          pantalla para que ninguna tenga que acordarse de incluirlo: el propio

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
@@ -54,21 +55,20 @@ function formatoSegundos(int $s): string {
         : sprintf('%02dh %02dm %02ds', $horas, $min, $seg);
 }
 
-$paginaTitulo = 'Misiones';
+$paginaTitulo = 'Objetivos';
 $paginaDesc   = 'Misiones diarias, semanales y objetivos de la Superliga Frontier.';
+$cssExtra = array_merge($cssExtra ?? [], ['assets/css/misiones.css']);
 include __DIR__ . '/partials/head.php';
 
 $activePage = 'misiones';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <h1>Misiones</h1>
-    <p>Diarias y semanales se reinician solas; los objetivos se reclaman una sola vez.</p>
-  </div>
-</header>
+<?php cabecera([
+  'rotulo' => 'Jugar',
+  'titulo' => 'Objetivos',
+  'texto'  => 'Los diarios y los semanales se reinician solos. Cada uno se cobra una sola vez.',
+]); ?>
 
 <main id="contenido" class="seccion wrap">
 
@@ -96,7 +96,7 @@ include __DIR__ . '/navbar.php';
 
     <?php foreach ($apartados as $ciclo => $info): ?>
     <div class="tab-panel" role="tabpanel" id="panel-<?= $ciclo ?>" aria-labelledby="tab-<?= $ciclo ?>" tabindex="0"
-         style="padding-top:var(--space-6);"<?= $ciclo === 'diaria' ? '' : ' hidden' ?>>
+         style="padding-top:var(--e-6);"<?= $ciclo === 'diaria' ? '' : ' hidden' ?>>
 
       <?php if ($ciclo === 'diaria' || $ciclo === 'semanal'): ?>
       <span class="mision-cuenta-atras" data-ciclo="<?= $ciclo ?>" data-segundos="<?= (int) $reinicios[$ciclo] ?>" role="timer" aria-live="off">
@@ -106,12 +106,12 @@ include __DIR__ . '/navbar.php';
       <?php endif; ?>
 
       <?php if (empty($porCiclo[$ciclo])): ?>
-        <div class="vacio" style="margin-top:var(--space-6);">
+        <div class="vacio" style="margin-top:var(--e-6);">
           <span class="vacio-ico"><i class="ph <?= $info['ico'] ?>" aria-hidden="true"></i></span>
           <h3><?= htmlspecialchars($info['vacio']) ?></h3>
         </div>
       <?php else: ?>
-        <div class="stack stack-4" style="margin-top:var(--space-6);">
+        <div class="stack stack-4" style="margin-top:var(--e-6);">
           <?php foreach ($porCiclo[$ciclo] as $m): ?>
             <?php $pct = $m['objetivo'] > 0 ? min(100, (int) round($m['progreso'] / $m['objetivo'] * 100)) : 100; ?>
             <section class="panel">
@@ -124,11 +124,11 @@ include __DIR__ . '/navbar.php';
                 <?php endif; ?>
               </div>
 
-              <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+              <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
                 <?= htmlspecialchars($m['descripcion']) ?>
               </p>
 
-              <div class="progreso" style="margin-bottom:var(--space-4);">
+              <div class="progreso" style="margin-bottom:var(--e-4);">
                 <div class="progreso-riel">
                   <div class="progreso-relleno" style="width:<?= $pct ?>%"></div>
                 </div>

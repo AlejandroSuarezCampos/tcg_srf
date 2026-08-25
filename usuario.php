@@ -24,6 +24,7 @@
  */
 session_start();
 require_once __DIR__ . '/db/conexion.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/components/carta.php';
 
 if (empty($_SESSION['id_usuario'])) {
@@ -83,48 +84,28 @@ $activePage = '';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
+<?php
+$avatarHtml = '<span class="avatar avatar--lg">'
+  . ($tieneFoto ? '<img src="' . htmlspecialchars($fotoWeb) . '" alt="">' : htmlspecialchars($iniciales))
+  . '</span>';
 
-    <div class="perfil-cabecera">
-      <span class="avatar avatar--lg">
-        <?php if ($tieneFoto): ?>
-          <img src="<?= htmlspecialchars($fotoWeb) ?>" alt="">
-        <?php else: ?>
-          <?= htmlspecialchars($iniciales) ?>
-        <?php endif; ?>
-      </span>
+$datosPerfil = [
+  [number_format($totalCartas, 0, ',', '.'), 'fichas distintas'],
+  [(int) $expansionesCompletas, 'expansiones completas'],
+];
+foreach (array_slice($porRareza, 0, 2) as $r) {
+  $datosPerfil[] = [(int) $r['distintas'], $r['nombre']];
+}
 
-      <div class="stack stack-2">
-        <div class="fila">
-          <h1><?= htmlspecialchars($perfil['nombre']) ?></h1>
-          <?php if (!empty($perfil['dictador'])): ?>
-            <span class="pastilla pastilla-warn">Administración</span>
-          <?php endif; ?>
-        </div>
-        <p class="t-caption t-dim">
-          Miembro desde
-          <span class="mono"><?= date('d/m/Y', strtotime($perfil['fecha_registro'])) ?></span>
-        </p>
-      </div>
-    </div>
-
-    <div class="cabecera-datos">
-      <div class="dato">
-        <b><?= number_format($totalCartas, 0, ',', '.') ?></b><span>Cartas en colección</span>
-      </div>
-      <div class="dato">
-        <b><?= (int) $expansionesCompletas ?></b><span>Expansiones completas</span>
-      </div>
-      <?php foreach (array_slice($porRareza, 0, 2) as $r): ?>
-        <div class="dato">
-          <b><?= (int) $r['distintas'] ?></b><span><?= htmlspecialchars($r['nombre']) ?></span>
-        </div>
-      <?php endforeach; ?>
-    </div>
-  </div>
-</header>
+cabecera([
+  'rotulo'   => 'Jugador de la liga',
+  'titulo'   => $perfil['nombre'],
+  'texto'    => 'En la liga desde el ' . date('d/m/Y', strtotime($perfil['fecha_registro'])) . '.',
+  'avatar'   => $avatarHtml,
+  'pastilla' => !empty($perfil['dictador']) ? 'Administración' : '',
+  'datos'    => $datosPerfil,
+]);
+?>
 
 <main class="wrap seccion stack stack-6">
 

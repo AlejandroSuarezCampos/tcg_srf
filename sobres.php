@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/cabecera.php';
 require_once __DIR__ . '/components/caja3d.php';
 require_once __DIR__ . '/partials/csrf.php';
 
@@ -135,28 +136,27 @@ $monedasActuales = $_SESSION['monedas'] ?? 0;
 
 $paginaTitulo = 'Sobres';
 $paginaDesc   = 'Abre sobres para conseguir cartas nuevas de la Superliga Frontier.';
+$cssExtra = array_merge($cssExtra ?? [], ['assets/css/ceremonia.css']);
 include __DIR__ . '/partials/head.php';
 
 $activePage = 'sobres';
 include __DIR__ . '/navbar.php';
 ?>
 
-<header class="cabecera">
-  <div class="linea-campo" aria-hidden="true"></div>
-  <div class="wrap cabecera-contenido">
-    <h1>Sobres</h1>
-    <p>Cada sobre reparte cartas al azar. La probabilidad de cada rareza es siempre la misma.</p>
-    <div class="cabecera-datos">
-      <div class="dato"><b id="saldoMonedas"><?= number_format($monedasActuales, 0, ',', '.') ?></b><span>Tus monedas</span></div>
-      <div class="dato"><b><?= count($sobresPlanos) ?></b><span>Sobres disponibles</span></div>
-    </div>
-  </div>
-</header>
+<?php cabecera([
+  'rotulo' => 'Jugar',
+  'titulo' => 'Sobres',
+  'texto'  => 'Cada sobre reparte cartas al azar. La probabilidad de cada rareza es siempre la misma.',
+  'datos'  => [
+    [number_format($monedasActuales, 0, ',', '.'), 'Tus monedas', 'saldoMonedas'],
+    [count($sobresPlanos), count($sobresPlanos) === 1 ? 'sobre a la venta' : 'sobres a la venta'],
+  ],
+]); ?>
 
 <main id="contenido" class="seccion wrap">
 
   <?php if ($error): ?>
-  <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--space-5);">
+  <div class="alerta alerta-danger" role="alert" style="margin-bottom:var(--e-5);">
     <i class="ph ph-warning-circle" aria-hidden="true"></i>
     <span><?= htmlspecialchars($error) ?></span>
   </div>
@@ -191,7 +191,7 @@ include __DIR__ . '/navbar.php';
     <span class="vacio-ico"><i class="ph ph-package" aria-hidden="true"></i></span>
     <h3>No hay sobres a la venta</h3>
     <p>Cuando se abra una expansión nueva, sus sobres aparecerán aquí.</p>
-    <a class="btn btn-ghost" href="album.php">Ver el álbum</a>
+    <a class="btn btn-ghost" href="plantilla.php?ver=todas">Ver todas las fichas</a>
   </div>
   <?php endif; ?>
 

@@ -258,9 +258,18 @@
   }, true);
 
   /* ------------------------------------------------------------------------
-     MENÚ DE NAVEGACIÓN EN MÓVIL
+     MENÚ DEL PANEL DE ADMINISTRACIÓN
+
+     Lo que queda del menú desplegable de antes. El sitio público ya no lo usa
+     —tiene la barra de cinco destinos—, pero `panel/navbar.php` sigue con su
+     hamburguesa y no entra en este rediseño: es una herramienta interna con
+     veintitantos destinos, y ahí una lista desplegable es la forma correcta.
+
+     Se queda solo el abrir y cerrar. La medición de ancho que decidía si la
+     tira cabía (`ajustarModoNav`) se ha ido con el menú público: el panel usa
+     un punto de corte fijo en su propia hoja.
      ------------------------------------------------------------------------ */
-  function iniciarNav() {
+  function iniciarMenuPanel() {
     var burger = document.querySelector('.nav-burger');
     var menu = document.getElementById('nav-menu');
     if (!burger || !menu) return;
@@ -284,100 +293,150 @@
       }
     });
 
-    /* si se navega con teclado fuera del menú abierto, se cierra */
+    /* pulsar fuera del menú abierto lo cierra */
     document.addEventListener('click', function (e) {
       if (burger.getAttribute('aria-expanded') !== 'true') return;
       if (!menu.contains(e.target) && !burger.contains(e.target)) cerrar();
     });
-
-    ajustarModoNav();
-    var esperando = null;
-    window.addEventListener('resize', function () {
-      clearTimeout(esperando);
-      esperando = setTimeout(ajustarModoNav, 120);
-    });
-    /* La tipografía de respaldo mide distinto que la definitiva, así que el
-       primer cálculo puede decir que cabe cuando luego no cabe. Se rehace al
-       terminar de cargarla. */
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(ajustarModoNav);
-    }
   }
 
   /* ------------------------------------------------------------------------
-     BARRA COMPLETA O HAMBURGUESA — se decide MIDIENDO, no por un umbral
+     HOJAS INFERIORES
 
-     Aquí vivía «Más», un desplegable que recogía los destinos que no cabían.
-     Se ha quitado entero, y no por gusto: falló en cuatro sitios a la vez y
-     ninguno era arreglable sin volver a pelearse con el siguiente.
+     Un panel que en móvil sube desde abajo y en escritorio se coloca donde le
+     diga su CSS. Lo usan la navegación («Jugar») y los filtros de la plantilla.
 
-       · El desplegable salía vacío. Es `position:absolute` dentro de
-         `.nav-menu`, que en escritorio lleva `overflow:hidden` para que un
-         fotograma de desbordamiento no empuje la página. Un descendiente
-         absoluto SÍ lo recorta su ancestro con overflow cuando está en su
-         cadena de contención, y como el panel se abre POR DEBAJO de la barra,
-         quedaba fuera de la caja y se recortaba del todo. Invisible siempre.
-       · Al cambiar de pestaña, los destinos aparecían sueltos fuera del
-         desplegable: cada carga rehacía el reparto y, según cuándo llegara la
-         tipografía, unos se quedaban en la barra y otros no.
-       · «Más» desaparecía solo, por lo mismo.
-       · Y la tira nunca acababa centrada, porque `.esta-centrada` solo se
-         ponía en la rama en la que todo cabía.
+     Es un diálogo de verdad —atrapa el foco, cierra con Esc y devuelve el foco
+     al botón—, porque en móvil ocupa la pantalla y dejar el foco suelto detrás
+     del velo es la forma más rápida de perder a quien navega con teclado o con
+     lector de pantalla.
 
-     En su lugar, EN ESCRITORIO SE VEN TODOS LOS ENLACES. Lo que cede es el
-     tamaño, no la cantidad: la dieta de `layout.css` deja la barra completa en
-     1.095 px con las once entradas, así que cabe entera en cualquier
-     resolución de PC de uso corriente. La hamburguesa vuelve a ser lo que
-     tenía que ser, cosa de móvil.
+     Marcado:
+       <button data-abre-hoja="ID" aria-expanded="false" aria-controls="ID">
+       <div class="hoja-velo" data-cierra-hoja hidden>
+       <div class="hoja" id="ID" role="dialog" aria-modal="true" hidden>
+         ... <button data-cierra-hoja>
 
-     Lo que queda aquí es UNA pregunta —¿se sale la tira de su caja?— y UNA
-     clase, como red por si aun así no cupiera. Sin mover nodos, sin
-     desplegable que recortar y sin nada que centrar a mano: en modo ancho lo
-     centra el grid de `.nav-interior`.
-
-     ⚠️ SE MIDE, NO SE ADIVINA. El ancho que pide la barra depende del rótulo,
-        de la tipografía que acabe cargando, del saldo de monedas (un millón
-        ocupa 48 px más que 500) y de si la cuenta es administradora, que suma
-        «Panel». Medido con la fuente cargada y la dieta puesta: 161 del
-        logotipo + 701 de los enlaces + 150 del chip + 72 de márgenes y huecos.
-        Un umbral fijo acierta en la pantalla donde se probó y falla en las
-        demás — y aquí las variables son cuatro.
+     El `hidden` se quita ANTES de animar y se vuelve a poner DESPUÉS: un
+     elemento con `hidden` no anima, y sin `hidden` seguiría siendo tabulable
+     mientras está cerrado.
      ------------------------------------------------------------------------ */
-  function ajustarModoNav() {
-    var barra = document.querySelector('.nav');
-    var lista = barra && barra.querySelector('.nav-lista');
-    if (!lista) return;
+  function iniciarHojas() {
+    var velo = document.querySelector('.hoja-velo');
+    var abridores = document.querySelectorAll('[data-abre-hoja]');
+    var deMovil   = document.querySelectorAll('[data-abre-hoja-movil]');
+    if (!velo || (!abridores.length && !deMovil.length)) return;
 
-    /* Por debajo de esto es siempre compacta: no se mide, porque el modo ancho
-       ni siquiera cabría en la pantalla. El valor coincide con el que usa el
-       CSS de arranque en navbar.php, para que no haya un fotograma en el que
-       uno diga una cosa y el otro la contraria. */
-    if (!window.matchMedia('(min-width: 901px)').matches) {
-      barra.classList.add('es-compacta');
-      return;
+    var abierta = null;      // la hoja visible ahora mismo
+    var disparador = null;   // el botón que la abrió
+    var cerrando = null;
+
+    function focoables(hoja) {
+      return Array.prototype.filter.call(
+        hoja.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])'),
+        function (el) { return el.offsetParent !== null; }
+      );
     }
 
-    /* Para medir hay que estar en modo ancho: en compacto la tira es una
-       columna dentro de un panel plegado y su ancho no dice nada. */
-    var estabaCompacta = barra.classList.contains('es-compacta');
-    barra.classList.remove('es-compacta');
+    function abrir(hoja, boton) {
+      if (abierta && abierta !== hoja) cerrar(false);
+      abierta = hoja;
+      disparador = boton;
+      clearTimeout(cerrando);
 
-    /* `scrollWidth > clientWidth` es la misma medida contra sí misma: dos
-       enteros del mismo elemento, cierto solo mientras de verdad sobresale
-       algo. Se intentó calcular el hueco restando el logotipo y el chip al
-       ancho de la barra y no converge, porque `.nav-lista` RELLENA a su
-       contenedor y su ancho se queda clavado en el disponible. */
-    if (lista.scrollWidth > lista.clientWidth) {
-      barra.classList.add('es-compacta');
-    } else if (estabaCompacta) {
-      /* Se ha pasado de compacta a ancha: si el panel estaba desplegado, se
-         cierra, o se quedaría abierto y flotando sobre una barra que ya
-         enseña los mismos enlaces en fila. */
-      var burger = barra.querySelector('.nav-burger');
-      var menu = barra.querySelector('.nav-menu');
-      if (burger) burger.setAttribute('aria-expanded', 'false');
-      if (menu) menu.classList.remove('is-abierto');
+      hoja.hidden = false;
+      velo.hidden = false;
+      boton.setAttribute('aria-expanded', 'true');
+
+      /* Se fuerza un reflujo para que el navegador registre el estado inicial
+         —`hidden` quitado, todavía sin la clase— y la transición tenga de dónde
+         partir. Con requestAnimationFrame esto fallaba en una pestaña de fondo:
+         rAF no corre ahí, y la hoja se quedaba fuera de pantalla con el foco
+         atrapado dentro y el velo tapándolo todo. */
+      void hoja.offsetHeight;
+      hoja.classList.add('esta-abierta');
+      velo.classList.add('esta-abierta');
+
+      var primero = focoables(hoja)[0];
+      if (primero) primero.focus();
     }
+
+    function cerrar(devolverFoco) {
+      if (!abierta) return;
+      var hoja = abierta;
+
+      hoja.classList.remove('esta-abierta');
+      velo.classList.remove('esta-abierta');
+      Array.prototype.forEach.call(abridores, function (b) { b.setAttribute('aria-expanded', 'false'); });
+      Array.prototype.forEach.call(deMovil,   function (b) { b.removeAttribute('aria-expanded'); });
+
+      /* Se espera a que termine de salir para volver a esconderlo. El tiempo
+         sale del propio token, así que si --t-panel cambia esto no se queda
+         descuadrado, y con movimiento mínimo (120 ms) se ajusta solo. */
+      var ms = parseFloat(getComputedStyle(hoja).transitionDuration) * 1000 || 0;
+      cerrando = setTimeout(function () {
+        hoja.hidden = true;
+        velo.hidden = true;
+      }, ms);
+
+      if (devolverFoco && disparador) disparador.focus();
+      abierta = null;
+      disparador = null;
+    }
+
+    /* ABRIDORES SOLO DE MÓVIL.
+       «Jugar» es un enlace de verdad a `jugar.php`: en escritorio y sin
+       JavaScript navega, que es lo correcto —ahí hay sitio de sobra para el
+       centro de mando—. Por debajo de 1024px se intercepta y se abre la hoja,
+       que no recarga y cae bajo el pulgar.
+       Se consulta el ancho EN CADA CLIC y no al arrancar: si alguien gira el
+       móvil o cambia el tamaño de la ventana, la decisión sigue siendo la
+       correcta sin tener que volver a montar nada. */
+    var anchoDeHoja = window.matchMedia('(max-width: 1023.98px)');
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-abre-hoja-movil]'), function (enlace) {
+      var hoja = document.getElementById(enlace.getAttribute('data-abre-hoja-movil'));
+      if (!hoja) return;
+      enlace.addEventListener('click', function (e) {
+        if (!anchoDeHoja.matches) return;   // escritorio: que navegue
+        e.preventDefault();
+        if (abierta === hoja) cerrar(true);
+        else abrir(hoja, enlace);
+      });
+    });
+
+    Array.prototype.forEach.call(abridores, function (boton) {
+      var hoja = document.getElementById(boton.getAttribute('data-abre-hoja'));
+      if (!hoja) return;
+      boton.addEventListener('click', function () {
+        if (boton.getAttribute('aria-expanded') === 'true') cerrar(true);
+        else abrir(hoja, boton);
+      });
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!abierta) return;
+      if (e.target.closest && e.target.closest('[data-cierra-hoja]')) cerrar(true);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (!abierta) return;
+
+      if (e.key === 'Escape') { e.preventDefault(); cerrar(true); return; }
+
+      /* Trampa de foco: el tabulador da la vuelta dentro de la hoja en vez de
+         irse al contenido de detrás, que está tapado por el velo. */
+      if (e.key !== 'Tab') return;
+      var lista = focoables(abierta);
+      if (!lista.length) return;
+      var primero = lista[0];
+      var ultimo = lista[lista.length - 1];
+      if (e.shiftKey && document.activeElement === primero) {
+        e.preventDefault(); ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault(); primero.focus();
+      }
+    });
   }
 
   /* ------------------------------------------------------------------------
@@ -400,6 +459,31 @@
         });
         if (moverFoco) tab.focus();
       }
+
+      /* ENLACE PROFUNDO A UNA PESTAÑA.
+         Dos entradas: llegar con `#panel-loquesea` en la URL, y pulsar un
+         enlace con `data-ir-a-tab="tab-loquesea"` desde otro sitio de la misma
+         página. Sin esto, un enlace a una pestaña oculta no hace nada: el
+         ancla salta a un elemento con `hidden` y parece que la página está
+         rota. Lo usa la cabecera del perfil para llevar a «Ajustes», y de paso
+         hace que se pueda compartir el enlace de cualquier pestaña. */
+      function porId(id) {
+        for (var j = 0; j < tabs.length; j++) if (tabs[j].id === id) return tabs[j];
+        return null;
+      }
+
+      var delHash = location.hash ? porId(location.hash.replace('#panel-', 'tab-')) : null;
+      if (delHash) activar(delHash);
+
+      document.addEventListener('click', function (e) {
+        var ir = e.target.closest && e.target.closest('[data-ir-a-tab]');
+        if (!ir) return;
+        var destino = porId(ir.getAttribute('data-ir-a-tab'));
+        if (!destino) return;
+        e.preventDefault();
+        activar(destino, true);
+        lista.scrollIntoView({ block: 'start', behavior: SRF.movimientoReducido() ? 'auto' : 'smooth' });
+      });
 
       tabs.forEach(function (tab, i) {
         tab.tabIndex = tab.getAttribute('aria-selected') === 'true' ? 0 : -1;
@@ -767,7 +851,8 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     iniciarReveal();
-    iniciarNav();
+    iniciarHojas();
+    iniciarMenuPanel();
     iniciarTabs();
     iniciarPlegables();
     iniciarConfirmar();

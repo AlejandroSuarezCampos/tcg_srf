@@ -14,42 +14,42 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   min-height: var(--btn-alto);
-  padding: 0 var(--space-5);
+  padding: 0 var(--e-5);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
+  border-radius: var(--r-chip);
+  font-family: var(--tipo-texto);
   font-size: var(--fs-body-sm);
   font-weight: var(--fw-semibold);
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--t-micro) var(--ease),
-              border-color var(--t-micro) var(--ease),
-              color var(--t-micro) var(--ease),
-              transform var(--t-micro) var(--ease);
+  transition: background var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva),
+              color var(--t-toque) var(--curva),
+              transform var(--t-toque) var(--curva);
 }
 .btn:active { transform: scale(.98); }
 
 .btn-primary {
-  background: var(--amber);
-  color: var(--amber-ink);
+  background: var(--brasa);
+  color: var(--brasa-tinta);
   font-weight: var(--fw-bold);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--elev-1);
 }
-.btn-primary:hover { background: var(--amber-light); }
+.btn-primary:hover { background: var(--brasa-alta); }
 
 .btn-ghost {
   background: transparent;
-  color: var(--frost);
-  border-color: var(--line-strong);
+  color: var(--hueso);
+  border-color: var(--linea-viva);
 }
 .btn-ghost:hover { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .28); }
 
 .btn-danger {
-  background: var(--danger);
+  background: var(--roja);
   color: #2A0603;
   font-weight: var(--fw-bold);
 }
@@ -58,13 +58,13 @@
 /* texto sin caja: acciones terciarias dentro de tablas y tarjetas */
 .btn-plano {
   background: transparent;
-  color: var(--frost-dim);
-  padding-inline: var(--space-3);
+  color: var(--ceniza);
+  padding-inline: var(--e-3);
 }
-.btn-plano:hover { color: var(--frost); background: rgba(255, 255, 255, .04); }
+.btn-plano:hover { color: var(--hueso); background: rgba(255, 255, 255, .04); }
 
-.btn-sm { --btn-alto: 36px; padding-inline: var(--space-4); font-size: var(--fs-caption); }
-.btn-lg { --btn-alto: 52px; padding-inline: var(--space-6); font-size: var(--fs-body); }
+.btn-sm { --btn-alto: 36px; padding-inline: var(--e-4); font-size: var(--fs-label); }
+.btn-lg { --btn-alto: 52px; padding-inline: var(--e-6); font-size: var(--fs-body); }
 .btn-bloque { width: 100%; }
 
 .btn:disabled, .btn[aria-disabled="true"] {
@@ -84,23 +84,23 @@
   border-top-color: transparent;
   border-radius: 50%;
   animation: girar .7s linear infinite;
-  color: var(--amber-ink);
+  color: var(--brasa-tinta);
 }
-.btn-ghost.is-cargando::after, .btn-plano.is-cargando::after { color: var(--frost); }
+.btn-ghost.is-cargando::after, .btn-plano.is-cargando::after { color: var(--hueso); }
 @keyframes girar { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
    2. CAMPO DE FORMULARIO
    Etiqueta siempre visible (nunca placeholder como etiqueta).
    ========================================================================== */
-.campo { display: flex; flex-direction: column; gap: var(--space-2); }
+.campo { display: flex; flex-direction: column; gap: var(--e-2); }
 
 .campo > label, .campo-label {
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 
 .campo input[type="text"],
@@ -112,14 +112,14 @@
 .campo select {
   width: 100%;
   min-height: 44px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--void-2);
-  color: var(--frost);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  color: var(--hueso);
   font-size: var(--fs-body-sm);
   outline: none;
-  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+  transition: border-color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
 }
 .campo textarea { min-height: 96px; resize: vertical; line-height: var(--lh-body); }
 
@@ -148,10 +148,10 @@
 
 .campo input::placeholder, .campo textarea::placeholder { color: rgba(147, 149, 159, .7); }
 
-.campo input:hover, .campo select:hover, .campo textarea:hover { border-color: var(--line-strong); }
+.campo input:hover, .campo select:hover, .campo textarea:hover { border-color: var(--linea-viva); }
 
 .campo input:focus, .campo select:focus, .campo textarea:focus {
-  border-color: var(--amber);
+  border-color: var(--brasa);
   background: rgba(232, 117, 42, .05);
 }
 
@@ -159,25 +159,25 @@
 .campo select {
   appearance: none;
   -webkit-appearance: none;
-  padding-right: var(--space-7);
+  padding-right: var(--e-7);
   cursor: pointer;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2393959F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M5 7.5l5 5 5-5'/></svg>");
   background-repeat: no-repeat;
-  background-position: right var(--space-4) center;
+  background-position: right var(--e-4) center;
   background-size: 16px;
 }
-.campo select option { background: var(--panel); color: var(--frost); }
+.campo select option { background: var(--carbon); color: var(--hueso); }
 
-.campo-hint { font-size: var(--fs-caption-sm); color: var(--frost-dim); }
+.campo-hint { font-size: var(--fs-micro); color: var(--ceniza); }
 
 /* error inline: siempre junto al campo, nunca solo arriba del formulario */
-.campo.is-error input, .campo.is-error select, .campo.is-error textarea { border-color: var(--danger); }
+.campo.is-error input, .campo.is-error select, .campo.is-error textarea { border-color: var(--roja); }
 .campo-error {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-caption-sm);
-  color: var(--danger-text);
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--roja-txt);
 }
 
 /* casilla */
@@ -185,14 +185,14 @@
 .casilla {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
   min-height: 36px;
   font-size: var(--fs-body-sm);
-  color: var(--frost-dim);
+  color: var(--ceniza);
   cursor: pointer;
 }
-.casilla:hover { color: var(--frost); }
-.casilla input { width: 18px; height: 18px; accent-color: var(--amber); cursor: pointer; flex-shrink: 0; }
+.casilla:hover { color: var(--hueso); }
+.casilla input { width: 18px; height: 18px; accent-color: var(--brasa); cursor: pointer; flex-shrink: 0; }
 
 /* ==========================================================================
    3. TARJETA DE CARTA  ← el componente más importante del sistema
@@ -212,7 +212,7 @@
   --rz: var(--rz1);
   --rz-halo: var(--rz1-halo);
   --rz-ink: var(--rz1-ink);
-  --rz-borde: var(--line-strong);
+  --rz-borde: var(--linea-viva);
 
   position: relative;
   display: block;
@@ -230,16 +230,16 @@
   background: var(--rz-borde);
   text-decoration: none;
   color: inherit;
-  transition: transform var(--t-media) var(--ease);
+  transition: transform var(--t-estado) var(--curva);
 }
 .carta[hidden] { display: none; }
 
 .carta-marco {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--e-3);
   height: 100%;
-  padding: var(--space-3);
+  padding: var(--e-3);
   /* red de seguridad: nada de lo que haya dentro del marco debe poder
      asomar fuera de él. Sin esto, una etiqueta de rareza larga ("Poco
      común") empujaba la insignia de cantidad literalmente fuera de la
@@ -248,15 +248,15 @@
      .carta, no contra .carta-marco, así que no los recorta. */
   overflow: hidden;
   border-radius: 0;
-  background: linear-gradient(180deg, var(--panel), var(--void));
-  transition: box-shadow var(--t-media) var(--ease);
+  background: linear-gradient(180deg, var(--carbon), var(--negro));
+  transition: box-shadow var(--t-estado) var(--curva);
 }
 
 .carta-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--e-2);
   min-height: 26px;
 }
 
@@ -274,7 +274,7 @@
   overflow: hidden;
   background:
     radial-gradient(ellipse 75% 55% at 50% 20%, var(--rz-halo), transparent 72%),
-    linear-gradient(170deg, var(--void-2), #08090C);
+    linear-gradient(170deg, var(--pozo), #08090C);
   display: grid;
   place-items: center;
 }
@@ -318,7 +318,7 @@
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  background-color: var(--void-2);
+  background-color: var(--pozo);
 }
 /* La ruta va aquí y no en línea desde PHP a propósito: es relativa a ESTA
    hoja, así que resuelve igual desde la raíz del sitio y desde `panel/`. Una
@@ -392,22 +392,22 @@
    Común/Poco común/Raro/Épico). */
 .carta-pos {
   position: absolute;
-  left: var(--space-2);
-  top: var(--space-2);
+  left: var(--e-2);
+  top: var(--e-2);
   z-index: 3;               /* por encima del tinte y el barrido holográficos */
-  padding: 3px var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  padding: 3px var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
   background: rgba(11, 12, 16, .8);
   backdrop-filter: blur(6px);
   font-size: 11px;
   font-weight: var(--fw-semibold);
   letter-spacing: .06em;
-  color: var(--frost);
+  color: var(--hueso);
 }
 
 /* ---- cuerpo ---- */
-.carta-cuerpo { display: flex; flex-direction: column; gap: var(--space-1); }
+.carta-cuerpo { display: flex; flex-direction: column; gap: var(--e-1); }
 .carta-nombre {
   font-size: var(--fs-body);
   font-weight: var(--fw-semibold);
@@ -421,9 +421,9 @@
 .carta-meta {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-2);
-  font-size: var(--fs-caption-sm);
-  color: var(--frost-dim);
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
 }
 .carta-equipo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -434,8 +434,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: var(--fs-caption-sm);
-  color: var(--amber-light);
+  font-size: var(--fs-micro);
+  color: var(--brasa-alta);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -448,65 +448,65 @@
 .carta-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
+  gap: var(--e-1);
+  margin-top: var(--e-1);
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
 }
 .carta-stat { text-align: center; }
 .carta-stat b {
   display: block;
-  font-family: var(--font-mono);
+  font-family: var(--tipo-display);
   font-size: var(--fs-body-sm);
   font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
-  color: var(--frost);
+  color: var(--hueso);
 }
 .carta-stat span {
   font-size: 10px;
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 
 /* pie de la carta: lo que cada pantalla añade debajo (vendedor, comprar…) */
 .carta-pie {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--e-3);
   margin-top: auto;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
 }
 .carta-vendedor {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-caption-sm);
-  color: var(--frost-dim);
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
 }
 
 /* botón flotante sobre la carta (proteger / quitar protección) */
 .carta-accion-flotante {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
+  top: var(--e-3);
+  left: var(--e-3);
   z-index: 4;
   display: grid;
   place-items: center;
   width: 32px; height: 32px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--linea);
   border-radius: 50%;
   background: rgba(11, 12, 16, .82);
   backdrop-filter: blur(6px);
-  color: var(--frost-dim);
+  color: var(--ceniza);
   font-size: 15px;
   cursor: pointer;
-  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
+  transition: color var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
 }
-.carta-accion-flotante:hover { color: var(--frost); border-color: var(--line-strong); }
-.carta-accion-flotante.esta-activa { color: var(--amber-light); border-color: var(--amber-line); }
+.carta-accion-flotante:hover { color: var(--hueso); border-color: var(--linea-viva); }
+.carta-accion-flotante.esta-activa { color: var(--brasa-alta); border-color: var(--brasa-borde); }
 
 /* agrupa la insignia de cantidad y el hexágono en el lado derecho de la
    cabecera, para que la rareza (izquierda) y ellos (derecha) se repartan con
@@ -514,7 +514,7 @@
 .carta-head-derecha {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   /* nunca cede espacio: si algo tiene que recortarse en .carta-head es la
      etiqueta de rareza (ver .rz-texto), no la cantidad ni el hexágono */
   flex-shrink: 0;
@@ -522,10 +522,10 @@
 
 /* insignia "×N" para copias repetidas en colección (ver $opts['cantidad']) */
 .carta-cantidad {
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption-sm);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 
 /* ---- afinidad (hexágono) ---- */
@@ -548,20 +548,20 @@
 .rz {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   /* min-width:0 es lo que permite que esta etiqueta se encoja por debajo
      del ancho de su propio texto dentro de .carta-head (flex). Sin esto,
      "Poco común" en una tarjeta pequeña empujaba lo que hubiera a su lado
      fuera de la tarjeta en vez de truncarse. */
   min-width: 0;
-  padding: 4px var(--space-2);
+  padding: 4px var(--e-2);
   border: 1px solid color-mix(in srgb, var(--rz) 40%, transparent);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-chip);
   background: color-mix(in srgb, var(--rz) 14%, transparent);
   color: var(--rz-ink);
   font-size: 10px;
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
 }
 .rz-marcas { display: inline-flex; align-items: center; gap: 2px; line-height: 0; flex-shrink: 0; }
@@ -608,8 +608,8 @@
    insignias la escondería entre ellas. */
 .carta-serie {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
+  top: var(--e-2);
+  right: var(--e-2);
   z-index: 3;
   display: inline-flex;
   align-items: center;
@@ -620,7 +620,7 @@
   background: var(--rz7-grad);
   color: #1A1F2B;
   font-family: var(--font-mono, monospace);
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-bold);
   letter-spacing: .02em;
   white-space: nowrap;
@@ -643,7 +643,7 @@
 .rz[data-rareza="5"] {
   background: var(--rz5-grad);
   border-color: rgba(255, 224, 174, .6);
-  color: var(--amber-ink);
+  color: var(--brasa-tinta);
 }
 
 /* ---- 6. SRF: la rareza cumbre.
@@ -704,7 +704,7 @@
     rgba(255, 255, 255, .55) 50%,
     rgba(255, 255, 255, .16) 54%,
     transparent 62%);
-  animation: holoBarrido 4.5s var(--ease) infinite;
+  animation: holoBarrido 4.5s var(--curva) infinite;
 }
 
 .rz[data-rareza="6"] {
@@ -727,7 +727,7 @@
   inset: 0;
   z-index: 0;
   background: linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, .5) 50%, transparent 60%);
-  animation: holoBarrido 3.5s var(--ease) infinite;
+  animation: holoBarrido 3.5s var(--curva) infinite;
 }
 .rz[data-rareza="6"] > * { position: relative; z-index: 1; }
 
@@ -813,7 +813,7 @@
   padding: 0;
   gap: 0;
   border-radius: 0;
-  background: var(--void-2);
+  background: var(--pozo);
   overflow: hidden;
   /* `height: 100%` de la regla general estiraba el marco hasta cubrir también
      el pie de foto: la altura de `.carta` sale de su contenido (marco + pie),
@@ -848,7 +848,7 @@
   aspect-ratio: var(--carta-ratio);
   /* El halo de rareza solo asomaría por detrás de un PNG con transparencia,
      tiñendo el arte. Con el arte a sangre no aporta nada: fondo plano. */
-  background: var(--void-2);
+  background: var(--pozo);
 }
 /* ⚠️ ESTA REGLA ES OBLIGATORIA, NO UN RETOQUE.
    La de arriba usa el ATAJO `background`, y un atajo reinicia TODAS las
@@ -870,10 +870,10 @@
    Es también donde vive ahora la marca no cromática de rareza en este modo. */
 .carta-leyenda {
   display: block;
-  margin-top: var(--space-2);
+  margin-top: var(--e-2);
   text-align: center;
-  font-size: var(--fs-caption);
-  color: var(--frost-dim);
+  font-size: var(--fs-label);
+  color: var(--ceniza);
 }
 /* El pie de la carta en modo arte NO está dentro de la carta: es hermano
    suyo, dentro de `.carta-bloque` (ver components/carta.php). Por eso pierde
@@ -886,10 +886,10 @@
   flex-direction: column;
 }
 .carta-pie--arte {
-  margin-top: var(--space-2);
+  margin-top: var(--e-2);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--e-2);
   padding-top: 0;
   border-top: 0;
 }
@@ -915,7 +915,7 @@
    contorno por fuera se recortaría — dejando a un usuario de teclado sin
    saber dónde está, que es justo lo que el contorno existe para evitar. */
 .carta-hitbox:focus-visible {
-  outline: 2px solid var(--amber-light);
+  outline: 2px solid var(--brasa-alta);
   outline-offset: -4px;
 }
 /* Las acciones flotantes (z-index 4) y las insignias (3) ya estaban por
@@ -937,7 +937,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--e-2);
   /* La lista es contenedor, y las filas se adaptan a ELLA, no a la ventana.
      Es lo que hace que el mismo componente valga en el mercado (a lo ancho de
      la página) y en el panel del deck builder (~360px con la ventana a 1400):
@@ -958,14 +958,14 @@
   display: grid;
   grid-template-columns: 56px minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  transition: border-color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+  gap: var(--e-4);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
+  transition: border-color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
 }
-.carta-fila:hover { border-color: var(--line-strong); background: var(--panel-2); }
+.carta-fila:hover { border-color: var(--linea-viva); background: var(--carbon-alto); }
 
 /* Franja de rareza en el borde izquierdo: la misma señal de la rejilla,
    traducida a una lista. Va con las marcas no cromáticas de `.rz` al lado,
@@ -981,8 +981,8 @@
   /* Esquinas RECTAS, como la carta en modo arte: una carta de este juego no
      tiene los cantos redondeados, y la miniatura es la misma carta en pequeño. */
   border-radius: 0;
-  background: var(--void-2);
-  color: var(--frost-dim);
+  background: var(--pozo);
+  color: var(--ceniza);
 }
 .carta-fila-miniatura img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -995,7 +995,7 @@
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  background-color: var(--void-2);
+  background-color: var(--pozo);
 }
 .carta-fila-miniatura--marco img {
   position: absolute;
@@ -1017,58 +1017,58 @@
   background: none;
   font: inherit;
   font-weight: var(--fw-semibold);
-  color: var(--frost);
+  color: var(--hueso);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 button.carta-fila-nombre { cursor: pointer; }
-button.carta-fila-nombre:hover { color: var(--amber-light); }
-button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); outline-offset: 2px; border-radius: var(--radius-sm); }
+button.carta-fila-nombre:hover { color: var(--brasa-alta); }
+button.carta-fila-nombre:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; border-radius: var(--r-chip); }
 .carta-fila-meta {
-  font-size: var(--fs-caption);
-  color: var(--frost-dim);
+  font-size: var(--fs-label);
+  color: var(--ceniza);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.carta-fila-pos { display: flex; align-items: center; gap: var(--space-2); }
+.carta-fila-pos { display: flex; align-items: center; gap: var(--e-2); }
 
-.carta-fila-stats { display: flex; gap: var(--space-2); }
+.carta-fila-stats { display: flex; gap: var(--e-2); }
 .carta-fila-stat {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--void-2);
-  font-size: var(--fs-caption);
+  padding: 4px var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  font-size: var(--fs-label);
 }
 .carta-fila-stat b { font-size: var(--fs-body-sm); }
-.carta-fila-stat-abrev { color: var(--frost-dim); font-size: 10px; letter-spacing: .06em; }
-.carta-fila-stat--ata i { color: var(--stat-ata); }
-.carta-fila-stat--ata b { color: var(--stat-ata-text); }
-.carta-fila-stat--def i { color: var(--stat-def); }
-.carta-fila-stat--def b { color: var(--stat-def-text); }
-.carta-fila-stat--tec i { color: var(--stat-tec); }
-.carta-fila-stat--tec b { color: var(--stat-tec-text); }
+.carta-fila-stat-abrev { color: var(--ceniza); font-size: 10px; letter-spacing: .06em; }
+.carta-fila-statvar(--ata) i { color: var(--ata); }
+.carta-fila-statvar(--ata) b { color: var(--ata-txt); }
+.carta-fila-statvar(--def) i { color: var(--def); }
+.carta-fila-statvar(--def) b { color: var(--def-txt); }
+.carta-fila-statvar(--tec) i { color: var(--tec); }
+.carta-fila-statvar(--tec) b { color: var(--tec-txt); }
 
 .carta-fila-derecha {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--e-3);
 }
 .carta-fila-precio {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  font-family: var(--font-mono);
+  gap: var(--e-1);
+  font-family: var(--tipo-display);
   font-weight: var(--fw-semibold);
-  color: var(--warning-text);
+  color: var(--amarilla-txt);
 }
 
 /* Tableta: la posición y la rareza se van con el nombre, que es donde menos
@@ -1078,7 +1078,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    porque el contenedor de rejilla es uno u otro según el caso. */
 @container lista (max-width: 900px) {
   .carta-fila,
-  .carta-fila-interior { grid-template-columns: 48px minmax(0, 1fr) auto; row-gap: var(--space-3); }
+  .carta-fila-interior { grid-template-columns: 48px minmax(0, 1fr) auto; row-gap: var(--e-3); }
   .carta-fila-miniatura { width: 48px; }
   .carta-fila-pos { grid-column: 2; grid-row: 2; }
   .carta-fila-stats { grid-column: 2 / -1; grid-row: 3; flex-wrap: wrap; }
@@ -1093,8 +1093,8 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   .carta-fila,
   .carta-fila-interior {
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: var(--space-2) var(--space-3);
-    row-gap: var(--space-2);
+    gap: var(--e-2) var(--e-3);
+    row-gap: var(--e-2);
   }
   /* La miniatura ocupa DOS filas (44px de ancho son 78 de alto por su
      proporción). Poniendo el nombre arriba y los distintivos justo debajo, a
@@ -1103,11 +1103,11 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   .carta-fila-miniatura { width: 44px; grid-row: 1 / 3; align-self: start; }
   .carta-fila-jugador { grid-column: 2; grid-row: 1; }
   .carta-fila-pos { grid-column: 2; grid-row: 2; flex-wrap: wrap; align-self: start; }
-  .carta-fila-stats { grid-column: 1 / -1; grid-row: 3; gap: var(--space-1); }
+  .carta-fila-stats { grid-column: 1 / -1; grid-row: 3; gap: var(--e-1); }
   .carta-fila-derecha { grid-column: 1 / -1; grid-row: 4; justify-content: space-between; }
   .carta-fila-stat-abrev { display: none; }
-  .carta-fila-stat { padding: 2px var(--space-2); }
-  .carta-fila-interior { padding: var(--space-2); }
+  .carta-fila-stat { padding: 2px var(--e-2); }
+  .carta-fila-interior { padding: var(--e-2); }
 }
 
 /* ---- fila pulsable (deck builder) ----
@@ -1124,9 +1124,9 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
      que reparte igual aunque sin alinear columnas entre filas. */
   grid-template-columns: 48px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
   width: 100%;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--e-2) var(--e-3);
   appearance: none;
   border: 0;
   background: none;
@@ -1136,31 +1136,31 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   cursor: pointer;
 }
 .carta-fila-interior:disabled { cursor: default; opacity: .45; }
-.carta-fila-interior:focus-visible { outline: 2px solid var(--amber-light); outline-offset: -3px; }
+.carta-fila-interior:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: -3px; }
 .carta-fila--accion .carta-fila-miniatura { width: 48px; }
 
 /* Ya está en el once: se marca en la fila, no solo apagándola, para que se
    distinga de "no disponible por otro motivo". */
-.carta-fila.esta-elegida { border-color: var(--amber-line); background: var(--amber-soft); }
+.carta-fila.esta-elegida { border-color: var(--brasa-borde); background: var(--brasa-velo); }
 .carta-fila.es-repetido .carta-fila-interior { opacity: .38; }
 
-.carta-fila-compo { color: var(--info-text); border-color: var(--info-line); }
+.carta-fila-compo { color: var(--var-txt); border-color: var(--var-borde); }
 .carta-fila-compo i { font-size: 11px; }
 
 /* Conmutador de vista (rejilla / lista) */
-.vista-conmutador { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.vista-conmutador { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--linea); border-radius: var(--r-chip); }
 .vista-conmutador a {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 6px var(--space-3);
-  border-radius: calc(var(--radius-sm) - 2px);
-  color: var(--frost-dim);
+  gap: var(--e-2);
+  padding: 6px var(--e-3);
+  border-radius: calc(var(--r-chip) - 2px);
+  color: var(--ceniza);
   text-decoration: none;
-  font-size: var(--fs-caption);
+  font-size: var(--fs-label);
 }
-.vista-conmutador a[aria-current="true"] { background: var(--panel-2); color: var(--frost); }
-.vista-conmutador a:hover { color: var(--frost); }
+.vista-conmutador a[aria-current="true"] { background: var(--carbon-alto); color: var(--hueso); }
+.vista-conmutador a:hover { color: var(--hueso); }
 
 /* ==========================================================================
    3c. TAMAÑOS Y ESTADOS DE LA CARTA
@@ -1169,19 +1169,19 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    con consultas de contenedor, que es lo que arregla el texto cortado. Aquí
    queda solo lo que no es texto — relleno, radio y el hexágono de afinidad. */
 .carta--sm { border-radius: 0; }
-.carta--sm .carta-marco { padding: var(--space-2); gap: var(--space-2); border-radius: 0; }
+.carta--sm .carta-marco { padding: var(--e-2); gap: var(--e-2); border-radius: 0; }
 .carta--sm .carta-afinidad { width: 22px; height: 22px; }
 .carta--sm .rz { padding: 3px 6px; }
 
-.carta--lg .carta-marco { padding: var(--space-4); gap: var(--space-4); }
+.carta--lg .carta-marco { padding: var(--e-4); gap: var(--e-4); }
 
 /* interactiva: solo las cartas que llevan a algún sitio se elevan al hover */
 .carta--accion { cursor: pointer; }
 @media (hover: hover) {
   .carta--accion:hover { transform: translateY(-6px); }
-  .carta--accion:hover .carta-marco { box-shadow: var(--shadow-lg); }
+  .carta--accion:hover .carta-marco { box-shadow: var(--elev-3); }
 }
-.carta--accion:focus-visible { outline: 2px solid var(--amber-light); outline-offset: 4px; }
+.carta--accion:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 4px; }
 
 /* no poseída (álbum): silueta apagada, nunca oculta del todo */
 .carta.is-nopos .carta-marco { filter: grayscale(1); opacity: .45; }
@@ -1194,52 +1194,52 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-xl);
+  gap: var(--e-2);
+  border-radius: var(--r-panel);
   background: rgba(11, 12, 16, .45);
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .carta-candado i { font-size: 22px; }
 
 /* insignias flotantes sobre la carta */
 .carta-insignia {
   position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
+  top: var(--e-3);
+  right: var(--e-3);
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 5px var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
+  gap: var(--e-1);
+  padding: 5px var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
   background: rgba(11, 12, 16, .82);
   backdrop-filter: blur(6px);
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption-sm);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  color: var(--frost);
+  color: var(--hueso);
 }
-.carta-insignia--precio { color: var(--amber-light); border-color: var(--amber-line); }
-.carta-insignia--protegida { top: var(--space-3); left: var(--space-3); right: auto; color: var(--amber-light); }
+.carta-insignia--precio { color: var(--brasa-alta); border-color: var(--brasa-borde); }
+.carta-insignia--protegida { top: var(--e-3); left: var(--e-3); right: auto; color: var(--brasa-alta); }
 
 /* seleccionada (deck builder): anillo ámbar, sin depender del arrastre */
-.carta.is-seleccionada { --rz-borde: var(--amber); }
-.carta.is-seleccionada .carta-marco { box-shadow: 0 0 0 2px var(--amber-soft); }
+.carta.is-seleccionada { --rz-borde: var(--brasa); }
+.carta.is-seleccionada .carta-marco { box-shadow: 0 0 0 2px var(--brasa-velo); }
 
 /* dorso: usado en la ceremonia de apertura antes del volteo */
 .carta-dorso {
   display: grid;
   place-items: center;
   height: 100%;
-  border-radius: calc(var(--radius-xl) - 1px);
+  border-radius: calc(var(--r-panel) - 1px);
   background:
     repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 8px, transparent 8px 16px),
-    linear-gradient(180deg, var(--panel), var(--void));
+    linear-gradient(180deg, var(--carbon), var(--negro));
   color: rgba(255, 255, 255, .18);
   font-size: 34px;
 }
@@ -1248,12 +1248,12 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .carta-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-4);
+  gap: var(--e-4);
 }
 @media (min-width: 480px) {
-  .carta-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-5); }
+  .carta-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--e-5); }
 }
-.carta-grid--densa { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--space-3); }
+.carta-grid--densa { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--e-3); }
 
 /* ==========================================================================
    LISTAS LARGAS — que el móvil solo pinte lo que se ve
@@ -1287,1274 +1287,13 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 }
 
 /* ==========================================================================
-   4. CAJAS Y SOBRES 3D — pack3d (components/caja3d.php)
-   Todo el volumen es CSS falso: perspective + transform-style:preserve-3d +
-   translateZ/rotateX/rotateY sobre capas PLANAS. Nunca WebGL, nunca Three.js,
-   nunca un modelo real. GSAP solo orquesta timing/easing, en sobres.js.
-
-   REFERENCIA VISUAL: caja de cromos tipo Panini/blaster. Cerrada se ven tres
-   caras con grosor real (frente + tapa + lateral); abierta, la tapa se
-   levanta por su charnela trasera y los sobres están DE PIE dentro, apretados
-   de delante hacia atrás y sobresaliendo por encima del borde.
-
-   GEOMETRÍA — cada cara se CENTRA primero en el volumen con
-   translate(-50%,-50%) y luego se empuja a su sitio con translateX/Y/Z +
-   rotate:
-     · front: translateZ(+d/2)
-     · top:   translateY(-h/2) rotateX(90deg)      (tamaño w × d)
-     · side:  translateX(+w/2) rotateY(90deg)      (tamaño d × h)
-     · suelo: translateY(+h/2) rotateX(90deg)      (tamaño w × d)
-   NO plegar las caras desde su arista con transform-origin: es lo que hacía
-   la versión anterior y las dejaba casi de canto — la caja se veía como un
-   rectángulo plano, sin ningún volumen.
-
-   El volumen se orienta con rotateX(-18deg) rotateY(-32deg): con esos signos
-   quedan visibles a la vez frente, tapa y lateral DERECHO (las normales de
-   ambas caras acaban con z positiva, o sea mirando a cámara).
-
-   Los sobres van en .pack3d-interior-sobres, en el MISMO árbol preserve-3d
-   que la caja. Ese contenedor NO puede llevar overflow ni scroll: cualquier
-   overflow≠visible crea un contexto de recorte que APLANA a todos sus
-   descendientes y destruye el 3D (además de pintar barras de scroll sueltas
-   flotando en la escena).
-   ========================================================================== */
-
-/* arte común: sin plantilla subida (Fase 5) este degradado es el único fondo,
-   así el render nunca se rompe por falta de assets */
-.pack3d-cara, .pack3d-tapa, .pack3d-interior, .pack3d-sobre-frente {
-  background-color: var(--panel);
-  background-image:
-    radial-gradient(ellipse 75% 55% at 50% 20%, var(--amber-soft), transparent 72%),
-    linear-gradient(170deg, var(--void-2), #08090C);
-  background-size: cover;
-  background-position: center;
-}
-
-/* ---- Fase 1: caja cerrada por expansión (vitrina) ---- */
-.vitrina-cabecera {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-}
-.vitrina-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-8);
-  padding-block: var(--space-6);
-}
-.vitrina-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-.js-caja-expansion { cursor: pointer; display: block; }
-.js-caja-expansion:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
-.vitrina-item-nombre { font-weight: var(--fw-semibold); text-align: center; }
-
-/* el portal: en reposo no pinta caja propia (display:contents), y solo al
-   abrirse pasa a overlay fijo. Abrir/cerrar es un toggle de clase, sin mover
-   el nodo en el DOM ni clonar nada. */
-.pack3d-portal { display: contents; }
-.pack3d-portal.esta-abierta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  padding: var(--space-6);
-  background: radial-gradient(ellipse at 50% 45%, rgba(24,14,6,.96), rgba(4,5,7,.985) 70%);
-}
-/* Mientras la caja se abre y los sobres suben, los sobres no se pueden
-   pulsar. Un clic a medio camino dejaba la animacion de entrada corriendo en
-   bucle por debajo de la ceremonia. El cursor lo dice tambien: nada que
-   pulsar todavia. */
-.pack3d-portal.esta-animando .pack3d-sobre { pointer-events: none; }
-.pack3d-portal.esta-animando { cursor: progress; }
-
-.pack3d-portal-cerrar { display: none; position: absolute; top: var(--space-5); right: var(--space-5); z-index: 2; }
-.pack3d-portal.esta-abierta .pack3d-portal-cerrar { display: inline-flex; }
-
-/* ---- el volumen ---- */
-.pack3d {
-  --pack3d-w: 200px;
-  --pack3d-h: 250px;
-  --pack3d-d: 130px;
-  --pack3d-sobre-w: 165px;
-  --pack3d-sobre-h: 235px;
-  --pack3d-giro-x: -18deg;
-  --pack3d-giro-y: -32deg;
-  position: relative;
-  width: var(--pack3d-w);
-  height: var(--pack3d-h);
-  perspective: 1500px;
-  perspective-origin: 50% 42%;
-  /* La caja gira y su tapa/lateral asoman FUERA de su caja de layout, y la
-     sombra de contacto cae otro medio "fondo" por debajo. Sin reservar ese
-     hueco arriba y abajo, la tapa se comía lo que hubiera encima y la sombra
-     oscurecía el nombre/precio de debajo. */
-  margin: calc(var(--pack3d-d) * .55) auto calc(var(--pack3d-d) * .5 + var(--space-4));
-}
-.pack3d--pequena {
-  --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px;
-  --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px;
-}
-
-/* sombra de contacto: elipse aplanada bajo la caja, fuera del preserve-3d
-   para que no herede la rotación del volumen */
-.pack3d-sombra {
-  position: absolute;
-  left: 50%;
-  top: calc(100% + var(--pack3d-d) * .1);
-  width: calc(var(--pack3d-w) * 1.25);
-  height: calc(var(--pack3d-d) * .5);
-  transform: translateX(-50%);
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.72), transparent 70%);
-  filter: blur(7px);
-  pointer-events: none;
-}
-
-/* idle (Fase 1: animación visible sin interacción). El tilt al cursor vive en
-   .pack3d-tilt, una capa aparte: GSAP escribe "transform" en línea, y sobre
-   esta misma capa competiría con la animación CSS por la misma propiedad. */
-.pack3d-volumen {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  animation: pack3dFlota 5.2s ease-in-out infinite;
-}
-@keyframes pack3dFlota {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-9px); }
-}
-.pack3d-volumen.en-portal { animation: none; }
-
-.pack3d-tilt {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  transform: rotateX(var(--pack3d-giro-x)) rotateY(var(--pack3d-giro-y));
-}
-
-.pack3d-cara, .pack3d-interior, .pack3d-tapa {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  background-size: cover;
-  background-position: center;
-}
-
-/* frente */
-.pack3d-cara--front {
-  width: var(--pack3d-w);
-  height: var(--pack3d-h);
-  transform: translate(-50%, -50%) translateZ(calc(var(--pack3d-d) / 2));
-  box-shadow: inset 0 0 0 1px var(--line), inset 0 -60px 90px rgba(0,0,0,.45);
-}
-/* tapa superior (la cara fija; la que se abre es .pack3d-tapa) */
-.pack3d-cara--top {
-  width: var(--pack3d-w);
-  height: var(--pack3d-d);
-  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / -2)) rotateX(90deg);
-  filter: brightness(1.22);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-/* lateral derecho */
-.pack3d-cara--side {
-  width: var(--pack3d-d);
-  height: var(--pack3d-h);
-  transform: translate(-50%, -50%) translateX(calc(var(--pack3d-w) / 2)) rotateY(90deg);
-  filter: brightness(.62);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-/* suelo interior: solo se ve con la caja abierta */
-.pack3d-interior {
-  width: var(--pack3d-w);
-  height: var(--pack3d-d);
-  transform: translate(-50%, -50%) translateY(calc(var(--pack3d-h) / 2)) rotateX(90deg);
-  filter: brightness(.4);
-}
-
-/* charnela: div de altura 0 colocado en la arista TRASERA-SUPERIOR. La tapa
-   cuelga de ella con transform-origin en su propio borde superior, así que
-   rotarla es literalmente abrir una bisagra:
-     · rotateX(90deg)  → tumbada hacia delante, tapando la boca (cerrada)
-     · rotateX(205deg) → de pie e inclinada hacia atrás (abierta) */
-.pack3d-bisagra {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--pack3d-w);
-  height: 0;
-  transform: translateX(-50%)
-             translateY(calc(var(--pack3d-h) / -2))
-             translateZ(calc(var(--pack3d-d) / -2));
-  transform-style: preserve-3d;
-}
-.pack3d-tapa {
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: var(--pack3d-d);
-  transform-origin: 50% 0;
-  transform: rotateX(90deg);
-  /* al abrirse pasa de 180°, así que se ve su reverso: sin esto desaparecería */
-  backface-visibility: visible;
-  filter: brightness(1.3);
-  box-shadow: inset 0 0 0 1px var(--amber-line);
-}
-
-/* ---- Fase 3/4: los sobres, DE PIE dentro de la caja ----
-   Sin overflow de ningún tipo (aplanaría el 3D). Cada sobre se coloca en
-   profundidad con --i (su índice) y --n (cuántos hay): se reparten simétricos
-   respecto al centro, ocupando ~el 88% del fondo de la caja. */
-.pack3d-interior-sobres {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--pack3d-w);
-  height: var(--pack3d-h);
-  transform: translate(-50%, -50%);
-  transform-style: preserve-3d;
-  pointer-events: none;   /* solo los sobres reciben clic, no el hueco */
-}
-.pack3d-sobre {
-  --paso: calc(var(--pack3d-d) * .88 / var(--n));
-  --z: calc((var(--i) - (var(--n) - 1) / 2) * var(--paso));
-  /* apoyado en el suelo: su base coincide con el fondo de la caja, así que
-     asoma por arriba tanto como su alto exceda al de la caja */
-  --y: calc((var(--pack3d-h) - var(--pack3d-sobre-h)) / 2);
-  --alza: 0px;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: var(--pack3d-sobre-w);
-  height: var(--pack3d-sobre-h);
-  transform: translate(-50%, -50%)
-             translateY(calc(var(--y) + var(--alza)))
-             translateZ(var(--z));
-  transform-style: preserve-3d;
-  transition: transform 200ms var(--ease), filter 200ms var(--ease);
-  border: 0;
-  padding: 0;
-  font: inherit;
-  background: none;
-  cursor: pointer;
-  opacity: 0;               /* invisibles hasta que la caja se abre */
-  pointer-events: none;
-}
-.pack3d--abierta .pack3d-sobre { opacity: 1; pointer-events: auto; }
-
-.pack3d-sobre-frente {
-  position: absolute;
-  inset: 0;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
-}
-/* canto brillante en el borde superior: es lo que de verdad da la lectura de
-   "muchos sobres apretados" al mirarlos desde arriba */
-.pack3d-sobre-canto {
-  position: absolute;
-  left: 0; right: 0; top: 0;
-  height: 4px;
-  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.06));
-  border-radius: 3px 3px 0 0;
-}
-
-/* Fase 4: levantar SOLO el sobre bajo el cursor (o con foco de teclado) */
-@media (hover: hover) {
-  .pack3d--abierta .pack3d-sobre:hover { --alza: -46px; filter: brightness(1.35); }
-}
-.pack3d--abierta .pack3d-sobre:focus-visible {
-  --alza: -46px;
-  filter: brightness(1.35);
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
-}
-/* mismo efecto forzado por JS (SRF.pack3d.liftEnvelopeOnHover), para la vista
-   previa del panel y para poder demostrarlo sin ratón */
-.pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -46px; filter: brightness(1.35); }
-.pack3d-sobre:disabled { cursor: not-allowed; filter: grayscale(.7) brightness(.55); }
-
-/* seleccionado: sale del todo de la caja, hacia cámara */
-.pack3d-sobre.es-seleccionado {
-  --alza: -150px;
-  transform: translate(-50%, -50%)
-             translateY(calc(var(--y) + var(--alza)))
-             translateZ(calc(var(--pack3d-d) / 2 + 140px))
-             rotateY(8deg);
-  filter: brightness(1.5) drop-shadow(0 26px 40px rgba(0,0,0,.7));
-  transition: transform 420ms var(--ease), filter 420ms var(--ease);
-}
-/* al elegir uno, el resto y la propia caja se apartan visualmente */
-.pack3d-interior-sobres.con-seleccion .pack3d-sobre:not(.es-seleccionado) { opacity: 0; pointer-events: none; }
-.pack3d-portal.con-seleccion .pack3d-cara,
-.pack3d-portal.con-seleccion .pack3d-interior,
-.pack3d-portal.con-seleccion .pack3d-tapa { opacity: .18; }
-
-/* ---- Fase 3: tamaño de la caja abierta ---- */
-/* DOS escalas independientes, cada una uniforme dentro de sí misma — nunca
-   valores sueltos por eje, o el arte se recorta (ver más abajo):
-     · caja  ×1.2 de la base 200:250:130   → 240×300×156
-     · sobre ×1.4 de la base 165:235       → 231×329
-   front/top/side/interior pintan un recorte FIJO de Tcg::ZONAS_CAJA
-   (proporción 4:5, 1.538:1 y 1:1.923 — ver §14.1 de branding/CLAUDE.md) y el
-   sobre otro de Tcg::ZONAS_SOBRE (1:1.427): cualquier forma que no respete
-   esas proporciones hace que `background-size: cover` recorte trozos reales
-   del arte — el bug de "la plantilla se ve cortada".
-   Las DOS escalas tienen que ser distintas a propósito: el sobre (329 alto)
-   es más alto que la caja (300 alto) para que asome por encima del borde
-   como una caja de cromos real abierta («sobresaliendo un poco por encima»,
-   ver cabecera de components/caja3d.php) — iguales, la caja tapa los sobres
-   enteros y no se ve ninguno (lo que pasó al probar con una sola escala
-   1.6× para las dos). Al mismo tiempo el sobre se queda MÁS ESTRECHO que la
-   caja (231 < 240): si fuera más ancho asomaría también por los LADOS, el
-   mismo defecto de "atraviesa el contenedor" que ya se corrigió para la
-   carta de la ceremonia en escenaCarta() (ceremonia.js). */
-.pack3d--abierta {
-  --pack3d-w: 240px;
-  --pack3d-h: 300px;
-  --pack3d-d: 156px;
-  --pack3d-sobre-w: 231px;
-  --pack3d-sobre-h: 329px;
-  margin: 0;
-}
-
-/* ---- Fase 2: submenú de tipos de sobre de una expansión ---- */
-/* [hidden] tiene la MISMA especificidad que .submenu-tipos (0-1-0): sin el
-   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
-   "display:none" del navegador y el submenú se queda visible siempre,
-   superpuesto a la vitrina, aunque sobres.js ponga/quite el atributo bien. */
-.submenu-tipos:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
-  gap: var(--space-8);
-  padding-block: var(--space-6);
-}
-.submenu-tipos-cabecera {
-  flex-basis: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-.submenu-tipos-cabecera h2 { margin: 0; }
-.submenu-tipos-cabecera p { margin: 0; }
-.submenu-tipo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-.js-tipo-sobre { cursor: pointer; display: block; }
-.js-tipo-sobre:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: var(--radius-md); }
-.submenu-tipo-nombre { font-weight: var(--fw-semibold); text-align: center; }
-.submenu-tipo-precio {
-  display: flex; align-items: center; gap: var(--space-1);
-  font-family: var(--font-mono); font-weight: var(--fw-semibold); color: var(--amber-light);
-}
-
-/* rótulo de la caja abierta, dentro del portal */
-.pack3d-portal-titulo {
-  display: none;
-  text-align: center;
-  margin-top: var(--space-6);
-}
-.pack3d-portal.esta-abierta .pack3d-portal-titulo { display: block; }
-
-/* sin movimiento: ni flotación, ni tilt, ni levantado al hover — cada fase
-   deja su estado final sin transición */
-:root[data-motion="reduce"] .pack3d-volumen { animation: none; }
-:root[data-motion="reduce"] .pack3d-sobre { transition: none; }
-:root[data-motion="reduce"] .pack3d-sobre:hover,
-:root[data-motion="reduce"] .pack3d-sobre:focus-visible,
-:root[data-motion="reduce"] .pack3d-sobre.es-hover-forzado { --alza: -46px; }
-
-@media (max-width: 760px) {
-  .vitrina-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-6); }
-  .pack3d { --pack3d-w: 150px; --pack3d-h: 185px; --pack3d-d: 95px; --pack3d-sobre-w: 122px; --pack3d-sobre-h: 172px; }
-  /* mismas DOS escalas que la variante de escritorio (caja ×1.2, sobre ×1.4
-     de sus respectivas bases), ver nota ahí: no valores sueltos, o el arte
-     vuelve a recortarse y los sobres dejan de asomar por encima. */
-  .pack3d--abierta {
-    --pack3d-w: 180px; --pack3d-h: 222px; --pack3d-d: 114px;
-    --pack3d-sobre-w: 171px; --pack3d-sobre-h: 241px;
-  }
-  .pack3d--abierta .pack3d-sobre:hover, .pack3d--abierta .pack3d-sobre.es-hover-forzado { --alza: -34px; }
-}
-
-/* ==========================================================================
-   4b. CEREMONIA DE APERTURA
-   Se reserva movimiento largo para este momento y para el duelo; el resto de
-   la interfaz se mantiene sobria. La lógica de ritmo vive en assets/js/sobres.js.
-   ========================================================================== */
-/* La mesa tiene que caber en pantalla: el sobre se mira, no se navega.
-   El número de columnas y el tamaño de la carta se calculan para que el modal
-   entre completo en el viewport sin scroll. */
-/* :not([hidden]) por la misma razón que .cer-escena/.cer-walkout/
-   .cer-aviso-motion: ceremonia.js hace mesa.hidden = true/false y sin el
-   guard esta regla de autor le ganaría siempre al [hidden] de user-agent. */
-/* minmax(110px, 170px), NO 1fr: con "1fr" una mesa de una sola carta (un
-   cofre que solo suelta una, el caso más común) tenía una única columna que
-   se estiraba a los 780px del modal entero y, con aspect-ratio 5/7 en la
-   carta, se disparaba también en alto — el "se ve ultra grande" que se vio
-   al probarlo. Con un tope fijo la carta para en su tamaño natural aunque
-   sea la única, y justify-content la centra en vez de pegarla a la
-   izquierda cuando la fila no se llena. */
-.ceremonia-mesa:not([hidden]) {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 170px));
-  justify-content: center;
-  gap: var(--space-3);
-  perspective: 1200px;
-}
-.ceremonia .modal-caja {
-  display: flex;
-  flex-direction: column;
-  max-height: 92svh;
-  overflow: hidden;          /* el contenido se ajusta, no se desplaza */
-}
-/* La mesa es la única parte que puede crecer más de lo que cabe en pantalla
-   (sobres con muchas cartas). Sin overflow-y aquí, .modal-caja (overflow:
-   hidden, arriba) fuerza a la mesa a encogerse por flexbox, pero su rejilla
-   de cartas —que es overflow:visible por defecto— se desborda igualmente
-   por encima y se solapa con la cabecera y con los botones del pie, que
-   quedan enterrados entre cartas en vez de fijos. Dándole scroll propio, la
-   cabecera y el pie quedan siempre fijos alrededor y el sobre entero, del
-   tamaño que sea, es alcanzable. */
-.ceremonia .ceremonia-mesa { min-height: 0; overflow-y: auto; overflow-x: hidden; }
-
-/* ---------------------------------------------------------------------------
-   RECUENTO DEL BOTÍN — la tira de "qué me ha tocado" sobre la mesa.
-
-   Va FUERA de .ceremonia-mesa a propósito: la mesa tiene scroll propio (regla
-   de arriba) y un resumen metido dentro se iría con el scroll justo cuando más
-   se consulta, que es tras bajar a ver las últimas cartas. Aquí se queda fijo
-   entre la cabecera y las cartas.
-
-   `flex-shrink: 0` porque .modal-caja es un flex en columna con overflow
-   oculto: sin esto, una tanda de diez sobres aplastaba la tira hasta dejarla
-   en una raya.
-   --------------------------------------------------------------------------- */
-.cer-recuento:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
-  margin-bottom: var(--space-4);
-}
-.cer-recuento-total {
-  font-size: var(--fs-caption); line-height: 1.3;
-  color: var(--frost-dim);
-  margin-right: var(--space-1);
-}
-.cer-recuento-rz {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-caption); line-height: 1.3;
-  /* El mismo color que ya identifica a la rareza en el marco de la carta y en
-     el aura de la ranura: se reconoce sin leer la palabra. */
-  color: var(--aura-color, var(--frost));
-  border: 1px solid color-mix(in srgb, var(--aura-color, var(--frost)) 45%, transparent);
-  background: color-mix(in srgb, var(--aura-color, var(--frost)) 12%, transparent);
-}
-.cer-recuento-rz[data-rareza="1"] { --aura-color: var(--rz1); }
-.cer-recuento-rz[data-rareza="2"] { --aura-color: var(--rz2); }
-.cer-recuento-rz[data-rareza="3"] { --aura-color: var(--rz3); }
-.cer-recuento-rz[data-rareza="4"] { --aura-color: var(--rz4); }
-.cer-recuento-rz[data-rareza="5"] { --aura-color: var(--rz5); }
-.cer-recuento-rz[data-rareza="6"] { --aura-color: var(--rz6); }
-.cer-recuento-rz[data-rareza="7"] { --aura-color: var(--rz7, var(--rz6)); }
-
-/* Los dos grupos del pie (saltar / reabrir) ocupan el mismo sitio y solo hay
-   uno visible a la vez, así que se comportan como si no existieran: sin esto,
-   un contenedor vacío seguía metiendo su gap y "Continuar" quedaba descolgado
-   del borde. */
-.cer-pie-grupo { display: contents; }
-/* ⚠️ IMPRESCINDIBLE, y no es redundante con el atributo. `[hidden]` lo pone
-   la hoja del NAVEGADOR, y cualquier regla de autor —incluida la de arriba—
-   le gana. Sin esta línea, `display: contents` dejaba los botones de saltar a
-   la vista durante el resumen, que es justo lo que se quería quitar. */
-.cer-pie-grupo[hidden] { display: none; }
-
-/* Resumen del cofre: monedas y bonus (camino perfecto, formación), por
-   encima de las cartas si trae alguna. Un cofre solo-monedas no tiene mesa
-   que enseñar, así que este es el único rastro visible del botín — tiene
-   que sostenerse solo. */
-.cer-cofre-bonus {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-4);
-}
-.cer-cofre-bonus span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--success) 45%, var(--line));
-  background: color-mix(in srgb, var(--success) 14%, transparent);
-  color: var(--frost);
-  font-size: var(--fs-body-sm);
-}
-.cer-cofre-bonus span i { color: var(--success); }
-
-/* ==========================================================================
-   ESCENA DE APERTURA — inmersiva y a pantalla completa.
-
-   Mientras dura la apertura, el modal deja de parecer un modal: se le quita
-   caja, borde, cabecera y pie, y queda solo el fondo negro con el sobre. Es
-   deliberado: los botones y el marco competían con lo único que importa mirar.
-   El único control es .cer-saltar, discreto, arriba a la derecha. Al llegar al
-   resumen se quita .es-inmersiva y vuelve el modal normal (título, Continuar).
-
-   EL SOBRE está construido como uno real:
-     · proporción 1 : 1.9, como un sobre de Adrenalyn / Pokémon
-     · dos bandas TERMOSELLADAS (arriba y abajo) con su estriado vertical fino
-     · borde dentado en el filo de cada banda (el corte "pinking")
-     · reflejo de film que barre al aparecer
-   La banda de arriba (.cer-sobre-tira) es la que se rasga y sale volando.
-   ========================================================================== */
-
-/* ---- el escenario ---- */
-/* `padding: 0` no es cosmético: `.modal` trae 16px de padding y esa franja es
-   el propio `.modal`, no la caja. Un clic ahí lo lee ui.js como "clic en el
-   fondo" y CIERRA — o sea, rozar el borde de la pantalla mataba la ceremonia
-   a media apertura. Con la caja ocupando el 100%, esa franja deja de existir. */
-.ceremonia.es-inmersiva { background: radial-gradient(ellipse at 50% 45%, #0d0a08, #000 72%); padding: 0; }
-.ceremonia.es-inmersiva .modal-caja {
-  max-width: none;
-  width: 100%;
-  height: 100%;
-  max-height: none;
-  padding: 0;
-  border: 0;
-  background: none;
-  box-shadow: none;
-}
-.ceremonia.es-inmersiva .modal-head,
-.ceremonia.es-inmersiva .modal-pie,
-.ceremonia.es-inmersiva .ceremonia-mesa,
-.ceremonia.es-inmersiva .cer-aviso-motion { display: none; }
-
-/* [hidden] tiene la MISMA especificidad que .cer-escena (0-1-0): sin el
-   ":not([hidden])", esta regla -que llega después en la cascada- le gana al
-   "display:none" del navegador (mismo problema que ya se documentó para
-   .submenu-tipos, ver más abajo). Sin este guard, escena.hidden = true
-   (terminar(), en ceremonia.js) NO ocultaba nada: la escena de apertura se
-   quedaba pintada por encima del resumen, mezclando el sobre/carta a medio
-   animar con la mesa de cartas reveladas — el "se queda ahí bugueado" que
-   se veía tras usar "Saltar". */
-.cer-escena:not([hidden]) {
-  --cer-crimp: 6.4%;        /* alto de cada banda termosellada */
-  --cer-diente: 7px;        /* paso del dentado del filo */
-  /* Cuánto ha avanzado el desgarro, de 0% (cerrado) a 100% (abierto del todo).
-     Lo mueve GSAP y de él dependen la boca, la luz interior y la tira: así el
-     rasgado es UNA sola magnitud y las tres capas no pueden ir desacompasadas
-     —que es exactamente lo que hacía que la apertura pareciera una tapa
-     abriéndose de golpe en vez de un plástico rompiéndose. */
-  --cer-rasgado: 0%;
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  display: block;
-}
-
-/* control único, discreto */
-.cer-saltar {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  z-index: 9;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 10px 16px;
-  min-height: 44px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .05);
-  color: var(--frost-dim);
-  font: inherit;
-  font-size: var(--fs-caption);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  cursor: pointer;
-  transition: color var(--t-micro) var(--ease), border-color var(--t-micro) var(--ease);
-}
-.cer-saltar:hover { color: var(--frost); border-color: var(--line-strong); }
-.cer-saltar:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
-
-/* ---- el sobre ----
-
-   Se busca el sobre de plástico metalizado de verdad, no un rectángulo con
-   textura: film brillante y ligeramente abombado, dos bandas termoselladas
-   con su estriado, filo dentado, y un desgarro que AVANZA de un lado al otro
-   en vez de abrirse entero de una vez.
-
-   Todo lo que se mueve durante el rasgado cuelga de `--cer-rasgado`, así que
-   la boca, la luz de dentro y la tira van clavadas entre sí por construcción.
-   -------------------------------------------------------------------------- */
-/* Sin `transform` de centrado en CSS: lo escribe GSAP entero (xPercent /
-   yPercent), igual que en .cer-carta. Si se dejara aquí un
-   translate(-50%,-50%), el primer tween lo machacaría y el sobre se iría a
-   la esquina. */
-.cer-sobre {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: clamp(150px, 21vh, 215px);
-  aspect-ratio: 1 / 1.9;
-  transform-style: preserve-3d;
-  z-index: 3;
-  /* Dos sombras y no una: la cercana asienta el sobre sobre el suelo, la
-     lejana y difusa lo despega del fondo. Con una sola parecía una pegatina. */
-  filter:
-    drop-shadow(0 10px 14px rgba(0, 0, 0, .55))
-    drop-shadow(0 34px 50px rgba(0, 0, 0, .8));
-}
-
-/* El film. Cuatro capas apiladas en un solo `background`, de arriba abajo:
-     1. el abombado (sombra en los dos cantos, luz en el centro),
-     2. el reflejo especular vertical del plástico,
-     3. el halo de color de la expansión,
-     4. el degradado base.
-   La textura de la plantilla la mete ceremonia.js como `background-image`, y
-   `background-blend-mode` la funde con las demás en vez de taparlas: sin esto
-   una plantilla opaca borraba de un plumazo todo el trabajo de plástico. */
-.cer-sobre-cuerpo {
-  position: absolute;
-  inset: 0;
-  border-radius: 3px;
-  background-color: var(--panel);
-  background-image:
-    radial-gradient(ellipse 82% 58% at 50% 22%, var(--amber-soft), transparent 70%),
-    linear-gradient(168deg, var(--void-2), #08090C);
-  background-size: cover;
-  background-position: center;
-  background-blend-mode: overlay, normal;
-  z-index: 3;
-  overflow: hidden;
-}
-/* abombamiento + especular del film, SIEMPRE encima de la textura */
-.cer-sobre-cuerpo::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    /* cantos: el sobre está lleno, así que los bordes se van de sombra */
-    linear-gradient(90deg,
-      rgba(0,0,0,.55) 0 3%,
-      rgba(0,0,0,.22) 7%,
-      transparent 20% 80%,
-      rgba(0,0,0,.22) 93%,
-      rgba(0,0,0,.55) 97% 100%),
-    /* especular: la franja de luz que recorre un plástico curvado */
-    linear-gradient(96deg,
-      transparent 26%,
-      rgba(255,255,255,.05) 34%,
-      rgba(255,255,255,.16) 43%,
-      rgba(255,255,255,.05) 50%,
-      transparent 58%);
-  pointer-events: none;
-}
-/* arruguitas del film: casi invisibles de una en una, pero son lo que
-   distingue un plástico de una cartulina */
-.cer-sobre-cuerpo::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    repeating-linear-gradient(83deg,
-      rgba(255,255,255,.035) 0 1px,
-      transparent 1px 13px),
-    repeating-linear-gradient(-77deg,
-      rgba(0,0,0,.05) 0 1px,
-      transparent 1px 19px);
-  mix-blend-mode: overlay;
-  pointer-events: none;
-}
-
-/* bandas termoselladas: estriado vertical fino, el detalle que hace que se
-   lea como un sobre y no como una tarjeta */
-.cer-sobre-sellado,
-.cer-sobre-tira {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: var(--cer-crimp);
-  background-color: color-mix(in srgb, var(--panel) 62%, #fff 38%);
-  background-image:
-    /* el estriado del sellado, y encima un degradado que lo abomba */
-    linear-gradient(180deg, rgba(255,255,255,.22), transparent 45%, rgba(0,0,0,.3)),
-    repeating-linear-gradient(90deg,
-      rgba(0,0,0,.38) 0 1px,
-      rgba(255,255,255,.2) 1px 3px);
-  z-index: 4;
-}
-.cer-sobre-sellado { bottom: 0; }
-.cer-sobre-tira {
-  top: 0;
-  /* Se arranca tirando del lado IZQUIERDO: el desgarro nace ahí y corre hacia
-     la derecha, así que la bisagra se queda a la derecha hasta que se suelta
-     del todo. */
-  transform-origin: right center;
-  will-change: transform, opacity;
-  /* El plástico se enrolla al despegarse. Se finge con un degradado que oscurece
-     el borde libre —la cara interior de la banda al curvarse— en vez de con
-     geometría 3D real: la banda tiene 26px de alto, y un curvado de verdad a
-     ese tamaño no se distingue de una sombra, pero cuesta un `transform-style`
-     y un hijo más. */
-  background-image:
-    linear-gradient(180deg, rgba(255,255,255,.28), transparent 42%, rgba(0,0,0,.45)),
-    repeating-linear-gradient(90deg,
-      rgba(0,0,0,.38) 0 1px,
-      rgba(255,255,255,.2) 1px 3px);
-}
-
-/* filo dentado: el corte "pinking" de la termoselladora. Triángulos de verdad
-   con conic-gradient, no bloques rectangulares — el diente recto se leía como
-   un código de barras. Se pintan del color del escenario en vez de recortar
-   con `mask`, para no depender de su soporte: si un navegador no entendiera
-   el conic-gradient, el filo sale recto y no se rompe nada. */
-.cer-sobre-sellado::after,
-.cer-sobre-tira::after {
-  content: '';
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  height: 5px;
-  background: repeating-conic-gradient(from -45deg at 50% 0,
-    #000 0deg 90deg, transparent 90deg 360deg);
-  background-size: var(--cer-diente) 5px;
-}
-.cer-sobre-sellado::after { bottom: -1px; transform: scaleY(-1); }
-.cer-sobre-tira::after    { top: -1px; }
-
-/* La boca: el interior oscuro del sobre. No aparece de golpe — se descubre de
-   izquierda a derecha siguiendo `--cer-rasgado`, que es lo que hace que se
-   lea como un plástico rompiéndose. El borde inferior es irregular a
-   propósito: un desgarro no deja una línea recta. */
-.cer-sobre-boca {
-  position: absolute;
-  left: 3%;
-  right: 3%;
-  top: 0;
-  height: calc(var(--cer-crimp) + 7%);
-  background: linear-gradient(180deg, #000 55%, rgba(0,0,0,.35));
-  box-shadow: inset 0 10px 18px rgba(0,0,0,.95);
-  z-index: 2;
-  /* de derecha a izquierda: al 0% no se ve nada, al 100% se ve entera */
-  clip-path: inset(0 calc(100% - var(--cer-rasgado)) 0 0);
-}
-/* El filo de abajo, dentado y FINO. Antes era `border-bottom: 2px solid #000`
-   con las esquinas redondeadas: una raya recta y limpia, que es exactamente lo
-   que un plástico rasgado nunca deja — se leía como una tapa recortada con
-   tijera. Los dientes son mucho más pequeños que los del termosellado (un
-   tercio de paso) para que no se confundan con él: el sellado es un patrón
-   regular de fábrica, el desgarro es ruido. */
-.cer-sobre-boca::after {
-  content: '';
-  position: absolute;
-  left: -2px;
-  right: -2px;
-  bottom: -1px;
-  height: 4px;
-  background: repeating-conic-gradient(from 135deg at 50% 100%,
-    #000 0deg 90deg, transparent 90deg 360deg);
-  background-size: calc(var(--cer-diente) / 3) 4px;
-}
-
-/* EL FRENTE DEL DESGARRO: la mancha blanca del plástico tensándose justo en el
-   punto donde está rompiendo. Es el detalle que más vende el rasgado —un film
-   blanquea antes de ceder— y en pantalla es lo que distingue "se está
-   rompiendo" de "se está abriendo".
-   Viaja con `--cer-rasgado`, así que va clavado con la boca sin sincronizar
-   nada, y NO está recortado: la tensión se ve por delante del corte, que es
-   donde ocurre. */
-.cer-sobre-corte {
-  position: absolute;
-  top: calc(var(--cer-crimp) * .15);
-  left: var(--cer-rasgado);
-  width: 30px;
-  height: calc(var(--cer-crimp) + 3%);
-  transform: translateX(-55%);
-  background: radial-gradient(ellipse at 50% 45%,
-    rgba(255,255,255,.95), rgba(255,255,255,.35) 38%, transparent 70%);
-  filter: blur(1px);
-  opacity: 0;
-  z-index: 6;
-  pointer-events: none;
-}
-
-/* La luz que escapa del interior. Sigue el mismo recorte que la boca, así que
-   el resplandor va apareciendo por donde ya está rasgado. */
-.cer-sobre-luz {
-  position: absolute;
-  left: 6%;
-  right: 6%;
-  top: calc(var(--cer-crimp) * .4);
-  height: 16%;
-  background: radial-gradient(ellipse at 50% 0,
-    rgba(255, 236, 200, .95), rgba(255, 190, 110, .35) 45%, transparent 72%);
-  filter: blur(7px);
-  z-index: 2;
-  opacity: 0;
-  clip-path: inset(0 calc(100% - var(--cer-rasgado)) 0 0);
-  pointer-events: none;
-}
-
-/* reflejo que barre el film al aparecer el sobre */
-.cer-sobre-brillo {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  background: linear-gradient(102deg,
-    transparent 36%, rgba(255,255,255,.42) 46%, rgba(255,255,255,.1) 53%, transparent 60%);
-  pointer-events: none;
-  opacity: 0;
-}
-
-/* Los flecos de plástico que saltan al rasgar. El contenedor no recorta ni
-   estorba: los hijos los crea ceremonia.js y los tira GSAP. */
-.cer-sobre-flecos {
-  position: absolute;
-  inset: -30% -40% auto;
-  height: 40%;
-  z-index: 6;
-  pointer-events: none;
-}
-.cer-fleco {
-  position: absolute;
-  top: 0;
-  width: 7px;
-  height: 4px;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--panel) 55%, #fff 45%);
-  opacity: 0;
-}
-
-/* ---- el cofre (ceremonia_cofre.js) ----
-   Misma lógica que el sobre: sin `transform` de centrado en CSS, lo escribe
-   GSAP entero. La tapa gira sobre una bisagra trasera (transform-origin
-   abajo, rotateX negativo levanta el borde de delante). */
-.cer-cofre {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: clamp(160px, 22vh, 220px);
-  aspect-ratio: 1 / .82;
-  transform-style: preserve-3d;
-  z-index: 3;
-  filter: drop-shadow(0 30px 44px rgba(0, 0, 0, .8));
-}
-.cer-cofre-cuerpo {
-  position: absolute;
-  inset: 14% 0 0;
-  border-radius: var(--radius-lg);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--amber) 22%, var(--panel)) 0%, var(--void-2) 78%);
-  border: 1px solid var(--line-strong);
-  box-shadow: inset 0 -10px 18px rgba(0, 0, 0, .5);
-  z-index: 2;
-}
-.cer-cofre-cierre {
-  position: absolute;
-  left: 50%;
-  top: 12%;
-  width: 15%;
-  aspect-ratio: 1;
-  transform: translateX(-50%);
-  border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, var(--amber-light), var(--amber));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
-  z-index: 4;
-}
-.cer-cofre-tapa {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 34%;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--amber) 30%, var(--panel)), var(--panel));
-  border: 1px solid var(--line-strong);
-  border-bottom: none;
-  transform-origin: bottom center;
-  z-index: 5;
-}
-/* el brillo del interior, revelado al abrirse la tapa. z-index por ENCIMA
-   del cuerpo (2): es opaco, así que un brillo detrás de él no se vería
-   nunca — mismo motivo que el z-index de .cer-sobre-boca sobre el cuerpo. */
-.cer-cofre-brillo {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  top: 16%;
-  height: 26%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, var(--amber-light), transparent 72%);
-  filter: blur(6px);
-  opacity: 0;
-  z-index: 3;
-}
-
-/* ---- la carta que sale ---- */
-/* Sin `transform` en CSS a propósito: lo escribe GSAP entero. El giro va con
-   rotationY desde JS, nunca con una clase — un transform en línea de GSAP le
-   gana siempre a una regla de clase y la carta se quedaría sin girar. */
-.cer-carta {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: clamp(170px, 30vh, 260px);
-  /* 451/800, la proporción REAL del arte y de las cuatro plantillas de marco,
-     la misma que usa `.carta-placa`. Estaba en 5/7 (0,714 contra 0,564): la
-     carta de la ceremonia era mucho más ancha que la carta que llevaba dentro,
-     así que la ilustración salía con banda negra a los dos lados y el dorso no
-     coincidía con el frente al girar. */
-  aspect-ratio: var(--carta-ratio, 451 / 800);
-  transform-style: preserve-3d;
-  border: 0;
-  padding: 0;
-  background: none;
-  cursor: pointer;
-  z-index: 2;              /* DETRÁS del sobre hasta que asoma por la boca */
-  opacity: 0;
-}
-.cer-carta:focus-visible { outline: 2px solid var(--amber); outline-offset: 8px; border-radius: 0; }
-.cer-carta-cara {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-  display: block;
-  /* Esquinas RECTAS, como el resto de las cartas del juego desde que existe el
-     modo arte. El dorso se quedó con el radio antiguo y cantaba: una carta con
-     las puntas redondeadas girando para destapar otra con las puntas rectas. */
-  border-radius: 0;
-  overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0,0,0,.6);
-}
-.cer-carta-dorso .carta-dorso {
-  display: grid;
-  place-items: center;
-  width: 100%; height: 100%;
-  border-radius: 0;
-  border: 1px solid var(--line-strong);
-  background:
-    repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 9px, transparent 9px 18px),
-    linear-gradient(180deg, var(--panel), var(--void));
-  color: rgba(255,255,255,.2);
-  font-size: 54px;
-}
-.cer-carta-frente { transform: rotateY(180deg); }
-/* La carta va en modo arte (ver sobres.php) y SIN pie: la caja de la cara mide
-   exactamente el arte (451/800), así que la carta la llena y no sobra nada.
-   `height: 100%` la estiraría y rompería la proporción, de ahí que solo se
-   fije el ancho. */
-.cer-carta-frente .carta { width: 100%; }
-.cer-carta-aura {
-  position: absolute;
-  inset: -22%;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--rz-aura, var(--amber)), transparent 62%);
-  opacity: 0;
-  pointer-events: none;
-  z-index: -1;
-  filter: blur(18px);
-}
-
-.cer-pista, .cer-contador {
-  position: absolute;
-  left: 0; right: 0;
-  margin: 0;
-  text-align: center;
-  color: var(--frost-dim);
-  font-size: var(--fs-caption);
-  z-index: 7;
-}
-.cer-pista {
-  bottom: var(--space-6);
-  text-transform: uppercase;
-  letter-spacing: .08em;
-}
-.cer-contador { top: var(--space-6); }
-
-/* ---- walkout: solo legendaria (5) y SRF (6) ---- */
-/* z-index 9: por ENCIMA de .cer-carta (máx. 6) y de .cer-pista/.cer-contador
-   (7) a propósito — el walkout tiene que tapar sobre y carta mientras dura
-   la tensión, y solo al desvanecerse (pedirVolteo, tramo final) deja ver la
-   carta ya volteada debajo. Antes iba en z-index 5, POR DEBAJO de la carta,
-   así que se veía la carta encima y la animación enterrada al fondo.
-   :not([hidden]) por el mismo motivo que .cer-escena y .cer-aviso-motion:
-   sin él, este display:grid (regla de autor) le gana siempre al display:none
-   de [hidden] (regla de user-agent), así que walkout.hidden = true (fuera de
-   una revelación legendaria/SRF) no ocultaba nada de verdad — el fondo
-   oscurecido del walkout se veía DETRÁS de cada carta común también,
-   mientras .cer-escena estuviera visible, no solo en las exclusivas. */
-.cer-walkout:not([hidden]) {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  z-index: 9;
-  background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.93) 66%);
-}
-.cer-walkout-rayos {
-  position: absolute;
-  width: 150vmax;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg 8deg, var(--rz-aura, var(--amber)) 9deg 11deg, transparent 12deg 26deg,
-    transparent 26deg 34deg, var(--rz-aura, var(--amber)) 35deg 37deg, transparent 38deg 52deg);
-  opacity: .45;
-  mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
-  -webkit-mask-image: radial-gradient(circle, transparent 12%, #000 26%, #000 52%, transparent 66%);
-}
-.cer-walkout-texto { position: relative; text-align: center; }
-.cer-walkout-rareza {
-  display: block;
-  font-size: clamp(34px, 9vw, 84px);
-  font-weight: var(--fw-bold);
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 30px var(--rz-aura, var(--amber)), 0 0 84px var(--rz-aura, var(--amber));
-}
-.cer-walkout-nombre {
-  display: block;
-  margin-top: var(--space-2);
-  font-family: var(--font-mono);
-  font-size: clamp(15px, 2.6vw, 22px);
-  letter-spacing: .04em;
-  color: var(--frost);
-  text-shadow: 0 0 20px rgba(0, 0, 0, .8);
-}
-
-@media (max-width: 600px) {
-  .cer-sobre { width: clamp(130px, 19vh, 170px); }
-  .cer-cofre { width: clamp(140px, 20vh, 175px); }
-  .cer-carta { width: clamp(150px, 27vh, 200px); }
-  .cer-saltar { top: var(--space-3); right: var(--space-3); }
-}
-
-/* Con movimiento reducido la escena no se usa: ceremonia.js va directo al
-   resumen. Se apaga también por CSS por si el modo cambia a media sesión. */
-:root[data-motion="reduce"] .cer-escena { display: none; }
-
-/* aviso de "puedes activar las animaciones solo en esta web": aparece en el
-   resumen cuando la ceremonia se saltó por la preferencia del SISTEMA.
-   :not([hidden]) por el mismo motivo que .cer-escena más arriba: sin él,
-   este display:flex (regla de autor) le gana al display:none de [hidden]
-   (regla de user-agent) pase lo que pase — así que ofrecerAnimaciones()
-   podía marcar avisoMotion.hidden = true y el aviso seguía viéndose en
-   cuanto .es-inmersiva dejaba de taparlo con su propio display:none. Es la
-   causa de "el aviso sigue saliendo aunque ya haya activado animaciones". */
-.cer-aviso-motion:not([hidden]) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--amber-line);
-  border-radius: var(--radius-md);
-  background: var(--amber-soft);
-}
-.cer-aviso-motion p {
-  margin: 0;
-  flex: 1;
-  min-width: 220px;
-  font-size: var(--fs-body-sm);
-  color: var(--frost);
-}
-.cer-aviso-motion p .ph { color: var(--amber-light); margin-right: var(--space-1); }
-.cer-aviso-motion-botones { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-
-/* dentro de la ceremonia la carta va al grano: rareza, arte y nombre */
-.ceremonia .carta-meta { display: none; }
-.ceremonia .carta-nombre { -webkit-line-clamp: 1; }
-
-@media (max-width: 600px) {
-  /* tres columnas fijas: cinco cartas caben en dos filas sin encogerse tanto
-     que el arte deje de leerse */
-  .ceremonia-mesa { grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
-  .ceremonia .modal-caja { padding: var(--space-4); }
-  .ceremonia .modal-head { margin-bottom: var(--space-4); }
-  .ceremonia .modal-pie { margin-top: var(--space-4); }
-  .ceremonia .carta-nombre { font-size: 11px; }
-  /* se quita el hexágono de afinidad para que la etiqueta de rareza conserve
-     su texto: la rareza es lo que importa en este momento */
-  .ceremonia .carta-afinidad { display: none; }
-  .ceremonia .rz { font-size: 8.5px; padding: 3px 5px; }
-}
-
-/* pantallas bajas (móvil apaisado): la mesa se ciñe al alto disponible */
-@media (max-height: 560px) {
-  .ceremonia-mesa { grid-template-columns: repeat(5, 1fr); gap: var(--space-2); }
-  .ceremonia .carta-cuerpo { display: none; }
-}
-
-.ranura {
-  position: relative;
-  transform-style: preserve-3d;
-  transition: transform 560ms var(--ease);
-}
-.ranura-cara { backface-visibility: hidden; }
-/* el frente va en el flujo: es quien define la altura de la ranura */
-.ranura-frente { transform: rotateY(180deg); }
-.ranura-dorso { position: absolute; inset: 0; }
-.ranura.esta-volteada { transform: rotateY(180deg); }
-
-/* fanfarria de legendario y SRF: un resplandor que acompaña al volteo */
-.ranura.con-fanfarria::after {
-  content: '';
-  position: absolute;
-  inset: -10px;
-  z-index: -1;
-  border-radius: var(--radius-xl);
-  background: radial-gradient(circle, var(--amber-light), transparent 68%);
-  animation: fanfarria 1.5s var(--ease-out) forwards;
-}
-.ranura[data-rareza="6"].con-fanfarria::after {
-  background: radial-gradient(circle, #fff, transparent 70%);
-}
-@keyframes fanfarria {
-  0%   { opacity: 0; transform: scale(.7); }
-  35%  { opacity: .85; transform: scale(1.05); }
-  100% { opacity: 0; transform: scale(1.2); }
-}
-
-/* el propio modal reacciona a la mejor carta del sobre */
-.ceremonia .modal-caja.es-legendario { box-shadow: var(--shadow-lg), 0 0 60px -12px var(--amber); }
-.ceremonia .modal-caja.es-srf {
-  border-color: rgba(255, 255, 255, .5);
-  box-shadow: var(--shadow-lg), 0 0 80px -10px rgba(255, 255, 255, .4);
-  animation: pulsoSrf 2.4s ease-in-out infinite;
-}
-@keyframes pulsoSrf {
-  0%, 100% { box-shadow: var(--shadow-lg), 0 0 70px -14px rgba(255, 255, 255, .3); }
-  50%      { box-shadow: var(--shadow-lg), 0 0 100px -8px rgba(255, 255, 255, .5); }
-}
-
-/* aura anticipatoria de rareza (§14.4): se enciende justo antes del volteo,
-   GSAP controla opacidad/escala; el color depende de la rareza real de la
-   carta, así el jugador intuye lo que va a salir antes de verlo. */
-.ranura[data-rareza="1"] { --aura-color: var(--rz1); }
-.ranura[data-rareza="2"] { --aura-color: var(--rz2); }
-.ranura[data-rareza="3"] { --aura-color: var(--rz3); }
-.ranura[data-rareza="4"] { --aura-color: var(--rz4); }
-.ranura[data-rareza="5"] { --aura-color: var(--rz5); }
-.ranura[data-rareza="6"] { --aura-color: var(--rz6); }
-.ranura-aura {
-  position: absolute;
-  inset: -18px;
-  z-index: -2;
-  border-radius: var(--radius-xl);
-  opacity: 0;
-  pointer-events: none;
-  background: radial-gradient(circle, var(--aura-color, var(--rz1)), transparent 70%);
-  filter: blur(2px);
-}
-
-/* secuencia FUT (§14.6): preámbulo exclusivo para legendaria y SRF, una
-   carta a la vez, por encima de la mesa. Reutiliza --aura-color de la ranura. */
-.ceremonia-fut {
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  background: rgba(4, 5, 7, .92);
-  opacity: 0;
-  pointer-events: none;
-}
-.ceremonia-fut-rayos {
-  position: absolute;
-  inset: -50%;
-  background: conic-gradient(from 0deg,
-    transparent 0 10deg, var(--aura-color, var(--amber)) 10deg 12deg, transparent 12deg 45deg);
-  opacity: .35;
-}
-.ceremonia-fut-nombre {
-  position: relative;
-  text-align: center;
-  padding-inline: var(--space-4);
-  font-family: var(--font-mono);
-  color: var(--frost);
-  text-shadow: 0 0 24px var(--aura-color, var(--amber));
-}
-.ceremonia-fut-nombre .fut-rareza {
-  display: block;
-  font-size: var(--fs-h2);
-  font-weight: var(--fw-bold);
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--aura-color, var(--amber));
-}
-.ceremonia-fut-nombre .fut-nombre {
-  display: block;
-  font-size: var(--fs-h1);
-  font-weight: var(--fw-bold);
-}
-
-/* destello de pantalla: exclusivo de la SRF */
-.ceremonia-destello {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-modal) + 1);
-  pointer-events: none;
-  background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, .5), transparent 60%);
-  animation: destello 800ms var(--ease-out) forwards;
-}
-@keyframes destello {
-  0%   { opacity: 0; }
-  16%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-/* Movimiento reducido: sin volteo, sin fanfarria, sin destello. Las cartas
-   ya salen reveladas desde JavaScript, así que aquí solo se anula el 3D. */
-:root[data-motion="reduce"] .ranura,
-:root[data-motion="reduce"] .ranura.esta-volteada { transform: none; transition: none; }
-:root[data-motion="reduce"] .ranura-frente { transform: none; }
-:root[data-motion="reduce"] .ranura-dorso,
-:root[data-motion="reduce"] .ranura.con-fanfarria::after,
-:root[data-motion="reduce"] .ceremonia-destello { display: none; }
-:root[data-motion="reduce"] .ceremonia .modal-caja.es-srf { animation: none; }
-:root[data-motion="reduce"] .ranura-aura,
-:root[data-motion="reduce"] .ceremonia-fut { display: none; }
-/* la escena de apertura ya se apaga en su propio bloque (.cer-escena) */
-
-/* ==========================================================================
    5. PANEL / TARJETA GENÉRICA
    ========================================================================== */
 .panel {
-  padding: var(--space-5);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
 }
 /* Sin marco. Para paneles largos —el de abrir sala en duelos— donde el borde
    solo consigue que el contenido se lea como "un formulario": el fondo ya
@@ -2564,26 +1303,26 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  gap: var(--e-3);
+  margin-bottom: var(--e-4);
 }
 .panel-titulo { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
 
 /* cifra destacada de dashboard: el dato en mono, la etiqueta en caption */
-.dato { display: flex; flex-direction: column; gap: var(--space-1); }
+.dato { display: flex; flex-direction: column; gap: var(--e-1); }
 .dato b {
-  font-family: var(--font-mono);
+  font-family: var(--tipo-display);
   font-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
   font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 .dato span {
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 
 /* ==========================================================================
@@ -2592,20 +1331,20 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .alerta {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
   background: rgba(255, 255, 255, .03);
   font-size: var(--fs-body-sm);
   line-height: var(--lh-body);
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .alerta i { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-.alerta-success { background: var(--success-bg); border-color: var(--success-line); color: var(--success-text); }
-.alerta-warning { background: var(--warning-bg); border-color: var(--warning-line); color: var(--warning-text); }
-.alerta-danger  { background: var(--danger-bg);  border-color: var(--danger-line);  color: var(--danger-text); }
-.alerta-info    { background: var(--info-bg);    border-color: var(--info-line);    color: var(--info-text); }
+.alerta-success { background: var(--cesped-velo); border-color: var(--cesped-borde); color: var(--cesped-txt); }
+.alerta-warning { background: var(--amarilla-velo); border-color: var(--amarilla-borde); color: var(--amarilla-txt); }
+.alerta-danger  { background: var(--roja-velo);  border-color: var(--roja-borde);  color: var(--roja-txt); }
+.alerta-info    { background: var(--var-velo);    border-color: var(--var-borde);    color: var(--var-txt); }
 
 /* ==========================================================================
    7. PASTILLA DE ESTADO
@@ -2614,42 +1353,48 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .pastilla {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 4px var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
+  gap: var(--e-2);
+  padding: 4px var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, .04);
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
   letter-spacing: .04em;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .pastilla::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.pastilla-on   { background: var(--success-bg); border-color: var(--success-line); color: var(--success-text); }
-.pastilla-warn { background: var(--warning-bg); border-color: var(--warning-line); color: var(--warning-text); }
-.pastilla-off  { background: var(--danger-bg);  border-color: var(--danger-line);  color: var(--danger-text); }
+/* Una fracción como «11/11» dentro de una pastilla hereda el tracking .04em
+   de la etiqueta y lo compone sobre cada carácter: en cuatro dígitos y una
+   barra se nota como un hueco de más entre los números. La pastilla necesita
+   ese tracking para su TEXTO (una palabra corta en mayúsculas); una cifra no
+   lo necesita nunca. */
+.pastilla .mono { letter-spacing: normal; }
+.pastilla-on   { background: var(--cesped-velo); border-color: var(--cesped-borde); color: var(--cesped-txt); }
+.pastilla-warn { background: var(--amarilla-velo); border-color: var(--amarilla-borde); color: var(--amarilla-txt); }
+.pastilla-off  { background: var(--roja-velo);  border-color: var(--roja-borde);  color: var(--roja-txt); }
 
 /* ==========================================================================
    8. BARRA DE PROGRESO (álbum, misiones)
    ========================================================================== */
-.progreso { display: flex; align-items: center; gap: var(--space-3); min-width: 180px; }
+.progreso { display: flex; align-items: center; gap: var(--e-3); min-width: 180px; }
 .progreso-riel {
   flex: 1;
   height: 6px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, .07);
   overflow: hidden;
 }
 .progreso-relleno {
   height: 100%;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--amber), var(--amber-light));
-  transition: width var(--t-media) var(--ease);
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--brasa), var(--brasa-alta));
+  transition: width var(--t-estado) var(--curva);
 }
 .progreso-label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption-sm);
-  color: var(--frost-dim);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -2660,31 +1405,31 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    ========================================================================== */
 .tabla-wrap {
   overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
 }
 .tabla { width: 100%; border-collapse: collapse; min-width: 520px; }
 .tabla thead th {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
+  padding: var(--e-3) var(--e-4);
+  border-bottom: 1px solid var(--linea);
   text-align: left;
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
   white-space: nowrap;
 }
 .tabla tbody td {
-  padding: var(--space-4);
-  border-bottom: 1px solid var(--line);
+  padding: var(--e-4);
+  border-bottom: 1px solid var(--linea);
   font-size: var(--fs-body-sm);
 }
 .tabla tbody tr:last-child td { border-bottom: 0; }
-.tabla tbody tr { transition: background var(--t-micro) var(--ease); }
+.tabla tbody tr { transition: background var(--t-toque) var(--curva); }
 .tabla tbody tr:hover { background: rgba(255, 255, 255, .03); }
-.tabla .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.tabla .num { font-family: var(--tipo-display); font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ==========================================================================
    10. CHIP DE USUARIO (avatar + monedas)
@@ -2692,10 +1437,10 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .chip-usuario {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: 5px var(--space-4) 5px 5px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
+  gap: var(--e-3);
+  padding: 5px var(--e-4) 5px 5px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, .03);
 }
 .avatar {
@@ -2706,25 +1451,25 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   place-items: center;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--amber);
-  color: var(--amber-ink);
+  background: var(--brasa);
+  color: var(--brasa-tinta);
   font-size: calc(var(--avatar) * .4);
   font-weight: var(--fw-bold);
   line-height: 1;
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar--lg { --avatar: 96px; border-radius: var(--radius-xl); }
+.avatar--lg { --avatar: 96px; border-radius: var(--r-panel); }
 .avatar--sm { --avatar: 24px; }
 
 .monedas {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption);
+  gap: var(--e-1);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 
 /* ==========================================================================
@@ -2732,56 +1477,56 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    ========================================================================== */
 .tabs {
   display: flex;
-  gap: var(--space-5);
-  border-bottom: 1px solid var(--line);
+  gap: var(--e-5);
+  border-bottom: 1px solid var(--linea);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
   position: relative;
-  padding: var(--space-4) 0;
+  padding: var(--e-4) 0;
   border: 0;
   background: none;
-  color: var(--frost-dim);
-  font-size: var(--fs-caption);
+  color: var(--ceniza);
+  font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-caption);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--t-micro) var(--ease);
+  transition: color var(--t-toque) var(--curva);
 }
-.tab:hover { color: var(--frost); }
-.tab[aria-selected="true"] { color: var(--frost); }
+.tab:hover { color: var(--hueso); }
+.tab[aria-selected="true"] { color: var(--hueso); }
 .tab[aria-selected="true"]::after {
   content: '';
   position: absolute;
   left: 0; right: 0; bottom: -1px;
   height: 2px;
-  background: var(--amber);
+  background: var(--brasa);
 }
 .tab-panel[hidden] { display: none; }
 
 /* ==========================================================================
    12. PAGINACIÓN
    ========================================================================== */
-.paginacion { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+.paginacion { display: flex; justify-content: center; gap: var(--e-2); flex-wrap: wrap; }
 .pag-btn {
   min-width: 44px;
   height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  padding: 0 var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
   background: transparent;
-  color: var(--frost-dim);
-  font-family: var(--font-mono);
-  font-size: var(--fs-caption);
+  color: var(--ceniza);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
   cursor: pointer;
-  transition: border-color var(--t-micro) var(--ease), color var(--t-micro) var(--ease);
+  transition: border-color var(--t-toque) var(--curva), color var(--t-toque) var(--curva);
 }
-.pag-btn:hover { border-color: var(--line-strong); color: var(--frost); }
-.pag-btn[aria-current="page"] { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); font-weight: var(--fw-bold); }
+.pag-btn:hover { border-color: var(--linea-viva); color: var(--hueso); }
+.pag-btn[aria-current="page"] { background: var(--brasa); border-color: var(--brasa); color: var(--brasa-tinta); font-weight: var(--fw-bold); }
 
 /* ==========================================================================
    13. ESTADO VACÍO
@@ -2791,25 +1536,25 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-8) var(--space-5);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
+  gap: var(--e-3);
+  padding: var(--e-8) var(--e-5);
+  border: 1px dashed var(--linea-viva);
+  border-radius: var(--r-carta);
   text-align: center;
 }
 .vacio-ico {
   display: grid;
   place-items: center;
   width: 52px; height: 52px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--linea);
   border-radius: 50%;
   background: rgba(255, 255, 255, .03);
   font-size: 22px;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .vacio h3 { font-size: var(--fs-h3); }
-.vacio p { max-width: 42ch; font-size: var(--fs-body-sm); color: var(--frost-dim); }
-.vacio .btn { margin-top: var(--space-2); }
+.vacio p { max-width: 42ch; font-size: var(--fs-body-sm); color: var(--ceniza); }
+.vacio .btn { margin-top: var(--e-2); }
 
 /* ==========================================================================
    14. SKELETON
@@ -2817,7 +1562,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .skeleton {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-chip);
   background: rgba(255, 255, 255, .06);
 }
 .skeleton::after {
@@ -2843,27 +1588,27 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: var(--e-4);
   background: rgba(6, 7, 9, .72);
   backdrop-filter: blur(6px);
   opacity: 0;
   visibility: hidden;
-  transition: opacity var(--t-media) var(--ease), visibility 0s linear var(--t-media);
+  transition: opacity var(--t-estado) var(--curva), visibility 0s linear var(--t-estado);
 }
-.modal.is-abierto { opacity: 1; visibility: visible; transition: opacity var(--t-media) var(--ease); }
+.modal.is-abierto { opacity: 1; visibility: visible; transition: opacity var(--t-estado) var(--curva); }
 
 .modal-caja {
   width: 100%;
   max-width: 560px;
   max-height: 88vh;
   overflow-y: auto;
-  padding: var(--space-6);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-xl);
-  background: var(--panel-2);
-  box-shadow: var(--shadow-lg);
+  padding: var(--e-6);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
   transform: scale(.97) translateY(8px);
-  transition: transform var(--t-media) var(--ease);
+  transition: transform var(--t-estado) var(--curva);
 }
 .modal.is-abierto .modal-caja { transform: none; }
 .modal-caja--ancha { max-width: 780px; }
@@ -2872,24 +1617,24 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  gap: var(--e-4);
+  margin-bottom: var(--e-5);
 }
 .modal-cerrar {
   display: grid;
   place-items: center;
   width: 44px; height: 44px;
-  margin: calc(var(--space-2) * -1);
+  margin: calc(var(--e-2) * -1);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-chip);
   background: none;
-  color: var(--frost-dim);
+  color: var(--ceniza);
   font-size: 20px;
   cursor: pointer;
-  transition: color var(--t-micro) var(--ease), background var(--t-micro) var(--ease);
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
 }
-.modal-cerrar:hover { color: var(--frost); background: rgba(255, 255, 255, .05); }
-.modal-pie { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+.modal-cerrar:hover { color: var(--hueso); background: rgba(255, 255, 255, .05); }
+.modal-pie { display: flex; justify-content: flex-end; gap: var(--e-3); margin-top: var(--e-6); flex-wrap: wrap; }
 
 /* ==========================================================================
    14b. MODAL DE FICHA DE CARTA
@@ -2902,42 +1647,42 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   max-width: 860px;
   display: grid;
   grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
-  gap: var(--space-6);
+  gap: var(--e-6);
   align-items: start;
 }
-.ficha-cerrar { position: absolute; top: var(--space-4); right: var(--space-4); }
+.ficha-cerrar { position: absolute; top: var(--e-4); right: var(--e-4); }
 
 .ficha-datos {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--e-5);
   /* deja sitio al botón de cerrar, que flota en la esquina */
-  padding-right: var(--space-7);
+  padding-right: var(--e-7);
 }
 .ficha-titulo-fila {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--e-3);
   flex-wrap: wrap;
   margin: 0;
 }
-.ficha-meta { margin: calc(var(--space-4) * -1) 0 0; font-size: var(--fs-body-sm); }
+.ficha-meta { margin: calc(var(--e-4) * -1) 0 0; font-size: var(--fs-body-sm); }
 
 .ficha-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--e-3);
 }
 .ficha-stat {
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel);
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
 }
 .ficha-stat-cifra {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--e-2);
   margin: 0;
 }
 /* El icono lleva el color pleno; la cifra, la variante legible sobre oscuro.
@@ -2945,16 +1690,16 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .ficha-stat-cifra i { font-size: 18px; }
 .ficha-stat-cifra b { font-size: var(--fs-h3); line-height: 1; }
 .ficha-stat-etiqueta {
-  margin: var(--space-1) 0 var(--space-2);
-  font-size: var(--fs-caption-sm);
+  margin: var(--e-1) 0 var(--e-2);
+  font-size: var(--fs-micro);
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .ficha-stat-barra {
   display: block;
   height: 4px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, .08);
   overflow: hidden;
 }
@@ -2962,41 +1707,41 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: block;
   height: 100%;
   border-radius: inherit;
-  transition: width var(--t-media) var(--ease);
+  transition: width var(--t-estado) var(--curva);
 }
 
-.ficha-stat--ata .ficha-stat-cifra i { color: var(--stat-ata); }
-.ficha-stat--ata .ficha-stat-cifra b { color: var(--stat-ata-text); }
-.ficha-stat--ata .ficha-stat-barra i { background: var(--stat-ata); }
+.ficha-statvar(--ata) .ficha-stat-cifra i { color: var(--ata); }
+.ficha-statvar(--ata) .ficha-stat-cifra b { color: var(--ata-txt); }
+.ficha-statvar(--ata) .ficha-stat-barra i { background: var(--ata); }
 
-.ficha-stat--def .ficha-stat-cifra i { color: var(--stat-def); }
-.ficha-stat--def .ficha-stat-cifra b { color: var(--stat-def-text); }
-.ficha-stat--def .ficha-stat-barra i { background: var(--stat-def); }
+.ficha-statvar(--def) .ficha-stat-cifra i { color: var(--def); }
+.ficha-statvar(--def) .ficha-stat-cifra b { color: var(--def-txt); }
+.ficha-statvar(--def) .ficha-stat-barra i { background: var(--def); }
 
-.ficha-stat--tec .ficha-stat-cifra i { color: var(--stat-tec); }
-.ficha-stat--tec .ficha-stat-cifra b { color: var(--stat-tec-text); }
-.ficha-stat--tec .ficha-stat-barra i { background: var(--stat-tec); }
+.ficha-statvar(--tec) .ficha-stat-cifra i { color: var(--tec); }
+.ficha-statvar(--tec) .ficha-stat-cifra b { color: var(--tec-txt); }
+.ficha-statvar(--tec) .ficha-stat-barra i { background: var(--tec); }
 
 .ficha-etiqueta {
-  margin: 0 0 var(--space-1);
-  font-size: var(--fs-caption-sm);
+  margin: 0 0 var(--e-1);
+  font-size: var(--fs-micro);
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .ficha-bloque p:last-child { margin: 0; }
-.ficha-afinidad { display: flex; align-items: center; gap: var(--space-2); }
+.ficha-afinidad { display: flex; align-items: center; gap: var(--e-2); }
 .ficha-afinidad .carta-afinidad { width: 26px; height: 26px; flex-shrink: 0; }
-.ficha-acciones { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.ficha-acciones { display: flex; gap: var(--e-3); flex-wrap: wrap; }
 .ficha-acciones:empty { display: none; }
 
 /* En móvil el arte se pone arriba y encoge: a pantalla estrecha la carta a
    tamaño completo empujaba las estadísticas fuera de la vista. */
 @media (max-width: 700px) {
-  .modal-caja--ficha { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .modal-caja--ficha { grid-template-columns: minmax(0, 1fr); gap: var(--e-5); }
   .ficha-arte { max-width: 200px; margin-inline: auto; }
   .ficha-datos { padding-right: 0; }
-  .ficha-stats { gap: var(--space-2); }
+  .ficha-stats { gap: var(--e-2); }
 }
 :root[data-motion="reduce"] .ficha-stat-barra i { transition: none; }
 
@@ -3008,16 +1753,16 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .selector-cartas {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: var(--space-3);
+  gap: var(--e-3);
   max-height: 40vh;
-  padding: var(--space-1);
+  padding: var(--e-1);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 .selector-cartas::-webkit-scrollbar { width: 6px; }
 .selector-cartas::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-pill);
-  background: var(--line-strong);
+  border-radius: var(--r-pill);
+  background: var(--linea-viva);
 }
 
 /* `.selector-cartas--grande` se ha RETIRADO: era la rejilla de tarjetas del
@@ -3026,7 +1771,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    El resto de `.selector-*` sigue en uso: apuesta de duelo, venta en el
    mercado y botín del editor de nodos. */
 
-.selector-item { display: block; cursor: pointer; border-radius: var(--radius-lg); }
+.selector-item { display: block; cursor: pointer; border-radius: var(--r-carta); }
 .selector-item[hidden] { display: none; }
 .selector-item .carta-meta,
 .selector-item .carta-afinidad { display: none; }
@@ -3034,7 +1779,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .selector-item .rz { font-size: 8.5px; padding: 3px 5px; }
 
 /* el foco del teclado se ve sobre la tarjeta entera, no sobre el radio oculto */
-.selector-item:focus-within { outline: 2px solid var(--amber-light); outline-offset: 3px; }
+.selector-item:focus-within { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
 /* marca de elegida: el check va dibujado en CSS, no con un glifo de la fuente
    de iconos, para que no dependa de que Phosphor haya cargado */
 .selector-item.esta-elegida { position: relative; }
@@ -3045,8 +1790,8 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   z-index: 5;
   width: 22px; height: 22px;
   border-radius: 50%;
-  background: var(--amber);
-  box-shadow: 0 0 0 2px var(--panel-2);
+  background: var(--brasa);
+  box-shadow: 0 0 0 2px var(--carbon-alto);
 }
 .selector-item.esta-elegida::after {
   content: '';
@@ -3054,17 +1799,17 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   top: -1px; right: 1px;
   z-index: 6;
   width: 5px; height: 9px;
-  border-right: 2px solid var(--amber-ink);
-  border-bottom: 2px solid var(--amber-ink);
+  border-right: 2px solid var(--brasa-tinta);
+  border-bottom: 2px solid var(--brasa-tinta);
   transform: rotate(45deg);
 }
 
 .selector-vacio {
   grid-column: 1 / -1;
-  padding: var(--space-6) var(--space-4);
+  padding: var(--e-6) var(--e-4);
   text-align: center;
   font-size: var(--fs-body-sm);
-  color: var(--frost-dim);
+  color: var(--ceniza);
 }
 .selector-vacio[hidden] { display: none; }
 
@@ -3075,33 +1820,33 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .toast-zona {
   position: fixed;
   left: 50%;
-  bottom: var(--space-5);
+  bottom: var(--e-5);
   z-index: var(--z-toast);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  width: min(420px, calc(100vw - var(--space-8)));
+  gap: var(--e-2);
+  width: min(420px, calc(100vw - var(--e-8)));
   pointer-events: none;
 }
 .toast {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-md);
-  background: var(--panel-2);
-  box-shadow: var(--shadow-lg);
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-alerta);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
   font-size: var(--fs-body-sm);
   pointer-events: auto;
-  animation: toastEntra var(--t-media) var(--ease);
+  animation: toastEntra var(--t-estado) var(--curva);
 }
 @keyframes toastEntra { from { opacity: 0; transform: translateY(12px); } }
 .toast i { font-size: 18px; }
-.toast-success i { color: var(--success); }
-.toast-danger i { color: var(--danger); }
-.toast-info i { color: var(--info); }
+.toast-success i { color: var(--cesped); }
+.toast-danger i { color: var(--roja); }
+.toast-info i { color: var(--var); }
 
 /* ==========================================================================
    INSIGNIA DE UNIVERSO (migración `035`)
@@ -3117,7 +1862,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   padding: 2px 7px;
   border: 1px solid;
   border-radius: 999px;
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   font-weight: var(--fw-semibold);
   letter-spacing: .06em;
   line-height: 1.5;
@@ -3127,9 +1872,9 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    en el sistema y no compiten con los colores de rareza, que son los que de
    verdad hay que distinguir de un vistazo. */
 .universo--srf {
-  border-color: var(--amber-line);
-  background: var(--amber-soft);
-  color: var(--amber-light);
+  border-color: var(--brasa-borde);
+  background: var(--brasa-velo);
+  color: var(--brasa-alta);
 }
 .universo--ie {
   border-color: rgba(120, 170, 255, .38);
@@ -3183,8 +1928,8 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   width: min(300px, calc(100vw - 24px));
   max-height: min(38vh, 260px);
   /* Sin velo detrás, el globo tiene que sostenerse solo sobre la página. */
-  background: var(--panel-2);
-  border-color: var(--amber-line, var(--line-strong));
+  background: var(--carbon-alto);
+  border-color: var(--amber-line, var(--linea-viva));
   box-shadow: 0 18px 50px rgba(0, 0, 0, .75);
 }
 
@@ -3192,12 +1937,12 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
    sombra, y sin anillo el hueco se lee como un fallo de pintado. */
 .tutorial-foco {
   position: absolute;
-  border: 2px solid var(--amber);
-  border-radius: var(--radius-lg);
+  border: 2px solid var(--brasa);
+  border-radius: var(--r-carta);
   box-shadow: 0 0 0 4px rgba(232, 117, 42, .18), 0 12px 40px rgba(0, 0, 0, .6);
   pointer-events: none;
-  transition: top var(--t-media) var(--ease), left var(--t-media) var(--ease),
-              width var(--t-media) var(--ease), height var(--t-media) var(--ease);
+  transition: top var(--t-estado) var(--curva), left var(--t-estado) var(--curva),
+              width var(--t-estado) var(--curva), height var(--t-estado) var(--curva);
 }
 
 .tutorial-globo {
@@ -3213,12 +1958,12 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
      y ahí no estorba a nada. */
   max-height: min(42vh, 300px);
   overflow-y: auto;
-  padding: var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-xl);
-  background: var(--panel-2);
-  box-shadow: var(--shadow-lg);
-  transition: top var(--t-media) var(--ease), left var(--t-media) var(--ease);
+  padding: var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  transition: top var(--t-estado) var(--curva), left var(--t-estado) var(--curva);
 }
 /* Los pasos que no señalan nada (bienvenida y despedida) van centrados. */
 /* Centrado SOLO en los pasos que no señalan nada (bienvenida y despedida).
@@ -3230,41 +1975,41 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   transform: translate(-50%, -50%);
   width: min(440px, calc(100vw - 32px));
 }
-.tutorial-globo h2 { font-size: var(--fs-h3); margin: var(--space-2) 0; }
-.tutorial-globo p { font-size: var(--fs-body-sm); color: var(--frost-dim); }
+.tutorial-globo h2 { font-size: var(--fs-h3); margin: var(--e-2) 0; }
+.tutorial-globo p { font-size: var(--fs-body-sm); color: var(--ceniza); }
 
 .tutorial-cuenta {
-  font-size: var(--fs-caption-sm);
+  font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: var(--amber-light);
+  color: var(--brasa-alta);
 }
 
 /* Lo que falta por hacer en los dos pasos con puerta. Ámbar y no rojo: no es
    un error, es una tarea pendiente. */
 .tutorial-pendiente {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--warning-line);
-  border-radius: var(--radius-md);
-  background: var(--warning-bg);
-  color: var(--warning-text) !important;
-  font-size: var(--fs-caption);
+  margin-top: var(--e-3);
+  padding: var(--e-3);
+  border: 1px solid var(--amarilla-borde);
+  border-radius: var(--r-alerta);
+  background: var(--amarilla-velo);
+  color: var(--amarilla-txt) !important;
+  font-size: var(--fs-label);
 }
 
 .tutorial-botones {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--e-3);
   flex-wrap: wrap;
-  margin-top: var(--space-4);
+  margin-top: var(--e-4);
 }
-.tutorial-botones-avance { display: flex; gap: var(--space-2); }
+.tutorial-botones-avance { display: flex; gap: var(--e-2); }
 
 /* Botón de acción del tutorial (crear el partido de prueba). Va separado de
    los de navegación: no avanza el tutorial, hace algo. */
-.tutorial-accion { margin-top: var(--space-3); width: 100%; }
+.tutorial-accion { margin-top: var(--e-3); width: 100%; }
 
 /* ---- EL TUTORIAL EN PANTALLA PEQUEÑA ----
    El globo pasa a ser una hoja pegada al borde de abajo, que es donde llega el
@@ -3296,7 +2041,7 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
     top: calc(var(--nav-h) + 12px) !important;
   }
 
-  .tutorial-botones { gap: var(--space-2); }
+  .tutorial-botones { gap: var(--e-2); }
   .tutorial-globo .btn { min-height: 44px; }
   .tutorial-accion { min-height: 44px; }
 }
@@ -3310,15 +2055,15 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-5);
+  gap: var(--e-5);
   flex-wrap: wrap;
-  margin-bottom: var(--space-6);
-  padding: var(--space-5);
-  border: 1px solid var(--amber-line);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(120deg, var(--amber-soft), transparent 60%), var(--panel);
+  margin-bottom: var(--e-6);
+  padding: var(--e-5);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-panel);
+  background: linear-gradient(120deg, var(--brasa-velo), transparent 60%), var(--carbon);
 }
-.sobre-inicial-texto { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
+.sobre-inicial-texto { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; flex: 1; }
 .sobre-inicial h2 { font-size: var(--fs-h3); }
 .sobre-inicial .pastilla { align-self: flex-start; }
 
@@ -3331,25 +2076,25 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .pie-beta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
-  border: 1px solid var(--warning-line);
-  border-radius: var(--radius-lg);
-  background: var(--warning-bg);
+  gap: var(--e-2);
+  margin-bottom: var(--e-5);
+  padding: var(--e-4);
+  border: 1px solid var(--amarilla-borde);
+  border-radius: var(--r-carta);
+  background: var(--amarilla-velo);
 }
-.pie-beta p { color: var(--frost-dim); }
+.pie-beta p { color: var(--ceniza); }
 .pie-beta-titulo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--warning-text) !important;
+  gap: var(--e-2);
+  color: var(--amarilla-txt) !important;
   font-size: var(--fs-body-sm);
   font-weight: var(--fw-semibold);
 }
 .pie-beta-canales {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--e-4);
   flex-wrap: wrap;
   margin-top: var(--space-1, 4px);
 }
@@ -3359,8 +2104,8 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   gap: 6px;
   /* 44px de alto: es un enlace que se pulsa con el dedo. */
   min-height: 44px;
-  color: var(--warning-text);
-  font-size: var(--fs-caption);
+  color: var(--amarilla-txt);
+  font-size: var(--fs-label);
   text-decoration: none;
 }
 .pie-beta-canales a:hover { text-decoration: underline; }
@@ -3380,20 +2125,20 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  gap: var(--e-4);
+  margin-bottom: var(--e-5);
+  padding: var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-carta);
   /* Opaco a propósito: va pegada arriba y las filas pasan por debajo. */
-  background: var(--panel-2);
+  background: var(--carbon-alto);
 }
 .descarte-barra p { margin: 0; }
-.descarte-acciones { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.descarte-acciones { display: flex; flex-wrap: wrap; gap: var(--e-2); }
 
 .descarte-lista {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--e-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -3401,11 +2146,11 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .descarte-fila {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--panel);
+  gap: var(--e-4);
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
 }
 .descarte-carta { flex: 0 0 auto; width: 84px; }
 .descarte-datos { flex: 1 1 auto; min-width: 0; }
@@ -3419,8 +2164,8 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
 .descarte-copias {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  gap: var(--e-2);
+  margin-top: var(--e-3);
 }
 .descarte-copia {
   display: inline-flex;
@@ -3429,23 +2174,23 @@ button.carta-fila-nombre:focus-visible { outline: 2px solid var(--amber-light); 
   /* 44 px de alto: es un objetivo táctil, y aquí se pulsa muchas veces
      seguidas en móvil. */
   min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  padding: 0 var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-chip);
   cursor: pointer;
-  font-size: var(--fs-caption);
-  color: var(--frost-dim);
-  transition: border-color var(--t-micro) var(--ease), color var(--t-micro) var(--ease);
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+  transition: border-color var(--t-toque) var(--curva), color var(--t-toque) var(--curva);
 }
-.descarte-copia:hover { color: var(--frost); border-color: var(--frost-dim); }
+.descarte-copia:hover { color: var(--hueso); border-color: var(--ceniza); }
 .descarte-copia:has(input:checked) {
-  color: var(--amber-light);
-  border-color: var(--amber);
+  color: var(--brasa-alta);
+  border-color: var(--brasa);
   background: rgba(232, 117, 42, .08);
 }
 
 @media (max-width: 600px) {
-  .descarte-barra { top: 0; padding: var(--space-3); }
+  .descarte-barra { top: 0; padding: var(--e-3); }
   .descarte-acciones { width: 100%; }
   .descarte-acciones .btn-primario { flex: 1 1 100%; }
   .descarte-carta { width: 64px; }

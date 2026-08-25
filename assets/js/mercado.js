@@ -70,7 +70,7 @@
          dejaba el anuncio en pantalla como si no hubiera pasado nada. */
       var carta = form.closest('.carta, .carta-fila');
       if (carta) {
-        carta.style.transition = 'opacity 200ms var(--ease), transform 200ms var(--ease)';
+        carta.style.transition = 'opacity 200ms var(--curva), transform 200ms var(--curva)';
         carta.style.opacity = '0';
         carta.style.transform = 'scale(.96)';
         setTimeout(function () { carta.remove(); }, 200);

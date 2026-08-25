@@ -1,0 +1,315 @@
+/* ==========================================================================
+   PANTALLA: PORTADA (captación, sin sesión)
+   --------------------------------------------------------------------------
+   La pantalla más editorial del sitio y la única que usa los ocho dispositivos
+   visuales. Móvil primero.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. HERO
+   ========================================================================== */
+.pt-hero {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-8) var(--e-7);
+  border-bottom: 1px solid var(--linea);
+}
+.pt-hero-cuerpo {
+  position: relative;
+  display: grid;
+  gap: var(--e-7);
+}
+
+/* El único tamaño display del sitio, y aparece dos veces en toda la web: aquí
+   y en el cierre de esta misma página. Si apareciera en más pantallas dejaría
+   de significar «esto es lo importante». */
+.pt-display {
+  font-size: var(--fs-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--track-display);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  /* `margin-block` y NO el atajo `margin`: el atajo escribe también el eje
+     horizontal, y como esta hoja se carga después de ascua.css se cargaba por
+     delante el `margin-inline: -6vw` de `.a-sangre` — la tipografía a sangre
+     dejaba de sangrar y nadie se enteraba, porque no falla nada, simplemente
+     se queda dentro del margen. */
+  margin-block: var(--e-3) var(--e-5);
+  text-wrap: balance;
+}
+
+.pt-lede {
+  font-size: 1.125rem;
+  line-height: 1.5;
+  color: var(--ceniza);
+  max-width: 44ch;
+  margin-block: 0 var(--e-6);
+}
+
+.pt-acciones { display: flex; flex-wrap: wrap; gap: var(--e-3); align-items: center; }
+
+.pt-cta {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: 52px;
+  padding-inline: var(--e-6);
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  box-shadow: var(--halo);
+  transition: transform var(--t-toque) var(--curva);
+}
+@media (hover: hover) { .pt-cta:hover { transform: translateY(-2px); } }
+.pt-cta:active { transform: translateY(0) scale(.98); }
+.pt-cta:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 4px; }
+
+.pt-cta-suave {
+  display: inline-flex; align-items: center;
+  min-height: 52px;
+  padding-inline: var(--e-4);
+  color: var(--ceniza);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+@media (hover: hover) { .pt-cta-suave:hover { color: var(--hueso); } }
+.pt-cta-suave:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ---- dispositivo 2: la carta delante de la palabra en hueco ---- */
+.pt-escena {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 300px;
+}
+.pt-escena .tipo-fondo { top: 50%; transform: translateY(-50%); }
+.pt-carta { position: relative; z-index: 1; width: min(230px, 62vw); }
+
+/* ==========================================================================
+   SECCIONES
+   ========================================================================== */
+.pt-seccion { padding-block: var(--e-8); }
+
+.pt-h2 {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  letter-spacing: var(--track-h2);
+  text-transform: uppercase;
+  margin: var(--e-2) 0 var(--e-5);
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+.pt-parrafo {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ceniza);
+  max-width: var(--medida);
+  margin: 0 0 var(--e-4);
+}
+.pt-parrafo b { color: var(--hueso); font-weight: var(--fw-semibold); }
+
+.pt-nota {
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+  max-width: var(--medida);
+  margin-top: var(--e-5);
+}
+.pt-nota a { color: var(--brasa-alta); }
+
+.pt-cabecera-fila {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--e-4); flex-wrap: wrap;
+}
+.pt-cabecera-fila .pt-h2 { margin-bottom: 0; }
+
+.pt-mas {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: 44px;
+  color: var(--brasa-alta);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@media (hover: hover) { .pt-mas:hover { color: var(--hueso); } }
+.pt-mas:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   3. CÓMO SE JUEGA — tres pasos
+   Aquí la numeración SÍ es información: cada paso lleva al siguiente. En el
+   resto del sitio los rótulos «01/02» estarían de adorno y no se usan.
+   ========================================================================== */
+.pt-pasos {
+  display: grid;
+  gap: var(--e-3);
+  margin: 0; padding: 0;
+  list-style: none;
+  counter-reset: paso;
+}
+.pt-paso {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--e-3);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-panel);
+  background: var(--carbon);
+}
+.pt-paso p { margin: 0; font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+.pt-paso-n {
+  position: absolute;
+  top: var(--e-4); right: var(--e-5);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: 2.5rem;
+  line-height: 1;
+  letter-spacing: -.04em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--linea-viva);
+  font-variant-numeric: tabular-nums;
+}
+.pt-paso-ico { font-size: 28px; color: var(--brasa-alta); }
+.pt-paso-titulo {
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+
+/* Dispositivo 4: UNA superficie invertida entre las oscuras. Es lo que impide
+   que los tres pasos se lean como un bloque uniforme. */
+.pt-paso--claro {
+  background: var(--hueso);
+  border-color: transparent;
+  color: var(--negro);
+}
+.pt-paso--claro p { color: rgba(8, 7, 10, .68); }
+.pt-paso--claro .pt-paso-ico { color: var(--brasa-honda); }
+.pt-paso--claro .pt-paso-n { -webkit-text-stroke-color: rgba(8, 7, 10, .22); }
+
+/* ==========================================================================
+   4. LAS SIETE RAREZAS
+   Cada fila lleva el color de su rareza, pero el NOMBRE va siempre en hueso:
+   los tonos de rareza no están auditados como texto sobre fondo oscuro, y una
+   lista es texto, no decoración.
+   ========================================================================== */
+.pt-rarezas { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+
+.pt-rareza {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--e-4);
+  min-height: 56px;
+  padding: var(--e-3) 0;
+  border-bottom: 1px solid var(--linea);
+}
+.pt-rareza:first-child { border-top: 1px solid var(--linea); }
+
+.pt-rareza-punto {
+  width: 10px; height: 10px; border-radius: var(--r-pill);
+  background: var(--tono);
+  box-shadow: 0 0 12px -2px var(--tono);
+}
+.pt-rareza-nombre {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+  color: var(--hueso);
+}
+.pt-rareza-odds {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  /* la tinta de cada rareza SÍ está auditada para texto (los `-ink`) */
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   5. VITRINA
+   ========================================================================== */
+.pt-vitrina {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-3);
+  margin: var(--e-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ==========================================================================
+   6. LOS NÚMEROS
+   ========================================================================== */
+.pt-numeros {
+  padding-block: var(--e-8);
+  border-block: 1px solid var(--linea);
+  background: var(--pozo);
+}
+.pt-cifras {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--e-5) var(--e-4);
+  margin: var(--e-5) 0 0;
+}
+.pt-cifra { display: flex; flex-direction: column-reverse; gap: var(--e-1); min-width: 0; }
+.pt-cifra dd { margin: 0; }
+.pt-cifra .cif {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: clamp(2rem, 1.3rem + 3vw, 3.25rem);
+  line-height: .9;
+  letter-spacing: -.035em;
+  color: var(--brasa-alta);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   7. CIERRE
+   ========================================================================== */
+.pt-cierre {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-9) var(--e-8);
+  text-align: center;
+}
+.pt-cierre-cuerpo { position: relative; }
+.pt-cierre .pt-lede { margin-inline: auto; }
+.pt-cierre .pt-acciones { justify-content: center; }
+
+/* ==========================================================================
+   ESCRITORIO
+   ========================================================================== */
+@media (min-width: 768px) {
+  .pt-pasos { grid-template-columns: repeat(3, 1fr); }
+  .pt-vitrina { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-4); }
+  .pt-cifras { grid-template-columns: repeat(4, 1fr); }
+  .pt-rareza { grid-template-columns: auto 1fr auto; gap: var(--e-5); }
+}
+
+@media (min-width: 1024px) {
+  .pt-hero { padding-block: var(--e-9) var(--e-8); }
+  /* El texto manda y la carta acompaña: 1.15fr a la izquierda para que el
+     titular a sangre tenga sitio de sobra antes de que la escena le quite
+     ancho. */
+  .pt-hero-cuerpo { grid-template-columns: 1.15fr .85fr; align-items: center; gap: var(--e-8); }
+  .pt-escena { min-height: 420px; }
+  .pt-carta { width: 280px; }
+
+  .pt-vitrina { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .pt-seccion { padding-block: var(--e-9); }
+}

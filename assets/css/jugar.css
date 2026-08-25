@@ -1,0 +1,355 @@
+/* ==========================================================================
+   PANTALLA: JUGAR
+   --------------------------------------------------------------------------
+   El centro de mando de los cuatro modos. Móvil primero.
+   ========================================================================== */
+
+.jg-cabecera {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-6) var(--e-5);
+  border-bottom: 1px solid var(--linea);
+}
+.jg-cabecera-cuerpo { position: relative; }
+.jg-titulo {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  letter-spacing: var(--track-h1);
+  text-transform: uppercase;
+  margin: var(--e-2) 0 0;
+}
+
+.jg-cuerpo { padding-block: var(--e-5) var(--e-8); }
+
+.jg-seccion-titulo {
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  letter-spacing: var(--track-label);
+  color: var(--ceniza);
+  margin: var(--e-7) 0 var(--e-4);
+}
+.jg-cuerpo > .jg-seccion-titulo:first-of-type { margin-top: var(--e-7); }
+
+.jg-cabecera-fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--e-4);
+  flex-wrap: wrap;
+}
+.jg-cabecera-fila .jg-seccion-titulo { margin-bottom: var(--e-4); }
+
+.jg-mas {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 44px;
+  color: var(--brasa-alta);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@media (hover: hover) { .jg-mas:hover { color: var(--hueso); } }
+.jg-mas:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   DISPOSICIÓN — ¿puede jugar ya?
+   Va antes que los modos porque es la puerta: sin once completo, dos de los
+   cuatro están cerrados. El color lo marca el estado real, y el icono y el
+   rótulo dicen lo mismo que el color: nadie tiene que distinguir verde de
+   ámbar para entenderlo.
+   ========================================================================== */
+.jg-listo {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--e-3) var(--e-4);
+  padding: var(--e-5);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: transform var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) { .jg-listo:hover { transform: translateY(-2px); } }
+.jg-listo:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.jg-listo-ico {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; flex: none;
+  border-radius: var(--r-chip);
+  font-size: 24px;
+}
+.jg-listo-cuerpo { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; }
+.jg-listo-titulo {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.jg-listo-texto { font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+.jg-listo-accion {
+  grid-column: 1 / -1;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2);
+  min-height: 44px;
+  padding-inline: var(--e-5);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--linea-viva);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* No tiene ninguna alineación: está parado, y eso es lo urgente */
+.jg-listo.es-no { border-color: var(--roja-borde); box-shadow: 0 0 0 1px var(--roja-borde); }
+.jg-listo.es-no .jg-listo-ico { background: var(--roja-velo); color: var(--roja-txt); }
+.jg-listo.es-no .jg-listo-rotulo { color: var(--roja-txt); }
+.jg-listo.es-no .jg-listo-accion { background: var(--fuego); color: var(--brasa-tinta); border-color: transparent; }
+
+/* Tiene algo pero no puede salir: le falta un paso concreto */
+.jg-listo.es-casi { border-color: var(--amarilla-borde); }
+.jg-listo.es-casi .jg-listo-ico { background: var(--amarilla-velo); color: var(--amarilla-txt); }
+.jg-listo.es-casi .jg-listo-rotulo { color: var(--amarilla-txt); }
+.jg-listo.es-casi .jg-listo-accion { background: var(--fuego); color: var(--brasa-tinta); border-color: transparent; }
+
+/* Listo: se dice y se quita de en medio. Sin halo ni relleno — si el estado
+   bueno grita igual que el malo, el aviso deja de significar nada. */
+.jg-listo.es-si { border-color: var(--cesped-borde); }
+.jg-listo.es-si .jg-listo-ico { background: var(--cesped-velo); color: var(--cesped-txt); }
+.jg-listo.es-si .jg-listo-rotulo { color: var(--cesped-txt); }
+.jg-listo.es-si .jg-listo-accion { color: var(--ceniza); }
+
+/* ==========================================================================
+   LOS CUATRO MODOS
+
+   MÓVIL: filas anchas con placa de icono, el mismo lenguaje que la hoja de la
+   barra. Es lo que se toca con el pulgar mientras se anda, y una rejilla de
+   cuadraditos ahí es peor: menos sitio para el dedo y sin espacio para decir
+   qué es cada modo.
+   ESCRITORIO: bento de cuatro, que es donde el ancho sí da para leerlos en
+   paralelo de un vistazo.
+   ========================================================================== */
+.jg-bento { display: flex; flex-direction: column; gap: var(--e-2); }
+
+.jg-modo {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--e-4);
+  min-height: 76px;
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  box-shadow: var(--elev-1);
+  color: var(--hueso);
+  text-decoration: none;
+  overflow: hidden;
+  transition: transform var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) {
+  .jg-modo:hover { transform: translateY(-2px); border-color: var(--linea-viva); }
+}
+.jg-modo:active { transform: scale(.985); transition-duration: var(--t-instante); }
+.jg-modo:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.jg-modo-placa {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; flex: none;
+  border-radius: var(--r-chip);
+  background: var(--brasa-velo);
+  border: 1px solid var(--brasa-borde);
+  color: var(--brasa-alta);
+  font-size: 23px;
+}
+.jg-modo-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jg-modo-nombre {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+}
+.jg-modo-que { font-size: var(--fs-body-sm); color: var(--ceniza); overflow-wrap: anywhere; }
+
+.jg-modo-estado { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.jg-modo .cif {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: 1.75rem;
+  line-height: .9;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.jg-modo-pie {
+  font-size: var(--fs-micro);
+  font-family: var(--tipo-display);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  color: var(--ceniza);
+  max-width: 12ch;
+}
+.jg-modo-barra { grid-column: 1 / -1; height: 5px; }
+
+/* Sobres con el relleno de brasa: es lo que más engancha de un TCG y se ve al
+   instante, sin romper la rejilla ni depender de que ocupe más sitio. */
+.jg-modo--destacado { background: var(--fuego); border-color: transparent; color: var(--brasa-tinta); }
+.jg-modo--destacado .jg-modo-que,
+.jg-modo--destacado .jg-modo-pie { color: rgba(20, 6, 0, .70); }
+.jg-modo--destacado .cif { color: var(--brasa-tinta); }
+.jg-modo--destacado .jg-modo-placa {
+  background: rgba(20, 6, 0, .18);
+  border-color: rgba(20, 6, 0, .30);
+  color: var(--brasa-tinta);
+}
+@media (hover: hover) {
+  .jg-modo--destacado:hover { border-color: transparent; box-shadow: var(--halo); }
+}
+
+/* Aviso de que ahí hay algo que atender. Solo lo llevan los que de verdad
+   piden acción: si lo llevaran los cuatro, no marcaría nada. */
+.jg-modo.es-urgente::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 12px; bottom: 12px;
+  width: 3px;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--fuego);
+}
+.jg-modo--destacado.es-urgente::after { background: var(--brasa-tinta); opacity: .5; }
+
+/* ==========================================================================
+   SALAS ABIERTAS
+   ========================================================================== */
+.jg-salas,
+.jg-mazos { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+
+.jg-sala {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--e-1) var(--e-4);
+  min-height: 56px;
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) { .jg-sala:hover { border-color: var(--brasa-borde); } }
+.jg-sala:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+
+.jg-sala-quien {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+.jg-sala-apuesta { grid-column: 1; font-size: var(--fs-body-sm); color: var(--ceniza); }
+.jg-sala-entrar {
+  grid-row: span 2;
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--brasa-alta);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   TUS ALINEACIONES
+   ========================================================================== */
+.jg-mazo {
+  display: flex; flex-direction: column; gap: var(--e-3);
+  min-height: 56px;
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: border-color var(--t-toque) var(--curva);
+}
+.jg-mazo.es-titular { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+@media (hover: hover) { .jg-mazo:hover { border-color: var(--linea-viva); } }
+.jg-mazo:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+
+.jg-mazo-alto { display: flex; align-items: center; gap: var(--e-3); flex-wrap: wrap; }
+.jg-mazo-nombre {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+.jg-mazo-insignia {
+  padding: 3px var(--e-2);
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+}
+.jg-mazo-bajo { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); }
+.jg-mazo-form { font-size: var(--fs-body-sm); color: var(--ceniza); }
+.jg-mazo-cartas {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--cesped-txt);
+}
+.jg-mazo-cartas.es-incompleto { color: var(--amarilla-txt); }
+
+/* ==========================================================================
+   ESCRITORIO
+   ========================================================================== */
+@media (min-width: 768px) {
+  /* En escritorio sí hay ancho para leerlos en paralelo: vuelve el bento y
+     cada modo se apila en columna. */
+  .jg-bento { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-4); }
+  .jg-modo {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    min-height: 190px;
+    padding: var(--e-5);
+    gap: var(--e-4);
+  }
+  .jg-modo-estado { align-items: flex-start; text-align: left; margin-top: auto; }
+  .jg-modo-pie { max-width: none; }
+  .jg-salas, .jg-mazos { grid-template-columns: repeat(2, 1fr); }
+
+  .jg-listo {
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--e-5);
+    padding: var(--e-5) var(--e-6);
+  }
+  .jg-listo-accion { grid-column: auto; }
+}
+
+@media (min-width: 1024px) {
+  .jg-cabecera { padding-block: var(--e-8) var(--e-6); }
+  .jg-mazos { grid-template-columns: repeat(3, 1fr); }
+}
