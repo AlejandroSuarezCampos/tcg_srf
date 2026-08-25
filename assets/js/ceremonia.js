@@ -334,7 +334,7 @@
 
   function pintarDorso(carta) {
     cerCarta.dataset.rareza = carta.id_rareza;
-    cerCarta.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
+    cerCarta.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--brasa)');
     cerFrente.innerHTML = carta.html;
     cerCarta.disabled = false;
     cartaRevelada = false;
@@ -427,7 +427,7 @@
     walkout.hidden = false;
     walkoutRz.textContent = carta.rareza;
     if (walkoutNom) walkoutNom.textContent = carta.nombre || '';
-    walkout.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--amber)');
+    walkout.style.setProperty('--rz-aura', RZ_COLOR[carta.id_rareza] || 'var(--brasa)');
     caja.classList.add('en-walkout');
 
     var rayos = walkout.querySelector('.cer-walkout-rayos');

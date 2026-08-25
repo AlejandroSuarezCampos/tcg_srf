@@ -254,6 +254,7 @@ foreach ($db->listarRarezas() as $r) {
 
 $paginaTitulo = $cadena['nombre'];
 $paginaDesc   = $cadena['descripcion'] ?: 'Ruta de partidos de la Superliga Frontier.';
+$cssExtra = array_merge($cssExtra ?? [], ['assets/css/ceremonia.css', 'assets/css/partido.css', 'assets/css/cadena.css']);
 include __DIR__ . '/partials/head.php';
 
 $activePage = 'cadenas';
@@ -400,7 +401,7 @@ include __DIR__ . '/navbar.php';
   </p>
 
   <!-- SELECCIÓN -->
-  <section id="seleccion" class="panel" style="margin-top:var(--space-6);">
+  <section id="seleccion" class="panel" style="margin-top:var(--e-6);">
     <?php if (!$sel): ?>
       <p class="t-body-sm t-dim">
         Elige un nodo abierto del mapa para ver qué hay en él. Perder no cuesta
@@ -419,7 +420,7 @@ include __DIR__ . '/navbar.php';
       <?php if ($sel['reclamado']): ?>
         <p class="t-body-sm t-dim">Ya abriste este cofre.</p>
       <?php else: ?>
-        <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+        <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
           Has llegado hasta aquí. Ábrelo para seguir avanzando por la ruta.
           <?php if ((int) $sel['es_final'] === 1 && $cadena['formacion_recompensa']
                     && isset(Tcg::FORMACIONES[$cadena['formacion_recompensa']])): ?>
@@ -453,7 +454,7 @@ include __DIR__ . '/navbar.php';
           Ya cumples lo que pedía este control. El camino sigue abierto.
         </p>
       <?php else: ?>
-        <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+        <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
           De aquí no se pasa hasta cumplir <b>todo</b> lo de abajo. No hay que
           volver: en cuanto lo cumplas, el control se abre solo.
         </p>
@@ -491,13 +492,13 @@ include __DIR__ . '/navbar.php';
 
       <!-- Ficha pre-partido: solo el rival. Ni su estilo ni sus compos, que es
            lo que evita que el PvE se memorice (§10 del briefing). -->
-      <p class="t-body-sm t-dim" style="margin-bottom:var(--space-4);">
+      <p class="t-body-sm t-dim" style="margin-bottom:var(--e-4);">
         No se sabe con qué alineación saldrá: este equipo tiene varias y elige
         una al azar en cada partido.
       </p>
 
       <?php if ($sel['progreso']): ?>
-        <div class="tabla-wrap" style="margin-bottom:var(--space-4);">
+        <div class="tabla-wrap" style="margin-bottom:var(--e-4);">
           <table class="tabla">
             <thead>
               <tr>

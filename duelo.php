@@ -257,7 +257,11 @@ $presentacion = ($jugado && isset($_GET['nuevo']))
     : null;
 
 // Su hoja va aparte y solo la carga esta pantalla: no la paga el resto de la web.
-$cssExtra = $cssExtra ?? [];
+/* `cadena.css` no es solo el mapa de cadena: se lleva dentro el desglose por
+   líneas (`.partido-lineas`) y la comparación de alineaciones
+   (`.partido-alineaciones`) que también pinta un duelo terminado. Sin ella,
+   el resultado final salía como texto corrido sin tabla ni rejilla. */
+$cssExtra = array_merge($cssExtra ?? [], ['assets/css/ceremonia.css', 'assets/css/partido.css', 'assets/css/cadena.css']);
 if ($presentacion) { $cssExtra[] = 'assets/css/presentacion.css'; }
 
 $paginaTitulo = $esperando ? 'Sala de duelo' : 'Duelo';
@@ -518,8 +522,8 @@ include __DIR__ . '/navbar.php';
         <!-- Recompensas del partido. Las monedas y cada carta son un drop
              aparte (uno por fila de cadena_loot que tocó), así que se listan
              sueltas en vez de intentar resumirlas en una frase. -->
-        <div class="panel recompensas" style="max-width:420px;margin:0 auto var(--space-6);">
-          <h2 class="t-h3" style="margin-bottom:var(--space-3);">Recompensas</h2>
+        <div class="panel recompensas" style="max-width:420px;margin:0 auto var(--e-6);">
+          <h2 class="t-h3" style="margin-bottom:var(--e-3);">Recompensas</h2>
           <ul class="lista-recompensas">
             <?php foreach ($drops as $d): ?>
               <li>
@@ -596,7 +600,7 @@ include __DIR__ . '/navbar.php';
 
       <!-- CAPA 2 — de dónde salió el ajuste sobre la fuerza bruta -->
       <?php if ($misCompos || $susCompos): ?>
-        <h2 class="t-h3" style="text-align:center;margin-bottom:var(--space-4);">Compos del partido</h2>
+        <h2 class="t-h3" style="text-align:center;margin-bottom:var(--e-4);">Compos del partido</h2>
         <div class="compos-enfrentadas">
           <?php
           panel_compos($nombreYo, $misCompos, $miAfinDom, $miCiclo, $miMalus, $catalogoRasgos, $etiquetaLinea);
@@ -643,7 +647,7 @@ include __DIR__ . '/navbar.php';
         </section>
       </div>
 
-      <p style="text-align:center;margin-top:var(--space-6);">
+      <p style="text-align:center;margin-top:var(--e-6);">
         <a class="btn btn-primary" href="<?= htmlspecialchars($volverUrl) ?>"><?= htmlspecialchars($volverTexto) ?></a>
       </p>
 
