@@ -10,22 +10,71 @@
 # verdad sostiene la portada.
 DirectoryIndex landing.php index.php index.html
 
-# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, branding/, .claude/...)
+# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, .claude/...)
 Options -Indexes
 
 # Ruta desde la raíz del dominio. En producción el proyecto ES la raíz, así que
 # es /404.php. (Apache no admite rutas relativas aquí: sin la barra inicial se
 # toma como texto literal y se manda tal cual al navegador.)
 ErrorDocument 404 /404.php
-# Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
-# tipo .xxx). Sin esto, aunque el listado de directorio esté desactivado,
-# .git/HEAD, .git/config, .git/index, etc. se pueden pedir uno a uno por su
-# nombre exacto y reconstruir el repositorio entero con git-dumper.
+
+# ============================================================================
+# MOD_REWRITE
+#
+# ⚠️ EL ORDEN DE ESTE BLOQUE ES EL DE PRODUCCIÓN, NO SE REORDENA A OJO.
+# Cuatro reglas, en este orden exacto: bloquear ocultos → sacar el .php de la
+# URL → volver a meterlo por dentro → la portada. Cambiar el orden puede
+# reintroducir el bucle que THE_REQUEST evita en la segunda regla.
+# ============================================================================
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # ------------------------------------------------------------------------
+    # BLOQUEAR ARCHIVOS Y CARPETAS OCULTAS
+    # ------------------------------------------------------------------------
+    # Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
+    # tipo .xxx, incluida .claude/). Sin esto, aunque el listado de directorio
+    # esté desactivado, .git/HEAD, .git/config, .git/index, etc. se pueden pedir
+    # uno a uno por su nombre exacto y reconstruir el repositorio entero con
+    # git-dumper.
     RewriteRule "(^|/)\." - [F]
 
-    # Si piden la raíz del sitio, servir landing.php sin cambiar la URL visible
+    # ------------------------------------------------------------------------
+    # OCULTAR .PHP DE LAS URL
+    # ------------------------------------------------------------------------
+    # Si alguien accede directamente a /login.php, /perfil.php, /plantilla.php…
+    # redirige (301, permanente) a /login, /perfil, /plantilla — sin extensión.
+    #
+    # THE_REQUEST (la línea de petición cruda que mandó el navegador) y no
+    # REQUEST_URI: evita que esta regla entre en bucle cuando la regla de abajo
+    # reescribe /login -> login.php por dentro. Si mirara REQUEST_URI después
+    # de esa reescritura interna, vería otra vez ".php" y se redirigiría a sí
+    # misma sin parar.
+    RewriteCond %{THE_REQUEST} \s/+(.+?)\.php(?:[\s?]|$) [NC]
+    RewriteRule ^(.+)\.php$ /$1 [R=301,L,NE]
+
+    # ------------------------------------------------------------------------
+    # SERVIR ARCHIVOS PHP SIN MOSTRAR .PHP
+    # ------------------------------------------------------------------------
+    # /login -> internamente sirve login.php, pero la URL del navegador se
+    # queda en /login. Es el complemento de la regla de arriba: una saca el
+    # .php hacia fuera (lo que ve el visitante), esta lo mete hacia dentro (lo
+    # que ejecuta Apache).
+    #
+    # !-d evita interferir con directorios reales (p. ej. /panel/).
+    # .php -f comprueba que el fichero exista de verdad antes de reescribir;
+    # si no existe, la petición sigue su curso normal y acaba en el 404.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+?)/?$ $1.php [L]
+
+    # ------------------------------------------------------------------------
+    # PORTADA
+    # ------------------------------------------------------------------------
+    # Si piden la raíz del sitio, servir landing.php sin cambiar la URL
+    # visible. Va AL FINAL a propósito: para "/" (cadena vacía) la regla de
+    # arriba no encuentra ningún fichero que reescribir ("".php no existe), así
+    # que esta es la que de verdad resuelve la portada dentro de mod_rewrite.
     RewriteRule ^$ landing.php [L]
 </IfModule>
 # ============================================================================
@@ -84,6 +133,7 @@ ErrorDocument 404 /404.php
     ExpiresByType image/jpeg               "access plus 6 months"
     ExpiresByType image/svg+xml            "access plus 6 months"
     ExpiresByType image/x-icon             "access plus 6 months"
+    # HTML/PHP no se cachea durante un periodo largo
     ExpiresDefault                         "access plus 1 hour"
 </IfModule>
 
@@ -99,11 +149,15 @@ ErrorDocument 404 /404.php
         Header set Cache-Control "public, max-age=15552000"
     </FilesMatch>
     # El HTML nunca se guarda: lleva el saldo, el mazo y el estado del duelo.
+    # Aunque internamente Apache ejecute .php, la URL visible ya no lo dice.
     <FilesMatch "\.php$">
         Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
 </IfModule>
 
+# ============================================================================
+# CONFIGURACIÓN PHP
+# ============================================================================
 <IfModule mod_php.c>
     php_flag session.cookie_httponly On
     php_value session.cookie_samesite Lax
