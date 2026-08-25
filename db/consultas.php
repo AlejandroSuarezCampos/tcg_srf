@@ -43,7 +43,17 @@ class Tcg
 	}
 
 	//Función para obtener los cromos destacados. (destacados desde el panel de control de administrador)
-	public function listarDestacados() {
+	/**
+	 * Las cartas que se enseñan en la portada.
+	 *
+	 * Ordena por RAREZA, no por id. Antes hacía `ORDER BY c.id_cromo LIMIT 5`,
+	 * que es «las cinco primeras que se metieron en la base» — un escaparate
+	 * que enseña cinco comunes al azar no vende un juego de coleccionismo.
+	 * Solo expansiones activas: una portada no puede anunciar cartas que ya no
+	 * se reparten.
+	 */
+	public function listarDestacados($limite = 5) {
+		$limite = max(1, (int) $limite);
 		$sql = "
 			SELECT
 				c.id_cromo,
@@ -51,6 +61,7 @@ class Tcg
 				c.descripcion,
 				c.imagen,
 				c.posicion,
+				c.ataque, c.defensa, c.tecnica,
 				e.nombre AS expansion,
 				eq.nombre AS equipo, c.universo,
 				r.id_rareza,
@@ -62,13 +73,44 @@ class Tcg
 			INNER JOIN equipos eq ON c.id_equipo = eq.id_equipo
 			INNER JOIN rarezas r ON c.id_rareza = r.id_rareza
 			INNER JOIN afinidad af ON c.id_afinidad = af.id
-			ORDER BY c.id_cromo LIMIT 5
+			WHERE e.activo = 1 AND c.solo_cadena = 0
+			ORDER BY r.id_rareza DESC, c.id_cromo
+			LIMIT $limite
 		";
 
 		$stmt = $this->pdo->prepare($sql);
 		$stmt->execute();
 
 		return $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+
+	/**
+	 * Las cifras de la portada, en UNA consulta.
+	 *
+	 * Van cuatro subconsultas en una sola ida y vuelta en vez de cuatro
+	 * llamadas: es la pantalla que ve todo el que llega de fuera, y es la única
+	 * que se sirve sin sesión, así que conviene que sea barata.
+	 *
+	 * Son cifras REALES. Si el día de mañana alguna queda fea, se cambia qué se
+	 * enseña, no el número.
+	 */
+	public function estadisticasPublicas() {
+		$fila = $this->pdo->query("
+			SELECT
+				(SELECT COUNT(*) FROM cromos c
+				   INNER JOIN expansiones e ON e.id_expansion = c.id_expansion
+				 WHERE e.activo = 1)                                  AS fichas,
+				(SELECT COUNT(*) FROM equipos)                        AS equipos,
+				(SELECT COUNT(*) FROM coleccion)                      AS repartidas,
+				(SELECT COUNT(*) FROM duelos WHERE estado = 'resuelto') AS duelos
+		")->fetch(PDO::FETCH_ASSOC);
+
+		return [
+			"fichas"     => (int) $fila["fichas"],
+			"equipos"    => (int) $fila["equipos"],
+			"repartidas" => (int) $fila["repartidas"],
+			"duelos"     => (int) $fila["duelos"],
+		];
 	}
 
 	public function listarExpansionesActivas() {
@@ -289,7 +331,11 @@ class Tcg
 				c.id_expansion,
 				e.nombre AS expansion,
 				e.fecha_salida,
-				eq.nombre AS equipo, c.universo,
+				/* `id_equipo` además del nombre: plantilla.php filtra por id en
+				   los dos modos, y sin esta columna el filtro de equipo se
+				   quedaba sin comparar nada en el modo «todas» — no fallaba,
+				   simplemente no filtraba, que es peor. */
+				c.id_equipo, eq.nombre AS equipo, c.universo,
 				r.id_rareza,
 				r.nombre AS rareza,
 				af.nombre AS afinidad,
@@ -557,12 +603,13 @@ class Tcg
 		],
 		[
 			"clave" => "navegacion", "pagina" => "landing", "destino" => "landing.php",
-			/* En móvil la barra se pliega y `#nav-menu` mide cero de alto, así que
-			   ahí se señala el botón de menú, que es lo que se ve. */
-			"selector" => "#nav-menu, .nav-burger",
-			"titulo" => "Todo está aquí arriba",
-			"texto" => "Esta barra no cambia nunca. A la izquierda lo de jugar; a la derecha "
-				. "tus cartas. En el móvil se abre con el botón de menú.",
+			/* En móvil la navegación vive abajo (.tabbar); en escritorio sube a la
+			   barra superior (.barra-destinos). Solo una de las dos está visible,
+			   así que se señalan las dos y acierta siempre. */
+			"selector" => ".tabbar, .barra-destinos",
+			"titulo" => "Cinco sitios, y ya está",
+			"texto" => "Hoy es tu portada. Jugar abre los sobres, los duelos, los objetivos "
+				. "y las cadenas. Plantilla son tus fichas. Y no hay más que aprender.",
 		],
 		[
 			"clave" => "sobres", "pagina" => "sobres", "destino" => "sobres.php",
@@ -573,21 +620,21 @@ class Tcg
 			"requiere" => "sobre",
 		],
 		[
-			"clave" => "coleccion", "pagina" => "coleccion", "destino" => "coleccion.php",
-			"selector" => ".carta-grid .carta, .carta-lista .carta-fila",
+			"clave" => "coleccion", "pagina" => "plantilla", "destino" => "plantilla.php",
+			"selector" => ".pl-rejilla .carta",
 			"titulo" => "Tus cartas viven aquí",
 			"texto" => "Aquí están tus cartas. Pulsa cualquiera para ver sus estadísticas, "
 				. "su afinidad y su compo: esos números deciden tus partidos.",
 		],
 		[
-			"clave" => "bloqueo", "pagina" => "coleccion", "destino" => "coleccion.php",
-			"selector" => ".carta-accion-flotante, .filtros-resumen",
+			"clave" => "bloqueo", "pagina" => "plantilla", "destino" => "plantilla.php",
+			"selector" => ".carta-accion-flotante, .pl-filtrar",
 			"titulo" => "Protege lo que no quieras vender",
 			"texto" => "El candado de cada carta la deja fuera del mercado y de las apuestas. "
 				. "Ponlo en las que te importen antes de empezar a vender repetidas.",
 		],
 		[
-			"clave" => "album", "pagina" => "album", "destino" => "album.php",
+			"clave" => "album", "pagina" => "plantilla", "destino" => "plantilla.php?ver=todas",
 			"selector" => "", "titulo" => "El álbum es el catálogo",
 			"texto" => "Aquí sale todo lo que existe, tengas la carta o no. Sirve para saber "
 				. "qué te falta. Hay cartas secretas que solo aparecen cuando las consigues.",
@@ -679,12 +726,14 @@ class Tcg
 				. "sin gastar nada.",
 		],
 		[
-			"clave" => "ajustes", "pagina" => "configuracion", "destino" => "configuracion.php",
+			/* `configuracion.php` se fusionó en el perfil (bloque 7a): la página
+			   que hay que reconocer es «perfil», y el destino su pestaña. */
+			"clave" => "ajustes", "pagina" => "perfil", "destino" => "perfil.php#panel-ajustes",
 			"selector" => "#selectAnimaciones, #formCodigo",
-			"titulo" => "Códigos y animaciones",
-			"texto" => "Aquí canjeas los códigos de evento que repartimos, y aquí se encienden "
-				. "o se apagan las animaciones — la apertura de sobres y las cajas 3D. Si "
-				. "tu móvil va justo, apagarlas lo deja fino.",
+			"titulo" => "Códigos y movimiento",
+			"texto" => "Aquí canjeas los códigos de evento que repartimos, y aquí se elige el "
+				. "nivel de movimiento: completo, ligero o mínimo. Si tu móvil va justo, "
+				. "el ligero le quita el 3D y los fondos animados sin quitarte el juego.",
 		],
 		[
 			"clave" => "fin", "pagina" => "landing", "destino" => "landing.php",
@@ -2053,6 +2102,15 @@ class Tcg
 			$sql .= " ORDER BY m.precio DESC";
 		} else {
 			$sql .= " ORDER BY m.fecha_publicacion DESC";
+		}
+
+		// `limite` existe para quien solo quiere asomarse (hoy.php enseña los
+		// últimos cuatro anuncios). Sin él habría que traerse el mercado entero
+		// para quedarse con cuatro filas, en la pantalla que abre todo el mundo.
+		// Se interpola porque LIMIT no admite parámetro en MySQL con emulación
+		// desactivada; va con cast a int, así que no entra nada del exterior.
+		if (!empty($filtros["limite"])) {
+			$sql .= " LIMIT " . (int) $filtros["limite"];
 		}
 
 		$stmt = $this->pdo->prepare($sql);

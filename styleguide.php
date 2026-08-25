@@ -132,7 +132,7 @@ include __DIR__ . '/partials/head.php';
   <section class="seccion" id="tipografia">
     <div class="seccion-head">
       <div><span class="seccion-tag">02</span><h2>Tipografía</h2></div>
-      <p class="t-caption t-dim">Geist Sans · Geist Mono</p>
+      <p class="t-caption t-dim">Space Grotesk · Inter</p>
     </div>
 
     <div class="panel stack stack-5">
@@ -181,7 +181,7 @@ include __DIR__ . '/partials/head.php';
       </div>
     </div>
 
-    <div class="alerta alerta-info" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-info" style="margin-bottom:var(--e-5);">
       <i class="ph ph-eye" aria-hidden="true"></i>
       <span>
         Cada rareza lleva una marca no cromática además del color. Es requisito
@@ -191,7 +191,7 @@ include __DIR__ . '/partials/head.php';
       </span>
     </div>
 
-    <div class="tabla-wrap" style="margin-bottom:var(--space-6);">
+    <div class="tabla-wrap" style="margin-bottom:var(--e-6);">
       <table class="tabla">
         <thead>
           <tr>
@@ -230,7 +230,7 @@ include __DIR__ . '/partials/head.php';
       <div><span class="seccion-tag">04</span><h2>Tarjeta de carta</h2></div>
     </div>
 
-    <div class="alerta alerta-warning" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-warning" style="margin-bottom:var(--e-5);">
       <i class="ph ph-frame-corners" aria-hidden="true"></i>
       <span>
         El arte se muestra siempre completo (<code class="mono">object-fit: contain</code>),
@@ -312,7 +312,7 @@ include __DIR__ . '/partials/head.php';
       <div><span class="seccion-tag">05</span><h2>Ceremonia de apertura</h2></div>
     </div>
 
-    <div class="alerta alerta-info" style="margin-bottom:var(--space-5);">
+    <div class="alerta alerta-info" style="margin-bottom:var(--e-5);">
       <i class="ph ph-timer" aria-hidden="true"></i>
       <span>
         Previsualización sin gastar monedas. La ceremonia real usa exactamente
@@ -570,7 +570,7 @@ include __DIR__ . '/partials/head.php';
     </div>
   </section>
 
-  <div class="alerta alerta-info" style="margin-bottom:var(--space-8);">
+  <div class="alerta alerta-info" style="margin-bottom:var(--e-8);">
     <i class="ph ph-list-checks" aria-hidden="true"></i>
     <span>
       Comprobaciones de esta guía: recorre la página entera con el tabulador y
