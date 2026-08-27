@@ -172,5 +172,76 @@ comprobar("un dedo que no se mueve da rendimiento 0",
 		["x" => 100, "y" => 100, "t" => 0], ["x" => 100, "y" => 100, "t" => 10],
 	], 30.0), 0.0));
 
+// ---------------------------------------------------------------------------
+echo "\n4. EL BUCLE DE POSESIÓN\n";
+
+$FAMILIAS = ["tiro", "regate", "defensa", "porteria", "carga"];
+
+$todasValidas = true;
+$totalAcciones = 0;
+foreach (Partido::ZONAS as $zona) {
+	$acciones = Partido::accionesDe($zona);
+	if (!$acciones) { $todasValidas = false; }
+	foreach ($acciones as $clave => $a) {
+		$totalAcciones++;
+		if (!in_array($a["atacante"], $FAMILIAS, true)) { $todasValidas = false; }
+		if (!in_array($a["defensor"], $FAMILIAS, true)) { $todasValidas = false; }
+		if (!in_array($a["efecto"], ["avanza", "area", "gol"], true)) { $todasValidas = false; }
+		if (($a["nombre"] ?? "") === "") { $todasValidas = false; }
+	}
+}
+comprobar("toda acción encamina a una familia de minijuego válida", $todasValidas);
+comprobar("hay 8 acciones repartidas en 3 zonas", $totalAcciones === 8, "$totalAcciones acciones");
+comprobar("una zona inventada no devuelve acciones", Partido::accionesDe("luna") === []);
+
+comprobar("en el área se puede tirar", isset(Partido::ACCIONES["area"]["tirar"]));
+comprobar("tirar desde el área persigue el gol",
+	Partido::ACCIONES["area"]["tirar"]["efecto"] === "gol");
+comprobar("el balón largo salta directo al área",
+	Partido::ACCIONES["salida"]["balon_largo"]["efecto"] === "area");
+
+echo "\n   Desenlaces\n";
+comprobar("si el ataque no supera a la defensa, el balón se pierde",
+	Partido::desenlace(90.0, 90.0, "gol") === "recupera");
+comprobar("ganar una acción de gol es gol",
+	Partido::desenlace(100.0, 90.0, "gol") === "gol");
+comprobar("ganar una acción de avance avanza",
+	Partido::desenlace(100.0, 90.0, "avanza") === "avanza");
+comprobar("ganar un balón largo planta el balón en el área",
+	Partido::desenlace(100.0, 90.0, "area") === "area");
+
+comprobar("perder el balón te devuelve a tu salida",
+	Partido::zonaTras("area", "recupera") === "salida");
+comprobar("después de un gol se saca de centro, o sea desde salida",
+	Partido::zonaTras("area", "gol") === "salida");
+comprobar("avanzar desde salida lleva a creación",
+	Partido::zonaTras("salida", "avanza") === "creacion");
+comprobar("avanzar desde creación lleva al área",
+	Partido::zonaTras("creacion", "avanza") === "area");
+comprobar("el balón largo deja el balón en el área",
+	Partido::zonaTras("salida", "area") === "area");
+comprobar("desde el área no se avanza más allá del área",
+	Partido::zonaTras("area", "avanza") === "area");
+
+echo "\n   El reloj\n";
+comprobar("la última de 12 jugadas cae en el 93 con 3 de descuento",
+	Partido::minutoDeJugada(12, 12, 3) === 93);
+comprobar("la primera de 12 no cae en el minuto 0",
+	Partido::minutoDeJugada(1, 12, 3) > 0);
+
+$creciente = true;
+$previo = 0;
+for ($i = 1; $i <= 12; $i++) {
+	$m = Partido::minutoDeJugada($i, 12, 3);
+	if ($m <= $previo) { $creciente = false; }
+	$previo = $m;
+}
+comprobar("los 12 minutos son estrictamente crecientes", $creciente);
+
+comprobar("bajar el dial a 9 jugadas sigue terminando en el 93",
+	Partido::minutoDeJugada(9, 9, 3) === 93);
+comprobar("un total de 0 jugadas no divide por cero",
+	Partido::minutoDeJugada(1, 0, 3) === 0);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);

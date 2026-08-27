@@ -162,4 +162,105 @@ class Partido {
 		}
 		return $suma / count($a);
 	}
+
+	/* EL CAMPO SON TRES ZONAS. El balón vive en una y avanza o retrocede. No son
+	   coordenadas: son estados, y el orden del array ES el orden del campo. */
+	const ZONAS = ["salida", "creacion", "area"];
+
+	const MINUTOS = 90;
+
+	/**
+	 * QUÉ PUEDES HACER CON EL BALÓN, según dónde esté.
+	 *
+	 * Esta tabla es el corazón del juego: es lo que convierte "ver un partido"
+	 * en "jugar un partido". El POSEEDOR elige una de estas; el rival no elige,
+	 * recibe el minijuego de la familia `defensor` como respuesta. Los dos
+	 * juegan en cada jugada, así que el usuario interviene en todas.
+	 *
+	 *   efecto  "avanza" = sube una zona   ·  "area" = salta directo al área
+	 *           "gol"    = si gana la jugada, es gol
+	 */
+	const ACCIONES = [
+		"salida" => [
+			"pase_corto" => [
+				"nombre" => "Pase en corto", "efecto" => "avanza",
+				"atacante" => "regate", "defensor" => "carga",
+			],
+			"balon_largo" => [
+				"nombre" => "Balón largo", "efecto" => "area",
+				"atacante" => "tiro", "defensor" => "defensa",
+			],
+		],
+		"creacion" => [
+			"conducir" => [
+				"nombre" => "Conducir", "efecto" => "avanza",
+				"atacante" => "regate", "defensor" => "carga",
+			],
+			"pase_filtrado" => [
+				"nombre" => "Pase filtrado", "efecto" => "avanza",
+				"atacante" => "regate", "defensor" => "defensa",
+			],
+			"tiro_lejano" => [
+				"nombre" => "Tiro lejano", "efecto" => "gol",
+				"atacante" => "tiro", "defensor" => "porteria",
+			],
+		],
+		"area" => [
+			"tirar" => [
+				"nombre" => "Tirar", "efecto" => "gol",
+				"atacante" => "tiro", "defensor" => "porteria",
+			],
+			"encarar" => [
+				"nombre" => "Encarar al portero", "efecto" => "gol",
+				"atacante" => "regate", "defensor" => "porteria",
+			],
+			"centro_atras" => [
+				"nombre" => "Centro atrás", "efecto" => "gol",
+				"atacante" => "regate", "defensor" => "defensa",
+			],
+		],
+	];
+
+	public static function accionesDe($zona) {
+		return self::ACCIONES[$zona] ?? [];
+	}
+
+	/**
+	 * Quién gana la jugada.
+	 *
+	 * El EMPATE lo gana la defensa a propósito: quien tiene que romper una
+	 * situación es el que ataca, y así no hace falta un desempate aleatorio que
+	 * volvería a meter azar donde este motor lo acaba de quitar.
+	 */
+	public static function desenlace($ofensivo, $defensivo, $efecto) {
+		if ((float) $ofensivo <= (float) $defensivo) return "recupera";
+		return in_array($efecto, ["gol", "area"], true) ? $efecto : "avanza";
+	}
+
+	/**
+	 * Dónde queda el balón después de la jugada.
+	 *
+	 * Tras un gol se saca de centro, y eso aquí es "salida": quien lo recibe
+	 * arranca su propia jugada desde atrás. Perder el balón hace lo mismo.
+	 */
+	public static function zonaTras($zona, $desenlace) {
+		if ($desenlace === "recupera" || $desenlace === "gol") return "salida";
+		if ($desenlace === "area") return "area";
+		$i = array_search($zona, self::ZONAS, true);
+		if ($i === false) return "salida";
+		return self::ZONAS[min($i + 1, count(self::ZONAS) - 1)];
+	}
+
+	/**
+	 * En qué minuto de partido cae la jugada número $numero de $total.
+	 *
+	 * El reloj REAL corre entre jugadas y se congela dentro de ellas; este
+	 * método solo reparte los 90 minutos más el descuento a lo largo de las
+	 * jugadas, para que el marcador de minuto avance a saltos coherentes. Bajar
+	 * `partido_jugadas_num` reparte solo, sin tocar nada más.
+	 */
+	public static function minutoDeJugada($numero, $total, $descuento) {
+		if ((int) $total <= 0) return 0;
+		return (int) round((self::MINUTOS + (int) $descuento) * (int) $numero / (int) $total);
+	}
 }
