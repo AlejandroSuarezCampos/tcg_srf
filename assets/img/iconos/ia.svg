@@ -1,0 +1,20 @@
+<!--
+  Escudo genérico del rival automático.
+
+  Lo usa la presentación de alineaciones cuando el rival de una cadena no tiene
+  escudo propio subido, y siempre en el amistoso de prueba, que no pertenece a
+  ninguna cadena y por tanto no tiene equipo del que sacar uno.
+
+  Va en SVG y con `currentColor` para que herede el color de donde se ponga y
+  no haya que mantener una versión clara y otra oscura.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img"
+     aria-label="Rival automático">
+  <path d="M32 4 58 13v22c0 13.5-10.4 21.9-26 25C16.4 56.9 6 48.5 6 35V13L32 4Z"
+        fill="currentColor" fill-opacity=".10"
+        stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="32" cy="30" r="10" stroke="currentColor" stroke-width="2.5"/>
+  <circle cx="32" cy="30" r="3.2" fill="currentColor"/>
+  <path d="M32 20v-5M32 45v-5M42 30h5M17 30h5" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round"/>
+</svg>

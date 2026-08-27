@@ -1,0 +1,155 @@
+/* ==========================================================================
+   PANTALLA: ACCESO (entrar / crear cuenta)
+   --------------------------------------------------------------------------
+   Una caja centrada sobre el rescoldo. Móvil primero.
+   ========================================================================== */
+
+.acceso {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  /* La barra mide --nav-h y el pie va debajo: se ocupa lo que queda para que
+     la caja salga centrada de verdad y no «casi». */
+  min-height: calc(100dvh - var(--nav-h));
+  padding: var(--e-6) var(--canal) var(--e-8);
+}
+
+.ac-caja {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-4);
+}
+
+.ac-volver {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  align-self: flex-start;
+  min-height: 44px;
+  color: var(--ceniza);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+@media (hover: hover) { .ac-volver:hover { color: var(--hueso); } }
+.ac-volver:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.ac-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+  padding: var(--e-6) var(--e-5) var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-panel);
+  background: var(--carbon);
+  box-shadow: var(--elev-2);
+}
+.ac-marca { margin: 0 auto; }
+
+/* ==========================================================================
+   PESTAÑAS
+   ========================================================================== */
+.ac-pestanas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-pill);
+  background: var(--pozo);
+}
+.ac-pestana {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px;
+  border-radius: var(--r-pill);
+  color: var(--ceniza);
+  text-decoration: none;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.ac-pestana.es-activa { background: var(--fuego); color: var(--brasa-tinta); }
+@media (hover: hover) {
+  .ac-pestana:hover { color: var(--hueso); }
+  .ac-pestana.es-activa:hover { color: var(--brasa-tinta); }
+}
+.ac-pestana:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   FORMULARIOS
+   ========================================================================== */
+.ac-form { display: flex; flex-direction: column; gap: var(--e-4); }
+
+.ac-titulo {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  letter-spacing: var(--track-h2);
+  text-transform: uppercase;
+  margin: 0;
+  text-wrap: balance;
+}
+.ac-sub { margin: calc(var(--e-3) * -1) 0 0; font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+.ac-form .campo { display: flex; flex-direction: column; gap: var(--e-2); }
+.campo-ayuda { font-size: var(--fs-body-sm); color: var(--humo); }
+
+/* El campo que ha fallado se marca en el propio campo, no solo en el aviso de
+   arriba: con tres campos, un «rellena los tres» genérico obliga a adivinar. */
+.ac-form input[aria-invalid="true"] { border-color: var(--roja); }
+
+.ac-boton {
+  min-height: 52px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  cursor: pointer;
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  box-shadow: var(--halo);
+  transition: transform var(--t-toque) var(--curva);
+}
+@media (hover: hover) { .ac-boton:hover { transform: translateY(-2px); } }
+.ac-boton:active { transform: translateY(0) scale(.98); }
+.ac-boton:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 4px; }
+
+.ac-cambio {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+}
+.ac-cambio a { color: var(--brasa-alta); }
+
+/* ==========================================================================
+   ERROR
+   Va ENCIMA de las pestañas y de los campos, con role="alert", para que un
+   lector de pantalla lo anuncie en cuanto se recarga con el fallo.
+   ========================================================================== */
+.ac-error {
+  display: flex; align-items: flex-start; gap: var(--e-3);
+  margin: 0;
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--roja-borde);
+  border-radius: var(--r-carta);
+  background: var(--roja-velo);
+  color: var(--roja-txt);
+  font-size: var(--fs-body-sm);
+}
+.ac-error i { font-size: 20px; flex: none; }
+
+@media (min-width: 768px) {
+  .ac-panel { padding: var(--e-7) var(--e-6) var(--e-6); }
+}

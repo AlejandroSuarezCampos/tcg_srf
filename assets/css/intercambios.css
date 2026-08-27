@@ -1,0 +1,96 @@
+/* ==========================================================================
+   INTERCAMBIOS — hoja propia (migración `053`)
+
+   Casi todo se pinta con lo que ya existe: `.panel`, `.selector-cartas`,
+   `.carta-grid`, `.vacio`, `.alerta`. Aquí solo vive lo que no tenía dónde
+   apoyarse: el contador de cuántas copias entran de cada carta y las dos
+   columnas del trato.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CUÁNTAS COPIAS DE ESTA CARTA
+   El resto de selectores del sitio eligen UNA carta (radio) o la marcan y ya
+   (checkbox). Aquí hace falta decir "tres de estas", porque el tope es de
+   diez por lado y una oferta de tres comunes por una rara es justo la que
+   tiene sentido hacer. Un <input type=number> es un control de verdad: se
+   teclea, sube con las flechas y lo lee un lector de pantalla. El clic sobre
+   el arte lo incrementa (lo hace el JS), que es como se usa de hecho.
+   -------------------------------------------------------------------------- */
+.selector-cant {
+  width: 100%;
+  margin-top: 4px;
+  padding: 3px 4px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-input);
+  background: var(--carbon-alto);
+  color: var(--hueso);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.selector-cant:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 1px; }
+/* En cero la carta está "apagada": se ve que no entra en el trato. */
+.selector-item:not(.esta-elegida) .carta { opacity: .55; }
+
+/* --------------------------------------------------------------------------
+   EL TRATO, EN DOS COLUMNAS
+   Lo que se da y lo que se recibe, uno al lado del otro. En móvil se apilan:
+   una rejilla de dos columnas con cartas dentro no cabe en 360 px.
+   -------------------------------------------------------------------------- */
+.trato {
+  display: grid;
+  gap: var(--e-4);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 720px) {
+  .trato { grid-template-columns: 1fr auto 1fr; align-items: start; }
+}
+
+.trato-lado { min-width: 0; }
+.trato-lado > h3 {
+  margin-bottom: var(--e-2);
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+
+/* La flecha del medio. En móvil apunta hacia abajo, que es como se leen las
+   dos columnas cuando se apilan. */
+.trato-flecha {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--linea);
+  color: var(--ceniza);
+  justify-self: center;
+  transform: rotate(90deg);
+}
+@media (min-width: 720px) { .trato-flecha { transform: none; } }
+
+/* Tira de cartas de una oferta ya hecha: se mira, no se toca. */
+.trato-cartas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--e-2);
+}
+
+/* --------------------------------------------------------------------------
+   CABECERA DE UNA OFERTA
+   Quién la manda, cuándo caduca y los botones. El plazo va en `.mono` y con
+   su propio color cuando aprieta: es el dato que decide si contestas ahora.
+   -------------------------------------------------------------------------- */
+.oferta-cab {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2) var(--e-3);
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--e-3);
+}
+.oferta-acciones { display: flex; gap: var(--e-2); flex-wrap: wrap; }
+.oferta-plazo { font-variant-numeric: tabular-nums; }
+.oferta-plazo.es-justo { color: var(--amarilla-txt); }

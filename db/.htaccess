@@ -1,0 +1,6 @@
+# `db/` es código y datos, nunca una URL. Sus .php los incluye el resto del
+# sitio por ruta de fichero (require_once), así que cerrar el acceso HTTP no
+# quita nada y evita que `conexion.php`, los volcados o las pruebas se puedan
+# pedir desde fuera — por ejemplo el día que el servidor deje de interpretar
+# PHP y sirva `conexion.php` como texto plano, con la contraseña dentro.
+Require all denied

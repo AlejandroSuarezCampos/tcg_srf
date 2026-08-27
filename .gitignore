@@ -1,0 +1,3 @@
+db/conexion.local.php
+*.log
+.superpowers/

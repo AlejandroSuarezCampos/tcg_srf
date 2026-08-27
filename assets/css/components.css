@@ -1,0 +1,2263 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — COMPONENTES
+   Librería mínima viable (briefing, sección 22). Depende de tokens.css y
+   base.css. Cada componente documenta sus estados donde no son obvios.
+   ========================================================================== */
+
+/* ==========================================================================
+   1. BOTÓN
+   Variantes: primario / ghost / peligro · Tamaños: sm / md / lg
+   Objetivo táctil: 44px de alto en md y lg, 36px en sm (uso secundario).
+   ========================================================================== */
+.btn {
+  --btn-alto: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-2);
+  min-height: var(--btn-alto);
+  padding: 0 var(--e-5);
+  border: 1px solid transparent;
+  border-radius: var(--r-chip);
+  font-family: var(--tipo-texto);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva),
+              color var(--t-toque) var(--curva),
+              transform var(--t-toque) var(--curva);
+}
+.btn:active { transform: scale(.98); }
+
+.btn-primary {
+  background: var(--brasa);
+  color: var(--brasa-tinta);
+  font-weight: var(--fw-bold);
+  box-shadow: var(--elev-1);
+}
+.btn-primary:hover { background: var(--brasa-alta); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--hueso);
+  border-color: var(--linea-viva);
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .28); }
+
+.btn-danger {
+  background: var(--roja);
+  color: #2A0603;
+  font-weight: var(--fw-bold);
+}
+.btn-danger:hover { background: #FF6E63; }
+
+/* texto sin caja: acciones terciarias dentro de tablas y tarjetas */
+.btn-plano {
+  background: transparent;
+  color: var(--ceniza);
+  padding-inline: var(--e-3);
+}
+.btn-plano:hover { color: var(--hueso); background: rgba(255, 255, 255, .04); }
+
+.btn-sm { --btn-alto: 36px; padding-inline: var(--e-4); font-size: var(--fs-label); }
+.btn-lg { --btn-alto: 52px; padding-inline: var(--e-6); font-size: var(--fs-body); }
+.btn-bloque { width: 100%; }
+
+.btn:disabled, .btn[aria-disabled="true"] {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* estado de carga: el botón conserva su ancho para no descuadrar el layout */
+.btn.is-cargando { pointer-events: none; color: transparent !important; position: relative; }
+.btn.is-cargando::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: girar .7s linear infinite;
+  color: var(--brasa-tinta);
+}
+.btn-ghost.is-cargando::after, .btn-plano.is-cargando::after { color: var(--hueso); }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   2. CAMPO DE FORMULARIO
+   Etiqueta siempre visible (nunca placeholder como etiqueta).
+   ========================================================================== */
+.campo { display: flex; flex-direction: column; gap: var(--e-2); }
+
+.campo > label, .campo-label {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+
+.campo input[type="text"],
+.campo input[type="password"],
+.campo input[type="number"],
+.campo input[type="search"],
+.campo input[type="file"],
+.campo textarea,
+.campo select {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  color: var(--hueso);
+  font-size: var(--fs-body-sm);
+  outline: none;
+  transition: border-color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.campo textarea { min-height: 96px; resize: vertical; line-height: var(--lh-body); }
+
+/* ⚠️ 16 PX EN TÁCTIL, Y NO ES UN CAPRICHO DE TAMAÑO.
+   Safari en iOS HACE ZOOM a la página entera en cuanto enfocas un campo cuyo
+   tipo mide menos de 16 px. Con los 15 px de arriba pasaba en todos: tocabas
+   el buscador de mazos, la página daba un salto y se quedaba ampliada —porque
+   el zoom no se deshace solo al salir del campo—, y a partir de ahí se
+   navegaba con la interfaz descuadrada y con scroll horizontal. Es el origen
+   de buena parte de "en móvil se ve todo mal".
+
+   La consulta es `pointer: coarse` y NO un ancho: lo que dispara el zoom es el
+   navegador táctil, no la pantalla estrecha. Un portátil de 1280 px con ratón
+   conserva sus 15 px, que es el tamaño elegido para el sistema. */
+@media (pointer: coarse) {
+  .campo input[type="text"],
+  .campo input[type="password"],
+  .campo input[type="number"],
+  .campo input[type="search"],
+  .campo input[type="file"],
+  .campo textarea,
+  .campo select {
+    font-size: 16px;
+  }
+}
+
+.campo input::placeholder, .campo textarea::placeholder { color: rgba(147, 149, 159, .7); }
+
+.campo input:hover, .campo select:hover, .campo textarea:hover { border-color: var(--linea-viva); }
+
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  border-color: var(--brasa);
+  background: rgba(232, 117, 42, .05);
+}
+
+/* select con caret propio */
+.campo select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: var(--e-7);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2393959F' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M5 7.5l5 5 5-5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right var(--e-4) center;
+  background-size: 16px;
+}
+.campo select option { background: var(--carbon); color: var(--hueso); }
+
+.campo-hint { font-size: var(--fs-micro); color: var(--ceniza); }
+
+/* error inline: siempre junto al campo, nunca solo arriba del formulario */
+.campo.is-error input, .campo.is-error select, .campo.is-error textarea { border-color: var(--roja); }
+.campo-error {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--roja-txt);
+}
+
+/* casilla */
+/* la etiqueta entera es el objetivo táctil, no solo la casilla de 18px */
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  min-height: 36px;
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+  cursor: pointer;
+}
+.casilla:hover { color: var(--hueso); }
+.casilla input { width: 18px; height: 18px; accent-color: var(--brasa); cursor: pointer; flex-shrink: 0; }
+
+/* ==========================================================================
+   3. TARJETA DE CARTA  ← el componente más importante del sistema
+   --------------------------------------------------------------------------
+   Regla estructural: el arte se muestra SIEMPRE completo (contain), sobre una
+   placa de fondo con halo de color según rareza. El marco absorbe que el arte
+   de origen no tenga proporciones ni resoluciones uniformes.
+
+   La rareza se marca por color Y por señal no cromática (chevrones / corona /
+   destello), obligatorio por accesibilidad y por equidad en los duelos.
+
+   Estados: por defecto · hover (solo si es interactiva) · is-nopos (no
+   poseída, álbum) · is-protegida (bloqueada para venta) · is-venta (en el
+   mercado) · is-seleccionada (deck builder) · is-revelando (ceremonia).
+   ========================================================================== */
+.carta {
+  --rz: var(--rz1);
+  --rz-halo: var(--rz1-halo);
+  --rz-ink: var(--rz1-ink);
+  --rz-borde: var(--linea-viva);
+
+  position: relative;
+  display: block;
+  padding: 1px;                       /* el padding de 1px ES el borde */
+  /* misma trampa que .cer-escena/.submenu-tipos/etc. (§8 del CLAUDE.md de
+     branding): un display propio empata en especificidad con la regla
+     [hidden] del navegador, y gana el autor. album.js/coleccion.js ocultan
+     cartas con .hidden = true; sin esto, la carta seguía mostrándose. */
+  /* ESQUINAS RECTAS EN TODA LA WEB, no solo en modo arte. Un cromo es un
+     rectángulo; el redondeo delataba que la carta era una tarjeta web y no una
+     carta. Quedaba redondeado justo donde no se había mirado —inicio, perfil,
+     la alineación del duelo, el editor de nodos—, así que la misma carta salía
+     con una forma en colección y con otra en perfil. */
+  border-radius: 0;
+  background: var(--rz-borde);
+  text-decoration: none;
+  color: inherit;
+  transition: transform var(--t-estado) var(--curva);
+}
+.carta[hidden] { display: none; }
+
+.carta-marco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+  height: 100%;
+  padding: var(--e-3);
+  /* red de seguridad: nada de lo que haya dentro del marco debe poder
+     asomar fuera de él. Sin esto, una etiqueta de rareza larga ("Poco
+     común") empujaba la insignia de cantidad literalmente fuera de la
+     tarjeta —y en el selector de mazos, fuera de la pantalla en móvil—.
+     Seguro: insignias, candado y el aura SRF están posicionados contra
+     .carta, no contra .carta-marco, así que no los recorta. */
+  overflow: hidden;
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--carbon), var(--negro));
+  transition: box-shadow var(--t-estado) var(--curva);
+}
+
+.carta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-2);
+  min-height: 26px;
+}
+
+/* ---- placa de arte: la decisión estructural del sistema ---- */
+.carta-placa {
+  position: relative;
+  /* 451/800, la proporción REAL de todo el arte y de las cuatro plantillas de
+     marco. Antes era 233/361, heredado de un único fichero antiguo: con esa
+     proporción la placa era más ancha que su contenido y todo —arte y
+     plantilla— salía con banda oscura a los lados. Las coordenadas del hueco
+     de foto y de la placa del nombre se han vuelto a medir sobre la plantilla
+     con esta proporción; ver los comentarios de cada una. */
+  aspect-ratio: var(--carta-ratio);
+  border-radius: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 75% 55% at 50% 20%, var(--rz-halo), transparent 72%),
+    linear-gradient(170deg, var(--pozo), #08090C);
+  display: grid;
+  place-items: center;
+}
+/* La imagen se posiciona en absoluto contra la placa. Con `height: 100%` a
+   secas el porcentaje no resuelve —la altura de la placa viene de
+   aspect-ratio, no de un valor explícito— y un arte muy alto desbordaba la
+   caja: se recortaba justo lo que este sistema promete no recortar nunca. */
+.carta-arte {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;      /* NUNCA cover: el arte no se recorta jamás */
+  object-position: center;
+}
+/* marca de agua cuando la carta aún no tiene arte */
+.carta-placa-vacia {
+  font-size: 40px;
+  color: rgba(255, 255, 255, .10);
+}
+
+/* ---------------------------------------------------------------------------
+   MARCO CON FOTO (Común/Poco común/Raro/Épico) — plantillas de
+   assets/img/marcos/ (451×800 completas, sin recortar), una por rareza. El
+   cuadrado y el rectángulo blanco de cada plantilla caen siempre en el mismo
+   sitio (medido a mano), así que las dos zonas se posicionan en porcentaje
+   fijo — no dependen del arte que lleve dentro.
+
+   `background-size: contain` se queda, pero ya NO sobra hueco: desde que la
+   placa mide 451/800 —la proporción real de la plantilla— `contain` la ajusta
+   exactamente, sin bandas. Antes la placa era 233/361 y la plantilla salía al
+   87,4% del ancho, centrada, con banda oscura a los lados; de ahí venían las
+   coordenadas horizontales antiguas (18.1%/64.1%), que compensaban ese
+   encogimiento. Ahora las coordenadas son las de la plantilla tal cual.
+   Sigue siendo `contain` y no `cover` por la misma razón de siempre: si algún
+   día entra una plantilla de otra proporción, se verá entera con banda antes
+   que recortada — recortarla se comía las estrellas y el emblema de abajo.
+   --------------------------------------------------------------------------- */
+.carta-placa--marco {
+  background-image: var(--marco-img);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: var(--pozo);
+}
+/* La ruta va aquí y no en línea desde PHP a propósito: es relativa a ESTA
+   hoja, así que resuelve igual desde la raíz del sitio y desde `panel/`. Una
+   ruta escrita por PHP tendría que saber a qué profundidad está la página.
+
+   Las tres extensiones se apilan como capas de fondo. No es un fallback de
+   CSS —eso no existe para `background-image`— pero funciona igual de bien: la
+   que no exista no pinta nada, y solo existe una. Así la plantilla se puede
+   dejar en jpg, png o webp sin tocar esta hoja.
+
+   Legendaria (5), SRF (6) y Numerada (7) están declaradas aunque sus archivos
+   todavía no existan: el componente comprueba en servidor si el archivo está
+   antes de usar el marco (ver `marco_de_rareza()` en components/carta.php), así
+   que estas reglas se activan solas el día que alguien deje las imágenes. */
+/* UNA SOLA EXTENSIÓN, y no las tres de antes. Todas las plantillas están ya en
+   WebP (db/herramientas/convertir_a_webp.php). La lista de tres URL era un
+   truco de "la que exista" —las capas que no cargan quedan transparentes— pero
+   costaba dos peticiones fallidas por carta y por rareza; en una pantalla de
+   colección eso son cientos de 404. */
+.carta[data-rareza="1"] .carta-placa--marco { --marco-img: url('../img/marcos/comun.webp'); }
+.carta[data-rareza="2"] .carta-placa--marco { --marco-img: url('../img/marcos/poco-comun.webp'); }
+.carta[data-rareza="3"] .carta-placa--marco { --marco-img: url('../img/marcos/raro.webp'); }
+.carta[data-rareza="4"] .carta-placa--marco { --marco-img: url('../img/marcos/epico.webp'); }
+.carta[data-rareza="5"] .carta-placa--marco { --marco-img: url('../img/marcos/legendario.webp'); }
+.carta[data-rareza="6"] .carta-placa--marco { --marco-img: url('../img/marcos/srf.webp'); }
+.carta[data-rareza="7"] .carta-placa--marco { --marco-img: url('../img/marcos/numerada.webp'); }
+
+/* Coordenadas MEDIDAS sobre assets/img/marcos/comun.webp (451×800), no
+   estimadas: el filo blanco que delimita el hueco de la foto va de x 57 a 394
+   y de y 70 a 407, y el arte se mete por dentro de ese filo (~4px). Las cuatro
+   plantillas comparten geometría.
+   Los valores verticales no han cambiado — con la proporción antigua el
+   `contain` ya ajustaba por altura—; los horizontales sí: eran 18.1%/64.1%,
+   calculados sobre una plantilla que salía encogida al 87,4% del ancho. */
+.carta-foto-hueco {
+  position: absolute;
+  left: 13.53%; top: 9.25%; width: 73.16%; height: 41.25%;
+}
+/* El nombre real (mismo <h3>, solo movido) sobre el rectángulo blanco de la
+   plantilla: sigue siendo texto de verdad, no está "quemado" en la imagen —
+   lo sigue leyendo un lector de pantalla y lo sigue encontrando el buscador
+   del álbum (§7, WCAG 2.2, no negociable). */
+/* Igual que el hueco de foto: medido, no estimado. El rectángulo blanco de la
+   plantilla ocupa x 61..394, y 426..478 de 451×800. */
+.carta-nombre-marco {
+  position: absolute;
+  left: 13.53%; top: 53.25%; width: 74.06%; height: 6.62%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 4px;
+  color: #14151A;
+  font-weight: var(--fw-semibold);
+  text-align: center;
+  /* el tamaño lo fija el bloque 3b-bis, en cqw: es el texto que se cortaba */
+}
+/* El recorte vive en el span, no en el <h3>: ver el comentario del componente.
+   Sobre un contenedor flex, `text-overflow` no tiene ningún elemento al que
+   aplicarse y el nombre se desborda por los dos lados. */
+.carta-nombre-marco > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* insignia de posición, esquina SUPERIOR izquierda de la placa. Antes iba
+   abajo, pero ahí tapaba las estrellas de la plantilla de marco (§ arriba,
+   Común/Poco común/Raro/Épico). */
+.carta-pos {
+  position: absolute;
+  left: var(--e-2);
+  top: var(--e-2);
+  z-index: 3;               /* por encima del tinte y el barrido holográficos */
+  padding: 3px var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: rgba(11, 12, 16, .8);
+  backdrop-filter: blur(6px);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .06em;
+  color: var(--hueso);
+}
+
+/* ---- cuerpo ---- */
+.carta-cuerpo { display: flex; flex-direction: column; gap: var(--e-1); }
+.carta-nombre {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+  /* dos líneas máximo: nombres largos no descuadran la rejilla */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.carta-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
+}
+.carta-equipo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- rasgo de configuración (Capa 2 — Compos): Contraataque, Justicia,
+   Vínculo o Brecha. La afinidad ya se ve como hexágono; este es el otro
+   ingrediente de las Compos y hasta ahora no se veía en ningún sitio. ---- */
+.carta-rasgo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-micro);
+  color: var(--brasa-alta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.carta-rasgo i { font-size: 11px; flex-shrink: 0; }
+
+/* ---- bloque de estadísticas de combate ----
+   Espacio reservado desde ya (briefing, sección 32). Se rellena cuando el
+   diseño de los duelos fije las estadísticas; el marco no cambia. */
+.carta-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--e-1);
+  margin-top: var(--e-1);
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
+}
+.carta-stat { text-align: center; }
+.carta-stat b {
+  display: block;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--hueso);
+}
+.carta-stat span {
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+
+/* pie de la carta: lo que cada pantalla añade debajo (vendedor, comprar…) */
+.carta-pie {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+  margin-top: auto;
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
+}
+.carta-vendedor {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
+}
+
+/* botón flotante sobre la carta (proteger / quitar protección) */
+.carta-accion-flotante {
+  position: absolute;
+  top: var(--e-3);
+  left: var(--e-3);
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 32px; height: 32px;
+  border: 1px solid var(--linea);
+  border-radius: 50%;
+  background: rgba(11, 12, 16, .82);
+  backdrop-filter: blur(6px);
+  color: var(--ceniza);
+  font-size: 15px;
+  cursor: pointer;
+  transition: color var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
+}
+.carta-accion-flotante:hover { color: var(--hueso); border-color: var(--linea-viva); }
+.carta-accion-flotante.esta-activa { color: var(--brasa-alta); border-color: var(--brasa-borde); }
+
+/* agrupa la insignia de cantidad y el hexágono en el lado derecho de la
+   cabecera, para que la rareza (izquierda) y ellos (derecha) se repartan con
+   el space-between de .carta-head sin que la cantidad quede suelta al centro */
+.carta-head-derecha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  /* nunca cede espacio: si algo tiene que recortarse en .carta-head es la
+     etiqueta de rareza (ver .rz-texto), no la cantidad ni el hexágono */
+  flex-shrink: 0;
+}
+
+/* insignia "×N" para copias repetidas en colección (ver $opts['cantidad']) */
+.carta-cantidad {
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  color: var(--ceniza);
+}
+
+/* ---- afinidad (hexágono) ---- */
+.carta-afinidad {
+  width: 28px; height: 28px;
+  flex-shrink: 0;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: rgba(255, 255, 255, .06);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.carta-afinidad img { width: 100%; height: 100%; object-fit: contain; }
+
+/* ==========================================================================
+   3b. ETIQUETA DE RAREZA
+   El mismo lenguaje visual en colección, mercado, álbum y sala de duelo.
+   Las marcas van en .rz-marcas y son la señal NO cromática.
+   ========================================================================== */
+.rz {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  /* min-width:0 es lo que permite que esta etiqueta se encoja por debajo
+     del ancho de su propio texto dentro de .carta-head (flex). Sin esto,
+     "Poco común" en una tarjeta pequeña empujaba lo que hubiera a su lado
+     fuera de la tarjeta en vez de truncarse. */
+  min-width: 0;
+  padding: 4px var(--e-2);
+  border: 1px solid color-mix(in srgb, var(--rz) 40%, transparent);
+  border-radius: var(--r-chip);
+  background: color-mix(in srgb, var(--rz) 14%, transparent);
+  color: var(--rz-ink);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.rz-marcas { display: inline-flex; align-items: center; gap: 2px; line-height: 0; flex-shrink: 0; }
+/* el texto es lo único que se recorta con puntos suspensivos: las marcas no
+   cromáticas (chevrones, corona, destello) siempre se quedan completas, son
+   la señal de accesibilidad que no puede desaparecer */
+.rz-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* chevrón dibujado en CSS: sigue siendo legible aunque falle la fuente de iconos */
+.rz-marca {
+  width: 5px; height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.rz-marcas i { font-size: 12px; }
+
+/* ---- rarezas 1–4: color plano + n marcas ---- */
+.carta[data-rareza="1"], .rz[data-rareza="1"] { --rz: var(--rz1); --rz-halo: var(--rz1-halo); --rz-ink: var(--rz1-ink); }
+.carta[data-rareza="2"], .rz[data-rareza="2"] { --rz: var(--rz2); --rz-halo: var(--rz2-halo); --rz-ink: var(--rz2-ink); }
+.carta[data-rareza="3"], .rz[data-rareza="3"] { --rz: var(--rz3); --rz-halo: var(--rz3-halo); --rz-ink: var(--rz3-ink); }
+.carta[data-rareza="4"], .rz[data-rareza="4"] { --rz: var(--rz4); --rz-halo: var(--rz4-halo); --rz-ink: var(--rz4-ink); }
+.carta[data-rareza="5"], .rz[data-rareza="5"] { --rz: var(--rz5); --rz-halo: var(--rz5-halo); --rz-ink: var(--rz5-ink); }
+.carta[data-rareza="6"], /* ---- 7. NUMERADA: placa de metal grabada.
+        No compite con la SRF ni con la legendaria: no lleva animación, ni aura,
+        ni barrido. Lo que la distingue es el ACABADO —metal pulido— y el
+        número de serie, que es un dato y no un efecto. Una tirada limitada se
+        reconoce por su número, no por brillar más. ---- */
+.carta[data-rareza="7"] {
+  --rz-borde: var(--rz7-grad);
+}
+.rz[data-rareza="7"] {
+  background: var(--rz7-grad);
+  border-color: rgba(221, 229, 242, .55);
+  color: #1A1F2B;
+}
+
+/* El número de serie sobre la carta. Va arriba a la derecha, sola: es lo
+   único que esta rareza necesita enseñar de más, y ponerla junto al resto de
+   insignias la escondería entre ellas. */
+.carta-serie {
+  position: absolute;
+  top: var(--e-2);
+  right: var(--e-2);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: 1px solid rgba(221, 229, 242, .5);
+  border-radius: 999px;
+  background: var(--rz7-grad);
+  color: #1A1F2B;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-bold);
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.carta--sm .carta-serie { font-size: 9px; padding: 1px 6px; }
+/* En la fila horizontal va en línea, sin posicionar. */
+.carta-fila .carta-serie { position: static; }
+
+.rz[data-rareza="6"] { --rz: var(--rz6); --rz-halo: var(--rz6-halo); --rz-ink: var(--rz6-ink); }
+.carta[data-rareza="7"], .rz[data-rareza="7"] { --rz: var(--rz7); --rz-halo: var(--rz7-halo); --rz-ink: var(--rz7-ink); }
+
+.carta[data-rareza="2"] { --rz-borde: color-mix(in srgb, var(--rz2) 34%, transparent); }
+.carta[data-rareza="3"] { --rz-borde: color-mix(in srgb, var(--rz3) 38%, transparent); }
+.carta[data-rareza="4"] { --rz-borde: color-mix(in srgb, var(--rz4) 42%, transparent); }
+
+/* ---- 5. Legendario: borde metálico + etiqueta en degradado ámbar-fuego ---- */
+.carta[data-rareza="5"] {
+  --rz-borde: linear-gradient(140deg, #FFE0AE, #E8752A 30%, #7A3A12 52%, #F2B134 72%, #FFE0AE);
+}
+.rz[data-rareza="5"] {
+  background: var(--rz5-grad);
+  border-color: rgba(255, 224, 174, .6);
+  color: var(--brasa-tinta);
+}
+
+/* ---- 6. SRF: la rareza cumbre.
+        Es la única con animación por defecto y tiene que ganar a la legendaria
+        sin discusión, así que suma tres señales que ninguna otra rareza usa:
+        borde arcoíris en movimiento, aura exterior y barrido holográfico sobre
+        el arte. El marco se ensancha a 2px para que el borde se lea de lejos. ---- */
+.carta[data-rareza="6"] {
+  padding: 2px;
+  background: var(--rz6-grad);
+  background-size: 300% 100%;
+  animation: holoDeriva 4s linear infinite;
+}
+.carta[data-rareza="6"] .carta-marco,
+.carta--sm[data-rareza="6"] .carta-marco { border-radius: 0; }
+
+/* aura exterior: se pinta por detrás de la carta y es lo que la hace destacar
+   en una rejilla, antes incluso de leer la etiqueta */
+.carta[data-rareza="6"]::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--rz6-grad);
+  background-size: 300% 100%;
+  filter: blur(13px);
+  opacity: .5;
+  animation: holoDeriva 4s linear infinite, holoAura 3.2s ease-in-out infinite;
+}
+
+/* tinte multitono sobre el arte, contenido para no competir con la
+   ilustración: el arte manda, el holográfico lo acompaña */
+.carta[data-rareza="6"] .carta-placa::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--rz6-grad);
+  background-size: 300% 100%;
+  mix-blend-mode: overlay;
+  opacity: .45;
+  animation: holoDeriva 6s linear infinite;
+}
+
+/* barrido de luz diagonal: el destello de una carta holográfica física al
+   girarla bajo la luz */
+.carta[data-rareza="6"] .carta-placa::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(110deg,
+    transparent 38%,
+    rgba(255, 255, 255, .16) 46%,
+    rgba(255, 255, 255, .55) 50%,
+    rgba(255, 255, 255, .16) 54%,
+    transparent 62%);
+  animation: holoBarrido 4.5s var(--curva) infinite;
+}
+
+.rz[data-rareza="6"] {
+  position: relative;
+  overflow: hidden;
+  /* la placa oscura mantiene el texto legible cuando pasa la banda amarilla:
+     sin ella el blanco cae por debajo de 2:1 */
+  background-image: linear-gradient(rgba(11, 12, 16, .45), rgba(11, 12, 16, .45)), var(--rz6-grad);
+  background-size: 100% 100%, 300% 100%;
+  border-color: rgba(255, 255, 255, .75);
+  color: #fff;
+  box-shadow: 0 0 12px -2px rgba(255, 255, 255, .35);
+  animation: holoDeriva 3s linear infinite;
+}
+/* la etiqueta recibe su propio barrido, más corto. Va por debajo del texto:
+   si pasara por encima, el contraste caería durante el destello */
+.rz[data-rareza="6"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, .5) 50%, transparent 60%);
+  animation: holoBarrido 3.5s var(--curva) infinite;
+}
+.rz[data-rareza="6"] > * { position: relative; z-index: 1; }
+
+@keyframes holoDeriva {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes holoAura {
+  0%, 100% { opacity: .38; }
+  50%      { opacity: .68; }
+}
+@keyframes holoBarrido {
+  0%, 55%  { transform: translateX(-115%); }
+  100%     { transform: translateX(115%); }
+}
+
+/* Movimiento reducido: se apagan los barridos y el aura queda fija en su
+   estado medio. La carta sigue siendo inconfundiblemente SRF —borde
+   arcoíris, aura y tinte— pero sin nada en movimiento. */
+:root[data-motion="reduce"] .carta[data-rareza="6"] .carta-placa::before,
+:root[data-motion="reduce"] .rz[data-rareza="6"]::after { display: none; }
+:root[data-motion="reduce"] .carta[data-rareza="6"]::before { opacity: .5; }
+
+/* ==========================================================================
+   3b-bis. EL TEXTO ESCALA CON LA CARTA, NO CON LA VENTANA
+   --------------------------------------------------------------------------
+   El problema que arregla: los tamaños de fuente eran fijos por clase
+   (`sm`/`md`/`lg`) mientras el ANCHO de la carta es fluido —viene de la
+   rejilla—. En cuanto la rejilla apretaba (selector de mazos, panel, móvil),
+   la carta encogía y el texto no: los nombres largos se cortaban.
+
+   Se resuelve con consultas de contenedor, que es exactamente el caso de uso
+   para el que existen: la carta se declara contenedor y su texto se mide en
+   `cqw` (1 % del ancho de la carta), así que nombre y marco encogen juntos.
+
+   `clamp()` pone suelo y techo: el suelo evita texto ilegible en la carta más
+   pequeña, el techo evita que en una carta enorme el nombre se desmadre. El
+   valor central es el que manda en los tamaños normales.
+   ========================================================================== */
+.carta {
+  container-type: inline-size;
+  container-name: carta;
+}
+
+/* El nombre sobre el rectángulo blanco de la plantilla (Común→Épico) es el
+   que se cortaba de verdad: vive en una caja de ancho fijo en PORCENTAJE de
+   la carta, así que es el que más necesita medirse en `cqw`. */
+.carta-nombre-marco { font-size: clamp(6px, 5.2cqw, 13px); }
+.carta--lg .carta-nombre-marco { font-size: clamp(8px, 5.2cqw, 15px); }
+
+.carta-nombre { font-size: clamp(11px, 7cqw, 16px); }
+.carta-meta   { font-size: clamp(10px, 5.6cqw, 15px); }
+.carta-pos    { font-size: clamp(8px, 4.4cqw, 12px); }
+.carta-stat b { font-size: clamp(12px, 7.5cqw, 18px); }
+.carta-stat span,
+.carta-rasgo  { font-size: clamp(8px, 4.4cqw, 12px); }
+/* La etiqueta de rareza se usa TAMBIÉN suelta —filtros, sala de duelo,
+   leyendas—, donde no hay carta que la contenga y `cqw` se mediría contra la
+   ventana. Por eso esta regla va acotada a dentro de la carta: fuera, la
+   etiqueta conserva sus 10px de siempre. */
+.carta .rz    { font-size: clamp(7px, 4cqw, 11px); }
+
+/* ==========================================================================
+   3b-ter. MODO ARTE — la carta ES el arte
+   --------------------------------------------------------------------------
+   Arte a sangre, esquinas RECTAS y ni un dato encima. Todo lo que el modo
+   normal pinta sobre la carta (nombre, rareza, equipo, estadísticas) se ha
+   mudado al modal de ficha, que se abre al pulsar.
+
+   Lo único que sobrevive del marco es el borde de rareza, porque es la señal
+   que distingue una SRF de una común de un vistazo: sigue siendo la técnica
+   de `padding + background` de siempre, así que el arcoíris animado de la SRF
+   y el degradado metálico de la legendaria funcionan aquí sin una línea más.
+   ========================================================================== */
+.carta--arte {
+  border-radius: 0;            /* esquinas rectas: es la petición explícita */
+  padding: 2px;                /* el borde de rareza, un pelo más visible que
+                                  en el modo normal porque ya no compite con
+                                  ningún otro elemento */
+  background: var(--rz-borde);
+}
+.carta--arte .carta-marco {
+  padding: 0;
+  gap: 0;
+  border-radius: 0;
+  background: var(--pozo);
+  overflow: hidden;
+  /* `height: 100%` de la regla general estiraba el marco hasta cubrir también
+     el pie de foto: la altura de `.carta` sale de su contenido (marco + pie),
+     y el marco volvía a leerla como suya. Resultado medido: marco de 413px
+     para una placa de 385px, o sea 28px de borde de rareza sobrando por
+     debajo del arte. Con `auto`, el marco mide exactamente el arte. */
+  height: auto;
+}
+/* ---- el borde ABRAZA el arte, sin bandas ----
+   Aquí estaba el fallo que se veía en pantalla: `.carta-placa` fija
+   `aspect-ratio: 233/361` (0,645), pero TODO el arte real del catálogo es
+   451×800 (0,564) —comprobado fichero a fichero, incluidas las cuatro
+   plantillas de marco de branding/—. Con `contain`, la ilustración quedaba
+   con banda oscura a los lados y el borde de rareza dibujaba el rectángulo de
+   la PLACA, no el del arte: por eso el borde "no se ajustaba".
+
+   Se probó lo obvio —quitar la proporción y dejar que la imagen la impusiera
+   con `height: auto`— y NO sirve: hasta que la imagen carga no hay proporción
+   intrínseca, así que la carta colapsa a 28px de alto, y con `loading="lazy"`
+   una carta colapsada puede no llegar a entrar en el viewport nunca. Medido:
+   marco de 217×28 y `naturalWidth` 0. Sería además un salto de maquetación
+   (CLS) en cada carga.
+
+   Así que la proporción se declara, pero en una variable y con el valor REAL
+   del catálogo en vez del heredado. Con esto el borde abraza el arte en el
+   100% de las cartas de hoy, se reserva el hueco antes de cargar y el
+   `contain` sigue garantizando que un arte de otra proporción se vea entero y
+   centrado —con márgenes mínimos— antes que recortado. */
+.carta { --carta-ratio: 451 / 800; }
+.carta--arte .carta-placa {
+  border-radius: 0;
+  aspect-ratio: var(--carta-ratio);
+  /* El halo de rareza solo asomaría por detrás de un PNG con transparencia,
+     tiñendo el arte. Con el arte a sangre no aporta nada: fondo plano. */
+  background: var(--pozo);
+}
+/* ⚠️ ESTA REGLA ES OBLIGATORIA, NO UN RETOQUE.
+   La de arriba usa el ATAJO `background`, y un atajo reinicia TODAS las
+   propiedades de la familia: se llevaba por delante el `background-image` de
+   `.carta-placa--marco` (que además pesa menos: 0-1-0 contra 0-2-0). Efecto
+   medido en pantalla: en colección y álbum las cartas Común→Épico salían como
+   rectángulos negros vacíos y el nombre —tinta oscura pensada para el
+   rectángulo blanco de la plantilla— desaparecía sobre el fondo.
+   Se repiten los cuatro longhand porque el atajo también reseteó tamaño,
+   repetición y posición; con solo devolver la imagen saldría en mosaico. */
+.carta--arte .carta-placa--marco {
+  background-image: var(--marco-img);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Pie de foto: la rareza escrita, DEBAJO del marco, no encima del arte.
+   Es también donde vive ahora la marca no cromática de rareza en este modo. */
+.carta-leyenda {
+  display: block;
+  margin-top: var(--e-2);
+  text-align: center;
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+}
+/* El pie de la carta en modo arte NO está dentro de la carta: es hermano
+   suyo, dentro de `.carta-bloque` (ver components/carta.php). Por eso pierde
+   la línea superior y el hueco que `.carta-pie` lleva para separarse del
+   cuerpo — aquí no hay cuerpo del que separarse, y esa raya dibujaba un
+   segundo recuadro alrededor del vendedor que lo hacía parecer pulsable.
+   El borde de rareza, mientras, sigue donde siempre: abrazando solo el arte. */
+.carta-bloque {
+  display: flex;
+  flex-direction: column;
+}
+.carta-pie--arte {
+  margin-top: var(--e-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  padding-top: 0;
+  border-top: 0;
+}
+
+/* La capa que abre la ficha: cubre SOLO el arte, no el pie de foto ni el pie
+   de la carta (en el mercado ahí vive el botón de comprar, y no debe abrir la
+   ficha al pulsarlo). z-index 2 la deja por debajo de las insignias y de las
+   acciones flotantes, que van a 3 y 4. */
+.carta-hitbox {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+/* Vive dentro de `.carta-marco`, que ya es exactamente el arte: `inset: 0` la
+   ajusta sola, sin necesidad de saber ninguna proporción. */
+.carta--arte .carta-marco { position: relative; }
+/* El foco va HACIA DENTRO: `.carta-marco` lleva `overflow: hidden` y un
+   contorno por fuera se recortaría — dejando a un usuario de teclado sin
+   saber dónde está, que es justo lo que el contorno existe para evitar. */
+.carta-hitbox:focus-visible {
+  outline: 2px solid var(--brasa-alta);
+  outline-offset: -4px;
+}
+/* Las acciones flotantes (z-index 4) y las insignias (3) ya estaban por
+   encima de este 2, así que sus clics siguen llegando sin tocar nada más. */
+
+/* ==========================================================================
+   3b-quater. VISTA DE LISTA — la misma carta, en horizontal
+   --------------------------------------------------------------------------
+   Miniatura + jugador + posición + las tres estadísticas + un hueco a la
+   derecha para lo que cada pantalla ponga (precio y "Comprar" en el mercado).
+
+   No es una `<table>`: seis columnas con miniatura, tres estadísticas y un
+   botón fuerzan scroll horizontal en móvil. Con rejilla, las columnas se
+   apilan solas y no hay scroll lateral en ningún ancho.
+   ========================================================================== */
+.carta-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  /* La lista es contenedor, y las filas se adaptan a ELLA, no a la ventana.
+     Es lo que hace que el mismo componente valga en el mercado (a lo ancho de
+     la página) y en el panel del deck builder (~360px con la ventana a 1400):
+     con media queries, la fila del panel habría intentado montar cuatro
+     columnas en 360px porque la VENTANA era ancha. */
+  container-type: inline-size;
+  container-name: lista;
+}
+/* ⚠️ NO QUITAR. Un contenedor flex en columna reparte el espacio entre sus
+   hijos, y `flex-shrink` vale 1 por defecto: en cuanto la lista vive dentro
+   de un panel con altura limitada —el selector del deck builder, que lleva
+   `max-height` y scroll propio— las filas se aplastaban unas contra otras.
+   Medido: fila de 23px con 145px de contenido dentro, o sea la lista entera
+   convertida en un montón de rayas horizontales. */
+.carta-lista > li { flex-shrink: 0; }
+
+.carta-fila {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
+  transition: border-color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.carta-fila:hover { border-color: var(--linea-viva); background: var(--carbon-alto); }
+
+/* Franja de rareza en el borde izquierdo: la misma señal de la rejilla,
+   traducida a una lista. Va con las marcas no cromáticas de `.rz` al lado,
+   así que sigue sin depender del color. */
+.carta-fila { border-left: 3px solid var(--rz-borde); }
+
+.carta-fila-miniatura {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  aspect-ratio: 451 / 800;
+  overflow: hidden;
+  /* Esquinas RECTAS, como la carta en modo arte: una carta de este juego no
+     tiene los cantos redondeados, y la miniatura es la misma carta en pequeño. */
+  border-radius: 0;
+  background: var(--pozo);
+  color: var(--ceniza);
+}
+.carta-fila-miniatura img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Con plantilla: el fondo es el marco de la comunidad y la foto va dentro de
+   su hueco, con la misma geometría medida que la carta grande — solo que sin
+   el nombre, que a este tamaño no se leería. */
+.carta-fila-miniatura--marco {
+  position: relative;
+  background-image: var(--marco-img);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: var(--pozo);
+}
+.carta-fila-miniatura--marco img {
+  position: absolute;
+  left: 13.53%; top: 9.25%; width: 73.16%; height: 41.25%;
+}
+.carta-fila-miniatura[data-rareza="1"] { --marco-img: url('../img/marcos/comun.webp'); }
+.carta-fila-miniatura[data-rareza="2"] { --marco-img: url('../img/marcos/poco-comun.webp'); }
+.carta-fila-miniatura[data-rareza="3"] { --marco-img: url('../img/marcos/raro.webp'); }
+.carta-fila-miniatura[data-rareza="4"] { --marco-img: url('../img/marcos/epico.webp'); }
+.carta-fila-miniatura[data-rareza="5"] { --marco-img: url('../img/marcos/legendario.webp'); }
+.carta-fila-miniatura[data-rareza="6"] { --marco-img: url('../img/marcos/srf.webp'); }
+.carta-fila-miniatura[data-rareza="7"] { --marco-img: url('../img/marcos/numerada.webp'); }
+
+.carta-fila-jugador { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.carta-fila-nombre {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  color: var(--hueso);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+button.carta-fila-nombre { cursor: pointer; }
+button.carta-fila-nombre:hover { color: var(--brasa-alta); }
+button.carta-fila-nombre:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; border-radius: var(--r-chip); }
+.carta-fila-meta {
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.carta-fila-pos { display: flex; align-items: center; gap: var(--e-2); }
+
+.carta-fila-stats { display: flex; gap: var(--e-2); }
+.carta-fila-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  font-size: var(--fs-label);
+}
+.carta-fila-stat b { font-size: var(--fs-body-sm); }
+.carta-fila-stat-abrev { color: var(--ceniza); font-size: 10px; letter-spacing: .06em; }
+.carta-fila-statvar(--ata) i { color: var(--ata); }
+.carta-fila-statvar(--ata) b { color: var(--ata-txt); }
+.carta-fila-statvar(--def) i { color: var(--def); }
+.carta-fila-statvar(--def) b { color: var(--def-txt); }
+.carta-fila-statvar(--tec) i { color: var(--tec); }
+.carta-fila-statvar(--tec) b { color: var(--tec-txt); }
+
+.carta-fila-derecha {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--e-3);
+}
+.carta-fila-precio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-semibold);
+  color: var(--amarilla-txt);
+}
+
+/* Tableta: la posición y la rareza se van con el nombre, que es donde menos
+   estorban, y las estadísticas se quedan con el bloque de acciones.
+   Las reglas nombran las DOS rejillas posibles —`.carta-fila` cuando la fila
+   es informativa y `.carta-fila-interior` cuando la fila entera es un botón—
+   porque el contenedor de rejilla es uno u otro según el caso. */
+@container lista (max-width: 900px) {
+  .carta-fila,
+  .carta-fila-interior { grid-template-columns: 48px minmax(0, 1fr) auto; row-gap: var(--e-3); }
+  .carta-fila-miniatura { width: 48px; }
+  .carta-fila-pos { grid-column: 2; grid-row: 2; }
+  .carta-fila-stats { grid-column: 2 / -1; grid-row: 3; flex-wrap: wrap; }
+}
+/* Estrecho: todo apilado bajo la miniatura. Nunca scroll lateral.
+   Y COMPACTO: apilado, una fila holgada ocupaba 189px, o sea tres jugadores
+   por pantalla en el panel del deck builder — donde justamente hace falta
+   barrer muchos. Se aprieta el espaciado y la abreviatura de cada estadística
+   se cae: el icono (espada / escudo / rayo) ya la distingue sin color, y el
+   nombre largo sigue ahí para lectores de pantalla. */
+@container lista (max-width: 560px) {
+  .carta-fila,
+  .carta-fila-interior {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: var(--e-2) var(--e-3);
+    row-gap: var(--e-2);
+  }
+  /* La miniatura ocupa DOS filas (44px de ancho son 78 de alto por su
+     proporción). Poniendo el nombre arriba y los distintivos justo debajo, a
+     su derecha, esos 78px se aprovechan enteros en vez de dejar hueco muerto
+     al lado: la fila baja de 185px a ~130. */
+  .carta-fila-miniatura { width: 44px; grid-row: 1 / 3; align-self: start; }
+  .carta-fila-jugador { grid-column: 2; grid-row: 1; }
+  .carta-fila-pos { grid-column: 2; grid-row: 2; flex-wrap: wrap; align-self: start; }
+  .carta-fila-stats { grid-column: 1 / -1; grid-row: 3; gap: var(--e-1); }
+  .carta-fila-derecha { grid-column: 1 / -1; grid-row: 4; justify-content: space-between; }
+  .carta-fila-stat-abrev { display: none; }
+  .carta-fila-stat { padding: 2px var(--e-2); }
+  .carta-fila-interior { padding: var(--e-2); }
+}
+
+/* ---- fila pulsable (deck builder) ----
+   La fila entera es un botón. Por eso NO puede llevar dentro ni el botón de
+   ficha ni el bloque derecho: un botón dentro de otro es marcado inválido y
+   el navegador lo desmonta. El componente lo impide por su cuenta. */
+.carta-fila--accion { padding: 0; overflow: hidden; }
+.carta-fila-interior {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  /* subgrid necesita que la rejilla la defina el padre; si el navegador no lo
+     soporta, esta declaración se ignora y manda el `display: grid` de abajo,
+     que reparte igual aunque sin alinear columnas entre filas. */
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--e-3);
+  width: 100%;
+  padding: var(--e-2) var(--e-3);
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.carta-fila-interior:disabled { cursor: default; opacity: .45; }
+.carta-fila-interior:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: -3px; }
+.carta-fila--accion .carta-fila-miniatura { width: 48px; }
+
+/* Ya está en el once: se marca en la fila, no solo apagándola, para que se
+   distinga de "no disponible por otro motivo". */
+.carta-fila.esta-elegida { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+.carta-fila.es-repetido .carta-fila-interior { opacity: .38; }
+
+.carta-fila-compo { color: var(--var-txt); border-color: var(--var-borde); }
+.carta-fila-compo i { font-size: 11px; }
+
+/* Conmutador de vista (rejilla / lista) */
+.vista-conmutador { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--linea); border-radius: var(--r-chip); }
+.vista-conmutador a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: 6px var(--e-3);
+  border-radius: calc(var(--r-chip) - 2px);
+  color: var(--ceniza);
+  text-decoration: none;
+  font-size: var(--fs-label);
+}
+.vista-conmutador a[aria-current="true"] { background: var(--carbon-alto); color: var(--hueso); }
+.vista-conmutador a:hover { color: var(--hueso); }
+
+/* ==========================================================================
+   3c. TAMAÑOS Y ESTADOS DE LA CARTA
+   ========================================================================== */
+/* Los tamaños ya NO tocan la tipografía: de eso se encarga el bloque 3b-bis
+   con consultas de contenedor, que es lo que arregla el texto cortado. Aquí
+   queda solo lo que no es texto — relleno, radio y el hexágono de afinidad. */
+.carta--sm { border-radius: 0; }
+.carta--sm .carta-marco { padding: var(--e-2); gap: var(--e-2); border-radius: 0; }
+.carta--sm .carta-afinidad { width: 22px; height: 22px; }
+.carta--sm .rz { padding: 3px 6px; }
+
+.carta--lg .carta-marco { padding: var(--e-4); gap: var(--e-4); }
+
+/* interactiva: solo las cartas que llevan a algún sitio se elevan al hover */
+.carta--accion { cursor: pointer; }
+@media (hover: hover) {
+  .carta--accion:hover { transform: translateY(-6px); }
+  .carta--accion:hover .carta-marco { box-shadow: var(--elev-3); }
+}
+.carta--accion:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 4px; }
+
+/* no poseída (álbum): silueta apagada, nunca oculta del todo */
+.carta.is-nopos .carta-marco { filter: grayscale(1); opacity: .45; }
+.carta.is-nopos:hover .carta-marco { opacity: .65; }
+.carta-candado {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-2);
+  border-radius: var(--r-panel);
+  background: rgba(11, 12, 16, .45);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.carta-candado i { font-size: 22px; }
+
+/* insignias flotantes sobre la carta */
+.carta-insignia {
+  position: absolute;
+  top: var(--e-3);
+  right: var(--e-3);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  padding: 5px var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
+  background: rgba(11, 12, 16, .82);
+  backdrop-filter: blur(6px);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  color: var(--hueso);
+}
+.carta-insignia--precio { color: var(--brasa-alta); border-color: var(--brasa-borde); }
+.carta-insignia--protegida { top: var(--e-3); left: var(--e-3); right: auto; color: var(--brasa-alta); }
+
+/* seleccionada (deck builder): anillo ámbar, sin depender del arrastre */
+.carta.is-seleccionada { --rz-borde: var(--brasa); }
+.carta.is-seleccionada .carta-marco { box-shadow: 0 0 0 2px var(--brasa-velo); }
+
+/* dorso: usado en la ceremonia de apertura antes del volteo */
+.carta-dorso {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  border-radius: calc(var(--r-panel) - 1px);
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,.03) 0 8px, transparent 8px 16px),
+    linear-gradient(180deg, var(--carbon), var(--negro));
+  color: rgba(255, 255, 255, .18);
+  font-size: 34px;
+}
+
+/* rejilla estándar de cartas */
+.carta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--e-4);
+}
+@media (min-width: 480px) {
+  .carta-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--e-5); }
+}
+.carta-grid--densa { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: var(--e-3); }
+
+/* ==========================================================================
+   LISTAS LARGAS — que el móvil solo pinte lo que se ve
+
+   El álbum son 469 cartas y crece; el mercado y la colección van por el mismo
+   camino. Cada carta lleva su `container-type`, su placa con proporción, su
+   marco y sus sombras: maquetarlas TODAS en la primera pintada es de lo más
+   caro que hace la web, y en un móvil de gama baja es la diferencia entre
+   entrar al álbum y quedarse mirando el blanco.
+
+   `content-visibility: auto` le dice al navegador que se salte el maquetado y
+   el pintado de lo que está fuera de pantalla, y que lo haga cuando se acerque
+   con el scroll. `contain-intrinsic-size` es la mitad que importa: es la
+   altura que se le supone a lo que aún no se ha maquetado. Sin ella la barra
+   de scroll saltaría a cada tramo que entra. Los valores salen de medir una
+   carta real (proporción 451/800 más el pie) y una fila real.
+
+   No se aplica a las listas cortas ni a los selectores: ahí no ahorra nada y
+   solo añadiría un salto al hacer scroll. */
+@supports (content-visibility: auto) {
+  .carta-grid > .carta-bloque,
+  .carta-grid > .carta,
+  .carta-grid > li {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 340px;
+  }
+  .carta-lista > li {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 84px;
+  }
+}
+
+/* ==========================================================================
+   5. PANEL / TARJETA GENÉRICA
+   ========================================================================== */
+.panel {
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+/* Sin marco. Para paneles largos —el de abrir sala en duelos— donde el borde
+   solo consigue que el contenido se lea como "un formulario": el fondo ya
+   separa el bloque del resto de la página. */
+.panel--sin-borde { border-color: transparent; }
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--e-3);
+  margin-bottom: var(--e-4);
+}
+.panel-titulo { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
+
+/* cifra destacada de dashboard: el dato en mono, la etiqueta en caption */
+.dato { display: flex; flex-direction: column; gap: var(--e-1); }
+.dato b {
+  font-family: var(--tipo-display);
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.dato span {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+
+/* ==========================================================================
+   6. ALERTA
+   ========================================================================== */
+.alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: rgba(255, 255, 255, .03);
+  font-size: var(--fs-body-sm);
+  line-height: var(--lh-body);
+  color: var(--ceniza);
+}
+.alerta i { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.alerta-success { background: var(--cesped-velo); border-color: var(--cesped-borde); color: var(--cesped-txt); }
+.alerta-warning { background: var(--amarilla-velo); border-color: var(--amarilla-borde); color: var(--amarilla-txt); }
+.alerta-danger  { background: var(--roja-velo);  border-color: var(--roja-borde);  color: var(--roja-txt); }
+.alerta-info    { background: var(--var-velo);    border-color: var(--var-borde);    color: var(--var-txt); }
+
+/* ==========================================================================
+   7. PASTILLA DE ESTADO
+   Lleva punto + texto: el color nunca es la única señal.
+   ========================================================================== */
+.pastilla {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: 4px var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .04);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: .04em;
+  color: var(--ceniza);
+}
+.pastilla::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+/* Una fracción como «11/11» dentro de una pastilla hereda el tracking .04em
+   de la etiqueta y lo compone sobre cada carácter: en cuatro dígitos y una
+   barra se nota como un hueco de más entre los números. La pastilla necesita
+   ese tracking para su TEXTO (una palabra corta en mayúsculas); una cifra no
+   lo necesita nunca. */
+.pastilla .mono { letter-spacing: normal; }
+.pastilla-on   { background: var(--cesped-velo); border-color: var(--cesped-borde); color: var(--cesped-txt); }
+.pastilla-warn { background: var(--amarilla-velo); border-color: var(--amarilla-borde); color: var(--amarilla-txt); }
+.pastilla-off  { background: var(--roja-velo);  border-color: var(--roja-borde);  color: var(--roja-txt); }
+
+/* ==========================================================================
+   8. BARRA DE PROGRESO (álbum, misiones)
+   ========================================================================== */
+.progreso { display: flex; align-items: center; gap: var(--e-3); min-width: 180px; }
+.progreso-riel {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .07);
+  overflow: hidden;
+}
+.progreso-relleno {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--brasa), var(--brasa-alta));
+  transition: width var(--t-estado) var(--curva);
+}
+.progreso-label {
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   9. TABLA DE DATOS
+   En móvil hace scroll horizontal controlado, nunca comprime columnas.
+   ========================================================================== */
+.tabla-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.tabla { width: 100%; border-collapse: collapse; min-width: 520px; }
+.tabla thead th {
+  padding: var(--e-3) var(--e-4);
+  border-bottom: 1px solid var(--linea);
+  text-align: left;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+  white-space: nowrap;
+}
+.tabla tbody td {
+  padding: var(--e-4);
+  border-bottom: 1px solid var(--linea);
+  font-size: var(--fs-body-sm);
+}
+.tabla tbody tr:last-child td { border-bottom: 0; }
+.tabla tbody tr { transition: background var(--t-toque) var(--curva); }
+.tabla tbody tr:hover { background: rgba(255, 255, 255, .03); }
+.tabla .num { font-family: var(--tipo-display); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ==========================================================================
+   10. CHIP DE USUARIO (avatar + monedas)
+   ========================================================================== */
+.chip-usuario {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: 5px var(--e-4) 5px 5px;
+  border: 1px solid var(--linea);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .03);
+}
+.avatar {
+  --avatar: 32px;
+  width: var(--avatar); height: var(--avatar);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--brasa);
+  color: var(--brasa-tinta);
+  font-size: calc(var(--avatar) * .4);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar--lg { --avatar: 96px; border-radius: var(--r-panel); }
+.avatar--sm { --avatar: 24px; }
+
+.monedas {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--brasa-alta);
+}
+
+/* ==========================================================================
+   11. TABS
+   ========================================================================== */
+.tabs {
+  display: flex;
+  gap: var(--e-5);
+  border-bottom: 1px solid var(--linea);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  position: relative;
+  padding: var(--e-4) 0;
+  border: 0;
+  background: none;
+  color: var(--ceniza);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--t-toque) var(--curva);
+}
+.tab:hover { color: var(--hueso); }
+.tab[aria-selected="true"] { color: var(--hueso); }
+.tab[aria-selected="true"]::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--brasa);
+}
+.tab-panel[hidden] { display: none; }
+
+/* ==========================================================================
+   12. PAGINACIÓN
+   ========================================================================== */
+.paginacion { display: flex; justify-content: center; gap: var(--e-2); flex-wrap: wrap; }
+.pag-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: transparent;
+  color: var(--ceniza);
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  cursor: pointer;
+  transition: border-color var(--t-toque) var(--curva), color var(--t-toque) var(--curva);
+}
+.pag-btn:hover { border-color: var(--linea-viva); color: var(--hueso); }
+.pag-btn[aria-current="page"] { background: var(--brasa); border-color: var(--brasa); color: var(--brasa-tinta); font-weight: var(--fw-bold); }
+
+/* ==========================================================================
+   13. ESTADO VACÍO
+   Siempre indica la siguiente acción posible; nunca deja la pantalla en blanco.
+   ========================================================================== */
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-8) var(--e-5);
+  border: 1px dashed var(--linea-viva);
+  border-radius: var(--r-carta);
+  text-align: center;
+}
+.vacio-ico {
+  display: grid;
+  place-items: center;
+  width: 52px; height: 52px;
+  border: 1px solid var(--linea);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .03);
+  font-size: 22px;
+  color: var(--ceniza);
+}
+.vacio h3 { font-size: var(--fs-h3); }
+.vacio p { max-width: 42ch; font-size: var(--fs-body-sm); color: var(--ceniza); }
+.vacio .btn { margin-top: var(--e-2); }
+
+/* ==========================================================================
+   14. SKELETON
+   ========================================================================== */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-chip);
+  background: rgba(255, 255, 255, .06);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .09), transparent);
+  animation: brillo 1.6s ease-in-out infinite;
+}
+@keyframes brillo { 100% { transform: translateX(100%); } }
+.skeleton-texto { height: 12px; }
+.skeleton-carta { aspect-ratio: var(--carta-ratio, 451 / 800); border-radius: 0; }
+
+/* ==========================================================================
+   15. MODAL
+   Foco atrapado y cierre con Esc los aporta assets/js/ui.js.
+   ========================================================================== */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--e-4);
+  background: rgba(6, 7, 9, .72);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--t-estado) var(--curva), visibility 0s linear var(--t-estado);
+}
+.modal.is-abierto { opacity: 1; visibility: visible; transition: opacity var(--t-estado) var(--curva); }
+
+.modal-caja {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: var(--e-6);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  transform: scale(.97) translateY(8px);
+  transition: transform var(--t-estado) var(--curva);
+}
+.modal.is-abierto .modal-caja { transform: none; }
+.modal-caja--ancha { max-width: 780px; }
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--e-4);
+  margin-bottom: var(--e-5);
+}
+.modal-cerrar {
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  margin: calc(var(--e-2) * -1);
+  border: 0;
+  border-radius: var(--r-chip);
+  background: none;
+  color: var(--ceniza);
+  font-size: 20px;
+  cursor: pointer;
+  transition: color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.modal-cerrar:hover { color: var(--hueso); background: rgba(255, 255, 255, .05); }
+.modal-pie { display: flex; justify-content: flex-end; gap: var(--e-3); margin-top: var(--e-6); flex-wrap: wrap; }
+
+/* ==========================================================================
+   14b. MODAL DE FICHA DE CARTA
+   El destino de todo lo que el modo arte quita de encima del arte: arte
+   completo a la izquierda, datos a la derecha. Es la pantalla donde de verdad
+   se lee una carta, así que aquí las estadísticas mandan.
+   ========================================================================== */
+.modal-caja--ficha {
+  position: relative;
+  max-width: 860px;
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: var(--e-6);
+  align-items: start;
+}
+.ficha-cerrar { position: absolute; top: var(--e-4); right: var(--e-4); }
+
+.ficha-datos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+  /* deja sitio al botón de cerrar, que flota en la esquina */
+  padding-right: var(--e-7);
+}
+.ficha-titulo-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.ficha-meta { margin: calc(var(--e-4) * -1) 0 0; font-size: var(--fs-body-sm); }
+
+.ficha-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--e-3);
+}
+.ficha-stat {
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
+}
+.ficha-stat-cifra {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  margin: 0;
+}
+/* El icono lleva el color pleno; la cifra, la variante legible sobre oscuro.
+   Nunca al revés: el tono puro no llega a 4.5:1 contra el panel. */
+.ficha-stat-cifra i { font-size: 18px; }
+.ficha-stat-cifra b { font-size: var(--fs-h3); line-height: 1; }
+.ficha-stat-etiqueta {
+  margin: var(--e-1) 0 var(--e-2);
+  font-size: var(--fs-micro);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.ficha-stat-barra {
+  display: block;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .08);
+  overflow: hidden;
+}
+.ficha-stat-barra i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--t-estado) var(--curva);
+}
+
+.ficha-statvar(--ata) .ficha-stat-cifra i { color: var(--ata); }
+.ficha-statvar(--ata) .ficha-stat-cifra b { color: var(--ata-txt); }
+.ficha-statvar(--ata) .ficha-stat-barra i { background: var(--ata); }
+
+.ficha-statvar(--def) .ficha-stat-cifra i { color: var(--def); }
+.ficha-statvar(--def) .ficha-stat-cifra b { color: var(--def-txt); }
+.ficha-statvar(--def) .ficha-stat-barra i { background: var(--def); }
+
+.ficha-statvar(--tec) .ficha-stat-cifra i { color: var(--tec); }
+.ficha-statvar(--tec) .ficha-stat-cifra b { color: var(--tec-txt); }
+.ficha-statvar(--tec) .ficha-stat-barra i { background: var(--tec); }
+
+.ficha-etiqueta {
+  margin: 0 0 var(--e-1);
+  font-size: var(--fs-micro);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.ficha-bloque p:last-child { margin: 0; }
+.ficha-afinidad { display: flex; align-items: center; gap: var(--e-2); }
+.ficha-afinidad .carta-afinidad { width: 26px; height: 26px; flex-shrink: 0; }
+.ficha-acciones { display: flex; gap: var(--e-3); flex-wrap: wrap; }
+.ficha-acciones:empty { display: none; }
+
+/* En móvil el arte se pone arriba y encoge: a pantalla estrecha la carta a
+   tamaño completo empujaba las estadísticas fuera de la vista. */
+@media (max-width: 700px) {
+  .modal-caja--ficha { grid-template-columns: minmax(0, 1fr); gap: var(--e-5); }
+  .ficha-arte { max-width: 200px; margin-inline: auto; }
+  .ficha-datos { padding-right: 0; }
+  .ficha-stats { gap: var(--e-2); }
+}
+:root[data-motion="reduce"] .ficha-stat-barra i { transition: none; }
+
+/* ==========================================================================
+   15b. SELECTOR VISUAL DE CARTAS
+   Para elegir una carta entre muchas: se busca y se reconoce por el arte, en
+   vez de leer una lista desplegable de cientos de líneas.
+   ========================================================================== */
+.selector-cartas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: var(--e-3);
+  max-height: 40vh;
+  padding: var(--e-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.selector-cartas::-webkit-scrollbar { width: 6px; }
+.selector-cartas::-webkit-scrollbar-thumb {
+  border-radius: var(--r-pill);
+  background: var(--linea-viva);
+}
+
+/* `.selector-cartas--grande` se ha RETIRADO: era la rejilla de tarjetas del
+   selector de mazos, que ahora es una lista horizontal (`.carta-lista` con
+   filas `.carta-fila--accion`). No quedaba ninguna referencia en el código.
+   El resto de `.selector-*` sigue en uso: apuesta de duelo, venta en el
+   mercado y botín del editor de nodos. */
+
+.selector-item { display: block; cursor: pointer; border-radius: var(--r-carta); }
+.selector-item[hidden] { display: none; }
+.selector-item .carta-meta,
+.selector-item .carta-afinidad { display: none; }
+.selector-item .carta-nombre { font-size: 11px; -webkit-line-clamp: 1; }
+.selector-item .rz { font-size: 8.5px; padding: 3px 5px; }
+
+/* el foco del teclado se ve sobre la tarjeta entera, no sobre el radio oculto */
+.selector-item:focus-within { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+/* marca de elegida: el check va dibujado en CSS, no con un glifo de la fuente
+   de iconos, para que no dependa de que Phosphor haya cargado */
+.selector-item.esta-elegida { position: relative; }
+.selector-item.esta-elegida::before {
+  content: '';
+  position: absolute;
+  top: -7px; right: -7px;
+  z-index: 5;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--brasa);
+  box-shadow: 0 0 0 2px var(--carbon-alto);
+}
+.selector-item.esta-elegida::after {
+  content: '';
+  position: absolute;
+  top: -1px; right: 1px;
+  z-index: 6;
+  width: 5px; height: 9px;
+  border-right: 2px solid var(--brasa-tinta);
+  border-bottom: 2px solid var(--brasa-tinta);
+  transform: rotate(45deg);
+}
+
+.selector-vacio {
+  grid-column: 1 / -1;
+  padding: var(--e-6) var(--e-4);
+  text-align: center;
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+}
+.selector-vacio[hidden] { display: none; }
+
+/* ==========================================================================
+   16. TOAST
+   Nunca tapa el foco: se ancla abajo y deja libre la zona de la nav.
+   ========================================================================== */
+.toast-zona {
+  position: fixed;
+  left: 50%;
+  bottom: var(--e-5);
+  z-index: var(--z-toast);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  width: min(420px, calc(100vw - var(--e-8)));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-alerta);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  font-size: var(--fs-body-sm);
+  pointer-events: auto;
+  animation: toastEntra var(--t-estado) var(--curva);
+}
+@keyframes toastEntra { from { opacity: 0; transform: translateY(12px); } }
+.toast i { font-size: 18px; }
+.toast-success i { color: var(--cesped); }
+.toast-danger i { color: var(--roja); }
+.toast-info i { color: var(--var); }
+
+/* ==========================================================================
+   INSIGNIA DE UNIVERSO (migración `035`)
+   De qué mundo viene la carta: Superliga Frontier o el Inazuma Eleven
+   original. Decorativa — no la lee el motor, solo se enseña.
+   Nunca es solo color: lleva su texto corto visible y el nombre completo en
+   el `title` y para el lector de pantalla.
+   ========================================================================== */
+.universo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: .06em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+/* Ámbar para lo propio, azul frío para lo canónico: los dos tonos ya existen
+   en el sistema y no compiten con los colores de rareza, que son los que de
+   verdad hay que distinguir de un vistazo. */
+.universo--srf {
+  border-color: var(--brasa-borde);
+  background: var(--brasa-velo);
+  color: var(--brasa-alta);
+}
+.universo--ie {
+  border-color: rgba(120, 170, 255, .38);
+  background: rgba(120, 170, 255, .12);
+  color: #a8c8ff;
+}
+
+/* Ya no va sobre la carta: solo en el modal de ficha, con el nombre completo.
+   La regla de la carta se retiró con la insignia. */
+
+/* ==========================================================================
+   TUTORIAL DE BIENVENIDA (migración `036`)
+
+   Un velo que oscurece la página y le RECORTA un hueco a lo que se está
+   explicando, más un globo con el texto. El hueco es un `clip-path` con regla
+   `evenodd` sobre un único elemento: con cuatro rectángulos alrededor, las
+   esquinas nunca acaban de cuadrar al redimensionar.
+   ========================================================================== */
+.tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 10);   /* por encima de cualquier modal */
+}
+.tutorial[hidden] { display: none; }
+
+/* ⚠️ EL TUTORIAL NO ATRAPA EL RATÓN, Y ES DELIBERADO.
+   Dos de sus pasos piden HACER algo —montar el mazo titular, jugar un
+   partido—: con la capa capturando los clics, el tutorial decía "móntalo y
+   esto se desbloquea solo" encima de una página que no dejaba tocar nada.
+   Solo el globo recoge sus propios clics; todo lo demás sigue vivo, y por eso
+   tampoco se bloquea el scroll de la página. */
+.tutorial { pointer-events: none; }
+.tutorial-globo { pointer-events: auto; }
+
+.tutorial-velo {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 7, .72);
+}
+
+/* ⚠️ MODO DISCRETO — cuando el paso pide HACER algo, el tutorial se aparta.
+   Un paso con requisito sin cumplir no es una explicación, es un encargo: hay
+   que abrir el sobre, montar el mazo o jugar el partido en esa misma pantalla.
+   Oscurecer el 72 % de la pantalla justo entonces es apagar la mesa de
+   trabajo — con el editor de mazos abierto, el velo se comía el campo y la
+   lista de jugadores, y el globo se plantaba encima.
+   Se va el velo (la página queda a plena luz), el globo se encoge y el anillo
+   se queda: es solo un contorno, señala sin tapar. */
+.tutorial.es-discreto .tutorial-velo { opacity: 0; }
+.tutorial.es-discreto .tutorial-globo {
+  width: min(300px, calc(100vw - 24px));
+  max-height: min(38vh, 260px);
+  /* Sin velo detrás, el globo tiene que sostenerse solo sobre la página. */
+  background: var(--carbon-alto);
+  border-color: var(--amber-line, var(--linea-viva));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .75);
+}
+
+/* El anillo va aparte del velo porque un `clip-path` no admite ni borde ni
+   sombra, y sin anillo el hueco se lee como un fallo de pintado. */
+.tutorial-foco {
+  position: absolute;
+  border: 2px solid var(--brasa);
+  border-radius: var(--r-carta);
+  box-shadow: 0 0 0 4px rgba(232, 117, 42, .18), 0 12px 40px rgba(0, 0, 0, .6);
+  pointer-events: none;
+  transition: top var(--t-estado) var(--curva), left var(--t-estado) var(--curva),
+              width var(--t-estado) var(--curva), height var(--t-estado) var(--curva);
+}
+
+.tutorial-globo {
+  position: absolute;
+  /* Estrecho y con tope de altura A PROPÓSITO: cuanto más pequeño, más veces
+     cabe AL LADO de lo que explica en vez de tener que irse a una esquina.
+     Con 360px de ancho y sin tope, en cuanto lo señalado era grande no cabía
+     en ningún sitio y acababa encima. */
+  width: min(320px, calc(100vw - 32px));
+  /* 42vh y no 60: con el globo a 411px de alto no cabía ni encima ni debajo de
+     un botón que estaba a media pantalla, así que se iba a una esquina y
+     acababa tapándolo igual. Medido: bajando el tope a ~290px sí cabe encima,
+     y ahí no estorba a nada. */
+  max-height: min(42vh, 300px);
+  overflow-y: auto;
+  padding: var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-panel);
+  background: var(--carbon-alto);
+  box-shadow: var(--elev-3);
+  transition: top var(--t-estado) var(--curva), left var(--t-estado) var(--curva);
+}
+/* Los pasos que no señalan nada (bienvenida y despedida) van centrados. */
+/* Centrado SOLO en los pasos que no señalan nada (bienvenida y despedida).
+   Cuando hay algo señalado nunca se centra: se ancla a una esquina, porque
+   centrarlo es justo lo que lo ponía encima de lo que estaba explicando. */
+.tutorial-globo.esta-centrado {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+}
+.tutorial-globo h2 { font-size: var(--fs-h3); margin: var(--e-2) 0; }
+.tutorial-globo p { font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+.tutorial-cuenta {
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--brasa-alta);
+}
+
+/* Lo que falta por hacer en los dos pasos con puerta. Ámbar y no rojo: no es
+   un error, es una tarea pendiente. */
+.tutorial-pendiente {
+  margin-top: var(--e-3);
+  padding: var(--e-3);
+  border: 1px solid var(--amarilla-borde);
+  border-radius: var(--r-alerta);
+  background: var(--amarilla-velo);
+  color: var(--amarilla-txt) !important;
+  font-size: var(--fs-label);
+}
+
+.tutorial-botones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  flex-wrap: wrap;
+  margin-top: var(--e-4);
+}
+.tutorial-botones-avance { display: flex; gap: var(--e-2); }
+
+/* Botón de acción del tutorial (crear el partido de prueba). Va separado de
+   los de navegación: no avanza el tutorial, hace algo. */
+.tutorial-accion { margin-top: var(--e-3); width: 100%; }
+
+/* ---- EL TUTORIAL EN PANTALLA PEQUEÑA ----
+   El globo pasa a ser una hoja pegada al borde de abajo, que es donde llega el
+   pulgar y donde no tapa lo que se señala: en 375 px de ancho no hay ningún
+   hueco "al lado" de nada, así que buscarlo no tiene sentido y solo lo dejaba
+   flotando encima del contenido.
+   Y los botones suben a 44 px: con 36 se fallaba el toque, y el de Saltar
+   estaba pegado al de Siguiente. */
+@media (max-width: 640px) {
+  .tutorial-globo,
+  .tutorial-globo.esta-centrado {
+    top: auto !important;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px !important;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    max-height: 46vh;
+  }
+  /* LA HOJA SE VA ARRIBA cuando lo señalado ha quedado en la mitad de abajo y
+     la hoja se le pondría encima. Pasa con todo lo que vive al final del
+     documento: ahí el scroll ya no puede subir más el objetivo, así que el que
+     se aparta es el globo. Lo decide tutorial.js midiendo, no una suposición
+     sobre dónde está el objetivo. */
+  .tutorial-globo.es-arriba,
+  .tutorial-globo.esta-centrado.es-arriba {
+    bottom: auto;
+    top: calc(var(--nav-h) + 12px) !important;
+  }
+
+  .tutorial-botones { gap: var(--e-2); }
+  .tutorial-globo .btn { min-height: 44px; }
+  .tutorial-accion { min-height: 44px; }
+}
+
+/* ==========================================================================
+   SOBRE DE BIENVENIDA (migración `039`)
+   Su propio bloque arriba de la pantalla de sobres, fuera de las cajas de
+   expansión: es gratis, se abre una sola vez y el tutorial lo pide.
+   ========================================================================== */
+.sobre-inicial {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--e-6);
+  padding: var(--e-5);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-panel);
+  background: linear-gradient(120deg, var(--brasa-velo), transparent 60%), var(--carbon);
+}
+.sobre-inicial-texto { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; flex: 1; }
+.sobre-inicial h2 { font-size: var(--fs-h3); }
+.sobre-inicial .pastilla { align-self: flex-start; }
+
+/* ==========================================================================
+   AVISO DE BETA EN EL PIE
+   Sale en todas las páginas, no en una alerta que se cierra: no es una
+   novedad que se anuncia una vez, es la condición en la que está el juego.
+   Ámbar y no rojo — no es un error, es una advertencia.
+   ========================================================================== */
+.pie-beta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  margin-bottom: var(--e-5);
+  padding: var(--e-4);
+  border: 1px solid var(--amarilla-borde);
+  border-radius: var(--r-carta);
+  background: var(--amarilla-velo);
+}
+.pie-beta p { color: var(--ceniza); }
+.pie-beta-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  color: var(--amarilla-txt) !important;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-semibold);
+}
+.pie-beta-canales {
+  display: flex;
+  gap: var(--e-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-1, 4px);
+}
+.pie-beta-canales a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* 44px de alto: es un enlace que se pulsa con el dedo. */
+  min-height: 44px;
+  color: var(--amarilla-txt);
+  font-size: var(--fs-label);
+  text-decoration: none;
+}
+.pie-beta-canales a:hover { text-decoration: underline; }
+
+/* --------------------------------------------------------------------------
+   DESCARTE DE REPETIDAS (`descartar.php`)
+
+   Una fila por cromo con copias de sobra, y dentro una casilla por copia. Las
+   casillas por copia y no una por cromo son lo que permite soltar dos de las
+   cinco que sobran sin ir a todo o nada.
+   -------------------------------------------------------------------------- */
+.descarte-barra {
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-4);
+  margin-bottom: var(--e-5);
+  padding: var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-carta);
+  /* Opaco a propósito: va pegada arriba y las filas pasan por debajo. */
+  background: var(--carbon-alto);
+}
+.descarte-barra p { margin: 0; }
+.descarte-acciones { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+
+.descarte-lista {
+  display: grid;
+  gap: var(--e-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.descarte-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e-4);
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
+}
+.descarte-carta { flex: 0 0 auto; width: 84px; }
+.descarte-datos { flex: 1 1 auto; min-width: 0; }
+.descarte-nombre {
+  margin: 0 0 2px;
+  font-weight: var(--fw-semibold);
+  /* un nombre largo parte en vez de ensanchar la fila */
+  overflow-wrap: anywhere;
+}
+
+.descarte-copias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  margin-top: var(--e-3);
+}
+.descarte-copia {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* 44 px de alto: es un objetivo táctil, y aquí se pulsa muchas veces
+     seguidas en móvil. */
+  min-height: 44px;
+  padding: 0 var(--e-3);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-chip);
+  cursor: pointer;
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+  transition: border-color var(--t-toque) var(--curva), color var(--t-toque) var(--curva);
+}
+.descarte-copia:hover { color: var(--hueso); border-color: var(--ceniza); }
+.descarte-copia:has(input:checked) {
+  color: var(--brasa-alta);
+  border-color: var(--brasa);
+  background: rgba(232, 117, 42, .08);
+}
+
+@media (max-width: 600px) {
+  .descarte-barra { top: 0; padding: var(--e-3); }
+  .descarte-acciones { width: 100%; }
+  .descarte-acciones .btn-primario { flex: 1 1 100%; }
+  .descarte-carta { width: 64px; }
+}
+
+/* ==========================================================================
+   99. LISTAS LARGAS — no maquetar lo que no se ve
+   ==========================================================================
+
+   El problema, medido con una colección completa (592 cromos distintos):
+
+     descartar        31.791 nodos   un recálculo de estilo+maquetación = 420 ms
+     mercado/vender   13.701 nodos                                        215 ms
+     plantilla         9.630 nodos                                        166 ms
+
+   Esos milisegundos son de un PC de sobremesa. Un móvil de gama media va
+   entre 4 y 6 veces más lento, así que ahí son 1-2,5 SEGUNDOS — y no se pagan
+   una vez: se pagan otra vez en cada filtro, en cada giro de pantalla y en
+   cada cambio que toque el documento. Eso es lo que se siente como que la web
+   "peta" al entrar a la plantilla o a montar un mazo.
+
+   No es el servidor (0,1-0,3 s por página) ni el peso de la respuesta (2,5 MB
+   en crudo son 75 KB comprimidos). Es que el navegador maqueta las 592 fichas
+   aunque en pantalla quepan ocho.
+
+   `content-visibility: auto` es exactamente eso: el navegador se salta
+   estilo, maquetación y pintado de lo que está fuera de la ventana, y lo hace
+   solo cuando se acerca al scroll. Medido, con las mismas páginas:
+
+     descartar        420 ms -> 32 ms      plantilla   166 ms -> 38 ms
+     mercado/vender   215 ms -> 11 ms
+
+   `contain-intrinsic-size: auto <alto>` es el alto que se le SUPONE a lo que
+   todavía no se ha maquetado, para que la barra de scroll no dé saltos. El
+   `auto` de delante hace que, una vez que un elemento se ha visto una vez, se
+   use su alto REAL en lugar de la estimación. Los valores son la mediana
+   medida de cada lista, no números inventados.
+
+   ⚠️ Esto implica `contain: layout paint`, así que un HIJO que se pinte fuera
+      de la caja de su ficha quedaría recortado. Hoy no hay ninguno (no hay
+      posiciones negativas en `.carta`, y el `translateY(-6px)` de
+      `.carta--accion:hover` mueve la ficha entera, que es la caja contenedora
+      y no su contenido). Si algún día se añade un distintivo que sobresalga,
+      hay que sacarlo de aquí.
+
+   NO se toca `.carta-grid` de `perfil.php` / `usuario.php`: son ocho fichas
+   contadas y ahí esto no ahorraría nada. */
+
+.descarte-lista > li      { content-visibility: auto; contain-intrinsic-size: auto 205px; }
+.selector-cartas > *      { content-visibility: auto; contain-intrinsic-size: auto 221px; }
+.carta-lista > li         { content-visibility: auto; contain-intrinsic-size: auto 110px; }
+/* El selector del constructor de mazos vive en una columna estrecha (~386 px),
+   así que sus filas parten en dos renglones y miden bastante más que las del
+   mercado. Con la estimación general la barra de scroll se reajustaba sola
+   durante 500 filas. */
+.mazo-selector-lista > li { contain-intrinsic-size: auto 143px; }
+
+/* Enlaces legales del pie. Van en el bloque que sale en TODAS las páginas, no
+   en las columnas de la portada, así que necesitan su propio espaciado: sin
+   esto quedaban pegados al aviso de fan-made y se leían como una sola frase. */
+.pie-enlaces-legales {
+  margin: 0 0 var(--e-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .5rem;
+  align-items: baseline;
+}
+.pie-enlaces-legales a { color: var(--ceniza); text-decoration: none; }
+.pie-enlaces-legales a:hover,
+.pie-enlaces-legales a:focus-visible { color: var(--hueso); text-decoration: underline; }

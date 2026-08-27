@@ -1,0 +1,522 @@
+/* ==========================================================================
+   PRESENTACIÓN DE ALINEACIONES — la intro previa al partido.
+
+   Va en su PROPIA hoja y la carga solo duelo.php (`$cssExtra`). Es la única
+   pantalla que la usa y son 400 líneas: metida en components.css la pagaría
+   cada carga de cada pantalla de la web a cambio de nada.
+
+   La referencia es una entrada de retransmisión deportiva —jerarquía, tipos
+   grandes en mayúscula, luz de foco, movimiento seco—, pero con la identidad
+   de la casa: los mismos tokens de color, la misma tipografía y el mismo ámbar
+   que el resto del sitio. Ni un elemento gráfico, tipografía o color tomado de
+   ninguna competición real.
+
+   REGLA DE RENDIMIENTO, sin excepciones: solo se animan `opacity` y
+   `transform`. Son las dos únicas que el navegador puede resolver en la GPU
+   sin volver a medir la página. El desenfoque de entrada se usa en contados
+   elementos —nunca en las once unidades a la vez— porque `filter` sí cuesta.
+   ========================================================================== */
+
+.pres {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 20);   /* por encima del modal del partido */
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--negro);
+  color: var(--hueso);
+  /* `dvh` y no `vh`: en el móvil la barra del navegador se recoge al hacer
+     scroll y con `vh` la escena quedaba cortada por abajo justo al empezar. */
+  height: 100dvh;
+}
+.pres[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   EL FONDO — cuatro capas planas, ninguna imagen.
+
+   La sensación de estadio sale de la luz, no de una foto: dos focos altos, la
+   trama del césped en perspectiva, motas suspendidas en el haz y un barrido
+   que cruza la escena. Todo son degradados, así que pesa cero y escala a
+   cualquier resolución sin pixelarse.
+   -------------------------------------------------------------------------- */
+.pres-fondo { position: absolute; inset: -10%; pointer-events: none; }
+
+.pres-focos {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 45% at 18% -10%, rgba(255, 177, 104, .22), transparent 70%),
+    radial-gradient(60% 45% at 82% -10%, rgba(91, 150, 242, .16), transparent 70%),
+    radial-gradient(90% 60% at 50% 110%, rgba(232, 117, 42, .10), transparent 70%),
+    linear-gradient(180deg, #0B0C10, #14161D 55%, #0B0C10);
+  animation: presRespirar 7s var(--ease, ease-in-out) infinite alternate;
+}
+
+/* Césped en fuga. Las bandas son un degradado repetido y la perspectiva la da
+   una sola rotación en X: dibujarlas una a una serían 40 nodos que animar. */
+.pres-trama {
+  position: absolute;
+  left: -25%; right: -25%; bottom: -20%;
+  height: 75%;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, .028) 0 60px,
+    transparent 60px 120px
+  );
+  transform: perspective(520px) rotateX(68deg);
+  transform-origin: 50% 100%;
+  mask-image: linear-gradient(180deg, transparent, #000 45%, transparent);
+}
+
+.pres-motas {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 15% 30%, rgba(255, 255, 255, .5), transparent),
+    radial-gradient(1.5px 1.5px at 72% 18%, rgba(255, 255, 255, .35), transparent),
+    radial-gradient(1px 1px   at 44% 62%, rgba(255, 255, 255, .4), transparent),
+    radial-gradient(1.5px 1.5px at 88% 72%, rgba(255, 255, 255, .3), transparent),
+    radial-gradient(1px 1px   at 28% 84%, rgba(255, 255, 255, .35), transparent),
+    radial-gradient(1px 1px   at 62% 44%, rgba(255, 255, 255, .28), transparent);
+  animation: presFlotar 12s linear infinite;
+}
+
+/* El barrido de luz que cruza al cambiar de equipo. Lo enciende el JS. */
+.pres-barrido {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -30%;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgba(255, 177, 104, .16), transparent);
+  opacity: 0;
+}
+
+@keyframes presRespirar {
+  from { transform: scale(1);    opacity: .92; }
+  to   { transform: scale(1.06); opacity: 1; }
+}
+@keyframes presFlotar {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, -40px, 0); }
+}
+
+/* --------------------------------------------------------------------------
+   SALTAR
+   -------------------------------------------------------------------------- */
+.pres-saltar {
+  position: absolute;
+  top: max(var(--e-4), env(safe-area-inset-top));
+  right: var(--e-4);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  /* 44px de alto mínimo: es un control que se pulsa con el pulgar en móvil. */
+  min-height: 44px;
+  padding: 0 var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: 999px;
+  background: rgba(11, 12, 16, .55);
+  backdrop-filter: blur(6px);
+  color: var(--ceniza);
+  font-size: var(--fs-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color var(--t-toque) ease, border-color var(--t-toque) ease;
+}
+.pres-saltar:hover,
+.pres-saltar:focus-visible { color: var(--hueso); border-color: var(--brasa-borde); }
+
+/* --------------------------------------------------------------------------
+   ESCENA DE EQUIPO — HORIZONTAL EN ESCRITORIO
+
+   Dos columnas: la identidad a un lado y la alineación al otro. Es la forma
+   que tiene sentido en un formato apaisado, y la que deja que los elementos
+   entren desde los laterales.
+   -------------------------------------------------------------------------- */
+.pres-equipo {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(var(--e-6), 5vw, var(--e-8));
+  width: min(1180px, 100% - 2 * var(--e-6));
+  max-height: 100dvh;
+  padding-block: var(--e-6);
+}
+.pres-equipo[hidden] { display: none; }
+
+.pres-identidad { min-width: 0; }
+
+/* LOCAL / VISITANTE. La etiqueta es lo primero que se lee y lo que sitúa: se
+   distingue por color y por la barra lateral, nunca solo por color. */
+.pres-etiqueta {
+  display: inline-block;
+  margin: 0 0 var(--e-4);
+  padding: var(--e-1) var(--e-3) var(--e-1) var(--e-4);
+  border-left: 3px solid var(--brasa);
+  background: linear-gradient(90deg, var(--brasa-velo), transparent);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--brasa-alta);
+}
+.pres[data-lado="visitante"] .pres-etiqueta {
+  border-left-color: var(--var);
+  background: linear-gradient(90deg, var(--var-velo), transparent);
+  color: var(--var-txt);
+}
+
+.pres-retrato {
+  position: relative;
+  width: clamp(96px, 12vw, 132px);
+  aspect-ratio: 1;
+  margin-bottom: var(--e-4);
+  border: 2px solid var(--brasa-borde);
+  border-radius: 50%;
+  background: var(--carbon);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: 0 0 0 6px rgba(232, 117, 42, .08), 0 18px 44px rgba(0, 0, 0, .6);
+}
+.pres[data-lado="visitante"] .pres-retrato {
+  border-color: var(--var-borde);
+  box-shadow: 0 0 0 6px rgba(91, 150, 242, .08), 0 18px 44px rgba(0, 0, 0, .6);
+}
+.pres-retrato-img { width: 100%; height: 100%; object-fit: cover; }
+
+/* El escudo de la máquina NO se recorta como una foto de perfil: es un icono y
+   necesita su aire. */
+.pres-retrato--ia .pres-retrato-img { width: 62%; height: 62%; object-fit: contain; }
+.pres-retrato--ia { background: var(--pozo); }
+
+/* Sin foto (o con una foto que ya no está en el servidor) el hueco no se queda
+   roto: se cae a la silueta. */
+.pres-retrato-vacio { font-size: 44px; color: var(--humo); }
+.pres-retrato-vacio[hidden] { display: none; }
+
+.pres-nombre {
+  margin: 0 0 var(--e-4);
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+  line-height: var(--lh-display);
+  letter-spacing: var(--track-display);
+  font-weight: var(--fw-bold);
+  /* Un nombre largo no puede romper la escena: parte por donde sea antes que
+     desbordar, y a partir de tres líneas se corta. */
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pres-datos {
+  margin: 0 0 var(--e-5);
+  display: grid;
+  gap: var(--e-3);
+}
+.pres-dato { margin: 0; }
+.pres-dato[hidden] { display: none; }
+.pres-dato dt {
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.pres-dato dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  /* Un nombre de mazo largo se corta con puntos suspensivos en vez de empujar
+     la columna. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- EL AUMENTO ---- */
+.pres-aumento {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-4);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-carta);
+  background: linear-gradient(120deg, rgba(232, 117, 42, .16), rgba(232, 117, 42, .04));
+  overflow: hidden;
+}
+.pres-aumento[hidden] { display: none; }
+
+/* El destello del aumento. Es un pseudo-elemento propio y no una sombra
+   animada: `box-shadow` obliga a repintar, y `transform` sobre una capa
+   aparte no. */
+.pres-aumento-halo {
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(closest-side, rgba(255, 177, 104, .45), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.pres-aumento-ico {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px; height: 44px;
+  border-radius: var(--r-alerta);
+  background: rgba(11, 12, 16, .5);
+  font-size: 24px;
+  color: var(--brasa-alta);
+}
+.pres-aumento-texto { min-width: 0; }
+.pres-aumento-titulo {
+  margin: 0;
+  font-size: var(--fs-micro);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--brasa-alta);
+}
+.pres-aumento-nombre {
+  margin: 2px 0 0;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-bold);
+}
+.pres-aumento-nombre b { font-family: var(--tipo-display); }
+.pres-aumento-desc {
+  margin: 2px 0 0;
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+}
+
+/* --------------------------------------------------------------------------
+   LA ALINEACIÓN
+   -------------------------------------------------------------------------- */
+.pres-alineacion { min-width: 0; }
+.pres-alineacion-titulo {
+  margin: 0 0 var(--e-3);
+  font-size: var(--fs-label);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.pres-lineas { display: grid; gap: var(--e-3); }
+
+.pres-linea {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--e-3);
+}
+.pres-linea-nombre {
+  font-size: var(--fs-micro);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--humo);
+  text-align: right;
+}
+/* ⚠️ ANCHO DE PLACA FIJO, NO `1fr`.
+   Con columnas elásticas, la línea de PORTERÍA —que tiene UN jugador— se
+   llevaba el ancho entero de la zona: 776 px de placa con un retrato cuadrado
+   de 776 px de alto. Medido: la alineación pasaba de 1578 px en una ventana de
+   720 y se salía media pantalla por abajo.
+   La placa mide lo mismo tenga la línea uno o cinco jugadores, y la línea se
+   centra. Que es además como se lee una alineación de verdad.
+
+   El tamaño va atado al ALTO de la ventana (`vh`) y no al ancho: lo que puede
+   no caber son las cuatro líneas apiladas, y eso depende del alto. */
+.pres-unidades {
+  /* Una carta mide 451x800, así que su ALTO es 1,77 veces su ancho: el ancho
+     útil sale de dividir el alto disponible entre ese factor y entre las
+     cuatro líneas. De ahí el 6vh y no el 10 de cuando eran placas cuadradas. */
+  --pres-placa: clamp(52px, 10vh, 96px);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, var(--pres-placa));
+  justify-content: center;
+  gap: var(--e-2);
+}
+
+/* Las unidades SON cartas de verdad: `render_carta()` en modo arte, el mismo
+   componente que la colección y el álbum. Aquí solo se les dice cuánto miden.
+   Nada de recrear su marcado — la plantilla de rareza, el arte a sangre y el
+   borde vienen puestos y se mantienen solos. */
+.pres-unidades .carta,
+.pres-unidades .carta-bloque { width: var(--pres-placa); }
+
+/* En la intro no se pulsan: son un pase de alineaciones, no un selector. */
+.pres-unidades .carta { pointer-events: none; }
+
+/* --------------------------------------------------------------------------
+   EL ENFRENTAMIENTO
+   -------------------------------------------------------------------------- */
+.pres-vs {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: clamp(var(--e-5), 6vw, var(--e-8));
+  width: min(1000px, 100% - 2 * var(--e-5));
+  text-align: center;
+}
+.pres-vs[hidden] { display: none; }
+
+.pres-vs-lado { display: grid; justify-items: center; gap: var(--e-3); min-width: 0; }
+.pres-vs-escudo {
+  display: grid;
+  place-items: center;
+  width: clamp(72px, 9vw, 104px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid var(--linea-viva);
+  background: var(--carbon);
+  overflow: hidden;
+}
+.pres-vs-escudo img { width: 100%; height: 100%; object-fit: cover; }
+.pres-vs-escudo img.es-icono { width: 62%; height: 62%; object-fit: contain; }
+.pres-vs-lado--local .pres-vs-escudo { border-color: var(--brasa-borde); }
+.pres-vs-lado--visitante .pres-vs-escudo { border-color: var(--var-borde); }
+
+.pres-vs-nombre {
+  font-size: clamp(1rem, .8rem + .9vw, 1.5rem);
+  font-weight: var(--fw-bold);
+  overflow-wrap: anywhere;
+}
+.pres-vs-marca {
+  font-size: clamp(2.5rem, 1.5rem + 5vw, 5rem);
+  font-weight: var(--fw-bold);
+  letter-spacing: -.04em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--brasa-alta), var(--brasa) 55%, var(--var));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   EL PITIDO INICIAL
+   -------------------------------------------------------------------------- */
+.pres-arranque {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: var(--e-4);
+  justify-items: center;
+  text-align: center;
+  padding-inline: var(--e-5);
+}
+.pres-arranque[hidden] { display: none; }
+.pres-arranque-linea {
+  width: min(420px, 70vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brasa), transparent);
+}
+.pres-arranque-texto {
+  margin: 0;
+  font-size: clamp(1.5rem, 1rem + 3vw, 3rem);
+  font-weight: var(--fw-bold);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   MÓVIL — VERTICAL DE VERDAD, no la versión de escritorio encogida.
+
+   Cambia la ESTRUCTURA: la identidad deja de ser una columna lateral y pasa a
+   ser una cabecera centrada, y la alineación baja debajo. Las unidades pasan a
+   tres por fila, que es lo que cabe legible en 375 px.
+   ========================================================================== */
+@media (max-width: 860px) {
+  .pres-equipo {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--e-5);
+    width: 100%;
+    height: 100dvh;
+    /* El hueco de arriba lo manda el botón de Saltar, que va fijo en esa
+       esquina: 44 px de botón + 16 de margen + aire. Medido con 56 px la
+       etiqueta LOCAL se le metía debajo por 4 px. */
+    padding: max(var(--e-8), calc(env(safe-area-inset-top) + 72px))
+             var(--e-4)
+             max(var(--e-5), env(safe-area-inset-bottom));
+    /* La escena no hace scroll: cabe entera o se ajusta. Un scroll a mitad de
+       una animación de cuatro segundos no lo usa nadie. */
+    overflow: hidden;
+  }
+
+  .pres-identidad { display: grid; justify-items: center; text-align: center; }
+
+  /* En vertical el retrato compite con la alineación por el mismo alto, y la
+     alineación no se puede cortar. Medido a 375x812: con el retrato grande la
+     última línea acababa a 6 px del borde, que es lo que se sale en cuanto un
+     nombre ocupa un renglón más. */
+  .pres-retrato { width: 84px; margin-bottom: var(--e-3); }
+  .pres-nombre { -webkit-line-clamp: 2; margin-bottom: var(--e-3); }
+
+  .pres-datos {
+    grid-auto-flow: column;
+    justify-content: center;
+    gap: var(--e-5);
+    margin-bottom: var(--e-4);
+  }
+  .pres-dato { text-align: center; }
+  .pres-dato dd { max-width: 42vw; }
+
+  .pres-aumento { width: 100%; }
+
+  .pres-alineacion-titulo { text-align: center; }
+  .pres-linea { grid-template-columns: minmax(0, 1fr); gap: var(--e-1); }
+  .pres-linea-nombre { text-align: center; }
+  .pres-unidades {
+    /* En vertical la carta se estrecha, pero NO se esconde: es una carta de
+       verdad y verla es la mitad de la gracia.
+       Medido a 375x812: con 48 px de ancho las cuatro líneas más la identidad
+       se salían 42 px por abajo, y la alineación es justo lo que no se puede
+       cortar. Con 40 sobra sitio. */
+    --pres-placa: clamp(34px, 11vw, 42px);
+    grid-template-columns: repeat(auto-fit, var(--pres-placa));
+    gap: var(--e-1);
+  }
+
+  /* La placa del aumento también se aprieta: en vertical compite por el mismo
+     alto que la alineación. */
+  .pres-aumento { padding: var(--e-2) var(--e-3); gap: var(--e-2); }
+  .pres-aumento-ico { width: 36px; height: 36px; font-size: 20px; }
+  .pres-aumento-desc { display: none; }
+
+
+  .pres-vs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--e-4);
+    justify-items: center;
+  }
+  .pres-vs-marca { font-size: clamp(2.5rem, 12vw, 4rem); }
+}
+
+/* Pantallas muy bajas (móvil en horizontal): se recorta el aire, no el
+   contenido. */
+@media (max-height: 520px) {
+  .pres-retrato { width: 72px; }
+  .pres-aumento { padding: var(--e-2) var(--e-3); }
+  .pres-unidades { --pres-placa: clamp(34px, 9vh, 52px); }
+}
+
+/* ==========================================================================
+   MOVIMIENTO REDUCIDO
+
+   Se conserva LA INFORMACIÓN Y SU ORDEN —local, identidad, mazo, aumento,
+   alineación, enfrentamiento— y se quita el movimiento: sin desplazamientos,
+   sin desenfoques, sin fondo respirando. Solo aparecer y desaparecer. El JS
+   además acorta los tiempos, porque un fundido no necesita lo mismo que un
+   desplazamiento con rebote.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .pres-focos, .pres-motas { animation: none; }
+}
+.pres.es-quieto .pres-focos,
+.pres.es-quieto .pres-motas { animation: none; }
+.pres.es-quieto .pres-trama { display: none; }

@@ -1,0 +1,1365 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — CHROME DE PÁGINA
+   Logotipo, cabecera de página y pie. La navegación se incorpora en la Fase 1.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   LOGOTIPO
+   El lockup principal siempre es "Superliga Frontier · TCG". El apodo
+   "Superruina Frontier" no aparece aquí nunca (briefing, sección 9).
+   -------------------------------------------------------------------------- */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+  font-size: 1.125rem;
+  font-weight: var(--fw-bold);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--hueso);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.logo-punto { color: var(--brasa); }
+/* --------------------------------------------------------------------------
+   CABECERA DE PÁGINA INTERNA
+   -------------------------------------------------------------------------- */
+.cabecera {
+  position: relative;
+  padding-block: var(--e-7) var(--e-6);
+  border-bottom: 1px solid var(--linea);
+  background:
+    radial-gradient(ellipse 60% 60% at 12% 0%, var(--brasa-velo), transparent 62%),
+    var(--negro);
+  overflow: hidden;
+}
+.cabecera-contenido { position: relative; z-index: 2; }
+.cabecera p {
+  max-width: 60ch;
+  margin-top: var(--e-3);
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+}
+.cabecera-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-6);
+  margin-top: var(--e-5);
+}
+
+/* línea de campo: firma visual discreta del sitio, no un grid de puntos */
+.linea-campo { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.linea-campo::before {
+  content: '';
+  position: absolute;
+  top: 42%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(70vw, 640px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, .055);
+  border-radius: 50%;
+}
+.linea-campo::after {
+  content: '';
+  position: absolute;
+  top: 42%; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, .055);
+}
+
+/* --------------------------------------------------------------------------
+   HERO (portada)
+   -------------------------------------------------------------------------- */
+.hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: min(78vh, 720px);
+  padding-block: var(--e-8);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 6%, var(--brasa-velo), transparent 62%),
+    var(--negro);
+}
+.hero-contenido { position: relative; z-index: 2; text-align: center; }
+.hero h1 { margin-inline: auto; max-width: 18ch; }
+.hero-sub {
+  max-width: 46ch;
+  margin: var(--e-5) auto 0;
+  font-size: clamp(1rem, .95rem + .4vw, 1.25rem);
+  color: var(--ceniza);
+}
+.hero-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--e-3);
+  margin-top: var(--e-7);
+}
+@media (max-width: 520px) {
+  .hero-acciones { flex-direction: column; }
+  .hero-acciones .btn { width: 100%; }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 32px;
+  margin-bottom: var(--e-5);
+  padding: 0 var(--e-4);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-pill);
+  background: var(--brasa-velo);
+  color: var(--brasa-alta);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brasa); }
+.eyebrow:hover { border-color: var(--brasa); }
+
+/* --------------------------------------------------------------------------
+   AUTENTICACIÓN (login / registro)
+   Estas páginas no llevan navegación: el único camino de vuelta es explícito.
+   -------------------------------------------------------------------------- */
+.auth {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* ⚠️ `svh` ADEMÁS DE `vh`, POR LA BARRA DEL NAVEGADOR MÓVIL. `100vh` es el
+     viewport GRANDE —el de la barra ya retraída—, así que en cuanto se carga
+     la pantalla de acceso con la barra visible el bloque mide más que lo que
+     se ve y aparece scroll en una página que cabía de sobra. `svh` es el
+     viewport pequeño, el que de verdad hay al llegar. El `vh` se queda debajo
+     como respaldo para navegadores que no conozcan la unidad. */
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: var(--e-6) var(--canal);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 45% at 50% 0%, var(--brasa-velo), transparent 62%),
+    var(--negro);
+}
+.auth-caja { position: relative; z-index: 2; width: 100%; max-width: 420px; }
+.auth-volver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 44px;
+  margin-bottom: var(--e-3);
+  color: var(--ceniza);
+  font-size: var(--fs-body-sm);
+  text-decoration: none;
+  transition: color var(--t-toque) var(--curva);
+}
+.auth-volver:hover { color: var(--hueso); }
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+  padding: var(--e-6);
+  border-radius: var(--r-panel);
+  box-shadow: var(--elev-3);
+}
+.auth-cabecera { display: flex; flex-direction: column; gap: var(--e-2); text-align: center; }
+.auth-cabecera .logo { justify-content: center; margin-bottom: var(--e-3); font-size: 1rem; }
+.auth-cabecera h1 { font-size: var(--fs-h2); }
+.auth-cambio { text-align: center; }
+.auth-cambio a { color: var(--brasa-alta); font-weight: var(--fw-semibold); }
+
+/* en las páginas de auth el pie se pega abajo, sin margen superior grande */
+.auth + .pie { margin-top: 0; }
+
+/* --------------------------------------------------------------------------
+   EXPANSIONES (portada y álbum)
+   -------------------------------------------------------------------------- */
+.expansion-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--e-4);
+}
+.expansion-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  text-decoration: none;
+  transition: border-color var(--t-toque) var(--curva), transform var(--t-estado) var(--curva);
+}
+@media (hover: hover) {
+  .expansion-tarjeta:hover { transform: translateY(-4px); border-color: var(--brasa-borde); }
+}
+.expansion-tarjeta h3 { font-size: var(--fs-h3); }
+.expansion-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  margin-top: var(--e-3);
+  color: var(--brasa-alta);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+/* cabecera de grupo de expansión, en álbum y sobres */
+.expansion-grupo { margin-bottom: var(--e-8); }
+.expansion-grupo:last-child { margin-bottom: 0; }
+.expansion-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-4);
+  margin-bottom: var(--e-5);
+  padding-bottom: var(--e-4);
+  border-bottom: 1px solid var(--linea);
+}
+
+/* --------------------------------------------------------------------------
+   LAYOUT CON PANEL DE FILTROS (colección, álbum)
+   En móvil los filtros van arriba y se pliegan; en escritorio, en columna fija.
+   -------------------------------------------------------------------------- */
+.con-filtros {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--e-5);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .con-filtros { grid-template-columns: 260px 1fr; gap: var(--e-7); }
+}
+
+.filtros {
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.filtros fieldset { border: 0; }
+.filtros .campo-label { display: block; margin-bottom: var(--e-2); }
+
+/* en móvil los filtros se pliegan: si no, empujan la rejilla de cartas
+   media pantalla hacia abajo */
+.filtros-resumen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  min-height: 44px;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  list-style: none;
+}
+.filtros-resumen::-webkit-details-marker { display: none; }
+.filtros-resumen span { display: flex; align-items: center; gap: var(--e-2); }
+.filtros-caret { transition: transform var(--t-toque) var(--curva); }
+.filtros[open] .filtros-caret { transform: rotate(180deg); }
+.filtros[open] .filtros-cuerpo { padding-top: var(--e-5); }
+/* .filtros-cuerpo también lleva la clase utilitaria .stack (display: flex),
+   que por ser una regla de autor gana al display:none nativo que el
+   navegador aplica a los hijos de un <details> cerrado —los orígenes de
+   hoja de estilo (user-agent vs autor) no compiten por especificidad, autor
+   gana siempre—. Sin esto, el panel de filtros se renderiza igual de
+   plegado que desplegado y se solapa con el resto de la página; con
+   rejillas largas (colección completa) es donde más se nota. */
+.filtros:not([open]) .filtros-cuerpo { display: none; }
+
+@media (min-width: 1024px) {
+  /* La columna acompaña al scroll. El panel es más alto que el viewport, así
+     que además de sticky necesita altura máxima y scroll propio: sin eso hay
+     que bajar hasta el final de la página para ver el último filtro. */
+  .filtros {
+    position: sticky;
+    top: calc(var(--nav-h) + var(--e-4));
+    /* `dvh`: aquí el alto se recalcula mientras la barra del navegador se
+       encoge y se estira, que es justo lo que queremos en un panel pegajoso
+       con scroll propio. */
+    max-height: calc(100vh - var(--nav-h) - var(--e-6));
+    max-height: calc(100dvh - var(--nav-h) - var(--e-6));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .filtros-resumen { display: none; }
+  .filtros .filtros-cuerpo { padding-top: 0; }
+
+  /* barra de scroll discreta dentro del panel */
+  .filtros::-webkit-scrollbar { width: 6px; }
+  .filtros::-webkit-scrollbar-thumb {
+    border-radius: var(--r-pill);
+    background: var(--linea-viva);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   MAZOS (deck builder)
+   Reaprovecha .con-filtros: la columna estrecha lista los mazos y la ancha es
+   el editor, exactamente igual que filtros + rejilla en colección.
+   -------------------------------------------------------------------------- */
+.lista-mazos { list-style: none; display: flex; flex-direction: column; gap: var(--e-2); }
+
+.mazo-fila {
+  display: flex;
+  align-items: stretch;
+  gap: var(--e-2);
+  padding: var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+}
+.mazo-fila.es-activo { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+
+/* La columna baja a ~210px, y ahí no caben a la vez nombre + formación +
+   insignia de cuenta + insignia "Titular" en una sola línea sin que algo se
+   trunque de forma ilegible o se solape con lo de al lado — se probó y las
+   dos cosas pasaron de verdad. La fila se parte en dos líneas reales, ambas
+   a lo ancho completo del enlace: nombre+formación arriba, las dos insignias
+   juntas abajo. Por eso "Titular" pasó a vivir DENTRO de .mazo-enlace junto
+   a la insignia de cuenta (antes era hermana suelta en el <li>): mientras
+   estuvo fuera, seguía compitiendo por ancho con la fila entera aunque el
+   nombre ya estuviera partido en dos líneas por su cuenta. */
+.mazo-enlace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-1);
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;              /* objetivo táctil, §7 */
+  color: inherit;
+  text-decoration: none;
+}
+
+.mazo-nombre {
+  display: flex;
+  align-items: baseline;
+  gap: var(--e-2);
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+/* el nombre es lo único que se trunca; la formación y las insignias de
+   cuenta/titular siempre se quedan enteras */
+.mazo-nombre-texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.mazo-formacion { flex-shrink: 0; }
+
+.mazo-insignias { display: flex; align-items: center; gap: var(--e-2); flex-wrap: wrap; }
+.mazo-insignias > .pastilla { flex-shrink: 0; }
+
+.pastilla-titular {
+  background: var(--brasa-velo);
+  border-color: var(--brasa-borde);
+  color: var(--brasa-alta);
+}
+
+.mazo-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-4);
+  margin-bottom: var(--e-4);
+}
+.mazo-totales { display: flex; gap: var(--e-5); }
+
+/* Cabecera de la pantalla: los mazos y el alta, en fila y a lo ancho.
+   Antes vivían en la columna estrecha de `.con-filtros` (260px, y menos aún
+   con el taller al lado): los nombres largos y las insignias se cortaban, y
+   encima le robaban ancho al campo, que es lo que hay que ver. */
+.mazos-cabecera {
+  display: grid;
+  gap: var(--e-5);
+  margin-bottom: var(--e-6);
+}
+@media (min-width: 800px) {
+  .mazos-cabecera { grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); align-items: start; }
+}
+/* Con varios mazos la lista se reparte en columnas en vez de crecer hacia
+   abajo y empujar el taller fuera de la pantalla. */
+.mazos-cabecera-lista .lista-mazos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--e-2);
+}
+.mazos-editor { min-width: 0; }
+
+/* --------------------------------------------------------------------------
+   EL TALLER — campo a la izquierda, selección a la derecha
+   Antes el editor era una columna única y muy larga: campo, compos, guardar
+   y al final del todo el buscador con los jugadores. Colocar a alguien era
+   bajar hasta abajo, elegir, y volver a subir a mirar el campo — once veces.
+
+   Ahora son dos paneles: el campo se queda arriba a la izquierda y la lista
+   de jugadores tiene su PROPIO scroll a la derecha, así que las dos cosas
+   están a la vista a la vez. Por debajo de 1100px se apila, que en un móvil
+   es lo correcto: ahí no caben dos paneles y el scroll de página es el que
+   toca.
+   -------------------------------------------------------------------------- */
+.mazo-taller { display: grid; gap: var(--e-6); }
+
+@media (min-width: 1100px) {
+  .mazo-taller {
+    /* 380px es el suelo por una razón medida: por debajo de eso los tres
+       distintivos de una fila (posición, rareza, compo) se parten en dos
+       líneas y cada jugador pasa de 147px de alto a 183. */
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 420px);
+    align-items: start;
+  }
+  .mazo-taller-selector {
+    position: sticky;
+    /* 88px = alto de la nav fija + un respiro */
+    top: 88px;
+    /* El panel nunca es más alto que la ventana: lo que sobra se desplaza
+       DENTRO de la lista, no arrastrando la página entera. */
+    max-height: calc(100vh - 108px);
+    max-height: calc(100dvh - 108px);
+    display: flex;
+    flex-direction: column;
+  }
+  .mazo-selector-lista { overflow-y: auto; }
+}
+
+.mazo-taller-selector {
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.mazo-selector-cabecera { margin-bottom: var(--e-4); }
+.mazo-selector-cabecera h3 { margin: 0; }
+.mazo-selector-cabecera p { margin: var(--e-1) 0 0; }
+
+.mazo-filtros {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+  margin-bottom: var(--e-4);
+  padding-bottom: var(--e-4);
+  border-bottom: 1px solid var(--linea);
+}
+.mazo-filtros-fila { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-3); }
+/* Un control que ocupa la fila entera en vez de media. Lo usa "Ordenar por":
+   sus opciones son largas ("Ataque · de mayor a menor") y a media columna se
+   cortan justo donde está el dato que importa. */
+.mazo-filtros-fila .campo-ancho { grid-column: 1 / -1; }
+.mazo-filtros-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  flex-wrap: wrap;
+}
+
+/* La lista lleva su propio scroll dentro del panel (ver arriba). El
+   `padding-right` deja sitio a la barra para que no se coma el borde de las
+   filas. */
+.mazo-selector-lista { padding-right: var(--e-2); }
+.mazo-selector-lista .selector-vacio {
+  padding: var(--e-5);
+  text-align: center;
+  color: var(--ceniza);
+  font-size: var(--fs-body-sm);
+}
+
+/* Las compos, debajo del campo, ya no al final de una columna kilométrica. */
+.mazo-taller-campo .compos { margin-block: var(--e-5) 0; }
+
+.mazo-acciones { margin-bottom: var(--e-5); }
+
+/* --------------------------------------------------------------------------
+   CÓMO FUNCIONA UN MAZO — el manual, plegado bajo el taller.
+
+   `<details>` nativo y no un acordeón propio: trae gratis el plegado, el
+   teclado, la semántica y la búsqueda del navegador (Ctrl+F encuentra dentro
+   de un details cerrado en los navegadores modernos). Un acordeón a mano
+   habría sido más código para perder tres de esas cuatro cosas.
+   -------------------------------------------------------------------------- */
+.ayuda-mazos {
+  margin-block: var(--e-6);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.ayuda-mazos > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  padding: var(--e-4) var(--e-5);
+  cursor: pointer;
+  font-weight: var(--fw-semibold);
+  border-radius: var(--r-carta);
+  /* El triángulo por defecto se queda: es la señal de "esto se abre" que la
+     gente ya conoce, y sustituirlo por un icono propio es trabajo para empatar. */
+}
+.ayuda-mazos > summary:hover { color: var(--brasa-alta); }
+.ayuda-mazos > summary > .t-caption { margin-left: auto; }
+.ayuda-mazos[open] > summary { border-bottom: 1px solid var(--linea); border-radius: var(--r-carta) var(--r-carta) 0 0; }
+
+.ayuda-cuerpo {
+  display: grid;
+  /* Dos columnas cuando cabe: son seis bloques independientes y en una sola
+     columna el manual mide media pantalla de scroll. */
+  /* `min(320px, 100%)` y no `320px` a secas: en una pantalla de 320 px, una
+     pista de 320 px más el padding del contenedor ya no cabe, y la rejilla
+     desborda a lo ancho arrastrando la página entera. Con el `min()`, la
+     columna nunca pide más de lo que hay. */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--e-5);
+  padding: var(--e-5);
+}
+.ayuda-bloque { display: flex; flex-direction: column; gap: var(--e-3); }
+.ayuda-bloque h3 { font-size: var(--fs-body); color: var(--brasa-alta); }
+.ayuda-sub { font-size: var(--fs-body-sm); font-weight: var(--fw-semibold); margin-top: var(--e-2); }
+.ayuda-bloque p { margin: 0; }
+
+/* La columna de la estadística que manda en esa línea. Nunca es la única
+   pista: el número también es el más alto de su fila. */
+.ayuda-mazos .es-dueña { color: var(--brasa-alta); font-weight: var(--fw-semibold); }
+
+/* `.tabla` impone `min-width: 520px` porque son tablas de datos que se leen
+   desplazándolas. Las del manual son de cinco columnas cortas y caben en un
+   móvil sin desplazar nada: obligarlas a 520 px era condenar a la persona a
+   arrastrar cada tabla de la ayuda de lado. */
+.tabla-compacta { min-width: 0; }
+.tabla-compacta th, .tabla-compacta td { padding: 6px 10px; font-size: var(--fs-label); }
+
+.ayuda-aviso {
+  display: flex;
+  gap: var(--e-3);
+  padding: var(--e-3);
+  border-radius: var(--r-alerta);
+  border: 1px solid var(--brasa-borde);
+  background: var(--brasa-velo);
+  font-size: var(--fs-body-sm);
+}
+.ayuda-aviso > i { color: var(--brasa-alta); flex-shrink: 0; margin-top: 2px; }
+
+.ayuda-ciclo { display: flex; flex-wrap: wrap; gap: var(--e-2); list-style: none; }
+.ayuda-ciclo li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+}
+.ayuda-ciclo i { color: var(--ceniza); }
+.ayuda-ciclo span { color: var(--ceniza); }
+
+.ayuda-pasos { margin: 0; padding-left: var(--e-5); font-size: var(--fs-body-sm); color: var(--ceniza); }
+.ayuda-pasos li + li { margin-top: var(--e-2); }
+
+.mazo-pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-3);
+  margin-top: var(--e-5);
+  padding-top: var(--e-5);
+  border-top: 1px solid var(--linea);
+}
+
+/* jugador ya colocado en otro hueco: se apaga en vez de desaparecer, para que
+   se vea que lo tienes pero que ya está sobre el campo */
+.selector-item[disabled] { opacity: .38; cursor: not-allowed; }
+
+/* copia repetida de alguien YA alineado. Se apaga aún más y se marca con una
+   banda, porque el motivo es distinto: no es que esta copia esté usada, es que
+   ese jugador ya está en el once y nadie juega dos veces en el mismo equipo. */
+.selector-item.es-repetido { opacity: .22; }
+.selector-item.es-repetido::after {
+  content: 'Ya alineado';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  padding: 2px var(--e-2);
+  border-radius: var(--r-chip);
+  background: rgba(11, 12, 16, .9);
+  font-size: 9px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+  white-space: nowrap;
+}
+.selector-item { position: relative; }
+
+/* ---- los 11 huecos, dispuestos como en un campo de fútbol real ----
+   Las coordenadas NO están aquí: las calcula Tcg::coordenadasDe() y llegan
+   como `style` en cada hueco. Con ocho formaciones, tenerlas en CSS serían 88
+   reglas :nth-child que habría que mantener en sincronía a mano con el orden
+   de los huecos de PHP — y desincronizarlas no rompe nada visible, solo coloca
+   a la gente en el sitio equivocado. El terreno se dibuja con un SVG de líneas
+   de campo en el fondo (banda, círculo central, áreas), en tonos apagados para
+   no pelear con el resto del sistema de color del sitio. */
+.alineacion {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto var(--e-6);
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--linea-viva);
+  /* Sin esquinas redondeadas y con las líneas a sangre: un campo de fútbol no
+     tiene las esquinas romas, y el rectángulo exterior del dibujo ES la banda,
+     así que tiene que coincidir con el borde del lienzo. Antes el SVG dejaba
+     dos unidades de margen por dentro y se veía una franja de césped muerta
+     alrededor de todo el campo. */
+  border-radius: 0;
+  overflow: hidden;
+  background-color: #0E1710;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(255,255,255,.025) 0 10%, transparent 10% 20%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='.3' y='.3' width='99.4' height='139.4'/%3E%3Cline x1='0' y1='70' x2='100' y2='70'/%3E%3Ccircle cx='50' cy='70' r='14'/%3E%3Crect x='20' y='.3' width='60' height='24'/%3E%3Crect x='35' y='.3' width='30' height='10'/%3E%3Crect x='20' y='115.7' width='60' height='24'/%3E%3Crect x='35' y='129.7' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='70' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 100% 100%;
+}
+
+.hueco {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: clamp(60px, 15%, 84px);
+  /* al cambiar de formación los huecos se deslizan a su nueva posición en vez
+     de saltar, que es lo que hace legible de un vistazo qué se ha movido */
+  transition: left var(--t-estado) var(--curva), top var(--t-estado) var(--curva);
+}
+:root[data-motion="reduce"] .hueco { transition: none; }
+/* En pantalla estrecha, una línea de seis medios deja ~52px por jugador: el
+   retrato se encoge para que quepan sin pisarse ni salirse del campo. El
+   botón entero sigue por encima del objetivo táctil mínimo. */
+@media (max-width: 430px) {
+  .hueco { width: clamp(52px, 15%, 84px); }
+}
+
+/* El selector de formación va bajo el nombre del mazo, no en la barra de
+   totales: es una decisión de plantilla, no un dato de resultado. */
+.campo-formacion { margin-top: var(--e-3); max-width: 240px; }
+
+.hueco-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 44px;          /* objetivo táctil, aunque el retrato sea menor */
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* El aro del retrato usa EXACTAMENTE la misma técnica que .carta en
+   components.css: el borde no es un `border`, es un `padding` que deja ver el
+   `background` de debajo (--rz-borde), con un círculo interior encima que
+   pinta el contenido real. Así el mazo no inventa un lenguaje de borde propio:
+   reutiliza los mismos colores mezclados (color-mix) y el mismo tratamiento
+   especial de legendario (metálico) y SRF (arcoíris animado) que ya se ve en
+   colección, álbum y mercado. */
+.hueco-avatar {
+  --rz-borde: var(--linea-viva);
+  display: grid;
+  place-items: center;
+  width: clamp(40px, 11vw, 56px);
+  aspect-ratio: 1;
+  padding: 2px;                 /* el padding ES el borde, igual que .carta */
+  border-radius: 50%;
+  background: var(--rz-borde);
+  overflow: hidden;
+}
+
+.hueco-avatar-int {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--carbon-alto);
+  color: var(--ceniza);
+  font-size: 16px;
+  overflow: hidden;
+}
+.hueco-avatar-int img { width: 100%; height: 100%; object-fit: cover; }
+
+/* mismos valores que .carta[data-rareza] en components.css: 1–4 son el color
+   de la rareza mezclado con transparencia (nunca el tono puro), 5 un
+   degradado metálico, 6 el arcoíris animado (misma keyframe holoDeriva). */
+.hueco[data-rareza="2"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz2) 34%, transparent); }
+.hueco[data-rareza="3"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz3) 38%, transparent); }
+.hueco[data-rareza="4"] .hueco-avatar { --rz-borde: color-mix(in srgb, var(--rz4) 42%, transparent); }
+.hueco[data-rareza="5"] .hueco-avatar { --rz-borde: linear-gradient(140deg, #FFE0AE, #E8752A 30%, #7A3A12 52%, #F2B134 72%, #FFE0AE); }
+.hueco[data-rareza="6"] .hueco-avatar {
+  padding: 3px;
+  background: var(--rz6-grad);
+  background-size: 300% 100%;
+  animation: holoDeriva 4s linear infinite;
+}
+
+.hueco:not(.esta-lleno) .hueco-avatar {
+  padding: 0;
+  background: none;
+  border: 2px dashed var(--linea-viva);
+}
+/* seleccionado para recibir jugador: mismo recurso que .carta.is-seleccionada
+   en el resto del sitio, un anillo ámbar sustituyendo al de rareza */
+.hueco.es-activo .hueco-avatar { --rz-borde: var(--brasa); box-shadow: 0 0 0 3px var(--brasa-velo); }
+/* colocado fuera de su posición natural: no es un error, es una decisión, así
+   que se señala sin alarmar, no con el mismo tono que un error */
+.hueco.es-desubicado .hueco-avatar { outline: 2px solid var(--amarilla-borde); outline-offset: 2px; }
+
+.hueco-nombre {
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: var(--r-chip);
+  background: rgba(11, 12, 16, .78);
+  backdrop-filter: blur(4px);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--hueso);
+}
+.hueco:not(.esta-lleno) .hueco-nombre {
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ceniza);
+}
+
+.hueco-quitar {
+  position: absolute;
+  top: -6px; right: -6px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  /* 26px, no 22: por debajo de 24×24 incumple el objetivo táctil mínimo
+     (WCAG 2.2 SC 2.5.8) y en el selector de mazos era además el elemento
+     que quedaba más cerca del borde de la pantalla en móvil. */
+  width: 26px; height: 26px;
+  border: 1px solid var(--linea-viva);
+  border-radius: 50%;
+  background: var(--carbon-alto);
+  color: var(--ceniza);
+  font-size: 13px;
+  cursor: pointer;
+}
+.hueco-quitar:hover { color: var(--hueso); border-color: var(--ceniza); }
+
+/* --------------------------------------------------------------------------
+   EL CAMPO EN MÓVIL: MÁS ALTO Y CON LOS HUECOS MÁS COMPACTOS.
+
+   ⚠️ ESTO NO ES ESTÉTICA, ES QUE LAS FILAS SE PISABAN. Medido en el navegador
+      a 270 px de campo: el hueco mide 66 px de alto (40 de retrato + el
+      nombre) y las filas quedan a 45-53 px unas de otras, así que el portero y
+      la defensa se solapaban 20 px — el nombre de uno encima del retrato del
+      otro. Ya pasaba con el 1-4-4-2 de siempre, y con las formaciones de cinco
+      y seis líneas que ahora existen se multiplica: siete filas repartidas
+      entre el 91 % y el 16 % del campo caen a 12,5 % una de otra.
+
+      Se arregla por los dos lados a la vez, porque ninguno basta solo: el
+      campo se estira (5/8 en vez de 5/7, que a 270 px son 54 px más de alto) y
+      el hueco adelgaza hasta unos 49 px. Con eso caben siete filas sin
+      tocarse. Solo en móvil: en pantalla grande el campo ya tiene sitio de
+      sobra y el retrato grande se ve mejor.
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  /* 5/9: con siete filas (portero + seis de campo) repartidas entre el 91 % y
+     el 16 %, los huecos caen a 12,5 % unos de otros. A 5/8 eso eran 54 px con
+     un hueco de 58 y seguían pisándose; a 5/9 son 60 px y ya no. */
+  .alineacion {
+    aspect-ratio: 5 / 9;
+    /* ⚠️ SU PROPIO DIBUJO, no el de escritorio estirado. `background-size:
+       100% 100%` deforma lo que le echen: con el SVG de 100x140 metido en un
+       lienzo 5/9, el círculo central salía ovalado y las áreas un 29 % más
+       profundas de lo que tocan. Este es el mismo campo con viewBox 100x180,
+       así que una unidad vuelve a medir igual en los dos ejes. */
+    background-image:
+      repeating-linear-gradient(180deg, rgba(255,255,255,.025) 0 10%, transparent 10% 20%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 180'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.16' stroke-width='.6'%3E%3Crect x='.3' y='.3' width='99.4' height='179.4'/%3E%3Cline x1='0' y1='90' x2='100' y2='90'/%3E%3Ccircle cx='50' cy='90' r='14'/%3E%3Crect x='20' y='.3' width='60' height='24'/%3E%3Crect x='35' y='.3' width='30' height='10'/%3E%3Crect x='20' y='155.7' width='60' height='24'/%3E%3Crect x='35' y='169.7' width='30' height='10'/%3E%3C/g%3E%3Ccircle cx='50' cy='90' r='.8' fill='%23ffffff' fill-opacity='.16'/%3E%3C/svg%3E");
+  }
+  .hueco { width: clamp(48px, 17%, 68px); gap: 2px; }
+  .hueco-avatar { width: clamp(30px, 9vw, 38px); }
+  .hueco-nombre { font-size: 8.5px; line-height: 1.15; }
+  /* El aspa de quitar también encoge, o se come el retrato al que cuelga. */
+  .hueco-quitar { width: 20px; height: 20px; }
+}
+
+/* --------------------------------------------------------------------------
+   FICHA AL VUELO DEL TITULAR
+   Lo que sale al pasar el ratón (o tabular) por un hueco ocupado.
+
+   ⚠️ VIVE DENTRO DE .alineacion, QUE TIENE overflow:hidden. Eso es a
+      propósito: el recorte es lo que mantiene el campo limpio, y la ficha se
+      diseña para caber dentro en vez de escaparse. Sacarla a position:fixed
+      obligaría a medir el hueco con getBoundingClientRect en cada hover y a
+      recalcular al hacer scroll; anclándola en % sobre el mismo campo que
+      coloca los huecos, no hay nada que medir y sigue cuadrando a cualquier
+      tamaño. Las variantes de abajo son las que evitan que se salga por un
+      borde: por arriba (`es-abajo`) y por las bandas.
+   -------------------------------------------------------------------------- */
+.hueco-ficha {
+  position: absolute;
+  z-index: 6;                      /* por encima de los huecos (z-index: 2) */
+  transform: translate(-50%, calc(-100% - 46px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: min(230px, 78%);
+  padding: var(--e-3);
+  border-radius: var(--r-alerta);
+  border: 1px solid var(--linea-viva);
+  /* Con solo `--carbon-alto` al 94% esto se leía como una caja negra lisa —
+     la queja de «el modal de jugadores no tenga fondo negro» aplica también
+     aquí: es otra ficha de jugador, aunque no use el modal grande. Un rescoldo
+     sutil detrás, como el de la ficha completa. */
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 92, 26, .16), transparent 70%),
+    color-mix(in srgb, var(--carbon-alto) 94%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--elev-3);
+  pointer-events: none;            /* nunca se interpone al clic del hueco */
+  font-size: var(--fs-label); line-height: 1.35;
+}
+/* El hueco está en la mitad de arriba: la ficha cae por debajo. */
+.hueco-ficha.es-abajo { transform: translate(-50%, 46px); }
+/* Pegada a una banda, se ancla por su borde para no salirse de lado. */
+.hueco-ficha.es-izquierda { transform: translate(-14%, calc(-100% - 46px)); }
+.hueco-ficha.es-derecha   { transform: translate(-86%, calc(-100% - 46px)); }
+.hueco-ficha.es-izquierda.es-abajo { transform: translate(-14%, 46px); }
+.hueco-ficha.es-derecha.es-abajo   { transform: translate(-86%, 46px); }
+
+/* Un filo del color de la rareza: la misma señal que ya llevan el avatar del
+   hueco y el marco de la carta. Nunca es la ÚNICA pista — la pastilla de
+   rareza va escrita justo debajo. */
+.hueco-ficha[data-rareza="1"] { border-top: 2px solid var(--rz1); }
+.hueco-ficha[data-rareza="2"] { border-top: 2px solid var(--rz2); }
+.hueco-ficha[data-rareza="3"] { border-top: 2px solid var(--rz3); }
+.hueco-ficha[data-rareza="4"] { border-top: 2px solid var(--rz4); }
+.hueco-ficha[data-rareza="5"] { border-top: 2px solid var(--rz5); }
+.hueco-ficha[data-rareza="6"] { border-top: 2px solid var(--rz6); }
+.hueco-ficha[data-rareza="7"] { border-top: 2px solid var(--rz7); }
+
+.hf-nombre { font-size: var(--fs-body-sm); font-weight: var(--fw-semibold); color: var(--hueso); }
+.hf-meta   { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.hf-pos {
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--linea);
+  color: var(--ceniza);
+}
+.hf-equipo { color: var(--ceniza); }
+.hf-afinidad { display: flex; align-items: center; gap: 5px; color: var(--ceniza); }
+.hf-afinidad .carta-afinidad { width: 18px; height: 20px; }
+
+.hf-stats { display: flex; gap: var(--e-3); }
+.hf-stat  { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.hf-stat b { font-size: 15px; color: var(--hueso); }
+.hf-stat-et { color: var(--ceniza); font-size: 9px; letter-spacing: .06em; }
+/* El peso de la línea, que es lo que explica el total de abajo. */
+.hf-stat-peso { color: var(--humo); font-size: 9px; opacity: .8; }
+
+.hf-aporte {
+  padding-top: 5px;
+  border-top: 1px solid var(--linea);
+  color: var(--ceniza);
+}
+.hf-aporte b { color: var(--brasa); font-size: 14px; }
+
+.hf-aviso { display: flex; align-items: center; gap: 4px; color: var(--brasa-alta); }
+.hf-rasgo { display: flex; align-items: center; gap: 4px; color: var(--ceniza); }
+
+/* En táctil no hay hover y el toque abre el selector: la ficha no llega a
+   verse nunca, así que no se pinta. `hover: none` es la consulta correcta
+   —no el ancho—: un portátil estrecho sí tiene ratón y sí debe verla. */
+@media (hover: none) {
+  .hueco-ficha { display: none; }
+}
+
+/* --------------------------------------------------------------------------
+   CAPA 2 — COMPOS
+   Panel de rasgos activos, en el constructor de mazos y en el resultado de
+   duelo. El nivel se lee por puntos llenos/vacíos además de por el número:
+   misma regla que las rarezas, nunca solo por color.
+   -------------------------------------------------------------------------- */
+.compos {
+  margin-block: var(--e-6);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.compos-cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  margin-bottom: var(--e-4);
+}
+
+/* `auto-fit` + un mínimo más bajo, no `auto-fill` con 240px: en la columna del
+   taller (que ahora es más estrecha que la página entera) 240px dejaba una
+   sola compo por fila con medio panel vacío al lado, y el detalle de cada una
+   —"3 en el once · +1,20 % Defensa"— se partía en tres líneas. Con 190px caben
+   dos y el texto respira. */
+.compos-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--e-3);
+  list-style: none;
+}
+.compo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--e-3);
+  padding: var(--e-3);
+  border: 1px solid var(--linea);
+  border-left: 3px solid var(--linea-viva);
+  border-radius: var(--r-alerta);
+  background: var(--pozo);
+}
+/* El nombre parte por palabras en vez de desbordar: "Contraataque" no cabe en
+   una columna estrecha, y truncarlo con puntos dejaría compos indistinguibles
+   entre sí ("Contraa…" / "Contraat…"). */
+.compo-nombre { overflow-wrap: anywhere; }
+.compo-nivel { flex-shrink: 0; }
+/* afinidad y configuración se distinguen por el filo izquierdo, pero el tipo
+   también se lee en el texto del detalle: el color no es la única señal */
+.compo--afinidad { border-left-color: var(--brasa); }
+.compo--configuracion { border-left-color: var(--var); }
+.compo--derivado { border-left-color: var(--cesped); }
+
+.compo-nombre { font-weight: var(--fw-semibold); }
+.compo-detalle { grid-column: 1 / -1; font-size: var(--fs-micro); }
+
+.compo-nivel { display: inline-flex; align-items: center; gap: 3px; }
+.compo-punto {
+  width: 7px; height: 7px;
+  border: 1px solid var(--linea-viva);
+  border-radius: 50%;
+}
+.compo-punto.esta-lleno { background: var(--brasa); border-color: var(--brasa); }
+
+.compos-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--e-4);
+  margin-top: var(--e-5);
+  padding-top: var(--e-4);
+  border-top: 1px solid var(--linea);
+}
+.compos-resumen .dato.es-malo b { color: var(--roja-txt); }
+.compos .alerta { margin-top: var(--e-4); }
+
+/* en el resultado de duelo van dos paneles enfrentados */
+.compos--duelo { margin-block: 0; }
+.compos-enfrentadas {
+  display: grid;
+  gap: var(--e-4);
+  margin-bottom: var(--e-6);
+}
+@media (min-width: 900px) {
+  .compos-enfrentadas { grid-template-columns: 1fr 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   DUELOS — lobby
+   La pantalla era literalmente un formulario y dos tablas. Lo que se apuesta
+   —que es de lo que va la pantalla— tenía el mismo peso visual que cualquier
+   campo, y para entrar en una sala de carta se elegía cuál en un desplegable
+   de nombres sueltos: se arriesgaba a ciegas un objeto que cambia de dueño.
+   -------------------------------------------------------------------------- */
+
+/* Qué se apuesta: dos opciones grandes, con su consecuencia escrita. El radio
+   es real y sigue ahí (oculto con .sr-only), así que el teclado, el foco y el
+   envío del formulario funcionan sin una línea de JavaScript; el JS solo
+   añade el resaltado. */
+.apuesta-opciones {
+  display: grid;
+  gap: var(--e-3);
+  margin-top: var(--e-2);
+}
+@media (min-width: 640px) {
+  .apuesta-opciones { grid-template-columns: 1fr 1fr; }
+}
+.apuesta-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--e-3);
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+  background: var(--pozo);
+  cursor: pointer;
+  transition: border-color var(--t-toque) var(--curva), background var(--t-toque) var(--curva);
+}
+.apuesta-opcion:hover { border-color: var(--linea-viva); }
+.apuesta-opcion.esta-elegida { border-color: var(--brasa-borde); background: var(--brasa-velo); }
+/* El foco se dibuja sobre la opción entera, no sobre el radio invisible. */
+.apuesta-opcion:focus-within { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+.apuesta-opcion-ico {
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--r-chip);
+  background: var(--carbon-alto);
+  color: var(--brasa-alta);
+  font-size: 20px;
+}
+.apuesta-opcion.esta-elegida .apuesta-opcion-ico { background: var(--brasa); color: var(--brasa-tinta); }
+.apuesta-opcion-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* Filtros del selector de apuesta. Van en fila porque son tres y cortos; si
+   ocuparan un bloque propio competirían con la lista, que es lo que hay que
+   mirar. */
+.apuesta-filtros {
+  display: grid;
+  gap: var(--e-3);
+  margin: var(--e-2) 0 var(--e-4);
+}
+@media (min-width: 700px) {
+  .apuesta-filtros { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); }
+}
+/* La lista de apuesta tiene tope de altura y scroll propio: con la colección
+   hecha, dejarla crecer empujaba el botón de "Abrir sala" fuera de la vista. */
+/* Cuántas cartas llevas elegidas de las que caben. Va ARRIBA de la lista y no
+   debajo: la lista tiene scroll propio, así que un contador al final quedaría
+   fuera de pantalla justo cuando hace falta mirarlo. */
+.apuesta-contador {
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+}
+.apuesta-contador.esta-lleno { color: var(--brasa-alta); }
+.apuesta-contador.esta-vacio { color: var(--roja-txt); }
+
+.carta-lista--apuesta { max-height: 52vh; overflow-y: auto; padding-right: var(--e-2); }
+.carta-lista--apuesta .selector-vacio {
+  padding: var(--e-5);
+  text-align: center;
+  color: var(--ceniza);
+  font-size: var(--fs-body-sm);
+}
+
+/* Salas abiertas. Cada una enseña QUÉ hay en juego en vez de describirlo en
+   una celda de tabla. */
+.salas {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--e-3);
+  /* Mismo criterio que `.carta-lista`: la sala se adapta al ANCHO DE LA LISTA,
+     no al de la ventana. Con media queries, una sala metida en una columna
+     estrecha con la ventana ancha aplastaba la columna del entrenador hasta
+     0px — medido. */
+  container-type: inline-size;
+  container-name: salas;
+}
+.sala {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-left: 3px solid var(--linea-viva);
+  border-radius: var(--r-alerta);
+  background: var(--carbon);
+}
+.sala:hover { border-color: var(--linea-viva); }
+/* Una sala de carta se distingue del filo, no solo del texto: es la que puede
+   costarte un objeto y no monedas. */
+.sala--carta { border-left-color: var(--brasa); }
+
+.sala-entrenador { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
+.sala-entrenador span { display: flex; flex-direction: column; min-width: 0; }
+.sala-entrenador b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sala-apuesta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sala-apuesta-etiqueta {
+  font-size: var(--fs-micro);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.sala-apuesta-valor {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  font-weight: var(--fw-semibold);
+}
+.sala-apuesta-valor--monedas { color: var(--amarilla-txt); }
+.sala-apuesta-valor i { color: var(--brasa-alta); }
+
+.sala-accion { display: flex; align-items: center; justify-content: flex-end; }
+.sala-accion .t-caption { display: inline-flex; align-items: center; gap: var(--e-1); }
+
+@container salas (max-width: 700px) {
+  .sala { grid-template-columns: minmax(0, 1fr) auto; }
+  .sala-accion { grid-column: 1 / -1; justify-content: stretch; }
+  .sala-accion form { width: 100%; }
+  .sala-accion .btn { width: 100%; }
+}
+
+/* --------------------------------------------------------------------------
+   DUELOS — sala de espera y pantalla de partido
+   -------------------------------------------------------------------------- */
+.sala-espera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-8) var(--e-4);
+  text-align: center;
+}
+
+/* Tres puntos que laten. Es la única señal de que la sala sigue viva, así que
+   tiene que verse sin depender de que cargue la fuente de iconos. */
+.sala-latido { display: flex; gap: var(--e-2); }
+.sala-latido span {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--brasa);
+  animation: latido 1.4s var(--curva) infinite;
+}
+.sala-latido span:nth-child(2) { animation-delay: .18s; }
+.sala-latido span:nth-child(3) { animation-delay: .36s; }
+
+@keyframes latido {
+  0%, 100% { opacity: .25; transform: scale(.85); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+
+/* con reducción de movimiento la sala no parpadea, pero sigue leyéndose que
+   está activa */
+:root[data-motion="reduce"] .sala-latido span { animation: none; opacity: .8; }
+
+/* ---- fase de aumento pre-partido ---- */
+.aumento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-6) 0;
+  text-align: center;
+}
+.aumento-reloj { font-size: var(--fs-h2); font-weight: var(--fw-bold); }
+
+.aumento-opciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--e-4);
+  width: 100%;
+  max-width: 720px;
+  margin-top: var(--e-4);
+}
+
+.aumento-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--e-5) var(--e-4);
+  border: 1px solid var(--linea-viva);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  color: inherit;
+  cursor: pointer;
+  transition: transform var(--t-toque) var(--curva), border-color var(--t-toque) var(--curva);
+}
+.aumento-boton:hover { transform: translateY(-2px); }
+
+.aumento-tier {
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.aumento-pct { font-size: var(--fs-h2); line-height: 1.1; }
+.aumento-stat { font-weight: var(--fw-semibold); }
+.aumento-efecto { font-size: var(--fs-label); color: var(--ceniza); }
+
+/* Los tres tiers se distinguen por color Y por texto ("Plata"/"Oro"/"Prisma"),
+   nunca solo por color: es la misma regla que siguen las rarezas. */
+.aumento-opcion.es-plata  .aumento-tier { color: var(--ceniza); }
+.aumento-opcion.es-oro    .aumento-tier { color: var(--amarilla); }
+.aumento-opcion.es-prisma .aumento-tier { color: var(--brasa-alta); }
+.aumento-opcion.es-oro    .aumento-boton { border-color: var(--amarilla-borde); }
+.aumento-opcion.es-prisma .aumento-boton { border-color: var(--brasa-borde); }
+
+/* destape de los dos aumentos, ya con el duelo resuelto */
+.aumento-destape {
+  display: flex;
+  justify-content: center;
+  gap: var(--e-6);
+  flex-wrap: wrap;
+  margin-bottom: var(--e-5);
+}
+.aumento-destape-lado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 220px;
+  padding: var(--e-3) var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta);
+}
+.aumento-destape-lado b { font-size: var(--fs-h3); }
+/* mismo motivo que .partido-nombre: un nombre de invocador largo y sin
+   espacios (hasta 50 caracteres, válido en el registro) no tiene dónde
+   romper de forma natural y se salía de esta tarjeta */
+.aumento-destape-lado > span.t-caption {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aumento-destape-lado.es-oro    { border-color: var(--amarilla-borde); }
+.aumento-destape-lado.es-prisma { border-color: var(--brasa-borde); }
+
+/* ---- marcador ---- */
+.partido-marcador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--e-3);
+}
+/* min-width:0 es necesario para que .partido-lado pueda encogerse dentro de
+   .partido-marcador (flex): sin él, un nombre de invocador largo y sin
+   espacios (permitido, hasta 50 caracteres) no tiene dónde romper y se sale
+   del marcador en vez de truncarse. Mismo patrón que .rz-texto en las cartas. */
+.partido-lado { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
+.partido-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 15ch;
+  font-weight: var(--fw-semibold);
+}
+.partido-goles { font-size: var(--fs-h1); line-height: 1; flex-shrink: 0; }
+.partido-guion { color: var(--ceniza); font-size: var(--fs-h2); }
+
+.partido-veredicto {
+  margin-bottom: var(--e-5);
+  text-align: center;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  letter-spacing: -.01em;
+}
+.partido.es-victoria .partido-veredicto { color: var(--cesped); }
+.partido.es-derrota  .partido-veredicto { color: var(--ceniza); }
+
+/* "en los penaltis" cuelga del titular cuando el duelo se decidió en la tanda.
+   Va en su propia línea y más pequeño: es la aclaración de por qué hay un
+   ganador con el marcador empatado, no parte del veredicto. Sin esto heredaría
+   el tamaño del <h1> y competiría con la palabra que importa. */
+.partido-tanda {
+  display: block;
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  color: var(--ceniza);
+}
+
+/* ---- VEREDICTO DEL PARTIDO (§1.5 regla 7) ----
+   El dato memorable del encuentro, también al perder. Va justo bajo el
+   titular y por encima de todo lo demás porque es lo que se lee y lo que se
+   comparte; las estadísticas quedan debajo, de apoyo. */
+.veredicto {
+  margin-bottom: var(--e-5);
+  text-align: center;
+}
+.veredicto-detalle {
+  margin: 0 auto var(--e-2);
+  max-width: 46ch;
+  font-size: var(--fs-body);
+  color: var(--hueso);
+}
+.veredicto-actuacion {
+  margin: 0 0 var(--e-3);
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+}
+.veredicto-copiar { margin-bottom: var(--e-4); }
+
+.veredicto-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--e-2) var(--e-5);
+  margin: 0;
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
+}
+.veredicto-stats > div { text-align: center; }
+.veredicto-stats dt {
+  font-size: var(--fs-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ceniza);
+}
+.veredicto-stats dd {
+  margin: 0;
+  font-size: var(--fs-body-sm);
+  color: var(--hueso);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- sello de rango (S/A/B) de las cadenas ----
+   Primer guiño retro de las Cadenas: letra grande y maciza, borde duro y sin
+   degradados, como el rango de un marcador de recreativa. La paleta sigue
+   siendo la del sitio, así que hace de homenaje sin desentonar con el resto
+   de la pantalla, que es lo que pidió Alejandro. */
+.rango-sello {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--e-3);
+  margin: 0 auto var(--e-5);
+  padding: var(--e-2) var(--e-4);
+  width: fit-content;
+  max-width: 100%;
+  border: 2px solid var(--rango-color, var(--linea-viva));
+  border-radius: var(--r-alerta);
+  background: color-mix(in srgb, var(--rango-color, var(--carbon)) 10%, transparent);
+}
+.rango-letra {
+  font-family: var(--tipo-display);
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  color: var(--rango-color, var(--hueso));
+  /* el "relieve" de recreativa es una sombra dura, sin desenfoque */
+  text-shadow: 2px 2px 0 color-mix(in srgb, var(--rango-color, var(--hueso)) 30%, transparent);
+}
+.rango-texto { font-size: var(--fs-body-sm); color: var(--ceniza); text-align: left; }
+
+/* La letra ya distingue el rango por sí sola: el color solo lo refuerza, así
+   que quien no perciba la diferencia cromática no pierde información. */
+.rango-s { --rango-color: var(--brasa); }
+.rango-a { --rango-color: var(--hueso); }
+.rango-b { --rango-color: var(--ceniza); }

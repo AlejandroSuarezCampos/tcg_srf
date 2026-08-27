@@ -1,0 +1,333 @@
+/* ==========================================================================
+   SUPERLIGA FRONTIER TCG — BASE
+   Reset, tipografía, foco, layout de página y utilidades.
+   Depende de tokens.css. No define ningún componente.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+* { margin: 0; padding: 0; }
+
+/* ⚠️ EL ATRIBUTO `hidden` NO FUNCIONA SIN ESTO. No es una utilidad: es una
+   corrección del reset, y sin ella medio JavaScript de la app miente.
+   El navegador declara `[hidden] { display: none }` en su hoja de agente de
+   usuario, y CUALQUIER regla de autor que fije un `display` la gana —da igual
+   la especificidad, las hojas de autor pesan más que las del agente—. Como
+   aquí casi todo componente declara su display (`.campo` es flex, `.carta` es
+   block, `.sala` es grid…), poner `elemento.hidden = true` dejaba el elemento
+   perfectamente visible.
+   Se vio en duelos: al apostar monedas, el bloque del selector de cartas se
+   marcaba como `hidden` y seguía ocupando 508px en pantalla con las 50 cartas
+   dentro. Se había parcheado a mano en `.carta[hidden]`, pero el fallo no era
+   de la carta: era del reset, y lo tenía toda la aplicación.
+   `!important` es la forma correcta y la que recomienda la propia
+   especificación de HTML: para volver a enseñar algo hay que quitarle el
+   atributo, que es justo lo que `hidden` significa. */
+[hidden] { display: none !important; }
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  /* el ancla de scroll deja hueco para la nav fija: sin esto, saltar a un
+     destino por teclado deja el elemento enfocado bajo la barra */
+  scroll-padding-top: calc(var(--nav-h) + var(--e-4));
+  -webkit-text-size-adjust: 100%;
+
+  /* ⚠️ EL RECUADRO AZUL DE LOS MÓVILES. Al tocar cualquier cosa pulsable, los
+     navegadores WebKit/Blink pintan encima un rectángulo azul translúcido —su
+     color por defecto— que no respeta ni el radio ni la forma del control: en
+     una carta redondeada salía un cuadrado azul, y en los sobres 3D salía
+     sobre una cara girada. No es un estado del sistema de diseño, es un
+     resto del navegador.
+
+     Se apaga aquí y no control por control porque afecta a TODO lo pulsable, y
+     dejarlo puesto en un sitio y quitado en otro es peor que no quitarlo.
+     La respuesta al toque no se pierde: cada componente ya tiene su `:active`
+     propio, que es la señal buena —respeta la forma y el color del sitio—. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ⚠️ Y LA SELECCIÓN DE TEXTO AL MANTENER PULSADO. En táctil, dejar el dedo un
+   momento sobre un botón selecciona su rótulo y saca la lupa y el menú de
+   copiar: pasaba al arrastrar en los minijuegos y al pulsar un sobre.
+   Solo se apaga en los CONTROLES, nunca en el contenido: seleccionar y copiar
+   un texto de la página tiene que seguir funcionando. */
+button, .btn, [role="button"], summary, .hueco, .pack3d-sobre, .nodo-boton {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body {
+  background: var(--negro);
+  color: var(--hueso);
+  font-family: var(--tipo-texto);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* `clip` y no `hidden`: hidden convierte el body en contenedor de scroll y
+     eso rompe el position:sticky de la navegación. Además hidden no impedía
+     el desplazamiento lateral, porque el que scrollea es el elemento html. */
+  overflow-x: clip;
+}
+
+img, svg, video { display: block; max-width: 100%; }
+
+/* --------------------------------------------------------------------------
+   CÓMO PARTE EL TEXTO
+
+   En una pantalla estrecha el navegador reparte las líneas de forma
+   codiciosa: llena cada una hasta el borde y lo que sobra baja. Con títulos
+   cortos eso deja renglones muy desiguales, y con párrafos deja huérfanas —
+   una sola palabra sola en la última línea. Se veía en el marcador del
+   partido, en el relato de los minijuegos y en el modal de confirmación de los
+   sobres, y es lo que hace que la interfaz parezca descuidada.
+
+   Son dos propiedades distintas y cada una va donde toca:
+     · `balance` iguala el largo de las líneas. Para TÍTULOS, que son cortos —
+       el navegador solo lo aplica a bloques de pocas líneas, así que ponerlo
+       en un párrafo largo no hace nada.
+     · `pretty` no iguala nada: solo evita la huérfana del final. Para TEXTO
+       corrido, que es donde molesta.
+
+   Los navegadores que no las conozcan las ignoran y se quedan como estaban.
+   -------------------------------------------------------------------------- */
+h1, h2, h3, h4, .t-h1, .t-h2, .t-h3 { text-wrap: balance; }
+p, li, dd, figcaption { text-wrap: pretty; }
+
+/* ⚠️ EN MÓVIL, ADEMÁS, SE PARTEN LAS PALABRAS.
+
+   `text-wrap: pretty` reparte mejor las líneas pero no puede partir una
+   palabra, y en castellano las palabras largas son el problema: en una columna
+   de 320 px, «Recompensa», «Coleccionista» o «República Democrática del Congo»
+   dejan un hueco enorme al final de la línea anterior o se van solas a una
+   línea propia. Eso es lo que se ve como saltos de línea feos.
+
+   `hyphens: auto` usa el diccionario del idioma —de ahí que `<html lang="es">`
+   sea obligatorio, y lo es— y parte por sílabas con guion. Solo por debajo de
+   700 px: en escritorio hay ancho de sobra y un guion donde no hace falta se
+   lee peor.
+
+   Va en los contenedores de PROSA, no en todo: partir un nombre de usuario, un
+   precio o el rótulo de un botón sería peor que el hueco que evita. */
+@media (max-width: 700px) {
+  p, li, dd, figcaption,
+  .t-body, .t-body-sm, .ayuda-texto {
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+}
+
+/* Un hijo de flex no baja de su `min-content` por defecto, así que una palabra
+   larga ensancha la caja entera en vez de partirse: es lo que empujaba las
+   filas de estadísticas y los rótulos del minijuego fuera de la pantalla. */
+.sim-mj-opcion, .sim-mj-texto, .hueco-ficha, .carta-nombre {
+  min-width: 0;
+}
+
+/* ⚠️ LOS NOMBRES QUE ESCRIBE LA GENTE NO SE PUEDEN PARTIR POR SÍLABAS, pero sí
+   tienen que poder partirse. Un usuario puede llamarse
+   `follandocabritillas04` de una tirada: sin esto, esa palabra no cabe en
+   375 px, no parte por ningún sitio y ESTIRA su contenedor, sacando scroll
+   lateral a la página entera o desbordando la tarjeta.
+   `anywhere` y no `break-word`: `break-word` no reduce el ancho mínimo
+   intrínseco del elemento, así que en una rejilla o en un flex la columna
+   sigue reservando el ancho de la palabra completa y el desbordamiento
+   persiste. */
+.nombre-usuario, .sim-nombre, .carta-nombre, .hueco-nombre,
+.mazo-nombre, .cadena-nodo-nombre, .vitrina-item-nombre {
+  overflow-wrap: anywhere;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+/* El `fieldset` trae de fábrica un borde gris en relieve (`1.6px groove`) que
+   ninguna hoja de este proyecto pedía: es el recuadro claro que salía en
+   duelos alrededor de "Qué se apuesta". `* { padding: 0 }` no lo quitaba —el
+   borde no es padding— y por eso sobrevivió al reset.
+   `min-width: 0` va con él: un fieldset tiene `min-inline-size: min-content`
+   de serie, así que se niega a encoger por debajo de su contenido y desborda
+   cualquier rejilla estrecha que lo contenga. */
+fieldset { border: 0; min-width: 0; }
+legend { padding: 0; }
+
+a { color: inherit; }
+
+::selection { background: var(--brasa); color: var(--brasa-tinta); }
+
+/* --------------------------------------------------------------------------
+   TIPOGRAFÍA
+   -------------------------------------------------------------------------- */
+h1, h2, h3, h4 { font-weight: var(--fw-bold); line-height: var(--lh-h2); }
+
+.t-display {
+  font-size: var(--fs-display);
+  font-weight: var(--fw-bold);
+  line-height: var(--lh-display);
+  letter-spacing: var(--track-display);
+}
+
+h1, .t-h1 {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-display);
+  letter-spacing: -.015em;
+}
+
+h2, .t-h2 { font-size: var(--fs-h2); letter-spacing: -.01em; }
+
+h3, .t-h3 { font-size: var(--fs-h3); font-weight: var(--fw-semibold); }
+
+.t-body { font-size: var(--fs-body); line-height: var(--lh-body); }
+.t-body-sm { font-size: var(--fs-body-sm); line-height: var(--lh-body); }
+
+/* caption / meta: la etiqueta pequeña en mayúsculas del sistema */
+.t-caption {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.t-caption-sm { font-size: var(--fs-micro); }
+
+.t-dim { color: var(--ceniza); }
+
+/* mono: SOLO datos — monedas, estadísticas, contadores, timestamps.
+   Nunca texto editorial. */
+.mono {
+  font-family: var(--tipo-display);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* --------------------------------------------------------------------------
+   FOCO VISIBLE — no negociable, consistente en todo elemento interactivo
+   (WCAG 2.2 SC 2.4.11 / 2.4.13)
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--brasa-alta);
+  outline-offset: 3px;
+  border-radius: var(--r-chip);
+}
+
+/* quitamos el outline por defecto solo cuando NO es navegación por teclado */
+:focus:not(:focus-visible) { outline: none; }
+
+/* enlace de salto: primer tabulable de cada página */
+.skip-link {
+  position: absolute;
+  top: var(--e-2);
+  left: var(--e-2);
+  z-index: calc(var(--z-toast) + 1);
+  padding: var(--e-3) var(--e-4);
+  border-radius: var(--r-chip);
+  background: var(--brasa);
+  color: var(--brasa-tinta);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  transform: translateY(-150%);
+  transition: transform var(--t-toque) var(--curva);
+}
+.skip-link:focus-visible { transform: translateY(0); }
+
+/* solo para lectores de pantalla */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+   MOVIMIENTO REDUCIDO
+   Cubre también las ceremonias de sobre y duelo: las clases de ceremonia
+   consultan este mismo criterio, no tienen excepción propia.
+   -------------------------------------------------------------------------- */
+:root[data-motion="reduce"], :root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+/* --------------------------------------------------------------------------
+   LAYOUT DE PÁGINA
+   -------------------------------------------------------------------------- */
+.wrap {
+  width: 100%;
+  max-width: var(--wrap);
+  margin-inline: auto;
+  padding-inline: var(--canal);
+}
+
+/* sección estándar: aire vertical entre bloques */
+.seccion { padding-block: var(--e-7); }
+@media (min-width: 1024px) { .seccion { padding-block: var(--e-8); } }
+
+/* grid de página: 1 / 8 / 12 columnas según breakpoint */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  gap: var(--gap);
+}
+
+/* min-width:0 es necesario para cuando .stack actúa como hijo de un grid o
+   flex ajeno (p. ej. la columna de .con-filtros): sin él, contenido interno
+   que no puede encogerse (un flex row sin wrap más abajo) hace crecer el
+   .stack entero más allá de su columna asignada, y con él se lleva a toda
+   la página a desbordar. Mismo patrón que .rz-texto, .partido-nombre, etc. */
+.stack { display: flex; flex-direction: column; min-width: 0; }
+.stack-2 { gap: var(--e-2); }
+.stack-3 { gap: var(--e-3); }
+.stack-4 { gap: var(--e-4); }
+.stack-5 { gap: var(--e-5); }
+.stack-6 { gap: var(--e-6); }
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  flex-wrap: wrap;
+}
+.fila-entre { justify-content: space-between; }
+
+/* cabecera de sección: título a la izquierda, acción a la derecha */
+.seccion-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--e-4);
+  margin-bottom: var(--e-6);
+}
+.seccion-tag {
+  display: block;
+  margin-bottom: var(--e-2);
+  color: var(--brasa-alta);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+/* separador */
+.hr { height: 1px; background: var(--linea); border: 0; }
+
+/* --------------------------------------------------------------------------
+   REVELADO AL SCROLL — decorativo y discreto (principio 4)
+   -------------------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--t-estado) var(--curva), transform var(--t-estado) var(--curva);
+}
+.reveal.in { opacity: 1; transform: none; }
+
+:root[data-motion="reduce"] .reveal { opacity: 1; transform: none; }

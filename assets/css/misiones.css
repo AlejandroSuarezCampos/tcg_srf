@@ -1,0 +1,89 @@
+/* ==========================================================================
+   OBJETIVOS — pestañas y tarjetas de misión
+   --------------------------------------------------------------------------
+   Extraído de layout.css en el bloque 7d. Se carga con `$cssExtra` solo en las
+   pantallas que lo usan, no en las trece.
+   ========================================================================== */
+
+   MISIONES (misiones.php) — las pestañas (diarias/semanales/objetivos) son
+   `.tabs`/`.tab-panel` del sistema real (perfil.php ya las usa igual); las
+   tarjetas son `.panel`, `.pastilla` y `.progreso`. Lo único propio de esta
+   página es la insignia de cuenta atrás.
+   ========================================================================== */
+.mision-cuenta-atras {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-pill);
+  color: var(--ceniza);
+  font-size: var(--fs-micro);
+}
+.mision-cuenta-atras .ph-hourglass { color: var(--brasa-alta); }
+.mision-cuenta-atras-valor { color: var(--hueso); }
+
+/* --------------------------------------------------------------------------
+   DIFICULTADES DE TODA LA CADENA (editor de nodos, migración `043`)
+
+   Una fila por dificultad con su interruptor y, al lado, en cuántos partidos
+   está encendida. Ese contador no es decoración: el estado puede estar A
+   MEDIAS —alguien apagó el Extremo solo en dos nodos— y un interruptor que
+   dijera "encendido" sobre siete de nueve estaría mintiendo.
+   -------------------------------------------------------------------------- */
+.dificultades-cadena {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--e-2);
+  margin-top: var(--e-3);
+}
+
+/* --------------------------------------------------------------------------
+   TRAMPAS DEL RIVAL, PARA TODA LA CADENA
+   Una fila por dificultad, con los dos desplegables de tres estados. Mismo
+   aspecto que el bloque de dificultades de arriba: son hermanos y se leen
+   seguidos.
+   -------------------------------------------------------------------------- */
+.trampas-cadena {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  margin-top: var(--e-3);
+}
+.trampa-fila {
+  display: grid;
+  /* La dificultad manda a la izquierda y los dos controles reparten el resto.
+     `min()` en el minmax porque este bloque vive dentro de un modal, que en un
+     portátil no es ancho: sin él la rejilla desborda y saca scroll lateral. */
+  grid-template-columns: minmax(90px, 130px) repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+}
+.trampa-dif { font-weight: var(--fw-semibold); }
+.trampa-campo {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+.trampa-nombre { font-size: var(--fs-label); color: var(--ceniza); white-space: nowrap; }
+.trampa-campo select { min-width: 92px; }
+.dificultad-cadena {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  min-height: 44px;
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-chip);
+  background: var(--pozo);
+  cursor: pointer;
+}
+.dificultad-cadena:hover { border-color: var(--linea-viva); }
+.dificultad-cadena-nombre { flex: 1; font-weight: var(--fw-semibold); }
+

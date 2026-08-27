@@ -1,0 +1,333 @@
+# Endurecimiento básico del servidor para este proyecto (no toca el php.ini global).
+
+# ⚠️ LA PORTADA ES landing.php, NO index.php.
+# Sin esta línea Apache busca index.php / index.html, no encuentra ninguno, y
+# como el listado de directorios está desactivado responde
+# "Forbidden. You don't have permission to access this resource" en la raíz
+# del dominio — que es justo lo que pasaba en tcgfrontier.es. La regla de
+# RewriteRule de más abajo hace lo mismo, pero solo si mod_rewrite está
+# activo; DirectoryIndex no depende de ningún módulo, así que es la que de
+# verdad sostiene la portada.
+DirectoryIndex landing.php index.php index.html
+
+# No listar el contenido de carpetas sin index (db/, db/pruebas/, assets/, .claude/...)
+Options -Indexes
+
+# Ruta desde la raíz del dominio. En producción el proyecto ES la raíz, así que
+# es /404.php. (Apache no admite rutas relativas aquí: sin la barra inicial se
+# toma como texto literal y se manda tal cual al navegador.)
+# ⚠️ En producción el proyecto ES la raíz del dominio, así que la ruta correcta
+# es /404.php. En una instalación de desarrollo bajo subcarpeta (XAMPP,
+# /tcg_srf/) esa ruta no existe y Apache enseña su 404 genérico: es cosmético,
+# no rompe nada. Apache no admite rutas relativas en esta directiva.
+ErrorDocument 404 /404.php
+
+# ============================================================================
+# MOD_REWRITE
+#
+# ⚠️ EL ORDEN DE ESTE BLOQUE ES EL DE PRODUCCIÓN, NO SE REORDENA A OJO.
+# Cinco reglas, en este orden exacto: bloquear ocultos → forzar HTTPS → sacar
+# el .php de la URL → volver a meterlo por dentro → la portada. Cambiar el
+# orden puede reintroducir el bucle que THE_REQUEST evita en la tercera regla,
+# y bajar la de HTTPS dejaría un salto intermedio en claro (ver su comentario).
+# ============================================================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ------------------------------------------------------------------------
+    # BLOQUEAR ARCHIVOS Y CARPETAS OCULTAS
+    # ------------------------------------------------------------------------
+    # Bloquea cualquier archivo dentro de .git/ (o cualquier otra carpeta oculta
+    # tipo .xxx, incluida .claude/). Sin esto, aunque el listado de directorio
+    # esté desactivado, .git/HEAD, .git/config, .git/index, etc. se pueden pedir
+    # uno a uno por su nombre exacto y reconstruir el repositorio entero con
+    # git-dumper.
+    RewriteRule "(^|/)\." - [F]
+
+    # ------------------------------------------------------------------------
+    # FORZAR HTTPS
+    # ------------------------------------------------------------------------
+    # Sin esto, quien escribe el dominio a pelo en el navegador (que es lo
+    # normal: nadie teclea "https://") se quedaba en http para siempre, con la
+    # cookie de sesión viajando en claro en cada petición.
+    #
+    # Va ANTES de la regla del .php. Una URL vieja con .php pedida por http
+    # gasta dos redirecciones de todas formas (a https, y luego a quitarle el
+    # .php); lo que decide el orden es POR DÓNDE va el salto intermedio. Con
+    # esta regla primero, la única petición en claro es la primera. Al revés,
+    # el navegador daría un segundo viaje en claro —con la cookie de sesión
+    # dentro— antes de llegar a https.
+    #
+    # Las tres condiciones, y por qué hacen falta las tres:
+    #
+    #  1. `%{HTTPS} !=on` — lo evidente: si ya viene por HTTPS, no tocar nada.
+    #     Sin ella la regla se redirige a sí misma sin parar.
+    #
+    #  2. `%{HTTP:X-Forwarded-Proto} !=https` — en un hosting compartido el TLS
+    #     suele terminar en un balanceador que habla con Apache por HTTP. Ahí
+    #     `%{HTTPS}` vale "off" AUNQUE el visitante venga por HTTPS, y con solo
+    #     la condición 1 el sitio entraría en un bucle de redirecciones
+    #     ("ERR_TOO_MANY_REDIRECTS") en cuanto se despliegue detrás de uno.
+    #
+    #  3. `%{HTTP_HOST} !^(localhost|127.0.0.1)` — la máquina de desarrollo
+    #     (XAMPP) sirve por http y sin certificado; sin esta línea, abrir
+    #     http://localhost/tcg_srf/ mandaría a https://localhost/tcg_srf/ y
+    #     dejaría el proyecto inaccesible en local. El MISMO fichero tiene que
+    #     valer en las dos máquinas, igual que `db/conexion.php`.
+    #
+    # `NE` para no volver a escapar lo que REQUEST_URI ya trae escapado (un
+    # nombre con espacios o acentos se convertiría en %2520). La cadena de
+    # consulta la conserva Apache sola: la sustitución no lleva "?".
+    RewriteCond %{HTTPS}                    !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto}   !=https
+    RewriteCond %{HTTP_HOST}                !^(localhost|127\.0\.0\.1)(:[0-9]+)?$ [NC]
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L,NE]
+
+    # ------------------------------------------------------------------------
+    # UN SOLO HOST: SIN WWW
+    # ------------------------------------------------------------------------
+    # Antes de esto, tcgfrontier.es y www.tcgfrontier.es respondían LAS DOS con
+    # 200 y exactamente el mismo contenido (comprobado: mismo md5 de la portada
+    # una vez descontado el token CSRF, que es lo único que cambia entre
+    # peticiones). Con la regla de HTTPS de arriba eso son cuatro versiones de
+    # cada página —http/https × con/sin www—, y ninguna decía cuál era la
+    # buena.
+    #
+    # Para un buscador eso no es "el mismo sitio": son cuatro sitios que se
+    # copian entre ellos, y los enlaces que lleguen a uno no cuentan para los
+    # otros. El canónico elegido es SIN www, que es el que usan el resto de la
+    # documentación del proyecto y las URL del JSON-LD (partials/seo.php).
+    #
+    # Va DESPUÉS de la de HTTPS para que quien llegue a http://www.… acabe en
+    # https://sin-www con dos saltos como mucho, y el intermedio ya sea seguro.
+    RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L,NE]
+
+    # ------------------------------------------------------------------------
+    # OCULTAR .PHP DE LAS URL
+    # ------------------------------------------------------------------------
+    # Si alguien accede directamente a /login.php, /perfil.php, /plantilla.php…
+    # redirige (301, permanente) a /login, /perfil, /plantilla — sin extensión.
+    #
+    # THE_REQUEST (la línea de petición cruda que mandó el navegador) y no
+    # REQUEST_URI: evita que esta regla entre en bucle cuando la regla de abajo
+    # reescribe /login -> login.php por dentro. Si mirara REQUEST_URI después
+    # de esa reescritura interna, vería otra vez ".php" y se redirigiría a sí
+    # misma sin parar.
+    RewriteCond %{THE_REQUEST} \s/+(.+?)\.php(?:[\s?]|$) [NC]
+    # El destino se saca de %1 (la ruta tal cual la pidió el navegador, ya sin
+    # ".php") y NO de $1 (la ruta relativa a esta carpeta). Con $1 la redirección
+    # apuntaba al dominio raíz: en producción da igual —el proyecto ES la raíz—
+    # pero en una instalación bajo subcarpeta (XAMPP: /tcg_srf/) mandaba /landing
+    # en vez de /tcg_srf/landing y todo caía en 404. %1 ya trae la subcarpeta
+    # cuando la hay, así que la misma línea vale para las dos máquinas.
+    RewriteRule \.php$ /%1 [R=301,L,NE]
+
+    # ------------------------------------------------------------------------
+    # FICHAS DE CARTA — /carta/tom-skipper
+    # ------------------------------------------------------------------------
+    # 460 páginas servidas por un solo carta.php. Va ANTES de la regla genérica
+    # de abajo porque esa exige que exista un fichero con ese nombre
+    # (`%{REQUEST_FILENAME}.php -f`), y aquí no lo hay: `carta/tom-skipper` no
+    # es ningún fichero, es un parámetro.
+    #
+    # El segmento se acepta ENTERO ([^/]+) y quien decide es PHP.
+    # Acotarlo aquí a [a-z0-9-] parecía más limpio y era un bug: un slug con
+    # mayúsculas (/carta/MAYUS) no encajaba, caía a la regla genérica de abajo,
+    # y como carta.php SÍ existe Apache entraba en bucle de redirección interna
+    # y respondía 500 en vez de 404. Cualquier enlace mal copiado tiraba la
+    # página con un error de servidor.
+    # Ahora todo llega a carta.php, que normaliza y responde 404 o redirige a la
+    # forma canónica.
+    # QSA para no perder la cadena de consulta si algún día hace falta.
+    RewriteRule ^carta/([^/]+)/?$ carta.php?slug=$1 [L,QSA]
+
+    # ------------------------------------------------------------------------
+    # SERVIR ARCHIVOS PHP SIN MOSTRAR .PHP
+    # ------------------------------------------------------------------------
+    # /login -> internamente sirve login.php, pero la URL del navegador se
+    # queda en /login. Es el complemento de la regla de arriba: una saca el
+    # .php hacia fuera (lo que ve el visitante), esta lo mete hacia dentro (lo
+    # que ejecuta Apache).
+    #
+    # !-d evita interferir con directorios reales (p. ej. /panel/).
+    # .php -f comprueba que el fichero exista de verdad antes de reescribir;
+    # si no existe, la petición sigue su curso normal y acaba en el 404.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+?)/?$ $1.php [L]
+
+    # ------------------------------------------------------------------------
+    # PORTADA
+    # ------------------------------------------------------------------------
+    # Si piden la raíz del sitio, servir landing.php sin cambiar la URL
+    # visible. Va AL FINAL a propósito: para "/" (cadena vacía) la regla de
+    # arriba no encuentra ningún fichero que reescribir ("".php no existe), así
+    # que esta es la que de verdad resuelve la portada dentro de mod_rewrite.
+    RewriteRule ^$ landing.php [L]
+</IfModule>
+# ============================================================================
+# RENDIMIENTO
+#
+# Aquí no había NADA de esto, y era el motivo principal de que el sitio fuera
+# lento: cada página se llevaba 269 KB de CSS propia SIN COMPRIMIR y sin una
+# sola cabecera de caché, así que el navegador volvía a pedirlo todo en cada
+# navegación. Comprimido son unos 40 KB, y con caché son cero a partir de la
+# segunda página.
+# ============================================================================
+
+# ---- TIPOS MIME ----
+# ⚠️ Sin esto, un Apache que no conozca `.woff2` lo sirve como
+# `application/octet-stream`. Los navegadores modernos lo aceptan igual porque
+# el `format("woff2")` del CSS manda, pero la regla `ExpiresByType font/woff2`
+# de más abajo NO se aplicaría y las fuentes de iconos se revalidarían en cada
+# navegación. Declararlo cuesta una línea.
+<IfModule mod_mime.c>
+    AddType font/woff2 .woff2
+    AddType image/webp .webp
+</IfModule>
+
+# ---- COMPRESIÓN ----
+# Solo texto: las imágenes (webp/png/jpg) y las fuentes woff2 ya vienen
+# comprimidas y volver a pasarlas por gzip gasta CPU para no ganar nada.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript text/javascript
+    AddOutputFilterByType DEFLATE application/json application/xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+# Brotli si el servidor lo trae: comprime ~15 % mejor que gzip en texto.
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/css application/javascript text/javascript application/json image/svg+xml
+</IfModule>
+
+# ---- CACHÉ DE ESTÁTICOS ----
+#
+# ⚠️ UN AÑO EN CSS Y JS NO ES UNA IMPRUDENCIA: `assetUrl()` (partials/assets.php)
+#    les pega `?v=<filemtime>` a todos, así que al cambiar un fichero cambia su
+#    URL y el navegador se lo baja igualmente. La caché larga solo afecta a lo
+#    que NO ha cambiado, que es de lo que se trata.
+#
+#    El HTML se queda FUERA a propósito: es lo único que no lleva versión en la
+#    URL, y cachearlo dejaría a la gente viendo una página vieja con monedas y
+#    cartas que ya no son las suyas.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css                 "access plus 1 year"
+    ExpiresByType application/javascript   "access plus 1 year"
+    ExpiresByType text/javascript          "access plus 1 year"
+    ExpiresByType font/woff2               "access plus 1 year"
+    ExpiresByType image/webp               "access plus 6 months"
+    ExpiresByType image/png                "access plus 6 months"
+    ExpiresByType image/jpeg               "access plus 6 months"
+    ExpiresByType image/svg+xml            "access plus 6 months"
+    ExpiresByType image/x-icon             "access plus 6 months"
+    # NO hay ExpiresDefault, y es a propósito.
+    # `ExpiresDefault` es un cajón de sastre que alcanza TAMBIÉN al text/html —el
+    # comentario que había aquí decía lo contrario, pero mod_expires no exceptúa
+    # nada por su cuenta—. El resultado era una cabecera con dos valores pegados,
+    # `Cache-Control: public, max-age=300, max-age=3600`, porque mod_expires
+    # añadía el suyo al que ya había puesto PHP.
+    # Cada tipo estático tiene su línea arriba; del HTML se encarga PHP, que es
+    # el único que sabe si la página lleva sesión dentro.
+</IfModule>
+
+<IfModule mod_headers.c>
+    # `immutable` le ahorra al navegador hasta la petición de revalidación
+    # cuando la persona recarga: sin él, un F5 manda un If-None-Match por cada
+    # estático y se comen 30 viajes de ida y vuelta para recibir 30 "sigue
+    # igual". Es seguro por lo mismo de arriba: la URL lleva la versión.
+    <FilesMatch "\.(css|js|woff2)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+    <FilesMatch "\.(webp|png|jpe?g|svg|ico)$">
+        Header set Cache-Control "public, max-age=15552000"
+    </FilesMatch>
+    # El HTML de las pantallas con sesión no se guarda: lleva el saldo, el mazo
+    # y el estado del duelo.
+    #
+    # `setifempty` y no `set`: PHP ya manda su propia Cache-Control en cuanto
+    # se abre una sesión, y con `set` esta línea la PISABA — incluida la de la
+    # portada y el catálogo, que sin sesión no llevan ningún dato personal y sí
+    # pueden cachearse unos minutos (partials/seo.php, seoCachePublica()).
+    # Con `setifempty` manda PHP, que es quien sabe si hay sesión, y esta regla
+    # solo actúa de red por si alguna página no dijera nada.
+    <FilesMatch "\.php$">
+        Header setifempty Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+
+# ============================================================================
+# CONFIGURACIÓN PHP
+# ============================================================================
+<IfModule mod_php.c>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
+<IfModule php_module>
+    php_flag session.cookie_httponly On
+    php_value session.cookie_samesite Lax
+    php_flag display_errors Off
+</IfModule>
+
+# ============================================================================
+# FICHEROS QUE NO SON DEL SITIO
+#
+# Aquí no había nada y se podían descargar tal cual, sin sesión:
+#   /db/tcg.sql                  → el volcado ENTERO de la base de datos (500 KB)
+#   /db/actualizar_produccion.sql y /db/migraciones/*.sql
+#   /branding/CLAUDE.md          → 292 KB de documentación interna
+#   /db/conexion.php.example     → la forma de las credenciales
+# Ninguno se pide nunca desde el navegador: los .sql se aplican por consola y
+# los .md se leen en el editor.
+# ============================================================================
+<FilesMatch "\.(sql|md|log|example|docx|xlsx|csv|ini|bak)$">
+    Require all denied
+</FilesMatch>
+
+# ============================================================================
+# CABECERAS DE SEGURIDAD
+#
+# Aquí no había NINGUNA. La auditoría del 2026-08-26 comprobó que la respuesta
+# no traía ni HSTS, ni nosniff, ni CSP, ni X-Frame-Options, ni Referrer-Policy.
+#
+# ⚠️ HSTS NO ESTÁ AQUÍ, Y ES A PROPÓSITO. Es la única de estas cabeceras que no
+#    se puede deshacer: el navegador se la guarda durante meses y a partir de
+#    ahí se NIEGA a hablar con el dominio por http, aunque el certificado
+#    caduque o haya que revertir algo. Se añade cuando la redirección a HTTPS
+#    lleve unos días funcionando sin sorpresas, no el mismo día. La línea está
+#    escrita al final, comentada, para no tener que buscarla entonces.
+# ============================================================================
+<IfModule mod_headers.c>
+    # El navegador respeta el Content-Type que enviamos en vez de adivinarlo
+    # mirando los primeros bytes. Sin esto, un fichero subido por un usuario que
+    # "parezca" HTML puede acabar ejecutándose como HTML — y este sitio permite
+    # subir imágenes de perfil y escudos.
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Nadie puede meter el sitio en un iframe. Aquí no hay ningún widget que se
+    # embeba en otra página, así que no se pierde nada, y cierra el clickjacking
+    # sobre los botones de comprar, apostar y descartar.
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # Al salir hacia Discord, Instagram o X se manda el dominio, no la URL
+    # completa. Que un enlace saliente revele /duelo?id=1234 no aporta nada.
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # El sitio no usa cámara, micrófono, ubicación ni pagos. Declararlo impide
+    # que lo haga nada que se cuele en la página.
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+    # CSP en modo INFORME, no bloqueo. El sitio tiene JavaScript en línea (el
+    # motor de movimiento del <head>, el JSON de formaciones de mazos.php, los
+    # bloques JSON-LD), así que una CSP estricta lo rompería entero el primer
+    # día. Con Report-Only las violaciones se ven en la consola del navegador y
+    # no se rompe nada; cuando esté claro qué hace falta, se convierte en
+    # Content-Security-Policy a secas.
+    Header always set Content-Security-Policy-Report-Only "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+
+    # Cuando la redirección a HTTPS lleve unos días sin dar problemas,
+    # descomenta esta línea. Antes no.
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>

@@ -1,0 +1,331 @@
+/* ==========================================================================
+   PANTALLA: HOY
+   --------------------------------------------------------------------------
+   Primera hoja POR PANTALLA del sistema Ascua, y el patrón que sustituye a las
+   tres monolíticas: se carga con `$cssExtra` solo donde hace falta, en vez de
+   servir las reglas de las diecisiete pantallas en cada carga.
+
+   Móvil primero. Todo lo de aquí se escribe para 360 px y se AÑADE hacia
+   arriba con `min-width`; no hay una sola regla en `max-width`.
+   ========================================================================== */
+
+/* ==========================================================================
+   MARCADOR
+   ========================================================================== */
+.hoy-marcador {
+  position: relative;
+  overflow: hidden;
+  padding-block: var(--e-7) var(--e-6);
+  border-bottom: 1px solid var(--linea);
+}
+.hoy-marcador-cuerpo { position: relative; }
+
+.hoy-saludo {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  letter-spacing: var(--track-h1);
+  text-transform: uppercase;
+  margin: var(--e-2) 0 var(--e-6);
+  /* Un nombre de usuario puede ser una palabra larguísima de una tirada. Sin
+     esto no cabe en 360 px, no parte por ningún sitio y ESTIRA el contenedor,
+     sacándole scroll lateral a la página entera. */
+  overflow-wrap: anywhere;
+}
+
+.hoy-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--e-3);
+  margin: 0 0 var(--e-5);
+}
+.hoy-cifra { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.hoy-cifra dt { margin: 0; }
+.hoy-cifra dd { margin: 0; }
+.hoy-cifra .cif {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: clamp(1.5rem, 1.1rem + 1.8vw, 2.25rem);
+  line-height: .95;
+  letter-spacing: -.03em;
+  color: var(--hueso);
+  font-variant-numeric: tabular-nums;
+}
+/* .rot vive en ascua.css: la usan también landing.php y partials/cabecera.php,
+   y aquí solo se definía por accidente de origen, dejando sin estilo a las
+   ocho pantallas que no cargan esta hoja. */
+.hoy-progreso { max-width: 520px; }
+.hoy-progreso-pie { margin-top: var(--e-2); }
+
+/* ==========================================================================
+   LO SIGUIENTE
+   La ÚNICA tarjeta de la pantalla con halo y filo. Si dos cosas gritan, no
+   grita ninguna.
+   ========================================================================== */
+.hoy-seccion { padding-block: var(--e-6); }
+
+.siguiente {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--e-3) var(--e-4);
+  padding: var(--e-5);
+  border: 1px solid var(--brasa-borde);
+  border-radius: var(--r-panel);
+  background: var(--carbon);
+  box-shadow: var(--halo);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: transform var(--t-toque) var(--curva),
+              box-shadow var(--t-toque) var(--curva);
+}
+@media (hover: hover) {
+  .siguiente:hover { transform: translateY(-3px); box-shadow: var(--halo), var(--elev-2); }
+}
+.siguiente:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.siguiente-ico {
+  display: grid; place-items: center;
+  width: 48px; height: 48px; flex: none;
+  border-radius: var(--r-chip);
+  background: var(--brasa-velo);
+  color: var(--brasa-alta);
+  font-size: 24px;
+}
+.siguiente-cuerpo { display: flex; flex-direction: column; gap: var(--e-2); min-width: 0; }
+.siguiente-rotulo { color: var(--brasa-alta); }
+.siguiente-titulo {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  line-height: 1.15;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.siguiente-texto { font-size: var(--fs-body-sm); color: var(--ceniza); }
+
+.siguiente-accion {
+  grid-column: 1 / -1;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2);
+  min-height: 44px;
+  padding-inline: var(--e-5);
+  border-radius: var(--r-pill);
+  background: var(--fuego);
+  color: var(--brasa-tinta);
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body-sm);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* El tono lo marca la urgencia REAL, no la decoración: rojo si hay un partido
+   corriendo sin ti, verde si tienes algo cobrado que reclamar, amarillo si te
+   falta un paso. El icono y el rótulo dicen lo mismo que el color, así que
+   nadie tiene que distinguir verde de rojo para entenderlo. */
+.siguiente.es-roja     { border-color: var(--roja-borde); box-shadow: 0 0 0 1px var(--roja-borde), 0 18px 50px -22px rgba(255,68,56,.45); }
+.siguiente.es-roja     .siguiente-ico { background: var(--roja-velo);     color: var(--roja-txt); }
+.siguiente.es-roja     .siguiente-rotulo { color: var(--roja-txt); }
+.siguiente.es-roja::before { background: linear-gradient(90deg, var(--roja), var(--brasa-honda)); }
+
+.siguiente.es-cesped   { border-color: var(--cesped-borde); box-shadow: 0 0 0 1px var(--cesped-borde), 0 18px 50px -22px rgba(47,217,126,.4); }
+.siguiente.es-cesped   .siguiente-ico { background: var(--cesped-velo);   color: var(--cesped-txt); }
+.siguiente.es-cesped   .siguiente-rotulo { color: var(--cesped-txt); }
+.siguiente.es-cesped::before { background: linear-gradient(90deg, var(--cesped), var(--var)); }
+
+.siguiente.es-amarilla { border-color: var(--amarilla-borde); box-shadow: 0 0 0 1px var(--amarilla-borde), 0 18px 50px -22px rgba(255,197,61,.4); }
+.siguiente.es-amarilla .siguiente-ico { background: var(--amarilla-velo); color: var(--amarilla-txt); }
+.siguiente.es-amarilla .siguiente-rotulo { color: var(--amarilla-txt); }
+.siguiente.es-amarilla::before { background: linear-gradient(90deg, var(--amarilla), var(--brasa)); }
+
+/* ==========================================================================
+   CABECERAS DE SECCIÓN
+   ========================================================================== */
+.hoy-titulo {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  letter-spacing: var(--track-h2);
+  text-transform: uppercase;
+  margin: 0 0 var(--e-4);
+}
+.hoy-cabecera {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--e-4); flex-wrap: wrap;
+  margin-bottom: var(--e-4);
+}
+.hoy-cabecera .hoy-titulo { margin: 0; }
+.hoy-mas {
+  display: inline-flex; align-items: center; gap: var(--e-2);
+  min-height: 44px;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--brasa-alta);
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (hover: hover) { .hoy-mas:hover { color: var(--hueso); } }
+.hoy-mas:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+/* ==========================================================================
+   BENTO
+   Cuatro celdas del mismo tamaño; la jerarquía la pone el relleno, no el
+   ancho (ver .hoy-celda--destacada más abajo).
+   ========================================================================== */
+.hoy-bento {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--e-3);
+}
+.hoy-celda {
+  display: flex; flex-direction: column; justify-content: space-between;
+  gap: var(--e-5);
+  min-height: 132px;
+  padding: var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  box-shadow: var(--elev-1);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: transform var(--t-toque) var(--curva),
+              border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) {
+  .hoy-celda:hover { transform: translateY(-3px); border-color: var(--linea-viva); }
+}
+.hoy-celda:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 3px; }
+
+.hoy-celda-alto { display: flex; align-items: center; gap: var(--e-2); color: var(--ceniza); }
+.hoy-celda-alto i { font-size: 20px; color: var(--brasa-alta); }
+.hoy-celda-bajo { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.hoy-celda .cif {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: 2rem;
+  line-height: .9;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+.hoy-celda-pie { font-size: var(--fs-body-sm); color: var(--ceniza); overflow-wrap: anywhere; }
+
+/* SOBRES DESTACADO POR TRATAMIENTO, NO POR TAMAÑO.
+   Empezó ocupando dos columnas, y con cuatro celdas en una rejilla de dos eso
+   deja un hueco vacío en la última fila (Sobres / Duelos+Objetivos / Cadenas y
+   un agujero al lado). Alargar también la última celda tapaba el agujero pero
+   dejaba el bloque sin jerarquía ninguna.
+   Se destaca con el relleno de brasa: es lo que más engancha de un TCG y se ve
+   al instante, sin romper la rejilla ni pelearse con el número de celdas. */
+.hoy-celda--destacada {
+  background: var(--fuego);
+  border-color: transparent;
+  color: var(--brasa-tinta);
+}
+.hoy-celda--destacada .rot,
+.hoy-celda--destacada .hoy-celda-pie { color: rgba(20, 6, 0, .68); }
+.hoy-celda--destacada .hoy-celda-alto i,
+.hoy-celda--destacada .cif { color: var(--brasa-tinta); }
+@media (hover: hover) {
+  .hoy-celda--destacada:hover { border-color: transparent; box-shadow: var(--halo); }
+}
+
+/* ==========================================================================
+   TIRA DE CARTAS
+   Desplazamiento horizontal y no rejilla: en móvil ocho cartas apiladas echan
+   fuera de pantalla todo lo que viene después, y esto es un vistazo, no la
+   pantalla de colección.
+   ========================================================================== */
+.hoy-tira-cartas {
+  display: flex;
+  gap: var(--e-3);
+  margin: 0;
+  padding: 0 var(--canal) var(--e-2);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  /* se sale del `.wrap` a los lados para que las cartas mueran en el canto de
+     la pantalla y se vea que hay más */
+  margin-inline: calc(var(--canal) * -1);
+  scrollbar-width: thin;
+}
+.hoy-tira-cartas > li {
+  flex: 0 0 148px;
+  scroll-snap-align: start;
+}
+@media (min-width: 768px) { .hoy-tira-cartas > li { flex-basis: 176px; } }
+
+/* ==========================================================================
+   MOVIMIENTO EN LA LIGA
+   ========================================================================== */
+.hoy-mercado { display: flex; flex-direction: column; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+
+.hoy-anuncio {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--e-2) var(--e-3);
+  min-height: 56px;
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+  color: var(--hueso);
+  text-decoration: none;
+  transition: border-color var(--t-toque) var(--curva);
+}
+@media (hover: hover) { .hoy-anuncio:hover { border-color: var(--linea-viva); } }
+.hoy-anuncio:focus-visible { outline: 2px solid var(--brasa-alta); outline-offset: 2px; }
+
+.hoy-anuncio-rz { grid-row: span 2; }
+.hoy-anuncio-carta {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body);
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+.hoy-anuncio-quien {
+  grid-column: 2;
+  font-size: var(--fs-body-sm);
+  color: var(--ceniza);
+  overflow-wrap: anywhere;
+}
+.hoy-anuncio-precio {
+  grid-row: span 2;
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-body);
+  color: var(--brasa-alta);
+  white-space: nowrap;
+}
+.hoy-anuncio-precio::after { content: ' ◈'; font-size: .78em; opacity: .75; }
+
+/* ==========================================================================
+   ESCRITORIO
+   ========================================================================== */
+@media (min-width: 768px) {
+  .hoy-bento { grid-template-columns: repeat(4, 1fr); }
+
+  .siguiente {
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--e-5);
+    padding: var(--e-5) var(--e-6);
+  }
+  .siguiente-accion { grid-column: auto; }
+
+  .hoy-cifras { max-width: 560px; gap: var(--e-6); }
+  .hoy-mercado { display: grid; grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .hoy-marcador { padding-block: var(--e-9) var(--e-7); }
+  .hoy-seccion { padding-block: var(--e-7); }
+  .hoy-celda { min-height: 152px; padding: var(--e-5); }
+  .hoy-mercado { grid-template-columns: repeat(4, 1fr); }
+  .hoy-anuncio { grid-template-columns: 1fr; align-items: start; min-height: 116px; }
+  .hoy-anuncio-rz, .hoy-anuncio-precio { grid-row: auto; }
+  .hoy-anuncio-quien { grid-column: auto; }
+}

@@ -1,0 +1,49 @@
+# Superliga Frontier TCG
+
+> Juego de cartas coleccionables fan-made y gratuito basado en la Superliga
+> Frontier, una liga de creadores de contenido de Inazuma Eleven: Victory Road.
+> Fichas de jugadores reales de la comunidad, siete rarezas, formaciones y
+> duelos contra otras personas o contra la máquina.
+
+Superliga Frontier TCG es un proyecto de aficionados: no es oficial y no está
+afiliado a Level-5. Se juega en el navegador y es gratis de principio a fin — no
+hay compras, ni suscripción, ni publicidad. La cuenta solo pide un nombre y una
+contraseña, y el primer sobre de once jugadores lo regala el juego.
+
+Cada carta corresponde a una persona real de la Superliga Frontier —jugador,
+presidente, entrenador o escudo de equipo— con su ilustración, su equipo, su
+posición y sus estadísticas de ataque, defensa y técnica. También hay cartas de
+personajes del Inazuma Eleven original.
+
+El bucle del juego son tres pasos: abrir sobres para conseguir cartas, montar
+una alineación de once con una formación, y competir. Se compite de dos formas:
+duelos contra otras personas, donde se apuestan cartas o monedas del juego, y
+cadenas de partidos contra rivales controlados por la máquina. Hay además un
+mercado interno para comprar y vender cartas con monedas del propio juego, que
+no tienen valor económico real, un sistema de intercambios para cambiar cartas
+por cartas directamente con otra persona o mediante un tablón de anuncios, y
+misiones que se renuevan.
+
+## Páginas
+
+- [Portada](https://tcgfrontier.es/): qué es el juego, cómo se juega en tres
+  pasos y las siete rarezas con sus probabilidades reales.
+- [Catálogo completo](https://tcgfrontier.es/plantilla): todas las fichas del
+  juego, agrupadas por expansión, con equipo, posición y rareza. Se consulta sin
+  registrarse.
+- [Qué es este proyecto](https://tcgfrontier.es/quienes-somos): quién está
+  detrás, por qué es fan-made y cómo pedir que se retire una carta.
+
+## Legal
+
+- [Aviso legal](https://tcgfrontier.es/legal)
+- [Privacidad](https://tcgfrontier.es/privacidad): qué datos se guardan (nombre
+  de usuario y contraseña cifrada, nada más) y cómo borrarlos.
+
+## Comunidad
+
+- [Superliga Frontier](https://superligafrontier.es/): la liga de la que sale
+  todo el contenido del juego.
+- [Discord](https://discord.gg/KgEBHA87fF)
+- [Instagram](https://www.instagram.com/superligafrontier/)
+- [X](https://x.com/supligafrontier)

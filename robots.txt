@@ -1,0 +1,80 @@
+# Superliga Frontier TCG — https://tcgfrontier.es
+#
+# Antes no existía este fichero. Que diera 404 NO bloqueaba nada (la RFC 9309
+# dice que un 404 significa "sin restricciones"), pero tampoco permitía
+# declarar el sitemap ni dejar por escrito qué rastreadores son bienvenidos.
+# Tenerlo explícito también protege de un error silencioso muy común: si algún
+# día se pone un CDN o un plugin de seguridad delante, muchos bloquean bots de
+# IA por defecto sin avisar, y sin un robots.txt que documente la intención
+# nadie se entera.
+
+# ---------------------------------------------------------------------------
+# RASTREADORES DE IA — todos permitidos, incluidos los de entrenamiento.
+#
+# La plantilla habitual dice "permite los de búsqueda y bloquea los de
+# entrenamiento". Aquí se permite todo a propósito: esto es un proyecto de
+# comunidad que necesita que se le conozca, no un medio con contenido de pago
+# que proteger. Bloquear el entrenamiento no protegería nada valioso y sí
+# reduciría la probabilidad de que un modelo sepa que este juego existe.
+#
+# Si algún día se publican guías o lore propios que no se quieran ver
+# reentrenados, se revisan CCBot y anthropic-ai. Hoy no hay nada así.
+# ---------------------------------------------------------------------------
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# ---------------------------------------------------------------------------
+# TODO LO DEMÁS
+#
+# Solo se cierra lo que no tiene nada que indexar: el formulario de acceso, el
+# panel de administración y las pantallas de cuenta, que responden con una
+# redirección al login para cualquiera que no haya entrado. Dejarlas abiertas
+# solo gasta presupuesto de rastreo en redirecciones.
+#
+# El catálogo (/plantilla) se queda ABIERTO a propósito: es la página con más
+# contenido público del sitio.
+# ---------------------------------------------------------------------------
+User-agent: *
+Disallow: /acceso
+Disallow: /login
+Disallow: /registro
+Disallow: /logout
+Disallow: /panel/
+Disallow: /perfil
+Disallow: /usuario
+Disallow: /mazos
+Disallow: /duelo
+Disallow: /duelos
+Disallow: /sobres
+Disallow: /mercado
+Disallow: /intercambios
+Disallow: /misiones
+Disallow: /cadena
+Disallow: /cadenas
+Disallow: /descartar
+Disallow: /jugar
+Disallow: /hoy
+Allow: /
+
+Sitemap: https://tcgfrontier.es/sitemap.xml

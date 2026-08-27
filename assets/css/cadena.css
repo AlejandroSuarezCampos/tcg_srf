@@ -1,0 +1,483 @@
+/* ==========================================================================
+   MAPA DE CADENA — la pantalla de ruta
+   --------------------------------------------------------------------------
+   Extraído de layout.css en el bloque 7d. Se carga con `$cssExtra` solo en las
+   pantallas que lo usan, no en las trece.
+   ========================================================================== */
+
+/* ==========================================================================
+   MAPA DE CADENA — pantalla de ruta estilo Inazuma Eleven
+   Esta pantalla ROMPE a propósito con la paleta oscura del sitio. Las dos
+   capturas de referencia (rutas de la DS y de la era GO) se definen ante todo
+   por su fondo cian brillante con panal hexagonal y sus piezas claras de borde
+   grueso: en oscuro es imposible parecerse a ellas, por muy hexagonales que
+   sean los nodos. Se trata como lo que es, una pantalla de juego embebida,
+   con su propio marco; el resto del sitio no se toca.
+
+   Sus colores viven aquí y no en tokens.css justamente porque son locales de
+   esta pantalla y no forman parte del sistema de diseño.
+   ========================================================================== */
+.mapa-marco {
+  --ruta-cian:      #45CFE8;
+  --ruta-cian-hondo:#1F9CC4;
+  --ruta-borde:     #12557A;
+  --ruta-pieza:     #EAF7FD;   /* relleno claro de las piezas */
+  --ruta-tinta:     #12405C;   /* icono/letra sobre pieza clara */
+  --ruta-oro:       #FFC933;
+  --ruta-camino:    #F2FBFF;
+
+  position: relative;
+  overflow-x: auto;             /* solo aquí: el body sigue con overflow-x clip */
+  overscroll-behavior-x: contain;
+  padding: var(--e-5) var(--e-4) 0;
+  border: 3px solid var(--ruta-borde);
+  border-radius: var(--r-carta);
+  /* Panal hexagonal sobre el degradado cian: es la textura de fondo de la
+     captura de la era GO. El panal va en un SVG en línea porque es un patrón
+     que se repite, no una imagen que haya que descargar. */
+  background-color: var(--ruta-cian);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='96' viewBox='0 0 56 96'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.30' stroke-width='2'%3E%3Cpath d='M28 0 L56 16 L56 48 L28 64 L0 48 L0 16 Z'/%3E%3Cpath d='M28 64 L56 80 L56 112 L28 128 L0 112 L0 80 Z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 70% at 50% 25%, rgba(255,255,255,.38), transparent 65%),
+    linear-gradient(180deg, var(--ruta-cian) 0%, var(--ruta-cian-hondo) 100%);
+  background-size: 56px 96px, auto, auto;
+}
+.mapa { position: relative; margin: 0 auto; }
+
+.mapa-lineas { position: absolute; inset: 0; overflow: visible; }
+
+/* Los caminos son cintas claras: una carcasa azul oscura y encima una banda
+   casi blanca. Dos trazos del MISMO path, así que no pueden desalinearse. */
+.mapa-carcasa {
+  fill: none;
+  stroke: var(--ruta-borde);
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mapa-energia {
+  fill: none;
+  stroke: #A9D8EA;              /* tramo aún no abierto: apagado */
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* tramo ya recorrido: cinta blanca encendida, como en las capturas */
+.mapa-energia.es-recorrida {
+  stroke: var(--ruta-camino);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, .9));
+}
+
+/* Rótulo inferior con el nombre de la ruta, como la barra azul de
+   "Cadena Refriega" de la captura de la era GO. */
+.mapa-rotulo {
+  position: sticky;
+  left: 0;
+  margin: var(--e-4) calc(var(--e-4) * -1) 0;
+  padding: 6px var(--e-4);
+  background: var(--ruta-borde);
+  color: #EAF7FD;
+  font-family: var(--tipo-display);
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-bold);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.nodo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.nodo-boton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px;
+  border-radius: var(--r-alerta);
+  color: inherit;
+  text-decoration: none;
+}
+.nodo-boton[aria-disabled="true"] { cursor: default; }
+.nodo-boton:focus-visible { outline: 3px solid #123A5A; outline-offset: 2px; }
+
+/* La pieza envuelve hexágono y sello para poder colgar el sello de la esquina. */
+.nodo-pieza { position: relative; display: block; }
+
+/* El hexágono usa la misma técnica de borde que las cartas del sitio: relleno
+   por debajo y una capa interior encima que deja ver el borde. Con clip-path
+   no se puede usar `border`, así que esto no es un capricho.
+   Borde grueso (4px) y relleno CLARO: así son las piezas de las capturas,
+   fichas macizas sobre el cian, no cajas oscuras. */
+.nodo-hex {
+  display: block;
+  width: 70px; height: 62px;
+  padding: 4px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background: var(--nodo-borde, var(--ruta-borde));
+  filter: var(--nodo-brillo, drop-shadow(0 3px 0 rgba(9, 52, 78, .45)));
+  transition: transform var(--t-toque) var(--curva), filter var(--t-estado) var(--curva);
+}
+.nodo-hex-int {
+  position: relative;    /* ancla a .nodo-escudo, que se posiciona en absoluto contra este hueco */
+  display: grid;
+  place-items: center;
+  width: 100%; height: 100%;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  /* brillo arriba: da el volumen de ficha que tienen las piezas del original */
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--nodo-fondo, var(--ruta-pieza)) 55%,
+              color-mix(in srgb, var(--nodo-fondo, var(--ruta-pieza)) 86%, var(--ruta-cian-hondo)) 100%);
+  color: var(--nodo-tinta, var(--ruta-tinta));
+  font-size: 26px;
+}
+
+/* Escudo del rival dentro de la ficha hexagonal. El clip-path de
+   .nodo-hex-int (mismo hexágono) ya recorta cualquier contenido suyo, así
+   que el escudo no puede salirse del hueco aunque su imagen no sea
+   perfectamente hexagonal.
+
+   `position: absolute; inset: 6px` en vez de `width/height: 100%` sueltos:
+   .nodo-hex-int es una fila de grid AUTO (sin alto propio, lo hereda de su
+   padre), así que un `height: 100%` en un hijo de grid no tenía contra qué
+   resolverse y el navegador lo sustituía por el alto intrínseco de la
+   imagen — la hacía más alta que el hueco real y quedaba descentrada hacia
+   abajo. En absoluto, `inset` sí resuelve siempre contra el hueco (mismo
+   criterio que usa `.carta-arte` contra `.carta-placa`, que sí es
+   `position: relative` con alto explícito). `contain`, nunca `cover`, para
+   que se vea el escudo entero. */
+.nodo-escudo {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  object-fit: contain;
+}
+
+/* Sello de rango: disco dorado en la esquina con borde oscuro y sombra dura,
+   exactamente como marca el rango el mapa de rutas de la DS. */
+.nodo-sello {
+  position: absolute;
+  bottom: -4px; right: -4px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ruta-borde);
+  background: var(--rango-color, var(--ruta-oro));
+  color: #3A2600;
+  font-family: var(--tipo-display);
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);   /* sombra dura, sin desenfoque */
+}
+/* En el mapa los tres rangos van en oro, como en el original; la letra es la
+   que los distingue. El color por rango se reserva al sello grande del
+   resultado, donde sí hay sitio para leerlo. */
+.nodo-sello.rango-s { background: var(--ruta-oro); }
+.nodo-sello.rango-a { background: #E4E9EE; }
+.nodo-sello.rango-b { background: #C79A6B; }
+
+.nodo-nombre {
+  padding: 1px 6px;
+  border-radius: var(--r-chip);
+  background: rgba(18, 64, 92, .82);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: .07em;
+  text-transform: uppercase;   /* rotulación de mapa, no texto de web */
+  line-height: 1.25;
+  text-align: center;
+  color: #EAF7FD;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Casilla de salida, como el "Inicio" rojo del mapa de la DS. */
+.nodo.es-inicio .nodo-pieza::after {
+  content: 'INICIO';
+  position: absolute;
+  left: 50%; top: -11px;
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: var(--r-chip);
+  border: 2px solid var(--ruta-borde);
+  background: #E33B2E;
+  color: #fff;
+  font-family: var(--tipo-display);
+  font-size: 9px;
+  font-weight: var(--fw-bold);
+  letter-spacing: .08em;
+  box-shadow: 0 2px 0 rgba(9, 52, 78, .6);
+}
+
+/* Los estados se distinguen por icono ADEMÁS de por color (candado, espada,
+   cofre, sello de rango), así que no dependen de percibir el matiz. */
+/* El nodo bloqueado se apaga con un relleno grisáceo, NO con opacity: bajar la
+   opacidad lo mezclaba con el cian del fondo y el candado se quedaba en 3,04:1
+   de contraste, justo en el límite. Con relleno propio el icono se lee bien y
+   la pieza sigue viéndose claramente apagada. */
+.nodo.es-bloqueado {
+  --nodo-borde: #2C6E8E;
+  --nodo-fondo: #9FB4BF;
+  --nodo-tinta: #22414F;
+  --nodo-brillo: drop-shadow(0 3px 0 rgba(9, 52, 78, .35));
+}
+
+.nodo.es-disponible {
+  --nodo-borde: var(--ruta-oro);
+  --nodo-fondo: #FFF6DE;
+  --nodo-tinta: #7A4B00;
+}
+.nodo.es-superado {
+  --nodo-borde: var(--ruta-borde);
+  --nodo-fondo: var(--ruta-pieza);
+  --nodo-tinta: var(--ruta-tinta);
+}
+/* EL CONTROL DE PASO (`045`). Un bloqueo sin cumplir sale como `es-disponible`
+   —se puede pinchar para ver qué pide—, pero con el oro y el latido de los
+   nodos jugables diría justo lo contrario de lo que hace: invitaría a jugarlo.
+   Rojo y quieto, que es lo que significa un STOP. Una vez cumplido cae en
+   `es-superado` y se pinta como cualquier otro nodo pasado. */
+.nodo--bloqueo.es-disponible {
+  --nodo-borde: #B3352E;
+  --nodo-fondo: #FFE1DE;
+  --nodo-tinta: #8A2019;
+}
+.nodo--bloqueo.es-disponible .nodo-hex { animation: none; }
+
+.nodo.es-elegido {
+  --nodo-borde: #FFFFFF;
+  --nodo-brillo: drop-shadow(0 0 9px rgba(255, 255, 255, .95)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45));
+}
+.nodo.es-elegido .nodo-hex { transform: scale(1.12); }
+
+a.nodo-boton:hover .nodo-hex { transform: scale(1.08); }
+
+/* Latido del nodo que toca jugar: es el "aquí estás" de los mapas de la saga.
+   Solo lo lleva el disponible sin elegir, para que no compitan dos cosas
+   parpadeando a la vez. */
+.nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: nodoLatido 1.9s var(--curva) infinite; }
+@keyframes nodoLatido {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 201, 51, .65)) drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(255, 201, 51, 1))  drop-shadow(0 3px 0 rgba(9, 52, 78, .45)); }
+}
+
+:root[data-motion="reduce"] .nodo-hex,
+:root[data-motion="reduce"] a.nodo-boton:hover .nodo-hex,
+:root[data-motion="reduce"] .nodo.es-elegido .nodo-hex { transition: none; }
+:root[data-motion="reduce"] .nodo.es-disponible:not(.es-elegido) .nodo-hex { animation: none; }
+
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-4);
+  margin-top: var(--e-3);
+}
+.mapa-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- lista de cadenas ---- */
+.lista-cadenas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--e-5);
+}
+.cadena-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-3);
+  padding: var(--e-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  background: var(--carbon);
+}
+.cadena-tarjeta.es-bloqueada { opacity: .72; }
+.cadena-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); }
+.cadena-nombre {
+  font-family: var(--tipo-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-h3);
+  text-transform: uppercase;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+.cadena-pie { margin-top: auto; }
+
+.lista-requisitos { display: flex; flex-direction: column; gap: var(--e-2); margin: var(--e-3) 0; }
+.lista-requisitos li { display: flex; align-items: center; gap: var(--e-2); color: var(--ceniza); }
+
+/* Requisito de un CONTROL DE PASO (`045`), que además del texto lleva barra.
+   Se apoya en .lista-requisitos —es la misma lista de "lo que te falta"— y solo
+   añade lo que el de cadena no tiene: el progreso. */
+.requisito-cuerpo { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.requisito-texto  { display: block; }
+.requisito-barra {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ceniza) 25%, transparent);
+  overflow: hidden;
+}
+.requisito-barra > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brasa);
+}
+
+/* ---- recompensas de un partido/cofre de cadena ---- */
+.lista-recompensas { display: flex; flex-direction: column; gap: var(--e-2); }
+.lista-recompensas li { display: flex; align-items: center; gap: var(--e-2); }
+.lista-recompensas .ph-fill.ph-coins { color: var(--brasa); }
+.lista-recompensas .ph-fill.ph-seal-star { color: var(--rz5); }
+
+/* ---- selector de dificultad de una cadena ---- */
+.dificultades {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--e-3);
+}
+.dificultad {
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  border-left: 3px solid var(--dif-color, var(--linea-viva));
+}
+.dificultad-nombre { font-weight: var(--fw-semibold); }
+.dificultad-nota { font-size: var(--fs-micro); color: var(--ceniza); }
+
+/* La dificultad se lee en el texto; el color solo acompaña. */
+.dificultad--facil       { --dif-color: var(--cesped); }
+.dificultad--medio       { --dif-color: var(--var); }
+.dificultad--dificil     { --dif-color: var(--amarilla); }
+.dificultad--muy_dificil { --dif-color: var(--brasa); }
+.dificultad--extremo     { --dif-color: var(--roja); }
+
+/* ---- desglose por líneas ---- */
+.partido-lineas {
+  max-width: 460px;
+  margin: 0 auto var(--e-7);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-carta);
+  overflow: hidden;
+}
+.partido-lineas-cab,
+.partido-linea {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-4);
+}
+.partido-lineas-cab {
+  background: var(--carbon);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ceniza);
+}
+.partido-lineas-cab span:last-child { text-align: right; }
+.partido-linea { border-top: 1px solid var(--linea); }
+.partido-linea span {
+  text-align: center;
+  font-size: var(--fs-label);
+  color: var(--ceniza);
+}
+.partido-linea b { color: var(--ceniza); }
+.partido-linea b:last-child { text-align: right; }
+/* el lado que ganó esa línea: se marca con color Y con peso, para no depender
+   solo del color */
+.partido-linea b.es-mejor { color: var(--brasa-alta); font-weight: var(--fw-bold); }
+.partido-linea.es-total { background: var(--carbon); }
+.partido-linea.es-total b { color: var(--hueso); }
+
+.partido-alineaciones {
+  display: grid;
+  gap: var(--e-7);
+}
+@media (min-width: 900px) {
+  .partido-alineaciones { grid-template-columns: 1fr 1fr; }
+}
+.partido-alineaciones h2 { margin-bottom: var(--e-3); }
+
+/* lo que aportó cada carta en su hueco, bajo la propia carta */
+.carta-aporte {
+  display: block;
+  text-align: center;
+  font-size: var(--fs-micro);
+  color: var(--ceniza);
+}
+.carta-aporte b { color: var(--hueso); }
+
+.carta-grid--compacta { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+
+/* --------------------------------------------------------------------------
+   SIMULACIÓN DEL PARTIDO
+   Ceremonia exclusiva de duelo: reloj + goles que aparecen, nunca ruleta ni
+   tragaperras. El marcador y la barra reutilizan .partido-marcador y
+   .progreso ya existentes; aquí solo lo que es nuevo de verdad.
+   -------------------------------------------------------------------------- */
+/* ⚠️ LA CAJA DEL PARTIDO SE ESTIRA, Y ES LO QUE ARREGLA EL MINIJUEGO CORTADO.
+
+   El minijuego se superpone al cuerpo con `position:absolute; inset:0`, así que
+   SU alto es exactamente el del cuerpo. Y el cuerpo medía lo que midiera su
+   contenido, con un mínimo de 340 px: en un móvil eso deja al minijuego una
+   franja de 340 px para título, enunciado, tres opciones y botón, aunque la
+   pantalla tenga 800. Cabía por dentro con scroll propio, pero un scroll dentro
+   de un panel que ya está dentro de un modal no lo encuentra nadie con el reloj
+   de decisión corriendo: se ve como «el minijuego sale cortado».
+
+   Con la caja en columna y alto fijo, el cuerpo se lleva TODO lo que sobra
+   (`flex: 1`) y el minijuego hereda ese alto. En un móvil pasa de 340 px a casi
+   la pantalla entera. El `safe center` y el `overflow-y` de abajo siguen ahí de
+   red, pero ya casi nunca tienen que actuar. */
+.modal.simulacion .modal-caja {
+  display: flex;
+  flex-direction: column;
+  height: 88vh;
+}
+
+.simulacion-cuerpo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-5) 0 var(--e-2);
+  overflow: hidden;
+  /* Se lleva el alto que sobre tras el marcador y el reloj. El mínimo se queda
+     como suelo para pantallas muy bajas. */
+  flex: 1 1 auto;
+  min-height: 340px;
+}
+.simulacion-cuerpo .linea-campo { opacity: .5; }
+.simulacion-cuerpo .partido-marcador { position: relative; z-index: 1; margin-bottom: 0; }
+
+.simulacion-reloj {
+  position: relative;
+  z-index: 1;
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-bold);
+  color: var(--ceniza);
+  font-variant-numeric: tabular-nums;
+}
+
+.simulacion-barra { position: relative; z-index: 1; width: 100%; max-width: 360px; }
+
+/* El MODO CLÁSICO vivía aquí: reloj y una insignia de gol que aparecía y se
+   iba, para las cadenas. Se retiró con él en el §15.12 —.simulacion-eventos,
+   .simulacion-evento y su @keyframes— cuando el partido pasó a decidir también
+   en PvE y dejó de haber un marcador previo que dramatizar. */
+

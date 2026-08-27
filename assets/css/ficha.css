@@ -1,0 +1,121 @@
+/* ==========================================================================
+   FICHA PÚBLICA DE CARTA — /carta/{slug}
+   Reutiliza .panel, .carta-grid, .seccion y el componente de carta; aquí solo
+   está lo que esta pantalla tiene de propio.
+   ========================================================================== */
+
+.fi-pagina { display: grid; gap: var(--e-6); }
+
+.fi-migas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  font-size: var(--t-caption-sm, .8rem);
+  color: var(--ceniza);
+}
+.fi-migas a { color: var(--ceniza); text-decoration: none; }
+.fi-migas a:hover, .fi-migas a:focus-visible { color: var(--hueso); text-decoration: underline; }
+.fi-migas [aria-current] { color: var(--hueso); }
+
+/* ---- Cabecera: arte a la izquierda, datos a la derecha ------------------ */
+.fi-cabecera {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: clamp(var(--e-4), 4vw, var(--e-7));
+  align-items: start;
+}
+.fi-arte { position: sticky; top: var(--e-5); }
+
+.fi-datos > h1 { margin: var(--e-1) 0 var(--e-3); }
+
+.fi-lede { font-size: 1.05rem; margin: 0 0 var(--e-3); }
+
+/* El párrafo de contexto es lo que hace que esta página no sea una ficha
+   técnica más: se destaca sin gritar. */
+.fi-contexto {
+  margin: 0 0 var(--e-4);
+  padding: var(--e-3) var(--e-4);
+  border-left: 2px solid var(--brasa-borde);
+  background: var(--brasa-velo);
+  border-radius: 0 var(--r-alerta, 6px) var(--r-alerta, 6px) 0;
+}
+.fi-descripcion { margin: 0 0 var(--e-4); color: var(--ceniza); font-style: italic; }
+
+/* ---- Estadísticas comparadas ------------------------------------------- */
+.fi-stats { display: grid; gap: var(--e-3); margin: 0 0 var(--e-2); }
+.fi-stat { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--e-3); align-items: center; }
+.fi-stat dt { font-size: .8rem; color: var(--ceniza); text-transform: uppercase; letter-spacing: .08em; }
+.fi-stat dd {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  gap: var(--e-3);
+  align-items: center;
+}
+.fi-stat dd > b { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+
+.fi-barra { position: relative; display: block; height: 8px; background: var(--carbon-alto); border-radius: 2px; }
+.fi-barra > span { display: block; height: 100%; border-radius: 2px; background: var(--brasa); }
+/* La marca de la media: una línea vertical, no un color distinto, para que se
+   entienda que es una referencia y no otro valor. */
+.fi-barra > i {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: var(--hueso);
+  opacity: .55;
+  border-radius: 1px;
+}
+.fi-stat--ata .fi-barra > span { background: var(--ata); }
+.fi-stat--def .fi-barra > span { background: var(--def); }
+.fi-stat--tec .fi-barra > span { background: var(--tec); }
+
+.fi-dif { font-size: .78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fi-dif.es-mas   { color: var(--cesped-txt); }
+.fi-dif.es-menos { color: var(--ceniza); }
+
+.fi-acciones { display: flex; flex-wrap: wrap; gap: var(--e-3); margin-top: var(--e-5); }
+
+/* ---- Compañeros de equipo ---------------------------------------------- */
+.fi-companeros {
+  list-style: none;
+  margin: var(--e-3) 0 var(--e-4);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--e-2);
+}
+.fi-companeros a {
+  display: grid;
+  gap: 2px;
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-alerta, 6px);
+  text-decoration: none;
+  color: inherit;
+  background: var(--carbon);
+  transition: border-color var(--dur-2, .16s) var(--ease-salida, ease);
+}
+.fi-companeros a:hover,
+.fi-companeros a:focus-visible { border-color: var(--brasa-borde); }
+.fi-comp-nombre { font-weight: var(--fw-semibold, 600); }
+.fi-comp-meta { font-size: .78rem; color: var(--ceniza); }
+
+@media (max-width: 720px) {
+  .fi-cabecera { grid-template-columns: 1fr; }
+
+  /* `width` y NO `max-width` + `margin-inline: auto`.
+     Un margen automático en el eje en línea hace que un elemento de rejilla
+     deje de estirarse y se ajuste a su contenido; y `.carta` no tiene ancho
+     propio —se dimensiona por porcentajes y `aspect-ratio`—, así que colapsaba
+     a 4px: los 2+2 de su padding. La carta se veía como una rayita.
+     Con `width` el ancho está declarado y `justify-self` centra sin encoger. */
+  .fi-arte {
+    position: static;
+    width: min(260px, 100%);
+    justify-self: center;
+  }
+
+  .fi-stat { grid-template-columns: 1fr; gap: var(--e-1); }
+}
