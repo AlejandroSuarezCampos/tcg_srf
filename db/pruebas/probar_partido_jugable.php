@@ -243,5 +243,54 @@ comprobar("bajar el dial a 9 jugadas sigue terminando en el 93",
 comprobar("un total de 0 jugadas no divide por cero",
 	Partido::minutoDeJugada(1, 0, 3) === 0);
 
+// ---------------------------------------------------------------------------
+echo "\n5. EL CATÁLOGO\n";
+
+$catalogo = Partido::catalogo();
+$errores  = Partido::validarCatalogo($catalogo);
+comprobar("el catálogo pasa su propio verificador", $errores === [], implode(" | ", $errores));
+
+comprobar("hay exactamente 5 minijuegos semilla", count($catalogo) === 5, count($catalogo) . " entradas");
+
+/* Ninguna acción puede quedarse sin minijuego que ofrecer: si una familia se
+   queda vacía, esa acción sería un botón que revienta la jugada. */
+$sinCubrir = [];
+foreach (Partido::ZONAS as $zona) {
+	foreach (Partido::accionesDe($zona) as $clave => $a) {
+		if (!Partido::minijuegosDeFamilia($a["atacante"])) { $sinCubrir[] = "$clave/atacante"; }
+		if (!Partido::minijuegosDeFamilia($a["defensor"])) { $sinCubrir[] = "$clave/defensor"; }
+	}
+}
+comprobar("las 8 acciones tienen minijuego en ambos lados", $sinCubrir === [], implode(", ", $sinCubrir));
+
+comprobar("las 5 familias están representadas",
+	count(array_filter(["tiro", "regate", "defensa", "porteria", "carga"],
+		function ($f) { return Partido::minijuegosDeFamilia($f) !== []; })) === 5);
+
+comprobar("Triple Escuadra es de lectura", $catalogo["triple_escuadra"]["tipo"] === "lectura");
+comprobar("Espiral de Fuego es de ejecución", $catalogo["espiral_fuego"]["tipo"] === "ejecucion");
+comprobar("Espiral de Fuego va de 0.8 a 1.8",
+	casi($catalogo["espiral_fuego"]["suelo"], 0.8) && casi($catalogo["espiral_fuego"]["techo"], 1.8));
+
+comprobar("toda entrada de lectura tiene una y solo una opción segura",
+	Partido::opcionSegura($catalogo["triple_escuadra"]) !== "");
+
+/* Un catálogo roto tiene que DELATARSE, no fallar en silencio en producción. */
+$roto = ["malo" => ["nombre" => "Malo", "familia" => "inventada", "tipo" => "ejecucion"]];
+comprobar("el verificador caza una familia inexistente",
+	count(Partido::validarCatalogo($roto)) > 0);
+
+$dosSeguras = ["x" => [
+	"nombre" => "X", "familia" => "tiro", "tipo" => "lectura", "titulo" => "T",
+	"enunciado" => "E", "stat_techo" => "ataque", "usa_elemento" => false,
+	"plazo_seg" => 8, "primitiva" => "eleccion",
+	"opciones" => [
+		["clave" => "a", "nombre" => "A", "pista" => "p", "mult" => 1.0, "mult_rival" => 1.0, "segura" => true],
+		["clave" => "b", "nombre" => "B", "pista" => "p", "mult" => 1.0, "mult_rival" => 1.0, "segura" => true],
+	],
+]];
+comprobar("el verificador caza dos opciones seguras",
+	count(Partido::validarCatalogo($dosSeguras)) > 0);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);

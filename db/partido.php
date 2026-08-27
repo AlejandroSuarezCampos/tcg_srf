@@ -263,4 +263,104 @@ class Partido {
 		if ((int) $total <= 0) return 0;
 		return (int) round((self::MINUTOS + (int) $descuento) * (int) $numero / (int) $total);
 	}
+
+	const FAMILIAS = ["tiro", "regate", "defensa", "porteria", "carga"];
+
+	/* Familias que, si se quedan sin entradas, retroceden a otra en vez de dejar
+	   una acción sin minijuego. Es el andamio que permite arrancar con 5
+	   semillas en lugar de con los 101: cuando el catálogo de defensa exista,
+	   este retroceso deja de dispararse solo y se puede borrar la línea. */
+	const FAMILIA_SUPLENTE = ["defensa" => "carga"];
+
+	private static $cacheCatalogo = null;
+
+	public static function catalogo() {
+		if (self::$cacheCatalogo === null) {
+			self::$cacheCatalogo = require __DIR__ . "/minijuegos.php";
+		}
+		return self::$cacheCatalogo;
+	}
+
+	public static function minijuegosDeFamilia($familia) {
+		$claves = [];
+		foreach (self::catalogo() as $clave => $mj) {
+			if (($mj["familia"] ?? "") === $familia) { $claves[] = $clave; }
+		}
+		if (!$claves && isset(self::FAMILIA_SUPLENTE[$familia])) {
+			return self::minijuegosDeFamilia(self::FAMILIA_SUPLENTE[$familia]);
+		}
+		return $claves;
+	}
+
+	public static function opcionSegura(array $mj) {
+		foreach ($mj["opciones"] ?? [] as $o) {
+			if (!empty($o["segura"])) return $o["clave"];
+		}
+		return "";
+	}
+
+	public static function opcionDe(array $mj, $clave) {
+		foreach ($mj["opciones"] ?? [] as $o) {
+			if ($o["clave"] === $clave) return $o;
+		}
+		return null;
+	}
+
+	/**
+	 * Comprueba que el catálogo es sano. Devuelve la lista de errores en texto;
+	 * array vacío significa que está bien.
+	 *
+	 * Existe porque un catálogo roto tiene que DELATARSE en la suite, no fallar
+	 * en silencio a mitad de un partido con cartas apostadas.
+	 */
+	public static function validarCatalogo(array $catalogo) {
+		$errores = [];
+		foreach ($catalogo as $clave => $mj) {
+			$falta = [];
+			foreach (["nombre", "familia", "tipo", "titulo", "enunciado", "stat_techo", "plazo_seg"] as $k) {
+				if (!isset($mj[$k])) { $falta[] = $k; }
+			}
+			if ($falta) { $errores[] = "$clave: falta " . implode(", ", $falta); continue; }
+
+			if (!in_array($mj["familia"], self::FAMILIAS, true)) {
+				$errores[] = "$clave: familia desconocida '{$mj["familia"]}'";
+			}
+			if (!in_array($mj["stat_techo"], ["ataque", "defensa", "tecnica"], true)) {
+				$errores[] = "$clave: stat_techo desconocida '{$mj["stat_techo"]}'";
+			}
+
+			if ($mj["tipo"] === "ejecucion") {
+				foreach (["suelo", "techo", "tolerancia", "figura"] as $k) {
+					if (!isset($mj[$k])) { $errores[] = "$clave: ejecución sin $k"; }
+				}
+				if (isset($mj["suelo"], $mj["techo"]) && $mj["techo"] <= $mj["suelo"]) {
+					$errores[] = "$clave: el techo no supera al suelo";
+				}
+				if (isset($mj["tolerancia"]) && $mj["tolerancia"] <= 0) {
+					$errores[] = "$clave: tolerancia no positiva";
+				}
+			} elseif ($mj["tipo"] === "lectura") {
+				$opciones = $mj["opciones"] ?? [];
+				if (count($opciones) < 2) { $errores[] = "$clave: lectura con menos de 2 opciones"; }
+				$seguras = 0;
+				$mejor = null;
+				foreach ($opciones as $o) {
+					foreach (["clave", "nombre", "pista", "mult", "mult_rival"] as $k) {
+						if (!isset($o[$k])) { $errores[] = "$clave: opción sin $k"; }
+					}
+					if (!empty($o["segura"])) { $seguras++; }
+					if ($mejor === null || ($o["mult"] ?? 0) > $mejor["mult"]) { $mejor = $o; }
+				}
+				if ($seguras !== 1) { $errores[] = "$clave: tiene $seguras opciones seguras, debe tener 1"; }
+				/* REGLA DURA: la segura NUNCA puede ser la de más premio. Quien no
+				   llega a tiempo no puede salir beneficiado por no decidir. */
+				if ($mejor !== null && !empty($mejor["segura"]) && count($opciones) > 1) {
+					$errores[] = "$clave: la opción segura es también la de más premio";
+				}
+			} else {
+				$errores[] = "$clave: tipo desconocido '{$mj["tipo"]}'";
+			}
+		}
+		return $errores;
+	}
 }
