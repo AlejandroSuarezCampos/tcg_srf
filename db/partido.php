@@ -307,6 +307,45 @@ class Partido {
 	}
 
 	/**
+	 * Cómo de bien juega la CPU su minijuego.
+	 *
+	 * DETERMINISTA por (duelo, jugada, lado) a propósito. Con azar real, un
+	 * reintento de la misma petición —que pasa constantemente con el sondeo— daría
+	 * un rendimiento distinto y el mismo partido podría resolverse de dos formas.
+	 *
+	 * `$peso` viene de `pve_pesos_ia_*`, que ya existe y va de 0 en Fácil a 0.85
+	 * en Extremo. Alrededor de él se abre una banda de ±0.15, así que un Fácil
+	 * falla trazos como una persona nerviosa y un Extremo casi no falla, pero
+	 * ninguno es una máquina perfecta ni un pelele constante.
+	 */
+	public static function rendimientoCpu($peso, $valorSorteo, $numero, $lado) {
+		$s = abs(crc32("cpu|" . (string) $valorSorteo . "|" . (string) $numero . "|" . $lado));
+		$ruido = (($s % 1000) / 1000.0 - 0.5) * 0.30;    // ±0.15
+		return max(0.0, min(1.0, (float) $peso + $ruido));
+	}
+
+	/**
+	 * Qué opción elige la CPU en un minijuego de lectura.
+	 *
+	 * Cuanto mejor es la CPU, más a menudo se aparta de la opción segura para
+	 * ir a por la de más premio. Una CPU floja se queda en lo conservador, que
+	 * es exactamente lo que hace un rival de dificultad baja.
+	 */
+	public static function opcionCpu(array $mj, $peso, $valorSorteo, $numero) {
+		$opciones = $mj["opciones"] ?? [];
+		if (!$opciones) return "";
+		$segura = self::opcionSegura($mj);
+
+		$s = abs(crc32("cpuop|" . (string) $valorSorteo . "|" . (string) $numero));
+		if (($s % 1000) / 1000.0 > (float) $peso) return $segura;
+
+		$arriesgadas = [];
+		foreach ($opciones as $o) { if (empty($o["segura"])) { $arriesgadas[] = $o["clave"]; } }
+		if (!$arriesgadas) return $segura;
+		return $arriesgadas[($s >> 7) % count($arriesgadas)];
+	}
+
+	/**
 	 * Comprueba que el catálogo es sano. Devuelve la lista de errores en texto;
 	 * array vacío significa que está bien.
 	 *

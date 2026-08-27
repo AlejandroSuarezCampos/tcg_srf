@@ -14138,6 +14138,64 @@ class Tcg
 		return Partido::elementoDe($this->listarAlineacionDuelo($id_duelo, $otro), "");
 	}
 
+	/**
+	 * Rellena el lado del rival cuando ese rival es la CPU de una cadena.
+	 *
+	 * Se llama desde el sondeo: en PvE no hay nadie al otro lado que envíe su
+	 * ejecución, así que la jugada se quedaría abierta para siempre.
+	 */
+	public function jugarTurnoCpu($id_duelo, $numero) {
+		$d = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$d->execute([":d" => $id_duelo]);
+		$duelo = $d->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo || $duelo["dificultad"] === null) return;   // solo PvE
+
+		$j = $this->pdo->prepare("SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n");
+		$j->execute([":d" => $id_duelo, ":n" => $numero]);
+		$j = $j->fetch(PDO::FETCH_ASSOC);
+		if (!$j || $j["desenlace"] !== null) return;
+
+		$idCpu = (int) $duelo["id_rival"];
+		$peso  = (float) $this->paramPve("pesos_ia", $duelo["dificultad"], $duelo["id_nodo"] ?? null, 0.0);
+
+		/* Si el balón es de la CPU, primero elige su acción. */
+		if ((int) $j["id_poseedor"] === $idCpu && $j["accion"] === null) {
+			$acciones = array_keys(Partido::accionesDe($j["zona"]));
+			$s = abs(crc32("cpuacc|" . (string) $duelo["valor_sorteo"] . "|" . (string) $numero));
+			$this->decidirAccion($id_duelo, $idCpu, $numero, $acciones[$s % count($acciones)]);
+			$j["accion"] = $acciones[$s % count($acciones)];
+			$j2 = $this->pdo->prepare("SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n");
+			$j2->execute([":d" => $id_duelo, ":n" => $numero]);
+			$j = $j2->fetch(PDO::FETCH_ASSOC);
+		}
+		if ($j["accion"] === null) return;   // espera a que la persona decida
+
+		$esAtacante = (int) $j["id_poseedor"] === $idCpu;
+		if (($esAtacante ? $j["rend_atacante"] : $j["rend_defensor"]) !== null) return;
+
+		$clave = $esAtacante ? $j["mj_atacante"] : $j["mj_defensor"];
+		$mj = Partido::catalogo()[$clave] ?? null;
+		if (!$mj) return;
+
+		$lado = $esAtacante ? "atacante" : "defensor";
+		if ($mj["tipo"] === "lectura") {
+			$this->registrarEjecucion($id_duelo, $idCpu, $numero, [
+				"opcion" => Partido::opcionCpu($mj, $peso, (float) $duelo["valor_sorteo"], (int) $numero),
+			]);
+		} else {
+			/* La CPU no traza: se le inyecta el rendimiento ya calculado. Es la
+			   única vía por la que un rendimiento NO sale de un trazo, y por eso
+			   está aquí dentro y no en el endpoint público. */
+			$rend = Partido::rendimientoCpu($peso, (float) $duelo["valor_sorteo"], (int) $numero, $lado);
+			$campo = $esAtacante ? "rend_atacante" : "rend_defensor";
+			$this->pdo->prepare("
+				UPDATE partido_jugadas SET $campo = :r, " . ($esAtacante ? "auto_atacante" : "auto_defensor") . " = 1
+				WHERE id_duelo = :d AND numero = :n AND $campo IS NULL AND desenlace IS NULL
+			")->execute([":r" => $rend, ":d" => $id_duelo, ":n" => $numero]);
+			$this->resolverJugadaSiProcede($id_duelo, $numero);
+		}
+	}
+
 	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
 	public function estadoPartido($id_duelo, $id_usuario) {
 		$abrir = $this->abrirJugada($id_duelo);

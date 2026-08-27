@@ -292,5 +292,58 @@ $dosSeguras = ["x" => [
 comprobar("el verificador caza dos opciones seguras",
 	count(Partido::validarCatalogo($dosSeguras)) > 0);
 
+// ---------------------------------------------------------------------------
+echo "\n6. LA CPU DE PvE\n";
+
+comprobar("DETERMINISMO: la misma jugada da siempre el mismo rendimiento",
+	casi(Partido::rendimientoCpu(0.5, 0.4242, 3, "atacante"),
+	     Partido::rendimientoCpu(0.5, 0.4242, 3, "atacante")),
+	"reintentar una peticion no puede cambiar el resultado");
+
+comprobar("jugadas distintas dan rendimientos distintos",
+	!casi(Partido::rendimientoCpu(0.5, 0.4242, 3, "atacante"),
+	      Partido::rendimientoCpu(0.5, 0.4242, 4, "atacante")));
+
+comprobar("los dos lados de la misma jugada no se copian",
+	!casi(Partido::rendimientoCpu(0.5, 0.4242, 3, "atacante"),
+	      Partido::rendimientoCpu(0.5, 0.4242, 3, "defensor")));
+
+/* La dificultad tiene que NOTARSE: un Extremo (peso 0.85) debe rendir de media
+   claramente por encima de un Fácil (peso 0). */
+function mediaCpu($peso) {
+	$s = 0.0;
+	for ($i = 1; $i <= 200; $i++) { $s += Partido::rendimientoCpu($peso, 0.31 + $i / 1000, $i, "atacante"); }
+	return $s / 200;
+}
+$facil   = mediaCpu(0.0);
+$extremo = mediaCpu(0.85);
+comprobar("el Extremo rinde muy por encima del Fácil",
+	$extremo > $facil + 0.4, sprintf("Fácil %.3f  /  Extremo %.3f", $facil, $extremo));
+
+$dentro = true;
+for ($i = 1; $i <= 300; $i++) {
+	foreach ([0.0, 0.25, 0.55, 0.85] as $p) {
+		$r = Partido::rendimientoCpu($p, 0.77, $i, "defensor");
+		if ($r < 0.0 || $r > 1.0) { $dentro = false; }
+	}
+}
+comprobar("el rendimiento de la CPU nunca se sale de 0..1", $dentro);
+
+$mjLectura = Partido::catalogo()["carga_segada"];
+comprobar("la CPU elige una opción que existe",
+	Partido::opcionDe($mjLectura, Partido::opcionCpu($mjLectura, 0.5, 0.4242, 2)) !== null);
+
+/* Una CPU floja debe tirar a la segura más a menudo que una fuerte. */
+function vecesArriesga($peso, $mj) {
+	$n = 0;
+	$segura = Partido::opcionSegura($mj);
+	for ($i = 1; $i <= 200; $i++) {
+		if (Partido::opcionCpu($mj, $peso, 0.5 + $i / 1000, $i) !== $segura) { $n++; }
+	}
+	return $n;
+}
+comprobar("la CPU fuerte arriesga más que la floja",
+	vecesArriesga(0.85, $mjLectura) > vecesArriesga(0.0, $mjLectura));
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
