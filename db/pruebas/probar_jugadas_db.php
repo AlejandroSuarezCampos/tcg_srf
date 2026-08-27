@@ -100,5 +100,33 @@ comprobar("el sondeo lleva el marcador", array_key_exists("goles", $est));
 comprobar("el sondeo NO filtra la ejecución del rival",
 	!isset($est["jugada"]["rend_defensor"]) && !isset($est["jugada"]["opc_defensor"]));
 
+echo "\n6. EL MARCADOR SALE DE LAS JUGADAS\n";
+
+/* Se fuerzan tres goles del creador y uno del rival escribiendo directamente el
+   desenlace: lo que se prueba aquí es el CONTEO, no el bucle. */
+$pdo = (new ReflectionClass(Tcg::class))->getProperty("pdo");
+$pdo->setAccessible(true);
+$conn = $pdo->getValue($db);
+
+$conn->exec("DELETE FROM partido_jugadas WHERE id_duelo = $idDuelo");
+$ins = $conn->prepare("
+	INSERT INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor, desenlace, resuelta)
+	VALUES (:d, :n, :m, 'area', :p, :x, NOW())
+");
+foreach ([[1, $idA, "gol"], [2, $idA, "gol"], [3, $idB, "gol"],
+          [4, $idA, "gol"], [5, $idA, "recupera"]] as $k => $f) {
+	$ins->execute([":d" => $idDuelo, ":n" => $f[0], ":m" => $f[0] * 7,
+	               ":p" => $f[1], ":x" => $f[2]]);
+}
+
+[$gA, $gB] = $db->marcadorDeJugadas($idDuelo);
+comprobar("el marcador es la cuenta literal de jugadas terminadas en gol",
+	$gA === 3 && $gB === 1, "$gA-$gB, esperado 3-1");
+
+comprobar("una jugada que no acabó en gol no suma",
+	($gA + $gB) === 4, "5 jugadas, 4 goles");
+
+comprobar("un duelo sin jugadas da 0-0", $db->marcadorDeJugadas(-1) === [0, 0]);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);

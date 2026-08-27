@@ -9494,21 +9494,32 @@ class Tcg
 			$fuerzaSimCreador = self::fuerzaParaSimulacion($calcCreador, $totalPctCreador);
 			$fuerzaSimRival   = self::fuerzaParaSimulacion($calcRival,   $totalPctRival);
 
+			/* ANTES: el marcador salía de `generarEventosPartido()` con
+			   `goles => null`, o sea que la simulación DECIDÍA el resultado desde
+			   una semilla antes de que nadie jugara. Eso es exactamente lo que
+			   este motor viene a quitar.
+
+			   AHORA: el marcador es la cuenta de las jugadas que cada uno ganó.
+			   `generarEventosPartido()` sigue viva y sigue haciendo falta, pero
+			   solo para NARRAR: se la llama más abajo con los goles ya sabidos
+			   (modo REPARTO), así que lo que se cuenta nunca puede contradecir
+			   lo que pasó. */
+			[$golesCreador, $golesRival] = $this->marcadorDeJugadas($id_duelo);
+
 			$sim = self::generarEventosPartido(
 				[
-					"nombre" => "local", "fuerza" => $fuerzaSimCreador, "goles" => null,
+					"nombre" => "local", "fuerza" => $fuerzaSimCreador, "goles" => $golesCreador,
 					"cartas" => $this->listarAlineacionDuelo($id_duelo, $idCreador),
 					"formacion" => $formCreador,
 				],
 				[
-					"nombre" => "visitante", "fuerza" => $fuerzaSimRival, "goles" => null,
+					"nombre" => "visitante", "fuerza" => $fuerzaSimRival, "goles" => $golesRival,
 					"cartas" => $this->listarAlineacionDuelo($id_duelo, $idRival),
 					"formacion" => $formRival,
 				],
 				$sorteo,
 				$this->opcionesSimulacion()
 			);
-			[$golesCreador, $golesRival] = $sim["goles"];
 
 			/* ⚠️ INTERRUPTOR DE PRUEBAS — `depuracion_forzar_empate`
 			   Con esto a 1, TODO partido acaba 1-1 y por tanto se va a la tanda.
@@ -14164,6 +14175,33 @@ class Tcg
 				? Partido::accionesDe($j["zona"]) : [],
 			"goles"     => $marcador,
 		];
+	}
+
+	/**
+	 * EL MARCADOR ES LA CUENTA LITERAL DE LAS JUGADAS GANADAS.
+	 *
+	 * Aquí es donde muere el resultado scripteado. Antes el marcador salía de
+	 * `generarEventosPartido()`, que lo sorteaba desde una semilla antes de que
+	 * el jugador tocara nada; ahora es un COUNT sobre lo que el jugador hizo.
+	 *
+	 * No hay presupuesto, ni tope, ni `partido_minijuego_prob_gol`: si metiste
+	 * gol es porque ganaste esa jugada.
+	 */
+	public function marcadorDeJugadas($id_duelo) {
+		$d = $this->pdo->prepare("SELECT id_creador, id_rival FROM duelos WHERE id_duelo = :d");
+		$d->execute([":d" => $id_duelo]);
+		$duelo = $d->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo) return [0, 0];
+
+		$q = $this->pdo->prepare("
+			SELECT id_poseedor, COUNT(*) AS n FROM partido_jugadas
+			WHERE id_duelo = :d AND desenlace = 'gol' GROUP BY id_poseedor
+		");
+		$q->execute([":d" => $id_duelo]);
+		$por = [];
+		foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $g) { $por[(int) $g["id_poseedor"]] = (int) $g["n"]; }
+
+		return [$por[(int) $duelo["id_creador"]] ?? 0, $por[(int) $duelo["id_rival"]] ?? 0];
 	}
 }
 
