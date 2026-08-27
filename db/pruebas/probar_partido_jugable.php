@@ -50,5 +50,67 @@ comprobar("las 16 combinaciones se reparten 4/4/4/4",
 comprobar("un elemento desconocido no rompe nada",
 	casi(Partido::factorElemental("no-afi", "fuego"), 1.0));
 
+// ---------------------------------------------------------------------------
+echo "\n2. LA FÓRMULA DE RESOLUCIÓN\n";
+
+$REF  = 80.0;   // stat_ref, el listón de élite
+$TOPE = 100.0;  // habilidad_tope_pct, generoso de nacimiento
+
+/* Un minijuego de ejecución de suelo 0.8 y techo 1.8 — los de Espiral de Fuego.
+   Las cuatro filas son literalmente la tabla del spec §6.1. */
+function fila($stat, $rend, $REF, $TOPE) {
+	$mult = Partido::multiplicadorEjecucion(0.8, 1.8, Partido::factorStat($stat, $REF), $rend);
+	return ["mult" => $mult, "valor" => Partido::valor($stat, $mult, 1.0, $TOPE)];
+}
+
+$flojoPerfecto  = fila(40, 1.0, $REF, $TOPE);
+$buenoMediocre  = fila(80, 0.4, $REF, $TOPE);
+$buenoPerfecto  = fila(80, 1.0, $REF, $TOPE);
+$decentePerfect = fila(65, 1.0, $REF, $TOPE);
+
+comprobar("Ataque 40 perfecto da x1.30 y valor 52",
+	casi($flojoPerfecto["mult"], 1.30) && casi($flojoPerfecto["valor"], 52.0),
+	sprintf("x%.2f -> %.1f", $flojoPerfecto["mult"], $flojoPerfecto["valor"]));
+comprobar("Ataque 80 mediocre da x1.20 y valor 96",
+	casi($buenoMediocre["mult"], 1.20) && casi($buenoMediocre["valor"], 96.0),
+	sprintf("x%.2f -> %.1f", $buenoMediocre["mult"], $buenoMediocre["valor"]));
+comprobar("Ataque 80 perfecto da x1.80 y valor 144",
+	casi($buenoPerfecto["mult"], 1.80) && casi($buenoPerfecto["valor"], 144.0),
+	sprintf("x%.2f -> %.1f", $buenoPerfecto["mult"], $buenoPerfecto["valor"]));
+comprobar("Ataque 65 perfecto da x1.61 y valor 105",
+	casi($decentePerfect["mult"], 1.6125, 0.001) && casi($decentePerfect["valor"], 104.8125, 0.001),
+	sprintf("x%.4f -> %.4f", $decentePerfect["mult"], $decentePerfect["valor"]));
+
+/* INVARIANTE 2 — PRIMACÍA DEL EQUIPO. Si esto se rompe, el mercado se cae:
+   un mazo flojo jugado perfecto tumbaría a uno bueno jugado mal. */
+comprobar("INVARIANTE: mazo flojo perfecto PIERDE contra mazo bueno mediocre",
+	$flojoPerfecto["valor"] < $buenoMediocre["valor"],
+	sprintf("%.1f < %.1f", $flojoPerfecto["valor"], $buenoMediocre["valor"]));
+
+/* Pero la habilidad tiene que servir para algo: con una diferencia moderada de
+   equipo, jugar perfecto remonta a jugar a medias. */
+comprobar("pero mazo decente perfecto SUPERA a mazo bueno mediocre",
+	$decentePerfect["valor"] > $buenoMediocre["valor"],
+	sprintf("%.1f > %.1f", $decentePerfect["valor"], $buenoMediocre["valor"]));
+
+comprobar("el factor de stat topa en 1 aunque la stat supere la referencia",
+	casi(Partido::factorStat(200, $REF), 1.0));
+comprobar("una stat de 0 no da factor negativo",
+	casi(Partido::factorStat(0, $REF), 0.0));
+comprobar("stat_ref a 0 no divide por cero",
+	casi(Partido::factorStat(50, 0), 1.0));
+
+comprobar("no ejecutar deja el multiplicador en el suelo",
+	casi(Partido::multiplicadorEjecucion(0.8, 1.8, 1.0, 0.0), 0.8));
+
+comprobar("la capa elemental multiplica sobre el valor ya calculado",
+	casi(Partido::valor(80, 1.8, 1.4, $TOPE), 160.0),
+	"144 x 1.4 = 201.6, recortado por el tope a 160");
+
+comprobar("la red de seguridad recorta por arriba",
+	casi(Partido::valor(100, 5.0, 1.0, 50.0), 150.0));
+comprobar("la red de seguridad recorta por abajo",
+	casi(Partido::valor(100, 0.1, 1.0, 50.0), 50.0));
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
