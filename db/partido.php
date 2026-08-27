@@ -93,4 +93,73 @@ class Partido {
 		$techo  = (float) $stat * (1.0 + $margen);
 		return max($suelo, min($techo, $bruto));
 	}
+
+	/**
+	 * Reparte una polilínea en EXACTAMENTE $n puntos equidistantes POR LONGITUD
+	 * DE ARCO, no por índice ni por tiempo.
+	 *
+	 * ⚠️ AQUÍ VIVE LA JUSTICIA DE HARDWARE, y por eso no se puede tocar a la
+	 * ligera. Si se repartiera por índice, un móvil que muestrea 20 veces y otro
+	 * que muestrea 120 compararían puntos distintos del mismo dedo y sacarían
+	 * notas distintas: tener peor teléfono sería tener peor balance. Repartiendo
+	 * por longitud recorrida, los dos describen la misma curva y puntúan igual.
+	 *
+	 * Un trazo sin longitud (el dedo no se movió) no tiene curva que repartir y
+	 * devuelve el array vacío; quien llama lo interpreta como no haber ejecutado.
+	 */
+	public static function remuestrear(array $puntos, $n) {
+		$n = max(2, (int) $n);
+		if (count($puntos) < 2) return [];
+
+		$acum  = [0.0];
+		$total = 0.0;
+		for ($i = 1; $i < count($puntos); $i++) {
+			$dx = (float) $puntos[$i]["x"] - (float) $puntos[$i - 1]["x"];
+			$dy = (float) $puntos[$i]["y"] - (float) $puntos[$i - 1]["y"];
+			$total += sqrt($dx * $dx + $dy * $dy);
+			$acum[$i] = $total;
+		}
+		if ($total <= 0.0) return [];
+
+		$salida = [];
+		$j = 1;
+		for ($k = 0; $k < $n; $k++) {
+			$objetivo = $total * $k / ($n - 1);
+			while ($j < count($acum) - 1 && $acum[$j] < $objetivo) { $j++; }
+			$tramo = $acum[$j] - $acum[$j - 1];
+			$t = $tramo > 0 ? ($objetivo - $acum[$j - 1]) / $tramo : 0.0;
+			$salida[] = [
+				"x" => (float) $puntos[$j - 1]["x"] + ((float) $puntos[$j]["x"] - (float) $puntos[$j - 1]["x"]) * $t,
+				"y" => (float) $puntos[$j - 1]["y"] + ((float) $puntos[$j]["y"] - (float) $puntos[$j - 1]["y"]) * $t,
+			];
+		}
+		return $salida;
+	}
+
+	/**
+	 * Qué tan bien ha seguido el jugador la figura que se le pedía: 0.0 a 1.0.
+	 *
+	 * Se remuestrean las dos curvas al mismo número de puntos y se mide la
+	 * distancia par a par. Cada par aporta `1 − distancia/tolerancia`, con suelo
+	 * en 0, y el rendimiento es la media. Un trazo clavado da 1; uno desviado la
+	 * mitad de la tolerancia da cerca de 0,5; uno fuera de tolerancia da 0.
+	 *
+	 * `$tolerancia` la declara el minijuego y NO puede depender del nivel visual
+	 * del dispositivo: es una regla dura del diseño.
+	 */
+	public static function rendimientoTrazo(array $ideal, array $trazo, $tolerancia, $n = 32) {
+		if ((float) $tolerancia <= 0.0) return 0.0;
+		$a = self::remuestrear($ideal, $n);
+		$b = self::remuestrear($trazo, $n);
+		if (!$a || !$b) return 0.0;
+
+		$suma = 0.0;
+		for ($i = 0; $i < count($a); $i++) {
+			$dx = $a[$i]["x"] - $b[$i]["x"];
+			$dy = $a[$i]["y"] - $b[$i]["y"];
+			$d  = sqrt($dx * $dx + $dy * $dy);
+			$suma += max(0.0, 1.0 - $d / (float) $tolerancia);
+		}
+		return $suma / count($a);
+	}
 }

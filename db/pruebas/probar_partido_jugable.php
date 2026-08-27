@@ -112,5 +112,65 @@ comprobar("la red de seguridad recorta por arriba",
 comprobar("la red de seguridad recorta por abajo",
 	casi(Partido::valor(100, 0.1, 1.0, 50.0), 50.0));
 
+// ---------------------------------------------------------------------------
+echo "\n3. EL RENDIMIENTO DE UN TRAZO\n";
+
+/* Genera una curva (un arco de circunferencia) muestreada en $n puntos. La
+   GEOMETRÍA es idéntica en todos los casos; lo único que cambia es cuántas
+   veces la ha muestreado el dispositivo. Eso es exactamente la diferencia
+   entre un móvil a 20 fps y uno a 120. */
+function arco($n, $desvio = 0.0) {
+	$p = [];
+	for ($i = 0; $i < $n; $i++) {
+		$a = M_PI * $i / ($n - 1);
+		$p[] = ["x" => 100 + 100 * cos($a), "y" => 100 + 100 * sin($a) + $desvio, "t" => $i * 10];
+	}
+	return $p;
+}
+
+$ideal = arco(60);
+
+comprobar("remuestrear devuelve siempre el número de puntos pedido",
+	count(Partido::remuestrear(arco(7), 32)) === 32);
+comprobar("remuestrear conserva el primer y el último punto",
+	casi(Partido::remuestrear($ideal, 32)[0]["x"], $ideal[0]["x"], 0.001)
+	&& casi(Partido::remuestrear($ideal, 32)[31]["x"], $ideal[59]["x"], 0.001));
+
+comprobar("un trazo idéntico al ideal da rendimiento 1",
+	casi(Partido::rendimientoTrazo($ideal, $ideal, 30.0), 1.0));
+
+/* INVARIANTE 1 — JUSTICIA DE HARDWARE. La misma curva muestreada a 20 y a 120
+   puntos tiene que puntuar igual. Si esto se rompe, tener peor móvil pasa a
+   ser tener peor balance, que es la trampa que este diseño existe para evitar. */
+$lento  = Partido::rendimientoTrazo($ideal, arco(20),  30.0);
+$rapido = Partido::rendimientoTrazo($ideal, arco(120), 30.0);
+comprobar("INVARIANTE: 20 fps y 120 fps puntúan igual el mismo trazo",
+	casi($lento, $rapido, 0.01),
+	sprintf("20 pts: %.4f  /  120 pts: %.4f", $lento, $rapido));
+
+/* Y lo mismo con un trazo IMPERFECTO: la independencia no puede depender de
+   que el jugador lo haya hecho bien. */
+$malLento  = Partido::rendimientoTrazo($ideal, arco(20,  15.0), 30.0);
+$malRapido = Partido::rendimientoTrazo($ideal, arco(120, 15.0), 30.0);
+comprobar("INVARIANTE: también con un trazo torcido",
+	casi($malLento, $malRapido, 0.01),
+	sprintf("20 pts: %.4f  /  120 pts: %.4f", $malLento, $malRapido));
+
+comprobar("desviarse la mitad de la tolerancia da alrededor de medio rendimiento",
+	casi(Partido::rendimientoTrazo($ideal, arco(60, 15.0), 30.0), 0.5, 0.05));
+comprobar("desviarse más que la tolerancia da rendimiento 0",
+	casi(Partido::rendimientoTrazo($ideal, arco(60, 400.0), 30.0), 0.0));
+
+comprobar("un trazo vacío da rendimiento 0",
+	casi(Partido::rendimientoTrazo($ideal, [], 30.0), 0.0));
+comprobar("un trazo de un solo punto da rendimiento 0",
+	casi(Partido::rendimientoTrazo($ideal, [["x" => 100, "y" => 100, "t" => 0]], 30.0), 0.0));
+comprobar("tolerancia 0 no divide por cero",
+	casi(Partido::rendimientoTrazo($ideal, $ideal, 0.0), 0.0));
+comprobar("un dedo que no se mueve da rendimiento 0",
+	casi(Partido::rendimientoTrazo($ideal, [
+		["x" => 100, "y" => 100, "t" => 0], ["x" => 100, "y" => 100, "t" => 10],
+	], 30.0), 0.0));
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
