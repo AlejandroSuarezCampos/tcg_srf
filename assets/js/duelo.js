@@ -301,7 +301,7 @@
   /* ======================================================================
      MINIJUEGO — el servidor manda
      El reloj está parado en el SERVIDOR desde que la jugada toca (ver
-     Tcg::estadoPartido), así que los dos jugadores están detenidos aquí, no
+     Tcg::estadoPartidoNarrado), así que los dos jugadores están detenidos aquí, no
      solo el que decide. La cuenta atrás que se ve abajo es puramente visual:
      si se agota no la resuelve este temporizador sino el propio servidor en el
      siguiente sondeo, aplicando la opción segura (§1.5 regla 4). Dejárselo al

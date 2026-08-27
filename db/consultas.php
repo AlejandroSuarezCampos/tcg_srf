@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . "/partido.php";
+
 class Tcg
 {
 
@@ -8308,14 +8310,22 @@ class Tcg
 	}
 
 	/**
-	 * EL SONDEO. Devuelve en qué minuto va el partido, qué se ha narrado hasta
+	 * EL SONDEO DEL PARTIDO NARRADO (sistema antiguo, previo al bucle de
+	 * jugadas). Devuelve en qué minuto va el partido, qué se ha narrado hasta
 	 * ahí y si hay un minijuego esperando decisión.
 	 *
 	 * Todo se evalúa aquí, en diferido: arrancar el reloj, pausarlo al llegar a
 	 * un minijuego, resolver por fallback al que no contesta y reanudar. No hay
 	 * nada corriendo de fondo entre sondeo y sondeo.
+	 *
+	 * ⚠️ RENOMBRADO de `estadoPartido()` a `estadoPartidoNarrado()` en la Task 7
+	 * del motor de partido jugable: ese nombre lo reclama el método NUEVO (el
+	 * del bucle de jugadas persistido, más abajo en esta clase), y las dos
+	 * cosas no pueden llamarse igual. Este sistema —narración generada de
+	 * antemano por `generarEventosPartido()`— es el que la Task 17 del mismo
+	 * plan retira por completo; hasta entonces sigue vivo con este nombre.
 	 */
-	public function estadoPartido($id_duelo, $id_usuario) {
+	public function estadoPartidoNarrado($id_duelo, $id_usuario) {
 		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
 		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
 		if (!in_array($duelo["estado"], self::ESTADOS_CON_PARTIDO, true)) {
@@ -13813,6 +13823,347 @@ class Tcg
 		");
 		$stmt->execute([':eq' => $idEquipo]);
 		return (int) $stmt->fetchColumn();
+	}
+
+	/**
+	 * Un duelo mínimo en juego, para las suites. NO se usa en producción.
+	 *
+	 * Existe porque montar un duelo real exige pasar por sala, aceptación,
+	 * aumentos y alineaciones, y una prueba del bucle de jugadas no debería
+	 * depender de todo eso. Las alineaciones se dejan vacías: `estadisticaDe()`
+	 * cae a un valor base cuando no encuentra carta.
+	 */
+	public function crearDueloDePrueba($idCreador, $idRival) {
+		$stmt = $this->pdo->prepare("
+			INSERT INTO duelos (id_creador, id_rival, estado, valor_sorteo,
+			                    formacion_creador, formacion_rival, creado)
+			VALUES (:c, :r, 'en_juego', 0.4242, :f, :f, NOW())
+		");
+		$stmt->execute([":c" => $idCreador, ":r" => $idRival, ":f" => self::FORMACION_BASE]);
+		return (int) $this->pdo->lastInsertId();
+	}
+
+	/* =====================================================================
+	   EL BUCLE DE JUGADAS. Métodos FINOS: todo el criterio vive en `Partido`,
+	   aquí solo se traduce entre la base de datos y esas funciones puras.
+	   ===================================================================== */
+
+	/**
+	 * Devuelve la jugada abierta; si no hay, abre la siguiente.
+	 *
+	 * Es IDEMPOTENTE a propósito: el sondeo la llama cada segundo desde los dos
+	 * navegadores, así que "abrir" tiene que significar "asegúrate de que hay una
+	 * abierta", no "crea una". El INSERT IGNORE contra la clave primaria
+	 * (duelo, numero) es lo que lo garantiza en la propia base de datos.
+	 */
+	public function abrirJugada($id_duelo) {
+		$duelo = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$duelo->execute([":d" => $id_duelo]);
+		$duelo = $duelo->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe.", "fin" => true];
+
+		$abierta = $this->pdo->prepare("
+			SELECT * FROM partido_jugadas
+			WHERE id_duelo = :d AND desenlace IS NULL
+			ORDER BY numero LIMIT 1
+		");
+		$abierta->execute([":d" => $id_duelo]);
+		if ($fila = $abierta->fetch(PDO::FETCH_ASSOC)) {
+			return ["ok" => true, "jugada" => $fila, "fin" => false];
+		}
+
+		$total = (int) $this->config("partido_jugadas_num", 12);
+		$ultima = $this->pdo->prepare("
+			SELECT numero, zona, desenlace, id_poseedor FROM partido_jugadas
+			WHERE id_duelo = :d ORDER BY numero DESC LIMIT 1
+		");
+		$ultima->execute([":d" => $id_duelo]);
+		$prev = $ultima->fetch(PDO::FETCH_ASSOC);
+
+		$numero = $prev ? (int) $prev["numero"] + 1 : 1;
+		if ($numero > $total) return ["ok" => true, "jugada" => null, "fin" => true];
+
+		if ($prev) {
+			$zona = Partido::zonaTras($prev["zona"], $prev["desenlace"]);
+			/* Quien pierde el balón deja de poseerlo. Un gol también cambia la
+			   posesión: se saca de centro y saca el que lo ha encajado. */
+			$cambia = in_array($prev["desenlace"], ["recupera", "gol"], true);
+			$poseedor = $cambia
+				? ((int) $prev["id_poseedor"] === (int) $duelo["id_creador"]
+					? (int) $duelo["id_rival"] : (int) $duelo["id_creador"])
+				: (int) $prev["id_poseedor"];
+		} else {
+			$zona = "salida";
+			/* El saque inicial lo decide el sorteo ya congelado del duelo, no un
+			   azar nuevo: así el partido es reproducible. */
+			$poseedor = ((float) $duelo["valor_sorteo"] < 0.5)
+				? (int) $duelo["id_creador"] : (int) $duelo["id_rival"];
+		}
+
+		$descuento = 1 + (int) (((float) $duelo["valor_sorteo"] * 1000) % 4);
+		$minuto = Partido::minutoDeJugada($numero, $total, $descuento);
+
+		$ins = $this->pdo->prepare("
+			INSERT IGNORE INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor)
+			VALUES (:d, :n, :m, :z, :p)
+		");
+		$ins->execute([":d" => $id_duelo, ":n" => $numero, ":m" => $minuto,
+		               ":z" => $zona, ":p" => $poseedor]);
+
+		$leer = $this->pdo->prepare("SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n");
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		return ["ok" => true, "jugada" => $leer->fetch(PDO::FETCH_ASSOC), "fin" => false];
+	}
+
+	/**
+	 * El poseedor elige qué hace con el balón. Eso fija los dos minijuegos.
+	 *
+	 * `accion IS NULL` en el WHERE es lo que impide cambiar de opinión: no es una
+	 * comprobación en PHP que se pueda esquivar con dos peticiones a la vez, es
+	 * la propia base de datos la que solo deja pasar la primera.
+	 */
+	public function decidirAccion($id_duelo, $id_usuario, $numero, $accion) {
+		$leer = $this->pdo->prepare("SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n");
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		$j = $leer->fetch(PDO::FETCH_ASSOC);
+		if (!$j) return ["ok" => false, "error" => "Esa jugada no existe."];
+		if ((int) $j["id_poseedor"] !== (int) $id_usuario) {
+			return ["ok" => false, "error" => "El balón no es tuyo."];
+		}
+
+		$acciones = Partido::accionesDe($j["zona"]);
+		if (!isset($acciones[$accion])) {
+			return ["ok" => false, "error" => "Desde ahí no se puede hacer eso."];
+		}
+		$a = $acciones[$accion];
+
+		/* Qué minijuego concreto de cada familia. Determinista por (duelo,
+		   jugada) para que dos sondeos simultáneos no elijan minijuegos
+		   distintos y acaben con dos jugadas incompatibles. */
+		$mjAt = Partido::elegirDeFamilia($a["atacante"], (float) $j["minuto"] + (int) $numero);
+		$mjDf = Partido::elegirDeFamilia($a["defensor"], (float) $j["minuto"] + (int) $numero + 0.5);
+
+		$upd = $this->pdo->prepare("
+			UPDATE partido_jugadas
+			SET accion = :a, mj_atacante = :at, mj_defensor = :df
+			WHERE id_duelo = :d AND numero = :n AND accion IS NULL AND desenlace IS NULL
+		");
+		$upd->execute([":a" => $accion, ":at" => $mjAt, ":df" => $mjDf,
+		               ":d" => $id_duelo, ":n" => $numero]);
+		if ($upd->rowCount() === 0) {
+			return ["ok" => false, "error" => "Esa jugada ya estaba decidida."];
+		}
+
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		return ["ok" => true, "jugada" => $leer->fetch(PDO::FETCH_ASSOC)];
+	}
+
+	/**
+	 * Registra lo que uno de los dos bandos ha HECHO en su minijuego.
+	 *
+	 * ⚠️ EL CLIENTE NO ENVÍA SU NOTA, ENVÍA LO QUE HIZO: la opción pulsada o los
+	 * puntos del trazo. El `rendimiento` lo calcula AQUÍ el servidor con la misma
+	 * función pura. Es obligatorio, no una precaución: se apuestan cartas reales,
+	 * y una nota que viaje desde el navegador es una nota que cualquiera pone a 1.
+	 */
+	public function registrarEjecucion($id_duelo, $id_usuario, $numero, array $carga) {
+		$leer = $this->pdo->prepare("SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n");
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		$j = $leer->fetch(PDO::FETCH_ASSOC);
+		if (!$j) return ["ok" => false, "error" => "Esa jugada no existe."];
+		if ($j["accion"] === null) return ["ok" => false, "error" => "Todavía no hay acción elegida."];
+		if ($j["desenlace"] !== null) return ["ok" => false, "error" => "Esa jugada ya está resuelta."];
+
+		$soyAtacante = (int) $j["id_poseedor"] === (int) $id_usuario;
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no es tuyo."];
+
+		$campoR = $soyAtacante ? "rend_atacante" : "rend_defensor";
+		$campoO = $soyAtacante ? "opc_atacante"  : "opc_defensor";
+		$clave  = $soyAtacante ? $j["mj_atacante"] : $j["mj_defensor"];
+
+		$catalogo = Partido::catalogo();
+		$mj = $catalogo[$clave] ?? null;
+		if (!$mj) return ["ok" => false, "error" => "Minijuego desconocido."];
+
+		$opcion = null;
+		if ($mj["tipo"] === "lectura") {
+			$opcion = (string) ($carga["opcion"] ?? "");
+			if (Partido::opcionDe($mj, $opcion) === null) {
+				$opcion = Partido::opcionSegura($mj);   // plazo agotado o basura
+			}
+			$rend = 1.0;   // en lectura no hay ejecución que medir
+		} else {
+			$trazo  = is_array($carga["trazo"] ?? null) ? $carga["trazo"] : [];
+			$ideal  = Partido::figuraIdeal($mj["figura"], (float) $duelo["valor_sorteo"], (int) $numero);
+			$abierta = strtotime($j["abierta"]);
+			if (!Partido::trazoPlausible($trazo, $ideal, $abierta)) {
+				$rend = 0.0;   // trazo imposible: cuenta como no haber ejecutado
+			} else {
+				$rend = Partido::rendimientoTrazo($ideal, $trazo, (float) $mj["tolerancia"]);
+			}
+		}
+
+		$upd = $this->pdo->prepare("
+			UPDATE partido_jugadas SET $campoR = :r, $campoO = :o
+			WHERE id_duelo = :d AND numero = :n AND $campoR IS NULL AND desenlace IS NULL
+		");
+		$upd->execute([":r" => $rend, ":o" => $opcion, ":d" => $id_duelo, ":n" => $numero]);
+		if ($upd->rowCount() === 0) {
+			return ["ok" => false, "error" => "Ya habías jugado esta jugada."];
+		}
+
+		$resuelta = $this->resolverJugadaSiProcede($id_duelo, $numero);
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		return ["ok" => true, "resuelta" => $resuelta, "jugada" => $leer->fetch(PDO::FETCH_ASSOC)];
+	}
+
+	/**
+	 * Resuelve la jugada si los dos bandos ya han ejecutado.
+	 *
+	 * `FOR UPDATE` dentro de transacción y `desenlace IS NULL` en el UPDATE: dos
+	 * sondeos simultáneos no pueden resolver dos veces la misma jugada, ni
+	 * contar dos veces el mismo gol.
+	 */
+	private function resolverJugadaSiProcede($id_duelo, $numero) {
+		$this->pdo->beginTransaction();
+		try {
+			$leer = $this->pdo->prepare("
+				SELECT * FROM partido_jugadas WHERE id_duelo = :d AND numero = :n FOR UPDATE
+			");
+			$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+			$j = $leer->fetch(PDO::FETCH_ASSOC);
+
+			if (!$j || $j["desenlace"] !== null
+				|| $j["rend_atacante"] === null || $j["rend_defensor"] === null) {
+				$this->pdo->rollBack();
+				return false;
+			}
+
+			$duelo = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+			$duelo->execute([":d" => $id_duelo]);
+			$duelo = $duelo->fetch(PDO::FETCH_ASSOC);
+
+			$idDefensor = (int) $j["id_poseedor"] === (int) $duelo["id_creador"]
+				? (int) $duelo["id_rival"] : (int) $duelo["id_creador"];
+
+			$cfg = [
+				"stat_ref" => (float) $this->config("partido_stat_ref", 80),
+				"tope_pct" => (float) $this->config("habilidad_tope_pct", 100),
+			];
+
+			$at = $this->valorDeLado($id_duelo, (int) $j["id_poseedor"], $j, true,  $cfg);
+			$df = $this->valorDeLado($id_duelo, $idDefensor,             $j, false, $cfg);
+
+			/* Cada lado puede empeorar al otro (`mult_rival`): así se expresan los
+			   "−10 % de Defensa del portero" del diseño sin una regla aparte. */
+			$valAt = $at["valor"] * $df["mult_rival"];
+			$valDf = $df["valor"] * $at["mult_rival"];
+
+			$accion = Partido::accionesDe($j["zona"])[$j["accion"]];
+			$desenlace = Partido::desenlace($valAt, $valDf, $accion["efecto"]);
+
+			$this->pdo->prepare("
+				UPDATE partido_jugadas
+				SET val_atacante = :va, val_defensor = :vd, desenlace = :x, resuelta = NOW()
+				WHERE id_duelo = :d AND numero = :n AND desenlace IS NULL
+			")->execute([":va" => $valAt, ":vd" => $valDf, ":x" => $desenlace,
+			             ":d" => $id_duelo, ":n" => $numero]);
+
+			$this->pdo->commit();
+			return true;
+		} catch (Exception $e) {
+			$this->pdo->rollBack();
+			throw $e;
+		}
+	}
+
+	/**
+	 * El valor con el que un bando llega a la comparación.
+	 *
+	 * La estadística sale de la carta que protagoniza la jugada según la línea
+	 * que le toque; si la alineación está vacía (partidos de laboratorio) cae a
+	 * un valor base para que el motor siga siendo jugable.
+	 */
+	private function valorDeLado($id_duelo, $id_usuario, array $j, $esAtacante, array $cfg) {
+		$clave = $esAtacante ? $j["mj_atacante"] : $j["mj_defensor"];
+		$mj    = Partido::catalogo()[$clave];
+		$rend  = (float) ($esAtacante ? $j["rend_atacante"] : $j["rend_defensor"]);
+		$opc   = $esAtacante ? $j["opc_atacante"] : $j["opc_defensor"];
+
+		$cartas = $this->listarAlineacionDuelo($id_duelo, $id_usuario);
+		$stat   = Partido::estadisticaDe($cartas, $mj["stat_techo"], $mj["familia"]);
+		$elem   = Partido::elementoDe($cartas, $mj["familia"]);
+
+		$multRival = 1.0;
+		if ($mj["tipo"] === "lectura") {
+			$o = Partido::opcionDe($mj, (string) $opc) ?: Partido::opcionDe($mj, Partido::opcionSegura($mj));
+			$mult = (float) $o["mult"];
+			$multRival = (float) $o["mult_rival"];
+		} else {
+			$mult = Partido::multiplicadorEjecucion(
+				(float) $mj["suelo"], (float) $mj["techo"],
+				Partido::factorStat($stat, $cfg["stat_ref"]), $rend
+			);
+		}
+
+		$factorElem = 1.0;
+		if (!empty($mj["usa_elemento"])) {
+			$factorElem = Partido::factorElemental($elem, $this->elementoRival($id_duelo, $id_usuario));
+		}
+
+		return [
+			"valor"      => Partido::valor($stat, $mult, $factorElem, $cfg["tope_pct"]),
+			"mult_rival" => $multRival,
+		];
+	}
+
+	/** Elemento dominante del OTRO bando del duelo. */
+	private function elementoRival($id_duelo, $id_usuario) {
+		$d = $this->pdo->prepare("SELECT id_creador, id_rival FROM duelos WHERE id_duelo = :d");
+		$d->execute([":d" => $id_duelo]);
+		$d = $d->fetch(PDO::FETCH_ASSOC);
+		$otro = (int) $d["id_creador"] === (int) $id_usuario ? (int) $d["id_rival"] : (int) $d["id_creador"];
+		return Partido::elementoDe($this->listarAlineacionDuelo($id_duelo, $otro), "");
+	}
+
+	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
+	public function estadoPartido($id_duelo, $id_usuario) {
+		$abrir = $this->abrirJugada($id_duelo);
+		$j = $abrir["jugada"] ?? null;
+
+		$goles = $this->pdo->prepare("
+			SELECT id_poseedor, COUNT(*) AS n FROM partido_jugadas
+			WHERE id_duelo = :d AND desenlace = 'gol' GROUP BY id_poseedor
+		");
+		$goles->execute([":d" => $id_duelo]);
+		$marcador = [];
+		foreach ($goles->fetchAll(PDO::FETCH_ASSOC) as $g) {
+			$marcador[(int) $g["id_poseedor"]] = (int) $g["n"];
+		}
+
+		$vista = null;
+		if ($j) {
+			$soyAtacante = (int) $j["id_poseedor"] === (int) $id_usuario;
+			$vista = [
+				"numero"    => (int) $j["numero"],
+				"minuto"    => (int) $j["minuto"],
+				"zona"      => $j["zona"],
+				"accion"    => $j["accion"],
+				"minijuego" => $soyAtacante ? $j["mj_atacante"] : $j["mj_defensor"],
+				"ya_jugue"  => ($soyAtacante ? $j["rend_atacante"] : $j["rend_defensor"]) !== null,
+			];
+		}
+
+		return [
+			"ok"        => true,
+			"fin"       => !empty($abrir["fin"]),
+			"jugada"    => $vista,
+			"decido_yo" => $j ? ((int) $j["id_poseedor"] === (int) $id_usuario && $j["accion"] === null) : false,
+			"acciones"  => ($j && $j["accion"] === null && (int) $j["id_poseedor"] === (int) $id_usuario)
+				? Partido::accionesDe($j["zona"]) : [],
+			"goles"     => $marcador,
+		];
 	}
 }
 

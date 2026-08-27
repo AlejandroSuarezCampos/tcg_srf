@@ -8,7 +8,7 @@
  * una pausa por minijuego los detiene a los dos.
  *
  * Mismo patrón sin websockets que la sala de espera: sondeo + latido. Toda la
- * lógica vive en Tcg::estadoPartido(), que además arranca el reloj, pausa,
+ * lógica vive en Tcg::estadoPartidoNarrado(), que además arranca el reloj, pausa,
  * aplica el fallback de quien no contesta y reanuda, todo en diferido — no hay
  * cron en este proyecto.
  */
@@ -51,7 +51,7 @@ if (empty($_SESSION['id_usuario'])) {
 session_write_close();
 
 $id_duelo = (int) ($_GET['id_duelo'] ?? $_POST['id_duelo'] ?? 0);
-$res = $db->estadoPartido($id_duelo, (int) $_SESSION['id_usuario']);
+$res = $db->estadoPartidoNarrado($id_duelo, (int) $_SESSION['id_usuario']);
 
 if (empty($res['ok'])) http_response_code(409);
 echo json_encode($res, JSON_UNESCAPED_UNICODE);

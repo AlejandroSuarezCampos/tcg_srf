@@ -22,7 +22,7 @@ if ($zona !== null) {
 }
 
 // El rival tambien sondea, que es lo que empuja la tanda.
-$e = $db->estadoPartido($id, $RIVAL);
+$e = $db->estadoPartidoNarrado($id, $RIVAL);
 $t = $e["tanda"] ?? null;
 if (!$t) { echo "fase=" . ($e["fase"] ?? "?") . " sin tanda\n"; exit; }
 

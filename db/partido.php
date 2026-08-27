@@ -363,4 +363,100 @@ class Partido {
 		}
 		return $errores;
 	}
+
+	/**
+	 * Elige un minijuego concreto de una familia, de forma DETERMINISTA.
+	 *
+	 * Determinista y no aleatoria porque los dos navegadores sondean a la vez: si
+	 * cada petición sorteara, dos sondeos simultáneos podrían fijar minijuegos
+	 * distintos para la misma jugada.
+	 */
+	public static function elegirDeFamilia($familia, $semilla) {
+		$claves = self::minijuegosDeFamilia($familia);
+		if (!$claves) return null;
+		$i = (int) (abs(crc32((string) $familia . "|" . (string) $semilla)) % count($claves));
+		return $claves[$i];
+	}
+
+	/**
+	 * La figura que hay que trazar, generada proceduralmente.
+	 *
+	 * Se genera cada vez (vueltas, sentido, amplitud) para que no se pueda
+	 * memorizar un patrón fijo, pero es DETERMINISTA por (duelo, jugada) para
+	 * que el servidor pueda recalcular exactamente la misma figura que vio el
+	 * cliente. Sin ese determinismo, el servidor no podría puntuar el trazo.
+	 *
+	 * El lienzo es siempre 0..1000 en las dos dimensiones; el cliente escala.
+	 */
+	public static function figuraIdeal($tipo, $valorSorteo, $numero, $n = 60) {
+		$s = abs(crc32($tipo . "|" . (string) $valorSorteo . "|" . (string) $numero));
+		$vueltas = 2 + ($s % 2);                 // 2 o 3 vueltas
+		$sentido = ($s >> 3) % 2 ? 1 : -1;
+		$amplitud = 300 + (($s >> 5) % 120);
+
+		$p = [];
+		for ($i = 0; $i < $n; $i++) {
+			$u = $i / ($n - 1);
+			if ($tipo === "arco") {
+				$a = M_PI * $u;
+				$p[] = ["x" => 500 + $sentido * $amplitud * cos($a), "y" => 850 - $amplitud * sin($a)];
+			} else {   // espiral
+				$a = $sentido * 2 * M_PI * $vueltas * $u;
+				$r = $amplitud * (1 - 0.75 * $u);
+				$p[] = ["x" => 500 + $r * cos($a), "y" => 850 - 700 * $u + $r * sin($a) * 0.35];
+			}
+		}
+		return $p;
+	}
+
+	/**
+	 * Comprobaciones baratas de plausibilidad del trazo, ANTES de puntuarlo.
+	 *
+	 * No sustituyen al recálculo del rendimiento (eso es lo que de verdad impide
+	 * hacer trampas), pero cierran dos atajos obvios: mandar un trazo que no
+	 * empieza donde estaba el balón, y mandar uno fabricado antes de que la
+	 * jugada existiera.
+	 */
+	public static function trazoPlausible(array $trazo, array $ideal, $abiertaTs, $margen = 180.0) {
+		if (count($trazo) < 4 || !$ideal) return false;
+
+		$dx = (float) $trazo[0]["x"] - (float) $ideal[0]["x"];
+		$dy = (float) $trazo[0]["y"] - (float) $ideal[0]["y"];
+		if (sqrt($dx * $dx + $dy * $dy) > $margen) return false;
+
+		/* Las marcas son milisegundos DESDE que se abrió la jugada, así que ni
+		   pueden ser negativas ni pueden ir hacia atrás. */
+		$previo = -1;
+		foreach ($trazo as $pt) {
+			$t = (int) ($pt["t"] ?? -1);
+			if ($t < 0 || $t < $previo) return false;
+			$previo = $t;
+		}
+		return true;
+	}
+
+	/** La estadística que manda en esta jugada, con caída a un valor base. */
+	public static function estadisticaDe(array $cartas, $cual, $familia) {
+		$col = ["ataque" => "ataque", "defensa" => "defensa", "tecnica" => "tecnica"][$cual] ?? "ataque";
+		$vals = [];
+		foreach ($cartas as $c) { if (isset($c[$col])) { $vals[] = (float) $c[$col]; } }
+		if (!$vals) return 50.0;   // partido de laboratorio: base jugable
+		rsort($vals);
+		return $vals[0];
+	}
+
+	/** Elemento dominante de una alineación. "no-afi" si no hay ninguno. */
+	public static function elementoDe(array $cartas, $familia) {
+		$cuenta = [];
+		foreach ($cartas as $c) {
+			$e = strtolower((string) ($c["afinidad"] ?? ""));
+			$e = str_replace("ñ", "n", $e);
+			if (in_array($e, self::ELEMENTOS, true)) {
+				$cuenta[$e] = ($cuenta[$e] ?? 0) + 1;
+			}
+		}
+		if (!$cuenta) return "no-afi";
+		arsort($cuenta);
+		return array_key_first($cuenta);
+	}
 }

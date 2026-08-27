@@ -25,6 +25,7 @@ $SUITES = [
     "probar_calibracion_pve" => "la calibración de dificultad PvE por preset",
     "probar_equipos_y_tutorial" => "los equipos con universo y el tutorial de bienvenida",
     "probar_nodo_bloqueo"    => "el nodo de bloqueo del mapa y sus requisitos",
+    "probar_jugadas_db"      => "el bucle de jugadas: apertura, decisión, ejecución e idempotencia",
 ];
 
 $mysql    = "C:\\xampp\\mysql\\bin\\mysql.exe";

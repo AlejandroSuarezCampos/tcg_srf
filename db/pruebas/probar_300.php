@@ -115,7 +115,7 @@ for ($n = 0; $n < TOTAL; $n++) {
        duelos que acaban empatados se quedan en `en_juego` con el bote retenido:
        lo detectó esta misma prueba al añadir la tanda jugable (73 de 300). */
     for ($i = 0; $i < 200; $i++) {
-        $e = $db->estadoPartido($id, 9);
+        $e = $db->estadoPartidoNarrado($id, 9);
         if (empty($e["ok"])) break;
 
         // --- LA TANDA ---
@@ -142,7 +142,7 @@ for ($n = 0; $n < TOTAL; $n++) {
         $quien = null; $mj = null;
         if (!empty($e["minijuego"]))            { $quien = 9; $mj = $e["minijuego"]; }
         elseif (!empty($e["esperando_rival"]))  {
-            $e2 = $db->estadoPartido($id, 2);
+            $e2 = $db->estadoPartidoNarrado($id, 2);
             if (!empty($e2["minijuego"])) { $quien = 2; $mj = $e2["minijuego"]; }
         }
         if ($mj) {
