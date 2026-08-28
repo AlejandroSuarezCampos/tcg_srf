@@ -702,3 +702,50 @@
   padding: 6px var(--e-2);
   font-size: var(--fs-body-sm);
 }
+
+/* =====================================================================
+   LA CAPA DE ESPECTÁCULO. Dos niveles.
+
+   Lo que cambia entre ellos es SOLO lo que se ve: sombras, filtros, partículas
+   y duraciones de adorno. Nunca un tamaño de zona pulsable ni un tiempo de
+   juego, porque eso convertiría tener peor móvil en tener peor balance.
+   ===================================================================== */
+
+.partido-lona { position: relative; }
+
+.partido-figura { width: 100%; height: auto; touch-action: none; }
+.partido-guia {
+  fill: none;
+  stroke: var(--ascua-trazo, #ff7a1a);
+  stroke-width: 14;
+  stroke-linecap: round;
+  opacity: .35;
+}
+.partido-estela {
+  fill: none;
+  stroke: var(--ascua-estela, #ffd166);
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+/* --- Nivel completo: el espectáculo --- */
+[data-espectaculo="completo"] .partido-guia {
+  filter: drop-shadow(0 0 12px var(--ascua-trazo, #ff7a1a));
+  animation: partido-pulso 1.5s ease-in-out infinite;
+}
+[data-espectaculo="completo"] .partido-estela {
+  filter: drop-shadow(0 0 18px var(--ascua-estela, #ffd166));
+}
+@keyframes partido-pulso {
+  0%, 100% { opacity: .30; }
+  50%      { opacity: .60; }
+}
+
+/* --- Nivel sobrio: mismo juego, menos humo --- */
+[data-espectaculo="sobrio"] .partido-guia,
+[data-espectaculo="sobrio"] .partido-estela { filter: none; animation: none; }
+[data-espectaculo="sobrio"] .partido-guia { opacity: .45; }
+
+/* Las zonas pulsables miden lo mismo en los dos niveles. A propósito. */
+.partido-sector { min-height: 88px; }
+.partido-opcion { min-height: 72px; }

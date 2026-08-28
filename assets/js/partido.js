@@ -142,6 +142,44 @@
   }
 
   /* =====================================================================
+     LA CAPA DE ESPECTÁCULO. Dos niveles, elegidos MIDIENDO el dispositivo.
+
+     ⚠️ REGLA DURA: el nivel NO toca ninguna tolerancia, ningún radio de acierto
+     ni ninguna ventana de tiempo. Solo cambia lo que se ve. Si algún día el
+     nivel visual empieza a decidir cómo de fácil es acertar, "gama baja" se
+     convierte en "peor balance", que es justo la trampa que este diseño existe
+     para evitar.
+     ===================================================================== */
+  var nivel = 'completo';
+
+  function medirNivel() {
+    /* Quien pide menos movimiento lo recibe, sin discusión y sin medir. */
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return aplicarNivel('sobrio');
+    }
+    /* Pistas baratas del propio dispositivo, antes de gastar frames midiendo. */
+    var hilos = navigator.hardwareConcurrency || 4;
+    var ram   = navigator.deviceMemory || 4;
+    if (hilos <= 4 || ram <= 2) { return aplicarNivel('sobrio'); }
+
+    /* Y una medición real de 20 frames: las pistas mienten a menudo. */
+    var frames = 0;
+    var t0 = performance.now();
+    (function contar() {
+      frames++;
+      if (frames < 20) { window.requestAnimationFrame(contar); return; }
+      var fps = frames / ((performance.now() - t0) / 1000);
+      aplicarNivel(fps < 40 ? 'sobrio' : 'completo');
+    })();
+  }
+
+  function aplicarNivel(cual) {
+    nivel = cual;
+    document.body.dataset.espectaculo = cual;
+    return cual;
+  }
+
+  /* =====================================================================
      LAS PRIMITIVAS. Tres, y las tres terminan en `Partido.enviar()`.
 
      ⚠️ NINGUNA PUNTÚA. Recogen lo que hizo el dedo y lo mandan tal cual.
@@ -316,6 +354,7 @@
       if (!elZona) return;                       // no estamos en la pantalla del partido
 
       alAbrir = montar;
+      medirNivel();
       window.setInterval(sondear, 1000);
       sondear();
       pintarReloj();
@@ -323,6 +362,7 @@
     alAbrirMinijuego: function (fn) { alAbrir = fn; },
     enviar: function (datos) { return enviar(datos); },
     jugadaActual: function () { return jugada; },
-    congelarReloj: congelarReloj
+    congelarReloj: congelarReloj,
+    nivelVisual: function () { return nivel; }
   };
 })();
