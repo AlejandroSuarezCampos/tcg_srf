@@ -141,6 +141,169 @@
     if (elLona) { elLona.hidden = true; }
   }
 
+  /* =====================================================================
+     LAS PRIMITIVAS. Tres, y las tres terminan en `Partido.enviar()`.
+
+     ⚠️ NINGUNA PUNTÚA. Recogen lo que hizo el dedo y lo mandan tal cual.
+     ===================================================================== */
+
+  var LIENZO = 1000;   // espacio lógico; el servidor usa el mismo
+
+  function aLogico(el, ev) {
+    var r = el.getBoundingClientRect();
+    return {
+      x: (ev.clientX - r.left) / r.width * LIENZO,
+      y: (ev.clientY - r.top) / r.height * LIENZO
+    };
+  }
+
+  /* --- 1. ELECCIÓN: botones grandes con su pista ---------------------- */
+  function montarEleccion(mj) {
+    elLona.hidden = false;
+    elLona.className = 'partido-lona es-eleccion';
+    elLona.innerHTML = '';
+
+    var t = document.createElement('p');
+    t.className = 'partido-enunciado';
+    t.textContent = mj.enunciado;
+    elLona.appendChild(t);
+
+    mj.opciones.forEach(function (o) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'partido-opcion';
+      var n = document.createElement('span');
+      n.className = 'partido-opcion-nombre';
+      n.textContent = o.nombre;
+      var p = document.createElement('span');
+      p.className = 'partido-opcion-pista';
+      p.textContent = o.pista;
+      b.appendChild(n); b.appendChild(p);
+      b.addEventListener('click', function () {
+        elLona.hidden = true;
+        esperando('…');
+        enviar({ que: 'ejecucion', opcion: o.clave });
+      });
+      elLona.appendChild(b);
+    });
+
+    plazo(mj.plazo_seg, function () {
+      elLona.hidden = true;
+      enviar({ que: 'ejecucion', opcion: '' });   // vacío = el servidor aplica la segura
+    });
+  }
+
+  /* --- 2. ZONA: las opciones sobre el marco de la portería ------------ */
+  function montarZona(mj) {
+    elLona.hidden = false;
+    elLona.className = 'partido-lona es-zona';
+    elLona.innerHTML = '<div class="partido-marco"></div>';
+    var marco = elLona.querySelector('.partido-marco');
+
+    mj.opciones.forEach(function (o, i) {
+      var z = document.createElement('button');
+      z.type = 'button';
+      z.className = 'partido-sector';
+      z.dataset.sector = o.clave;
+      z.style.gridArea = 's' + i;
+      z.title = o.pista;
+      z.textContent = o.nombre;
+      z.addEventListener('click', function () {
+        elLona.hidden = true;
+        esperando('…');
+        enviar({ que: 'ejecucion', opcion: o.clave });
+      });
+      marco.appendChild(z);
+    });
+
+    plazo(mj.plazo_seg, function () {
+      elLona.hidden = true;
+      enviar({ que: 'ejecucion', opcion: '' });
+    });
+  }
+
+  /* --- 3. TRAZO: seguir una figura con el dedo ------------------------ */
+  function montarTrazo(mj) {
+    elLona.hidden = false;
+    elLona.className = 'partido-lona es-trazo';
+    elLona.innerHTML = '<svg viewBox="0 0 1000 1000" class="partido-figura">'
+      + '<path class="partido-guia"></path><path class="partido-estela"></path></svg>';
+
+    var svg    = elLona.querySelector('svg');
+    var guia   = elLona.querySelector('.partido-guia');
+    var estela = elLona.querySelector('.partido-estela');
+
+    guia.setAttribute('d', comoPath(mj.figura_puntos));
+
+    var puntos = [];
+    var t0 = 0;
+    var trazando = false;
+
+    function punto(ev) {
+      var p = aLogico(svg, ev);
+      /* ⚠️ El instante se toma del RELOJ, no del contador de frames. Un móvil a
+         20 fps y uno a 120 mandan menos o más puntos, pero de la misma curva, y
+         el servidor los remuestrea por longitud de arco. Esa es toda la
+         justicia de hardware del juego, y vive en esta línea. */
+      p.t = t0 ? Date.now() - t0 : 0;
+      return p;
+    }
+
+    svg.addEventListener('pointerdown', function (ev) {
+      trazando = true; t0 = Date.now(); puntos = [punto(ev)];
+      svg.setPointerCapture(ev.pointerId);
+    });
+    svg.addEventListener('pointermove', function (ev) {
+      if (!trazando) return;
+      puntos.push(punto(ev));
+      estela.setAttribute('d', comoPath(puntos));
+    });
+    svg.addEventListener('pointerup', function () {
+      if (!trazando) return;
+      trazando = false;
+      elLona.hidden = true;
+      esperando('…');
+      enviar({ que: 'ejecucion', trazo: JSON.stringify(puntos.slice(0, 400)) });
+    });
+
+    plazo(mj.plazo_seg, function () {
+      if (!trazando && puntos.length === 0) {
+        elLona.hidden = true;
+        enviar({ que: 'ejecucion', trazo: '[]' });   // sin trazo = rendimiento 0
+      }
+    });
+  }
+
+  function comoPath(pts) {
+    if (!pts || !pts.length) return '';
+    return 'M' + pts.map(function (p) {
+      return p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+    }).join('L');
+  }
+
+  var temporizador = null;
+  function plazo(segundos, alAgotarse) {
+    if (temporizador) { window.clearTimeout(temporizador); }
+    temporizador = window.setTimeout(alAgotarse, segundos * 1000);
+  }
+
+  /* Engancha las primitivas al bucle. La ficha del minijuego (opciones, pistas,
+     figura) la manda el servidor: el cliente no tiene catálogo propio, para que
+     no haya dos versiones de la verdad. */
+  function montar(datosJugada) {
+    fetch(cfg.base + 'assets/ajax/partido_jugada.php?ficha='
+          + encodeURIComponent(datosJugada.minijuego)
+          + '&id_duelo=' + cfg.idDuelo + '&numero=' + datosJugada.numero,
+          { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (mj) {
+        if (!mj || !mj.ok) return;
+        if (mj.tipo === 'ejecucion')      { montarTrazo(mj); }
+        else if (mj.primitiva === 'zona') { montarZona(mj); }
+        else                              { montarEleccion(mj); }
+      });
+  }
+
   /* --------------------------------------------------------------------- */
   window.Partido = {
     iniciar: function (opciones) {
@@ -152,6 +315,7 @@
       elEspera   = document.getElementById('partido-espera');
       if (!elZona) return;                       // no estamos en la pantalla del partido
 
+      alAbrir = montar;
       window.setInterval(sondear, 1000);
       sondear();
       pintarReloj();

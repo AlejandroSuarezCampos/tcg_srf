@@ -14030,6 +14030,38 @@ class Tcg
 	}
 
 	/**
+	 * La ficha que el cliente necesita para PINTAR un minijuego.
+	 *
+	 * Nunca incluye `suelo`, `techo` ni `tolerancia`: son parámetros de puntuación
+	 * y el cliente no puntúa. Sí incluye la figura, porque hay que dibujarla, y
+	 * eso no regala nada: el servidor la regenera al puntuar.
+	 */
+	public function fichaMinijuego($clave, $id_duelo, $numero) {
+		$mj = Partido::catalogo()[$clave] ?? null;
+		if (!$mj) return ["ok" => false, "error" => "Minijuego desconocido."];
+
+		$ficha = [
+			"ok" => true, "clave" => $clave, "nombre" => $mj["nombre"],
+			"tipo" => $mj["tipo"], "titulo" => $mj["titulo"],
+			"enunciado" => $mj["enunciado"], "plazo_seg" => (int) $mj["plazo_seg"],
+		];
+
+		if ($mj["tipo"] === "lectura") {
+			$ficha["primitiva"] = $mj["primitiva"];
+			$ficha["opciones"] = array_map(function ($o) {
+				return ["clave" => $o["clave"], "nombre" => $o["nombre"], "pista" => $o["pista"]];
+			}, $mj["opciones"]);
+		} else {
+			$d = $this->pdo->prepare("SELECT valor_sorteo FROM duelos WHERE id_duelo = :d");
+			$d->execute([":d" => $id_duelo]);
+			$ficha["figura_puntos"] = Partido::figuraIdeal(
+				$mj["figura"], (float) $d->fetchColumn(), (int) $numero
+			);
+		}
+		return $ficha;
+	}
+
+	/**
 	 * Resuelve la jugada si los dos bandos ya han ejecutado.
 	 *
 	 * `FOR UPDATE` dentro de transacción y `desenlace IS NULL` en el UPDATE: dos

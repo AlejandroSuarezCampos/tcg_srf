@@ -26,6 +26,21 @@ if (empty($_SESSION['id_usuario'])) {
    «Gateway Timeout». */
 session_write_close();
 
+/* FICHA DEL MINIJUEGO. El cliente no tiene catálogo propio: lo pide aquí, para
+   que no existan dos versiones de la verdad que se puedan desincronizar.
+   Se sirve la figura ideal porque hay que PINTARLA — pero eso no da ventaja:
+   el servidor la vuelve a generar al puntuar, así que conocerla no evita tener
+   que trazarla bien. */
+if (isset($_GET['ficha'])) {
+    $mj = $db->fichaMinijuego(
+        (string) $_GET['ficha'],
+        (int) ($_GET['id_duelo'] ?? 0),
+        (int) ($_GET['numero'] ?? 0)
+    );
+    echo json_encode($mj, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (!csrfValido($_POST['csrf'] ?? null)) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Token CSRF inválido.']);
