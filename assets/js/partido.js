@@ -53,8 +53,18 @@
      SONDEO. Reusa el estado que ya viajaba; no abre una petición nueva.
      --------------------------------------------------------------------- */
   function sondear() {
-    fetch(cfg.base + 'assets/ajax/duelo_estado.php?id_duelo=' + cfg.idDuelo,
-          { credentials: 'same-origin' })
+    /* ⚠️ POST con csrf, no GET: `duelo_estado.php` es un endpoint que ya
+       existía antes de este motor y siempre exigió `$_POST['csrf']` y
+       `$_POST['id_duelo']` — nunca leyó `$_GET`. Un GET aquí vuelve
+       "Token CSRF inválido" en todas las peticiones y el partido nunca se
+       pinta. Tampoco lleva `.php` en la URL: el `.htaccess` del proyecto
+       redirige 301 quien lo pida con extensión, y un navegador real
+       convierte ese 301 en un GET sin cuerpo — el POST se perdería entero. */
+    var cuerpo = new FormData();
+    cuerpo.append('csrf', cfg.csrf);
+    cuerpo.append('id_duelo', cfg.idDuelo);
+    fetch(cfg.base + 'assets/ajax/duelo_estado',
+          { method: 'POST', body: cuerpo, credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) { if (d && d.partido) { aplicar(d.partido); } })
       .catch(function () { /* un sondeo perdido no es un error: cae el siguiente */ });
@@ -129,7 +139,9 @@
     cuerpo.append('numero', jugada.numero);
     Object.keys(datos).forEach(function (k) { cuerpo.append(k, datos[k]); });
 
-    return fetch(cfg.base + 'assets/ajax/partido_jugada.php',
+    /* Sin `.php`: mismo motivo que en sondear(), un 301 aquí convertiría este
+       POST en un GET sin cuerpo y la decisión o la ejecución se perdería. */
+    return fetch(cfg.base + 'assets/ajax/partido_jugada',
                  { method: 'POST', body: cuerpo, credentials: 'same-origin' })
       .then(function (r) { return r.json(); })
       .then(function (d) { sondear(); return d; });
@@ -329,7 +341,7 @@
      figura) la manda el servidor: el cliente no tiene catálogo propio, para que
      no haya dos versiones de la verdad. */
   function montar(datosJugada) {
-    fetch(cfg.base + 'assets/ajax/partido_jugada.php?ficha='
+    fetch(cfg.base + 'assets/ajax/partido_jugada?ficha='
           + encodeURIComponent(datosJugada.minijuego)
           + '&id_duelo=' + cfg.idDuelo + '&numero=' + datosJugada.numero,
           { credentials: 'same-origin' })
