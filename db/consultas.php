@@ -14228,6 +14228,80 @@ class Tcg
 		}
 	}
 
+	/**
+	 * RELLENA LOS HUECOS DE QUIEN NO HA RESPONDIDO A TIEMPO.
+	 *
+	 * El plazo de cada minijuego vive en el NAVEGADOR, y un navegador cerrado no
+	 * dispara temporizadores. Sin este barrido, cerrar la pestaña dejaría la
+	 * jugada abierta para siempre: el rival mirando una pantalla congelada y unas
+	 * cartas apostadas en el aire. Esto es lo único que corre en el servidor, así
+	 * que es lo único que garantiza que el partido siga.
+	 *
+	 * Lo que se le aplica al ausente NO es un castigo: es lo que vale no jugar.
+	 * En lectura, la opción SEGURA —nunca la de más premio, porque nadie puede
+	 * salir beneficiado por no decidir—; en ejecución, rendimiento 0, que deja el
+	 * multiplicador en el suelo.
+	 *
+	 * Devuelve true si tuvo que rellenar algo.
+	 */
+	public function caducarJugada($id_duelo, $numero) {
+		$plazo = (int) $this->config("partido_decision_seg", 10)
+		       + (int) $this->config("partido_latido_max", 12);
+
+		$leer = $this->pdo->prepare("
+			SELECT *, TIMESTAMPDIFF(SECOND, abierta, NOW()) AS edad
+			FROM partido_jugadas WHERE id_duelo = :d AND numero = :n
+		");
+		$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+		$j = $leer->fetch(PDO::FETCH_ASSOC);
+
+		if (!$j || $j["desenlace"] !== null) return false;
+		if ((int) $j["edad"] < $plazo) return false;
+
+		$duelo = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$duelo->execute([":d" => $id_duelo]);
+		$duelo = $duelo->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo) return false;
+
+		$toco = false;
+
+		/* 1. Si ni siquiera se ha decidido la acción, decide el servidor. Elige
+		      SIEMPRE la primera de la zona, que por orden del array es la más
+		      conservadora: quien no aparece no puede llevarse la jugada de más
+		      riesgo ni la de más premio. */
+		if ($j["accion"] === null) {
+			$acciones = array_keys(Partido::accionesDe($j["zona"]));
+			$this->decidirAccion($id_duelo, (int) $j["id_poseedor"], $numero, $acciones[0]);
+			$leer->execute([":d" => $id_duelo, ":n" => $numero]);
+			$j = $leer->fetch(PDO::FETCH_ASSOC);
+			$toco = true;
+		}
+
+		/* 2. Rellena el hueco que falte, en el lado que falte. */
+		foreach ([["atacante", "mj_atacante"], ["defensor", "mj_defensor"]] as $par) {
+			[$lado, $campoMj] = $par;
+			$campoR = "rend_$lado";
+			$campoO = "opc_$lado";
+			if ($j[$campoR] !== null) continue;
+
+			$mj = Partido::catalogo()[$j[$campoMj]] ?? null;
+			if (!$mj) continue;
+
+			$opcion = $mj["tipo"] === "lectura" ? Partido::opcionSegura($mj) : null;
+			$rend   = $mj["tipo"] === "lectura" ? 1.0 : 0.0;
+
+			$upd = $this->pdo->prepare("
+				UPDATE partido_jugadas SET $campoR = :r, $campoO = :o, auto_$lado = 1
+				WHERE id_duelo = :d AND numero = :n AND $campoR IS NULL AND desenlace IS NULL
+			");
+			$upd->execute([":r" => $rend, ":o" => $opcion, ":d" => $id_duelo, ":n" => $numero]);
+			if ($upd->rowCount() > 0) { $toco = true; }
+		}
+
+		if ($toco) { $this->resolverJugadaSiProcede($id_duelo, $numero); }
+		return $toco;
+	}
+
 	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
 	public function estadoPartido($id_duelo, $id_usuario) {
 		$abrir = $this->abrirJugada($id_duelo);

@@ -128,5 +128,53 @@ comprobar("una jugada que no acabó en gol no suma",
 
 comprobar("un duelo sin jugadas da 0-0", $db->marcadorDeJugadas(-1) === [0, 0]);
 
+echo "\n7. EL PARTIDO SIGUE SIN EL AUSENTE\n";
+
+/* Se monta una jugada abierta y decidida, con el atacante ya ejecutado y el
+   defensor desaparecido, y se la envejece a mano más allá del plazo. */
+$conn->exec("DELETE FROM partido_jugadas WHERE id_duelo = $idDuelo");
+$conn->prepare("
+	INSERT INTO partido_jugadas
+		(id_duelo, numero, minuto, zona, id_poseedor, accion,
+		 mj_atacante, mj_defensor, opc_atacante, rend_atacante, abierta)
+	VALUES (:d, 1, 7, 'salida', :p, 'pase_corto',
+	        'amago_salida', 'carga_segada', 'derecha', 1.000,
+	        DATE_SUB(NOW(), INTERVAL 120 SECOND))
+")->execute([":d" => $idDuelo, ":p" => $idA]);
+
+comprobar("antes del barrido la jugada sigue abierta",
+	$conn->query("SELECT desenlace FROM partido_jugadas WHERE id_duelo = $idDuelo AND numero = 1")
+	     ->fetchColumn() === null);
+
+$caducada = $db->caducarJugada($idDuelo, 1);
+comprobar("el barrido rellena el hueco del ausente", $caducada === true);
+
+$fila = $conn->query("SELECT * FROM partido_jugadas WHERE id_duelo = $idDuelo AND numero = 1")
+             ->fetch(PDO::FETCH_ASSOC);
+comprobar("la jugada del ausente queda RESUELTA, el partido no se cuelga",
+	$fila["desenlace"] !== null, (string) $fila["desenlace"]);
+comprobar("al ausente se le aplica la opción SEGURA, nunca la de más premio",
+	$fila["opc_defensor"] === Partido::opcionSegura(Partido::catalogo()["carga_segada"]),
+	(string) $fila["opc_defensor"]);
+comprobar("queda marcado que se resolvió solo", (int) $fila["auto_defensor"] === 1);
+comprobar("al que SÍ jugó no se le marca como automático", (int) $fila["auto_atacante"] === 0);
+
+comprobar("una jugada recién abierta NO se caduca",
+	$db->caducarJugada($idDuelo, 1) === false);
+
+/* Y el caso peor: nadie decide siquiera la acción. */
+$conn->exec("DELETE FROM partido_jugadas WHERE id_duelo = $idDuelo");
+$conn->prepare("
+	INSERT INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor, abierta)
+	VALUES (:d, 1, 7, 'salida', :p, DATE_SUB(NOW(), INTERVAL 120 SECOND))
+")->execute([":d" => $idDuelo, ":p" => $idA]);
+
+$db->caducarJugada($idDuelo, 1);
+$fila = $conn->query("SELECT * FROM partido_jugadas WHERE id_duelo = $idDuelo AND numero = 1")
+             ->fetch(PDO::FETCH_ASSOC);
+comprobar("si nadie decide la acción, el servidor elige una y sigue",
+	$fila["accion"] !== null && $fila["desenlace"] !== null,
+	$fila["accion"] . " / " . $fila["desenlace"]);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);

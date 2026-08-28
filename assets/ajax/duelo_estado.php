@@ -112,6 +112,17 @@ $respuesta = [
 /* El bucle de jugadas viaja en el mismo sondeo que ya existía: una petición por
    segundo, no dos. `estadoPartido()` ya abre la jugada siguiente si hace falta,
    así que sondear es también lo que hace avanzar el partido. */
+
+/* EL BARRIDO VA EN EL SONDEO, no en un cron. El sondeo lo dispara CUALQUIERA de
+   los dos navegadores, así que basta con que uno de los dos siga vivo para que
+   el partido avance — que es justo el caso que hay que cubrir: uno se va y el
+   otro se queda esperando. Si se van los dos, no hay a quién desbloquear y ya se
+   encarga `partido_abandono_seg` de cerrar el duelo. */
+$pendiente = $db->abrirJugada($id_duelo);
+if (!empty($pendiente['jugada'])) {
+    $db->caducarJugada($id_duelo, (int) $pendiente['jugada']['numero']);
+}
+
 $respuesta['partido'] = $db->estadoPartido($id_duelo, (int) $_SESSION['id_usuario']);
 if (!empty($respuesta['partido']['jugada'])) {
     $db->jugarTurnoCpu($id_duelo, (int) $respuesta['partido']['jugada']['numero']);
