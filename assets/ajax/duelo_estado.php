@@ -101,10 +101,20 @@ if ($duelo['estado'] === 'listo_para_resolver') {
 // Se relee el estado: entre el latido y ahora puede haber entrado el rival.
 $duelo = $db->obtenerDuelo($id_duelo, $id_usuario);
 
-echo json_encode([
+$respuesta = [
     'ok'     => true,
     'estado' => $duelo['estado'],
     // La pantalla solo necesita saber si debe seguir esperando o ya pasar al
     // partido; el detalle lo pinta el servidor al recargar.
     'listo'  => !in_array($duelo['estado'], ['creado'], true),
-]);
+];
+
+/* El bucle de jugadas viaja en el mismo sondeo que ya existía: una petición por
+   segundo, no dos. `estadoPartido()` ya abre la jugada siguiente si hace falta,
+   así que sondear es también lo que hace avanzar el partido. */
+$respuesta['partido'] = $db->estadoPartido($id_duelo, (int) $_SESSION['id_usuario']);
+if (!empty($respuesta['partido']['jugada'])) {
+    $db->jugarTurnoCpu($id_duelo, (int) $respuesta['partido']['jugada']['numero']);
+}
+
+echo json_encode($respuesta);
