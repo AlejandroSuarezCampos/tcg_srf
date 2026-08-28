@@ -242,5 +242,18 @@ jugadasCompletas($conn, $idDuelo, [[$idA, "recupera"], [$idB, "recupera"]]);
 comprobar("con jugadas por delante, el barrido no cierra nada",
 	$db->cerrarPartidoJugable($idDuelo) === false);
 
+/* El disparador viejo (reloj de pared) NO puede cerrar un partido jugable a
+   medias, ni aunque el reloj ya haya cumplido de sobra: mientras haya
+   jugadas de `partido_jugadas` sin resolver, `cerrarPartidoSiToca()` tiene
+   que negarse en redondo. Se simula un partido "viejo" retrasando `abierta`
+   y `resuelto` más allá de `partido_duracion_seg`. */
+$conn->prepare("UPDATE duelos SET partido_inicio = DATE_SUB(NOW(), INTERVAL 10 MINUTE) WHERE id_duelo = :d")
+     ->execute([":d" => $idDuelo]);
+comprobar("cerrarPartidoSiToca() se niega mientras el motor jugable tenga jugadas sin resolver",
+	$db->cerrarPartidoSiToca($idDuelo) === false);
+$duelo = $conn->query("SELECT estado FROM duelos WHERE id_duelo = $idDuelo")->fetch(PDO::FETCH_ASSOC);
+comprobar("el partido sigue en_juego, no lo cerró el reloj de pared",
+	$duelo["estado"] === "en_juego", (string) $duelo["estado"]);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);

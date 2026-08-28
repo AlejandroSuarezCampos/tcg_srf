@@ -7621,6 +7621,21 @@ class Tcg
 		$duelo = $leer();
 		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
 
+		/* ⚠️ UN PARTIDO JUGABLE NO SE CIERRA POR RELOJ DE PARED. Este umbral
+		   (`partido_duracion_seg`) es del sistema narrado viejo: una duración
+		   fija pensada para una simulación de duración conocida de antemano.
+		   El motor jugable no tiene duración fija —12 jugadas pueden tardar 20
+		   segundos o 4 minutos según lo que piensen los jugadores—, así que
+		   este reloj podía cerrar un partido A MEDIAS (con jugadas por resolver
+		   y el marcador que hubiera en ese instante) o corromperlo con datos del
+		   modal narrado viejo, que sigue vivo hasta la Task 17. Mientras haya
+		   jugadas de `partido_jugadas`, el único que puede cerrar este partido
+		   es `cerrarPartidoJugable()`, que mira si las 12 han terminado de
+		   verdad, no cuánto ha pasado. */
+		$stmtJ = $this->pdo->prepare("SELECT 1 FROM partido_jugadas WHERE id_duelo = :d LIMIT 1");
+		$stmtJ->execute([":d" => $id_duelo]);
+		if ($stmtJ->fetchColumn()) { return false; }
+
 		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
 		$abandono = max($duracion, (int) $this->config("partido_abandono_seg", 3600));
 
@@ -14302,7 +14317,6 @@ class Tcg
 		return $toco;
 	}
 
-	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
 	/**
 	 * CIERRA EL PARTIDO JUGABLE EN CUANTO SUS JUGADAS HAN TERMINADO.
 	 *
@@ -14324,10 +14338,18 @@ class Tcg
 	 * ⚠️ `liquidarPartido()` decide ganador y empate leyendo `duelos.goles_*`
 	 * de la FILA, no de `partido_jugadas`: es lo que el sistema narrado viejo
 	 * mantenía al día minijuego a minijuego, y el motor jugable no lo toca en
-	 * ningún otro sitio. Sin este UPDATE, `duelos.goles_*` se quedan en el 0-0
-	 * inicial de `resolverDuelo()` para siempre y todo partido liquidaría como
-	 * empate, sin importar lo jugado. Es el marcador FINAL y ya no cambia —
-	 * escribirlo aquí, justo antes de liquidar, es seguro.
+	 * ningún otro sitio. Sin este UPDATE, `duelos.goles_*` tienen un marcador
+	 * que NO es el de las jugadas —el 0-0 con el que `resolverDuelo()` montó
+	 * el partido, en el mejor de los casos— y todo partido jugable liquidaría
+	 * con ese marcador falso, sin importar lo jugado de verdad. Aquí, con las
+	 * 12 jugadas ya resueltas, es el marcador FINAL y ya no cambia — escribirlo
+	 * justo antes de liquidar es seguro.
+	 *
+	 * ⚠️ Comprueba el "fin" SIN pasar por `abrirJugada()`: esa función, si no
+	 * hay ninguna jugada abierta y todavía no se llegó a la última, ABRE la
+	 * siguiente (es su trabajo). Llamarla aquí para solo preguntar "¿ha
+	 * terminado?" arrancaría por accidente una jugada nueva en un partido que
+	 * no ha terminado todavía — justo lo contrario de "cerrar".
 	 */
 	public function cerrarPartidoJugable($id_duelo) {
 		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
@@ -14335,7 +14357,16 @@ class Tcg
 		$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
 		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
 
-		if (empty($this->abrirJugada($id_duelo)["fin"])) return false;
+		$abierta = $this->pdo->prepare("
+			SELECT 1 FROM partido_jugadas WHERE id_duelo = :d AND desenlace IS NULL LIMIT 1
+		");
+		$abierta->execute([":d" => $id_duelo]);
+		if ($abierta->fetchColumn()) return false;
+
+		$total = (int) $this->config("partido_jugadas_num", 12);
+		$resueltas = $this->pdo->prepare("SELECT COUNT(*) FROM partido_jugadas WHERE id_duelo = :d");
+		$resueltas->execute([":d" => $id_duelo]);
+		if ((int) $resueltas->fetchColumn() < $total) return false;
 
 		[$golesCreador, $golesRival] = $this->marcadorDeJugadas($id_duelo);
 		$this->pdo->prepare("
@@ -14349,6 +14380,7 @@ class Tcg
 		return $this->cerrarConTandaSiHace($id_duelo, $duelo, false);
 	}
 
+	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
 	public function estadoPartido($id_duelo, $id_usuario) {
 		$abrir = $this->abrirJugada($id_duelo);
 		$j = $abrir["jugada"] ?? null;
