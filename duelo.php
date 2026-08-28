@@ -893,5 +893,16 @@ include __DIR__ . '/navbar.php';
 
 <?= assetScript($base ?? '', 'assets/js/duelo.js') ?>
 
+<script src="<?= htmlspecialchars(assetUrl($base ?? '', 'assets/js/partido.js')) ?>"></script>
+<script>
+  Partido.iniciar({
+    idDuelo: <?= (int) $id_duelo ?>,
+    csrf: <?= json_encode(csrfToken()) ?>,
+    base: <?= json_encode($base ?? '') ?>,
+    minutos: 90,
+    narracionSeg: <?= (float) $db->config('partido_narracion_seg', 3) ?>
+  });
+</script>
+
 </body>
 </html>
