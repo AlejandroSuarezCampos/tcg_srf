@@ -26,6 +26,8 @@ $SUITES = [
     "probar_equipos_y_tutorial" => "los equipos con universo y el tutorial de bienvenida",
     "probar_nodo_bloqueo"    => "el nodo de bloqueo del mapa y sus requisitos",
     "probar_jugadas_db"      => "el bucle de jugadas: apertura, decisión, ejecución e idempotencia",
+    "probar_partido_jugable"  => "el motor puro: ciclo elemental, formula, trazo y bucle",
+    "probar_balance_jugable"  => "que la habilidad importe pero el equipo mande",
 ];
 
 $mysql    = "C:\\xampp\\mysql\\bin\\mysql.exe";

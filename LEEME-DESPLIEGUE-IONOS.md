@@ -177,6 +177,26 @@ Lo que hay que hacer es:
    local y costó una sesión entera de diagnóstico (v7.8 de
    `branding/CLAUDE.md`).
 
+### 054 — El partido se juega
+
+Aplicar `db/migraciones/054_partido_jugable.sql` **antes** de subir el código.
+Crea `partido_jugadas` y cinco diales nuevos en `configuracion`.
+
+Después de aplicarla, los duelos empiezan a resolverse por jugadas y el
+marcador deja de salir de la simulación. Los duelos **ya terminados** se siguen
+viendo igual; los que estuvieran en juego durante el despliegue hay que darlos
+por cancelados, porque no tienen filas en `partido_jugadas`.
+
+Diales que se pueden tocar sin desplegar código:
+
+| Clave | Nace en | Para qué |
+|---|---|---|
+| `partido_jugadas_num` | 12 | Jugadas y, por tanto, minijuegos por partido |
+| `partido_stat_ref` | 80 | Estadística que desbloquea el techo completo. Subirlo separa más los mazos |
+| `habilidad_tope_pct` | 100 | Cuánto puede desviar la ejecución. Bajarlo hace mandar más al equipo |
+| `partido_decision_seg` | 10 | Plazo para decidir o ejecutar |
+| `partido_narracion_seg` | 3 | Segundos que el reloj corre en vivo entre jugadas |
+
 ## Lo que NO va a funcionar igual en un hosting compartido típico de IONOS
 
 - **`db/pruebas/*.php` y los scripts de `db/migraciones/*.php`** son de
