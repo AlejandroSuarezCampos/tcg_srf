@@ -7621,20 +7621,26 @@ class Tcg
 		$duelo = $leer();
 		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
 
-		/* ⚠️ UN PARTIDO JUGABLE NO SE CIERRA POR RELOJ DE PARED. Este umbral
-		   (`partido_duracion_seg`) es del sistema narrado viejo: una duración
-		   fija pensada para una simulación de duración conocida de antemano.
-		   El motor jugable no tiene duración fija —12 jugadas pueden tardar 20
-		   segundos o 4 minutos según lo que piensen los jugadores—, así que
-		   este reloj podía cerrar un partido A MEDIAS (con jugadas por resolver
-		   y el marcador que hubiera en ese instante) o corromperlo con datos del
-		   modal narrado viejo, que sigue vivo hasta la Task 17. Mientras haya
-		   jugadas de `partido_jugadas`, el único que puede cerrar este partido
-		   es `cerrarPartidoJugable()`, que mira si las 12 han terminado de
-		   verdad, no cuánto ha pasado. */
-		$stmtJ = $this->pdo->prepare("SELECT 1 FROM partido_jugadas WHERE id_duelo = :d LIMIT 1");
-		$stmtJ->execute([":d" => $id_duelo]);
-		if ($stmtJ->fetchColumn()) { return false; }
+		/* ¿Es un partido jugable (tiene filas en `partido_jugadas`)? Si es así,
+		   antes de forzar un cierre hay que escribir el marcador REAL de las
+		   jugadas en `duelos.goles_*` — si no, un cierre por abandono liquidaría
+		   con el 0-0 (u otro valor obsoleto) que dejó `resolverDuelo()`, no con
+		   lo que de verdad se jugó. Se usa también más abajo para vetar el
+		   cierre por reloj de pared. */
+		$sincronizarMarcadorJugable = function () use ($id_duelo, &$duelo) {
+			$tieneJugadas = $this->pdo->prepare("SELECT 1 FROM partido_jugadas WHERE id_duelo = :d LIMIT 1");
+			$tieneJugadas->execute([":d" => $id_duelo]);
+			if (!$tieneJugadas->fetchColumn()) return false;
+
+			[$gc, $gr] = $this->marcadorDeJugadas($id_duelo);
+			$this->pdo->prepare("
+				UPDATE duelos SET goles_creador = :gc, goles_rival = :gr
+				WHERE id_duelo = :d AND estado = 'en_juego'
+			")->execute([":gc" => $gc, ":gr" => $gr, ":d" => $id_duelo]);
+			$duelo["goles_creador"] = $gc;
+			$duelo["goles_rival"]   = $gr;
+			return true;
+		};
 
 		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
 		$abandono = max($duracion, (int) $this->config("partido_abandono_seg", 3600));
@@ -7643,10 +7649,18 @@ class Tcg
 		   ⚠️ También pasa por la tanda: si el marcador quedó empatado, liquidar a
 		   secas no escribe ganador y el duelo se queda colgado con el bote dentro
 		   PARA SIEMPRE. Esta rama se me quedó sin la tanda al hacerla jugable y lo
-		   cazó la prueba del Paso 3, no el razonamiento. */
+		   cazó la prueba del Paso 3, no el razonamiento.
+
+		   ⚠️ Esta rama y la siguiente SÍ pueden cerrar un partido jugable: son la
+		   red de abandono (§12 del spec — "el partido sigue" no puede significar
+		   "el bote se queda dentro para siempre" si los dos se van). Lo único que
+		   un partido jugable tiene vetado es el cierre por RELOJ DE PARED, más
+		   abajo — ese es el que decidía con el marcador que hubiera en ese
+		   instante, jugadas terminadas o no. */
 		if (!$duelo["partido_inicio"]) {
 			$montado = $duelo["resuelto"] ? time() - strtotime($duelo["resuelto"]) : 0;
 			if ($montado < $abandono) return false;
+			$sincronizarMarcadorJugable();
 			return $this->cerrarConTandaSiHace($id_duelo, $duelo, true);
 		}
 
@@ -7663,12 +7677,28 @@ class Tcg
 
 		   La decisión pendiente simplemente no se juega, y eso es lo correcto: no
 		   hay nadie a quien aplicarle la opción segura, y sin jugarla no mueve el
-		   marcador. El resultado es el que la simulación dejó escrito. */
+		   marcador. El resultado es el que la simulación dejó escrito.
+
+		   (`partido_pausado_en` es del sistema narrado viejo — el motor jugable
+		   nunca lo pone, así que esta rama es un no-op para un partido jugable. Se
+		   deja tal cual: no hace falta sincronizar nada que no va a disparar.) */
 		if ($duelo["partido_pausado_en"]) {
 			if (time() - strtotime($duelo["partido_pausado_en"]) < $abandono) return false;
 			// Abandonado: se fuerza también la tanda, si la hubiera.
 			return $this->cerrarConTandaSiHace($id_duelo, $duelo, true);
 		}
+
+		/* ⚠️ AQUÍ EMPIEZA EL CIERRE POR RELOJ DE PARED, y un partido jugable lo
+		   tiene vetado del todo: `partido_duracion_seg` es la duración FIJA del
+		   sistema narrado viejo, y el motor jugable no tiene duración fija —12
+		   jugadas pueden tardar 20 segundos o 4 minutos según lo que piensen los
+		   jugadores—, así que este reloj podía cerrar un partido A MEDIAS (con
+		   jugadas por resolver) usando el marcador que hubiera en ese instante.
+		   Mientras haya jugadas de `partido_jugadas`, el único que decide si ya
+		   ha terminado de verdad es `cerrarPartidoJugable()`. */
+		$tieneJugadas = $this->pdo->prepare("SELECT 1 FROM partido_jugadas WHERE id_duelo = :d LIMIT 1");
+		$tieneJugadas->execute([":d" => $id_duelo]);
+		if ($tieneJugadas->fetchColumn()) return false;
 
 		if (self::segundosDePartido($duelo) < $duracion) return false;
 
@@ -14320,15 +14350,15 @@ class Tcg
 	/**
 	 * CIERRA EL PARTIDO JUGABLE EN CUANTO SUS JUGADAS HAN TERMINADO.
 	 *
-	 * `cerrarPartidoSiToca()` es del sistema narrado viejo: dispara por RELOJ DE
-	 * PARED (`segundosDePartido() < partido_duracion_seg`), un umbral pensado
-	 * para una simulación de duración fija. El motor jugable no tiene duración
-	 * fija — 12 jugadas pueden tardar 20 segundos o 4 minutos según lo que
-	 * piensen los jugadores—, así que ese reloj puede cerrar el partido A
-	 * MEDIAS (antes de la jugada 12) o dejarlo colgado mucho después de que
-	 * las 12 ya estén resueltas. Aquí el disparador es real: `abrirJugada()`
-	 * devuelve `fin` cuando no queda ninguna jugada por abrir, ni antes ni
-	 * después.
+	 * El cierre por RELOJ DE PARED de `cerrarPartidoSiToca()` (`segundosDePartido()
+	 * < partido_duracion_seg`) está vetado para un partido jugable —ese reloj es
+	 * del sistema narrado viejo, pensado para una duración fija que este motor no
+	 * tiene—, así que aquí el disparador es real: sin jugada abierta Y con las
+	 * `partido_jugadas_num` jugadas resueltas (comprobación de solo lectura, ver
+	 * más abajo por qué no se reusa `abrirJugada()` para esto). Las redes de
+	 * abandono de `cerrarPartidoSiToca()` (nadie llegó a ver el partido, o se
+	 * quedó parado en una decisión) SÍ siguen vivas para un partido jugable: la
+	 * única parte vetada es la del reloj de pared.
 	 *
 	 * Reutiliza `cerrarConTandaSiHace()` y `liquidarPartido()` tal cual: son
 	 * las mismas que ya cierran el sistema narrado, ya se llaman en cada
@@ -14363,6 +14393,10 @@ class Tcg
 		$abierta->execute([":d" => $id_duelo]);
 		if ($abierta->fetchColumn()) return false;
 
+		/* COUNT(*), no MAX(numero) como hace `abrirJugada()`: si algún día un
+		   hueco en la numeración deja menos filas que `$total`, esta función
+		   tiene que negarse a cerrar, no dar el partido por terminado con una
+		   jugada de menos. Equivocarse por "no cierro" es el lado seguro aquí. */
 		$total = (int) $this->config("partido_jugadas_num", 12);
 		$resueltas = $this->pdo->prepare("SELECT COUNT(*) FROM partido_jugadas WHERE id_duelo = :d");
 		$resueltas->execute([":d" => $id_duelo]);

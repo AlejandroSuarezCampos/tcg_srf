@@ -244,9 +244,14 @@ comprobar("con jugadas por delante, el barrido no cierra nada",
 
 /* El disparador viejo (reloj de pared) NO puede cerrar un partido jugable a
    medias, ni aunque el reloj ya haya cumplido de sobra: mientras haya
-   jugadas de `partido_jugadas` sin resolver, `cerrarPartidoSiToca()` tiene
-   que negarse en redondo. Se simula un partido "viejo" retrasando `abierta`
-   y `resuelto` más allá de `partido_duracion_seg`. */
+   jugadas de `partido_jugadas` SIN RESOLVER, `cerrarPartidoSiToca()` tiene
+   que negarse en redondo. Se deja una jugada abierta de verdad (desenlace
+   NULL) y se envejece `partido_inicio` más allá de `partido_duracion_seg`. */
+jugadasCompletas($conn, $idDuelo, [[$idA, "gol"], [$idB, "recupera"]]);
+$conn->prepare("
+	INSERT INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor, abierta)
+	VALUES (:d, 3, 20, 'salida', :p, NOW())
+")->execute([":d" => $idDuelo, ":p" => $idA]);
 $conn->prepare("UPDATE duelos SET partido_inicio = DATE_SUB(NOW(), INTERVAL 10 MINUTE) WHERE id_duelo = :d")
      ->execute([":d" => $idDuelo]);
 comprobar("cerrarPartidoSiToca() se niega mientras el motor jugable tenga jugadas sin resolver",
@@ -254,6 +259,28 @@ comprobar("cerrarPartidoSiToca() se niega mientras el motor jugable tenga jugada
 $duelo = $conn->query("SELECT estado FROM duelos WHERE id_duelo = $idDuelo")->fetch(PDO::FETCH_ASSOC);
 comprobar("el partido sigue en_juego, no lo cerró el reloj de pared",
 	$duelo["estado"] === "en_juego", (string) $duelo["estado"]);
+
+/* Pero si los DOS se han ido de verdad —el caso que el reloj de pared ya no
+   cubre para un partido jugable— la red de ABANDONO tiene que seguir
+   cerrando el partido, con el marcador real de lo que se llegó a jugar, no
+   con un 0-0 heredado. Se simula abandono total: nunca se marcó
+   `partido_inicio` (nadie del sistema narrado viejo llegó a tocar este
+   duelo) y `resuelto` queda muy por detrás de `partido_abandono_seg`. */
+$conn->prepare("
+	UPDATE duelos
+	SET partido_inicio = NULL, resuelto = DATE_SUB(NOW(), INTERVAL 2 HOUR),
+	    estado = 'en_juego', goles_creador = NULL, goles_rival = NULL, id_ganador = NULL
+	WHERE id_duelo = :d
+")->execute([":d" => $idDuelo]);
+
+comprobar("un partido jugable ABANDONADO de verdad sí se cierra (la red de abandono sigue viva)",
+	$db->cerrarPartidoSiToca($idDuelo) === true);
+$duelo = $conn->query("SELECT estado, goles_creador, goles_rival, id_ganador FROM duelos WHERE id_duelo = $idDuelo")
+              ->fetch(PDO::FETCH_ASSOC);
+comprobar("y se cierra con el marcador REAL de lo jugado (1-0), no con un 0-0 heredado",
+	(int) $duelo["goles_creador"] === 1 && (int) $duelo["goles_rival"] === 0
+	&& $duelo["estado"] === "resuelto" && (int) $duelo["id_ganador"] === $idA,
+	"{$duelo['estado']} {$duelo['goles_creador']}-{$duelo['goles_rival']} ganador={$duelo['id_ganador']}");
 
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
