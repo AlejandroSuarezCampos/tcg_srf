@@ -411,17 +411,32 @@ include __DIR__ . '/navbar.php';
          data-nuevo="<?= $ceremonia ? '1' : '0' ?>"
          data-revelar="<?= isset($_GET['revelar']) ? '1' : '0' ?>">
 
+    <!-- EL PARTIDO JUGABLE. Todo lo que hay aquí lo rellena partido.js desde el
+         sondeo; en HTML solo viven los huecos y el estado de partida. Vive
+         AQUÍ, fuera del if($enJuego), porque es precisamente durante el
+         partido en vivo cuando tiene que verse: antes vivía solo en la rama
+         resuelta, donde nunca llegaba a aparecer mientras se jugaba. -->
+    <section class="partido-jugable" aria-live="polite">
+      <header class="partido-jugable-cab">
+        <span class="partido-reloj" id="partido-minuto">0'</span>
+        <div class="partido-campo" id="partido-zona" data-zona="salida">
+          <span class="partido-campo-tramo" data-tramo="salida">Salida</span>
+          <span class="partido-campo-tramo" data-tramo="creacion">Creación</span>
+          <span class="partido-campo-tramo" data-tramo="area">Área</span>
+        </div>
+      </header>
+
+      <div class="partido-acciones" id="partido-acciones" hidden></div>
+      <div class="partido-lona" id="partido-lona" hidden></div>
+      <p class="partido-espera" id="partido-espera">Empieza el partido…</p>
+    </section>
+
     <?php if ($enJuego): ?>
-      <?php /* Con el partido corriendo aquí no hay nada que contar todavía. El
-               encuentro se ve en el modal, que es donde el minuto lo manda el
-               servidor. Sin JavaScript esta es la pantalla que queda, y dice la
-               verdad: el partido se está jugando. */ ?>
-      <div class="vacio">
-        <span class="vacio-ico"><i class="ph ph-hourglass" aria-hidden="true"></i></span>
-        <h1>Partido en juego</h1>
-        <p>El resultado aparece cuando termine el encuentro.</p>
-        <a class="btn btn-plano" href="<?= htmlspecialchars($volverUrl) ?>"><?= htmlspecialchars($volverTexto) ?></a>
-      </div>
+      <?php /* Sin JavaScript la sección de arriba se queda tal cual, con "Empieza
+               el partido…": no cuenta nada, pero tampoco miente. Con JavaScript,
+               `Partido.iniciar()` (llamado al final de esta página) la rellena
+               desde el sondeo — el mismo sondeo que antes solo alimentaba el
+               modal viejo. */ ?>
 
     <?php else: ?>
 
@@ -608,23 +623,6 @@ include __DIR__ . '/navbar.php';
           ?>
         </div>
       <?php endif; ?>
-
-      <!-- EL PARTIDO JUGABLE. Todo lo que hay aquí lo rellena partido.js desde
-           el sondeo; en HTML solo viven los huecos y el estado de partida. -->
-      <section class="partido-jugable" aria-live="polite">
-        <header class="partido-jugable-cab">
-          <span class="partido-reloj" id="partido-minuto">0'</span>
-          <div class="partido-campo" id="partido-zona" data-zona="salida">
-            <span class="partido-campo-tramo" data-tramo="salida">Salida</span>
-            <span class="partido-campo-tramo" data-tramo="creacion">Creación</span>
-            <span class="partido-campo-tramo" data-tramo="area">Área</span>
-          </div>
-        </header>
-
-        <div class="partido-acciones" id="partido-acciones" hidden></div>
-        <div class="partido-lona" id="partido-lona" hidden></div>
-        <p class="partido-espera" id="partido-espera">Empieza el partido…</p>
-      </section>
 
       <div class="partido-alineaciones">
         <section>
