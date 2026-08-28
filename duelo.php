@@ -609,6 +609,23 @@ include __DIR__ . '/navbar.php';
         </div>
       <?php endif; ?>
 
+      <!-- EL PARTIDO JUGABLE. Todo lo que hay aquí lo rellena partido.js desde
+           el sondeo; en HTML solo viven los huecos y el estado de partida. -->
+      <section class="partido-jugable" aria-live="polite">
+        <header class="partido-jugable-cab">
+          <span class="partido-reloj" id="partido-minuto">0'</span>
+          <div class="partido-campo" id="partido-zona" data-zona="salida">
+            <span class="partido-campo-tramo" data-tramo="salida">Salida</span>
+            <span class="partido-campo-tramo" data-tramo="creacion">Creación</span>
+            <span class="partido-campo-tramo" data-tramo="area">Área</span>
+          </div>
+        </header>
+
+        <div class="partido-acciones" id="partido-acciones" hidden></div>
+        <div class="partido-lona" id="partido-lona" hidden></div>
+        <p class="partido-espera" id="partido-espera">Empieza el partido…</p>
+      </section>
+
       <div class="partido-alineaciones">
         <section>
           <h2 class="t-h3">
