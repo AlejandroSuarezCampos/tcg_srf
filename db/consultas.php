@@ -7625,8 +7625,9 @@ class Tcg
 		   antes de forzar un cierre hay que escribir el marcador REAL de las
 		   jugadas en `duelos.goles_*` — si no, un cierre por abandono liquidaría
 		   con el 0-0 (u otro valor obsoleto) que dejó `resolverDuelo()`, no con
-		   lo que de verdad se jugó. Se usa también más abajo para vetar el
-		   cierre por reloj de pared. */
+		   lo que de verdad se jugó. La misma comprobación de "¿tiene jugadas?"
+		   se repite más abajo, sin pasar por esta closure, para vetar el cierre
+		   por reloj de pared. */
 		$sincronizarMarcadorJugable = function () use ($id_duelo, &$duelo) {
 			$tieneJugadas = $this->pdo->prepare("SELECT 1 FROM partido_jugadas WHERE id_duelo = :d LIMIT 1");
 			$tieneJugadas->execute([":d" => $id_duelo]);
@@ -7679,12 +7680,16 @@ class Tcg
 		   hay nadie a quien aplicarle la opción segura, y sin jugarla no mueve el
 		   marcador. El resultado es el que la simulación dejó escrito.
 
-		   (`partido_pausado_en` es del sistema narrado viejo — el motor jugable
-		   nunca lo pone, así que esta rama es un no-op para un partido jugable. Se
-		   deja tal cual: no hace falta sincronizar nada que no va a disparar.) */
+		   (`partido_pausado_en` lo pone `pausarPartido()`, llamada solo desde
+		   `estadoPartidoNarrado()` — el motor jugable nunca la toca. PERO ese
+		   modal narrado sigue vivo hasta la Task 17 y `duelo.php` lo sigue
+		   pintando SIEMPRE, jugable o no: si alguien lo abrió antes de irse, esta
+		   rama puede disparar sobre un duelo con `partido_jugadas`. Mismo motivo
+		   que la rama de arriba: hay que sincronizar antes de forzar el cierre.) */
 		if ($duelo["partido_pausado_en"]) {
 			if (time() - strtotime($duelo["partido_pausado_en"]) < $abandono) return false;
 			// Abandonado: se fuerza también la tanda, si la hubiera.
+			$sincronizarMarcadorJugable();
 			return $this->cerrarConTandaSiHace($id_duelo, $duelo, true);
 		}
 

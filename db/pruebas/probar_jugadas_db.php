@@ -282,5 +282,32 @@ comprobar("y se cierra con el marcador REAL de lo jugado (1-0), no con un 0-0 he
 	&& $duelo["estado"] === "resuelto" && (int) $duelo["id_ganador"] === $idA,
 	"{$duelo['estado']} {$duelo['goles_creador']}-{$duelo['goles_rival']} ganador={$duelo['id_ganador']}");
 
+/* La MISMA red de abandono, pero por la rama `partido_pausado_en` — la que
+   deja el modal narrado viejo (todavía vivo hasta la Task 17) si alguien
+   abrió un minijuego suyo en un duelo jugable y luego desapareció. También
+   tiene que sincronizar el marcador real antes de forzar el cierre, no
+   liquidar con lo que dejara escrito `resolverDuelo()`. */
+jugadasCompletas($conn, $idDuelo, [[$idA, "gol"], [$idB, "recupera"]]);
+$conn->prepare("
+	INSERT INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor, abierta)
+	VALUES (:d, 3, 20, 'salida', :p, NOW())
+")->execute([":d" => $idDuelo, ":p" => $idA]);
+$conn->prepare("
+	UPDATE duelos
+	SET partido_inicio = DATE_SUB(NOW(), INTERVAL 10 MINUTE),
+	    partido_pausado_en = DATE_SUB(NOW(), INTERVAL 2 HOUR),
+	    estado = 'en_juego', goles_creador = NULL, goles_rival = NULL, id_ganador = NULL
+	WHERE id_duelo = :d
+")->execute([":d" => $idDuelo]);
+
+comprobar("la rama de 'parado en una decisión' TAMBIÉN cierra un partido jugable abandonado",
+	$db->cerrarPartidoSiToca($idDuelo) === true);
+$duelo = $conn->query("SELECT estado, goles_creador, goles_rival, id_ganador FROM duelos WHERE id_duelo = $idDuelo")
+              ->fetch(PDO::FETCH_ASSOC);
+comprobar("y también con el marcador REAL (1-0), nunca con el que dejara resolverDuelo()",
+	(int) $duelo["goles_creador"] === 1 && (int) $duelo["goles_rival"] === 0
+	&& $duelo["estado"] === "resuelto" && (int) $duelo["id_ganador"] === $idA,
+	"{$duelo['estado']} {$duelo['goles_creador']}-{$duelo['goles_rival']} ganador={$duelo['id_ganador']}");
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
