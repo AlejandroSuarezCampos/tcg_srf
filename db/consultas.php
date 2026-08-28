@@ -14303,6 +14303,52 @@ class Tcg
 	}
 
 	/** Lo que ve el sondeo. Nunca incluye la ejecución del rival. */
+	/**
+	 * CIERRA EL PARTIDO JUGABLE EN CUANTO SUS JUGADAS HAN TERMINADO.
+	 *
+	 * `cerrarPartidoSiToca()` es del sistema narrado viejo: dispara por RELOJ DE
+	 * PARED (`segundosDePartido() < partido_duracion_seg`), un umbral pensado
+	 * para una simulación de duración fija. El motor jugable no tiene duración
+	 * fija — 12 jugadas pueden tardar 20 segundos o 4 minutos según lo que
+	 * piensen los jugadores—, así que ese reloj puede cerrar el partido A
+	 * MEDIAS (antes de la jugada 12) o dejarlo colgado mucho después de que
+	 * las 12 ya estén resueltas. Aquí el disparador es real: `abrirJugada()`
+	 * devuelve `fin` cuando no queda ninguna jugada por abrir, ni antes ni
+	 * después.
+	 *
+	 * Reutiliza `cerrarConTandaSiHace()` y `liquidarPartido()` tal cual: son
+	 * las mismas que ya cierran el sistema narrado, ya se llaman en cada
+	 * sondeo, y ya son idempotentes (`UPDATE ... WHERE estado = 'en_juego'`).
+	 * Llamarlas una vez de más aquí no hace nada la segunda vez.
+	 *
+	 * ⚠️ `liquidarPartido()` decide ganador y empate leyendo `duelos.goles_*`
+	 * de la FILA, no de `partido_jugadas`: es lo que el sistema narrado viejo
+	 * mantenía al día minijuego a minijuego, y el motor jugable no lo toca en
+	 * ningún otro sitio. Sin este UPDATE, `duelos.goles_*` se quedan en el 0-0
+	 * inicial de `resolverDuelo()` para siempre y todo partido liquidaría como
+	 * empate, sin importar lo jugado. Es el marcador FINAL y ya no cambia —
+	 * escribirlo aquí, justo antes de liquidar, es seguro.
+	 */
+	public function cerrarPartidoJugable($id_duelo) {
+		$stmt = $this->pdo->prepare("SELECT * FROM duelos WHERE id_duelo = :d");
+		$stmt->execute([":d" => $id_duelo]);
+		$duelo = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$duelo || $duelo["estado"] !== "en_juego") return false;
+
+		if (empty($this->abrirJugada($id_duelo)["fin"])) return false;
+
+		[$golesCreador, $golesRival] = $this->marcadorDeJugadas($id_duelo);
+		$this->pdo->prepare("
+			UPDATE duelos SET goles_creador = :gc, goles_rival = :gr
+			WHERE id_duelo = :d AND estado = 'en_juego'
+		")->execute([":gc" => $golesCreador, ":gr" => $golesRival, ":d" => $id_duelo]);
+
+		$duelo["goles_creador"] = $golesCreador;
+		$duelo["goles_rival"]   = $golesRival;
+
+		return $this->cerrarConTandaSiHace($id_duelo, $duelo, false);
+	}
+
 	public function estadoPartido($id_duelo, $id_usuario) {
 		$abrir = $this->abrirJugada($id_duelo);
 		$j = $abrir["jugada"] ?? null;

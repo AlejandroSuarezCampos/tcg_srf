@@ -121,6 +121,11 @@ $respuesta = [
 $pendiente = $db->abrirJugada($id_duelo);
 if (!empty($pendiente['jugada'])) {
     $db->caducarJugada($id_duelo, (int) $pendiente['jugada']['numero']);
+} else {
+    /* Sin jugada que abrir: o las 12 ya están resueltas, o el partido no ha
+       arrancado. cerrarPartidoJugable() no hace nada en el segundo caso
+       (exige `fin`) y es idempotente en el primero. */
+    $db->cerrarPartidoJugable($id_duelo);
 }
 
 $respuesta['partido'] = $db->estadoPartido($id_duelo, (int) $_SESSION['id_usuario']);

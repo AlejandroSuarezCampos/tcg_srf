@@ -176,5 +176,71 @@ comprobar("si nadie decide la acción, el servidor elige una y sigue",
 	$fila["accion"] !== null && $fila["desenlace"] !== null,
 	$fila["accion"] . " / " . $fila["desenlace"]);
 
+echo "\n8. EL PARTIDO SE CIERRA SOLO AL TERMINAR LAS JUGADAS\n";
+
+/* Añadida por el controller tras jugar un partido real de punta a punta por
+   HTTP: nada en el motor jugable llamaba a liquidarPartido() al llegar a la
+   jugada 12, así que el duelo se quedaba `en_juego` para siempre — cartas
+   bloqueadas, sin ganador, sin importar cuánto se recargara la pantalla.
+   `cerrarPartidoSiToca()` (el disparador del sistema narrado viejo) no vale:
+   dispara por reloj de pared, no por si las jugadas han terminado. */
+
+function jugadasCompletas($conn, $idDuelo, $resultados) {
+	$conn->exec("DELETE FROM partido_jugadas WHERE id_duelo = $idDuelo");
+	$conn->exec("DELETE FROM duelo_penaltis WHERE id_duelo = $idDuelo");
+	$ins = $conn->prepare("
+		INSERT INTO partido_jugadas (id_duelo, numero, minuto, zona, id_poseedor, desenlace, resuelta)
+		VALUES (:d, :n, :m, 'area', :p, :x, NOW())
+	");
+	foreach ($resultados as $k => $f) {
+		$ins->execute([":d" => $idDuelo, ":n" => $k + 1, ":m" => ($k + 1) * 7,
+		               ":p" => $f[0], ":x" => $f[1]]);
+	}
+}
+
+/* Caso decisivo: el creador mete 2, el rival 0. */
+jugadasCompletas($conn, $idDuelo, [
+	[$idA, "gol"], [$idA, "gol"], [$idB, "recupera"], [$idA, "recupera"],
+	[$idB, "recupera"], [$idA, "recupera"], [$idB, "recupera"], [$idA, "recupera"],
+	[$idB, "recupera"], [$idA, "recupera"], [$idB, "recupera"], [$idA, "recupera"],
+]);
+$conn->prepare("UPDATE duelos SET estado='en_juego', goles_creador=NULL, goles_rival=NULL, id_ganador=NULL WHERE id_duelo = :d")
+     ->execute([":d" => $idDuelo]);
+
+comprobar("con las 12 jugadas resueltas, el barrido cierra el partido",
+	$db->cerrarPartidoJugable($idDuelo) === true);
+
+$duelo = $conn->query("SELECT estado, goles_creador, goles_rival, id_ganador FROM duelos WHERE id_duelo = $idDuelo")
+              ->fetch(PDO::FETCH_ASSOC);
+comprobar("el duelo pasa a resuelto", $duelo["estado"] === "resuelto", (string) $duelo["estado"]);
+comprobar("el marcador final es el de las jugadas, no un 0-0 heredado",
+	(int) $duelo["goles_creador"] === 2 && (int) $duelo["goles_rival"] === 0,
+	"{$duelo['goles_creador']}-{$duelo['goles_rival']}");
+comprobar("gana quien de verdad metió más goles",
+	(int) $duelo["id_ganador"] === $idA);
+
+comprobar("un duelo ya resuelto no se vuelve a cerrar (idempotencia)",
+	$db->cerrarPartidoJugable($idDuelo) === false);
+
+/* Caso empate: se abre la tanda de penaltis existente, no se inventa nada. */
+$conn->prepare("UPDATE duelos SET estado='en_juego', goles_creador=NULL, goles_rival=NULL, id_ganador=NULL WHERE id_duelo = :d")
+     ->execute([":d" => $idDuelo]);
+jugadasCompletas($conn, $idDuelo, array_fill(0, 12, [$idA, "recupera"]));
+
+$db->cerrarPartidoJugable($idDuelo);
+$duelo = $conn->query("SELECT estado FROM duelos WHERE id_duelo = $idDuelo")->fetch(PDO::FETCH_ASSOC);
+comprobar("un empate 0-0 NO se liquida solo: abre la tanda y espera",
+	$duelo["estado"] === "en_juego", (string) $duelo["estado"]);
+comprobar("la tanda de penaltis se ha abierto de verdad",
+	(int) $conn->query("SELECT COUNT(*) FROM duelo_penaltis WHERE id_duelo = $idDuelo")->fetchColumn() > 0);
+
+/* Con jugadas de menos, no toca cerrar todavía. */
+$conn->prepare("UPDATE duelos SET estado='en_juego', goles_creador=NULL, goles_rival=NULL, id_ganador=NULL WHERE id_duelo = :d")
+     ->execute([":d" => $idDuelo]);
+$conn->exec("DELETE FROM duelo_penaltis WHERE id_duelo = $idDuelo");
+jugadasCompletas($conn, $idDuelo, [[$idA, "recupera"], [$idB, "recupera"]]);
+comprobar("con jugadas por delante, el barrido no cierra nada",
+	$db->cerrarPartidoJugable($idDuelo) === false);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
