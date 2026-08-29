@@ -10,6 +10,7 @@
  *
  *   php db/pruebas/probar_plantilla_filtro.php
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 require_once __DIR__ . '/../../partials/plantilla_filtro.php';
 
 $fallos = 0;

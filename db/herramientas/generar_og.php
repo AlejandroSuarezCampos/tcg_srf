@@ -18,6 +18,7 @@
  * 1200×630 es lo que piden Facebook, Discord, X y LinkedIn para la vista
  * grande; por debajo de 600×315 se degrada a miniatura pequeña.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../conexion.php';
 

@@ -32,9 +32,26 @@ function cerrarModalCodigo() {
   SRF.cerrarModal('modalCodigo');
 }
 
+/* Auditoría de seguridad: mismo motivo que pedirBorrado() en scriptUsuarios.js
+   — el borrado viajaba por GET con el token de sesión en la URL. Ahora es un
+   formulario POST montado con el DOM, nunca con innerHTML. */
 function pedirBorradoCodigo(codigo, id) {
   SRF.confirmar('¿Seguro que quieres eliminar el código "' + codigo + '"? Su historial de canjes se queda, pero nadie podrá volver a usarlo.', function () {
-    window.location.href = 'codigos.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.action = 'codigos.php';
+
+    var campos = { accion: 'eliminar', id_codigo: id, csrf: SRF.csrfToken() };
+    Object.keys(campos).forEach(function (nombreCampo) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = nombreCampo;
+      input.value = campos[nombreCampo];
+      f.appendChild(input);
+    });
+
+    document.body.appendChild(f);
+    f.submit();
   });
 }
 

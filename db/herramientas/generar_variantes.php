@@ -27,6 +27,7 @@
  * subida de imágenes— solo miran ficheros `png/jpg/jpeg`, así que un `.webp`
  * nuevo no los confunde. Y el original NUNCA se toca: es la copia maestra.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../conexion.php';
 

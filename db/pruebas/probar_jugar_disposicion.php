@@ -11,6 +11,7 @@
  *
  *   php db/pruebas/probar_jugar_disposicion.php
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 require_once __DIR__ . '/../consultas.php';
 require_once __DIR__ . '/../../partials/jugar_disposicion.php';
 

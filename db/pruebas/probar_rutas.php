@@ -24,6 +24,7 @@
  *    Las URL van SIN `.php` a propósito (lo quita el mod_rewrite del
  *    `.htaccess`), así que aquí se prueban las dos formas.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 $raiz = dirname(__DIR__, 2);
 $fallos = [];

@@ -17,6 +17,7 @@
  * Por eso `/plantilla` va SIN `?ver=todas`: son la misma página y la canónica es
  * la corta (ver seoCanonical() en partials/seo.php).
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../conexion.php';
 require_once __DIR__ . '/../../partials/seo.php';   // slugFicha()

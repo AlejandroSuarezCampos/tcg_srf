@@ -12533,9 +12533,24 @@ class Tcg
 		try {
 			$this->pdo->beginTransaction();
 
-			$this->pdo->prepare("
+			/* ⚠️ ESTO ES EL CERROJO, no un simple registro. La comprobación de
+			   "reclamado" de más arriba corre SIN transacción ni bloqueo — es solo
+			   un atajo para el caso normal, no la garantía. Dos peticiones
+			   simultáneas sobre el mismo cofre pasan las dos ese primer filtro; el
+			   `INSERT IGNORE` en sí no falla en la segunda (la PK lo evita en
+			   silencio), así que hay que MIRAR `rowCount()`: si vale 0, otro hilo
+			   ya reclamó este cofre entre la comprobación de arriba y aquí, y hay
+			   que parar antes de entregar el botín una segunda vez. Encontrado en
+			   auditoría de seguridad: sin este corte, dos POST a la vez duplicaban
+			   monedas y cartas de la nada. */
+			$ins = $this->pdo->prepare("
 				INSERT IGNORE INTO cadena_cofres (id_usuario, id_nodo) VALUES (:u, :n)
-			")->execute([":u" => $id_usuario, ":n" => $id_nodo]);
+			");
+			$ins->execute([":u" => $id_usuario, ":n" => $id_nodo]);
+			if ($ins->rowCount() === 0) {
+				$this->pdo->rollBack();
+				return ["ok" => false, "error" => "Ya habías abierto este cofre."];
+			}
 
 			$formacion = null;
 			if ((int) $nodo["es_final"] === 1 && $nodo["formacion_recompensa"]) {

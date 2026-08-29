@@ -25,6 +25,7 @@ session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
 require_once __DIR__ . '/partials/plantilla_filtro.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 $id_usuario = (int) ($_SESSION['id_usuario'] ?? 0);
 $haySesion  = $id_usuario > 0;
@@ -33,6 +34,17 @@ $haySesion  = $id_usuario > 0;
    PROTEGER / DESPROTEGER — se conserva tal cual venía de coleccion.php.
    Redirige después del POST para que recargar no repita la acción.
    --------------------------------------------------------------------------- */
+/* Auditoría de seguridad: esta página desbloqueaba cartas por POST sin pasar
+   por csrfValido() — la única (junto con duelo.php) de todo el proyecto.
+   `bloqueada = 0` es justo la condición que usan publicarAnuncio(),
+   copiasLibresDeCromo() y el selector de apuesta para decidir si una carta se
+   puede vender, intercambiar o apostar: un CSRF que desproteja en masa la
+   colección de la víctima es el paso previo a que la pierda. */
+if ($haySesion && $_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido($_POST['csrf'] ?? null)) {
+    header('Location: plantilla?error=csrf');
+    exit;
+}
+
 if ($haySesion && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     if ($_POST['accion'] === 'toggle_bloqueo') {
         $db->alternarBloqueoCromo((int) $_POST['id_coleccion'], $id_usuario);
@@ -342,7 +354,7 @@ include __DIR__ . '/navbar.php';
                 . ($cantidad > 1 ? 'las ' . $cantidad . ' copias de ' : '')
                 . htmlspecialchars($c['nombre']);
 
-            $accion = '<form method="POST" action="' . $accionForm . '">' . $campos
+            $accion = '<form method="POST" action="' . $accionForm . '">' . csrfCampo() . $campos
                 . '<button type="submit" class="carta-accion-flotante' . ($protegida ? ' esta-activa' : '') . '">'
                 . '<i class="ph ' . ($protegida ? 'ph-lock-simple' : 'ph-lock-simple-open') . '" aria-hidden="true"></i>'
                 . '<span class="sr-only">' . $rotulo . '</span>'

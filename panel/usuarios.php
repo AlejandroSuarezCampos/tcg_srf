@@ -13,7 +13,7 @@ if (isset($_SESSION['dictador'])) {
     exit;
 }
 
-if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['eliminar'])) && !csrfValido($_REQUEST['csrf'] ?? null)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido($_POST['csrf'] ?? null)) {
     header('Location: usuarios.php?error=csrf');
     exit;
 }
@@ -25,9 +25,9 @@ if (($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_GET['eliminar'])) && !csrf
  * "Restablecer contraseña" (llama a $db->restablecerPasswordUsuario()).
  */
 
-// ----- Borrado (?eliminar=ID) -----
-if (isset($_GET['eliminar'])) {
-    $db->eliminarUsuario((int) $_GET['eliminar']);
+// ----- Borrado (POST, ya no GET: ver auditoría de seguridad) -----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'eliminar') {
+    $db->eliminarUsuario((int) ($_POST['id_usuario'] ?? 0));
     header('Location: usuarios.php');
     exit;
 }

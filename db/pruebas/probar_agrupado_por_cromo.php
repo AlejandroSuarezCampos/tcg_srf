@@ -25,6 +25,7 @@
  *    las dos listas dejaran de coincidir, la pantalla ofrecería cartas que el
  *    servidor rechaza — un fallo que solo aparece al pulsar el botón.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once dirname(__DIR__) . '/conexion.php';
 

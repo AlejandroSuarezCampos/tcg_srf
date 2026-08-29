@@ -13,6 +13,7 @@
  *           nada. Es el modo por defecto en los dos frentes, a propósito.
  *   true  → lo hace.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../../partials/subida_imagen.php';   // convertirAWebp()
 

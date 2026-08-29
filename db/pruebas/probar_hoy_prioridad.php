@@ -11,6 +11,7 @@
  *
  *   php db/pruebas/probar_hoy_prioridad.php
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 require_once __DIR__ . '/../../partials/hoy_prioridad.php';
 
 $fallos = 0;

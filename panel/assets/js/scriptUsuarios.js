@@ -55,8 +55,29 @@ function cerrarResetPassword() {
   SRF.cerrarModal('modalResetPassword');
 }
 
+/* Auditoría de seguridad: el borrado viajaba por GET (`?eliminar=ID&csrf=...`).
+   El token se validaba bien, pero un secreto de sesión no debería acabar en
+   la barra de direcciones, el historial o el Referer de un recurso externo —
+   y cualquier precarga del navegador podía dispararlo sin que nadie hiciera
+   clic. Ahora es un formulario POST real, montado con el DOM (nunca con
+   innerHTML) para que el nombre del usuario no tenga ni ocasión de acabar
+   interpretado como HTML. */
 function pedirBorrado(nombre, id) {
   SRF.confirmar('¿Seguro que quieres eliminar al usuario "' + nombre + '"? Perderá su colección y su acceso.', function () {
-    window.location.href = 'usuarios.php?eliminar=' + encodeURIComponent(id) + '&csrf=' + encodeURIComponent(SRF.csrfToken());
+    var f = document.createElement('form');
+    f.method = 'POST';
+    f.action = 'usuarios.php';
+
+    var campos = { accion: 'eliminar', id_usuario: id, csrf: SRF.csrfToken() };
+    Object.keys(campos).forEach(function (nombreCampo) {
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = nombreCampo;
+      input.value = campos[nombreCampo];
+      f.appendChild(input);
+    });
+
+    document.body.appendChild(f);
+    f.submit();
   });
 }

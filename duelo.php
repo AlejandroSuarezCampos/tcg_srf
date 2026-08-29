@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/db/conexion.php';
 require_once __DIR__ . '/components/carta.php';
+require_once __DIR__ . '/partials/csrf.php';
 
 if (empty($_SESSION['id_usuario'])) {
     header('Location: login.php');
@@ -13,6 +14,16 @@ $id_duelo   = (int) ($_GET['id'] ?? 0);
 $duelo = $db->obtenerDuelo($id_duelo, $id_usuario);
 if (!$duelo) {
     header('Location: duelos.php');
+    exit;
+}
+
+/* Auditoría de seguridad: esta página mutaba estado por POST sin pasar por
+   csrfValido() — la única (junto con plantilla.php) de todo el proyecto. Con
+   IDs de duelo secuenciales, un formulario auto-enviado desde fuera podía
+   cancelar la sala de la víctima o, peor, fijarle el aumento (ver más abajo,
+   es definitivo). */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido($_POST['csrf'] ?? null)) {
+    header('Location: duelo.php?id=' . $id_duelo . '&error=csrf');
     exit;
 }
 
@@ -312,6 +323,7 @@ include __DIR__ . '/navbar.php';
       </p>
 
       <form method="POST">
+        <?= csrfCampo() ?>
         <input type="hidden" name="accion" value="cancelar">
         <button type="submit" class="btn btn-ghost" id="salaCancelar">Cancelar sala</button>
       </form>
@@ -374,6 +386,7 @@ include __DIR__ . '/navbar.php';
         <div class="aumento-opciones">
           <?php foreach ($misAumentos as $a): ?>
             <form method="POST" class="aumento-opcion es-<?= $a['tier'] ?>">
+              <?= csrfCampo() ?>
               <input type="hidden" name="accion" value="elegir_aumento">
               <input type="hidden" name="opcion" value="<?= (int) $a['opcion'] ?>">
               <button type="submit" class="aumento-boton">

@@ -27,6 +27,7 @@
  * 4. **Que el sitemap y la realidad coincidan.** Anunciar una URL que responde
  *    404 es un aviso en Search Console.
  */
+if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once dirname(__DIR__) . '/conexion.php';
 require_once dirname(__DIR__, 2) . '/partials/seo.php';
