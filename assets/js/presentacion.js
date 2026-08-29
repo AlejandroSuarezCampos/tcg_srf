@@ -404,16 +404,16 @@
     setTimeout(acabar, (linea.duration() * 2 + 3) * 1000);
   }
 
-  /* ⚠️ UNA SOLA INTRO, LA PIDA QUIEN LA PIDA. Desde que el motor de partido
-     jugable tiene su propio cliente (`partido.js`), esta función la llaman DOS
-     archivos en la misma carga: `duelo.js` (modal narrado viejo, vivo hasta la
-     Task 17) y `partido.js`. Sin este memo, la segunda llamada montaba una
-     segunda línea de tiempo sobre la misma caja y —peor— se quedaba colgada
-     para siempre: `terminada` es de módulo, así que en cuanto una de las dos
-     terminaba, el `acabar()` de la otra salía por la puerta de atrás sin
-     resolver su promesa, y quien la esperaba (el sondeo del partido) no
-     arrancaba nunca. Con el memo las dos esperan LA MISMA intro y las dos se
-     enteran de que acabó. La animación en sí no cambia. */
+  /* ⚠️ UNA SOLA INTRO, LA PIDA QUIEN LA PIDA. Mientras `duelo.js` (modal
+     narrado viejo, ya retirado) y `partido.js` convivieron en la misma carga,
+     los dos llamaban a esta función. Sin este memo, la segunda llamada montaba
+     una segunda línea de tiempo sobre la misma caja y —peor— se quedaba
+     colgada para siempre: `terminada` es de módulo, así que en cuanto una de
+     las dos terminaba, el `acabar()` de la otra salía por la puerta de atrás
+     sin resolver su promesa, y quien la esperaba (el sondeo del partido) no
+     arrancaba nunca. Con `partido.js` como único llamante hoy, el memo ya no
+     hace falta para eso, pero sigue siendo correcto e inofensivo si algún día
+     vuelve a haber dos. La animación en sí no cambia. */
   var enMarcha = null;
   window.SRF.presentacionPartido = function () {
     if (!enMarcha) { enMarcha = presentacion(); }

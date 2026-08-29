@@ -405,7 +405,7 @@ include __DIR__ . '/navbar.php';
              `#partido` y sus `data-*`, así que quitarlo dejaría el partido sin
              empezar. Lo que se va es el contenido.
 
-             No se pierde nada: al acabar, `duelo.js` recarga con `?revelar=1`,
+             No se pierde nada: al acabar, `partido.js` recarga con `?revelar=1`,
              el duelo ya está resuelto y esta misma pantalla se pinta entera. */ ?>
     <div class="partido<?= $enJuego ? '' : ($gane ? ' es-victoria' : ' es-derrota') ?>" id="partido"
          data-nuevo="<?= $ceremonia ? '1' : '0' ?>"
@@ -431,10 +431,9 @@ include __DIR__ . '/navbar.php';
 
       <?php /* LA TANDA DE PENALTIS (§15.11), dentro del partido y no en un modal
                aparte: es una fase más del encuentro, no otra pantalla. Los ids
-               son NUEVOS (`partido-penaltis-*`) a propósito — los `simTanda*` son
-               del modal narrado viejo, que sigue vivo en esta misma página hasta
-               que la Task 17 lo retire, y dos cajas con el mismo id serían una
-               tanda pintada dos veces.
+               son NUEVOS (`partido-penaltis-*`) a propósito, herencia de cuando
+               el modal narrado viejo (con sus `simTanda*`) todavía convivía en
+               esta misma página.
 
                La clase base tampoco puede ser `.partido-tanda`: ese nombre ya lo
                usa el "en los penaltis" del titular de resultado (layout.css). */ ?>
