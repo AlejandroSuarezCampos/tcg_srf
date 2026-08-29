@@ -121,6 +121,14 @@
       alAbrir(p.jugada);          // la Task 12 monta aquí la primitiva
     } else if (p.jugada.ya_jugue) {
       esperando('Esperando al rival…');
+    } else {
+      /* El rival tiene el balón y todavía no ha decidido su acción: no hay
+         nada que montar (ni acciones mías, ni minijuego), pero tampoco hay que
+         dejar la pantalla en blanco. Sin este mensaje, `elEspera` se quedaba
+         oculto desde la última vez que se pintaron acciones o un minijuego, y
+         el jugador veía el campo y el reloj sin ningún indicio de qué está
+         pasando. */
+      esperando('Esperando la decisión del rival…');
     }
   }
 

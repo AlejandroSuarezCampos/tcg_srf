@@ -35,7 +35,8 @@ if (isset($_GET['ficha'])) {
     $mj = $db->fichaMinijuego(
         (string) $_GET['ficha'],
         (int) ($_GET['id_duelo'] ?? 0),
-        (int) ($_GET['numero'] ?? 0)
+        (int) ($_GET['numero'] ?? 0),
+        (int) $_SESSION['id_usuario']
     );
     echo json_encode($mj, JSON_UNESCAPED_UNICODE);
     exit;

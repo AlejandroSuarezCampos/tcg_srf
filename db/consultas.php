@@ -13779,15 +13779,28 @@ class Tcg
 	 * Nunca incluye `suelo`, `techo` ni `tolerancia`: son parámetros de puntuación
 	 * y el cliente no puntúa. Sí incluye la figura, porque hay que dibujarla, y
 	 * eso no regala nada: el servidor la regenera al puntuar.
+	 *
+	 * ⚠️ `{jugador}`/`{rival}` del catálogo se sustituyen aquí, no antes: cada
+	 * lado pide su propia ficha (el atacante la de `mj_atacante`, el defensor la
+	 * de `mj_defensor`), así que "tú" es siempre quien pregunta y "el rival" es
+	 * siempre el otro, gane o pierda el balón en esa jugada. Sin `$id_usuario`
+	 * esto se quedaba en el enunciado literal con las llaves puestas — un bug
+	 * visible que ningún test detectó porque ninguno miraba el TEXTO mostrado.
 	 */
-	public function fichaMinijuego($clave, $id_duelo, $numero) {
+	public function fichaMinijuego($clave, $id_duelo, $numero, $id_usuario) {
 		$mj = Partido::catalogo()[$clave] ?? null;
 		if (!$mj) return ["ok" => false, "error" => "Minijuego desconocido."];
+
+		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
+		$soyCreador = $duelo && (int) $duelo["id_creador"] === (int) $id_usuario;
+		$miNombre = $duelo ? ($soyCreador ? $duelo["creador"] : $duelo["rival"]) : "Tú";
+		$suNombre = $duelo ? ($soyCreador ? $duelo["rival"] : $duelo["creador"]) : "el rival";
 
 		$ficha = [
 			"ok" => true, "clave" => $clave, "nombre" => $mj["nombre"],
 			"tipo" => $mj["tipo"], "titulo" => $mj["titulo"],
-			"enunciado" => $mj["enunciado"], "plazo_seg" => (int) $mj["plazo_seg"],
+			"enunciado" => strtr($mj["enunciado"], ["{jugador}" => $miNombre, "{rival}" => $suNombre]),
+			"plazo_seg" => (int) $mj["plazo_seg"],
 		];
 
 		if ($mj["tipo"] === "lectura") {
@@ -13796,10 +13809,8 @@ class Tcg
 				return ["clave" => $o["clave"], "nombre" => $o["nombre"], "pista" => $o["pista"]];
 			}, $mj["opciones"]);
 		} else {
-			$d = $this->pdo->prepare("SELECT valor_sorteo FROM duelos WHERE id_duelo = :d");
-			$d->execute([":d" => $id_duelo]);
 			$ficha["figura_puntos"] = Partido::figuraIdeal(
-				$mj["figura"], (float) $d->fetchColumn(), (int) $numero
+				$mj["figura"], (float) ($duelo["valor_sorteo"] ?? 0), (int) $numero
 			);
 		}
 		return $ficha;

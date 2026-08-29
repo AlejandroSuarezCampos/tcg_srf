@@ -309,5 +309,24 @@ comprobar("y también con el marcador REAL (1-0), nunca con el que dejara resolv
 	&& $duelo["estado"] === "resuelto" && (int) $duelo["id_ganador"] === $idA,
 	"{$duelo['estado']} {$duelo['goles_creador']}-{$duelo['goles_rival']} ganador={$duelo['id_ganador']}");
 
+echo "\n9. LA FICHA DEL MINIJUEGO SUSTITUYE {jugador}/{rival}\n";
+
+/* Encontrado jugando un partido real en el navegador: fichaMinijuego() mandaba
+   el enunciado del catálogo tal cual, con las llaves literales sin sustituir
+   ("{jugador} tiene el balón..."). Ningún test lo detectó porque ninguno
+   miraba el TEXTO mostrado, solo los datos. */
+$nombreA = $conn->query("SELECT nombre FROM usuarios WHERE id_usuario = $idA")->fetchColumn();
+$nombreB = $conn->query("SELECT nombre FROM usuarios WHERE id_usuario = $idB")->fetchColumn();
+
+$fichaA = $db->fichaMinijuego("amago_salida", $idDuelo, 1, $idA);
+comprobar("no quedan llaves sin sustituir en el enunciado",
+	strpos($fichaA["enunciado"], "{") === false, $fichaA["enunciado"]);
+comprobar("desde mi lado, 'jugador' soy yo", strpos($fichaA["enunciado"], $nombreA) !== false);
+comprobar("desde mi lado, 'rival' es el otro", strpos($fichaA["enunciado"], $nombreB) !== false);
+
+$fichaB = $db->fichaMinijuego("amago_salida", $idDuelo, 1, $idB);
+comprobar("el mismo enunciado desde el otro lado invierte quién es 'jugador'",
+	strpos($fichaB["enunciado"], $nombreB) !== false && strpos($fichaB["enunciado"], $nombreA) !== false);
+
 echo "\n" . ($fallos === 0 ? "TODO CORRECTO\n\n" : "$fallos COMPROBACIONES FALLIDAS\n\n");
 exit($fallos === 0 ? 0 : 1);
