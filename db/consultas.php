@@ -12512,8 +12512,12 @@ class Tcg
 	/**
 	 * Abre un cofre alcanzado. Entrega la formación de la cadena si es el cofre
 	 * final, y la loot table del nodo (monedas, cartas, numeradas). Idempotente:
-	 * reclamar dos veces no entrega dos veces (lo impide `$estado['reclamado']`
-	 * arriba, antes de llegar aquí).
+	 * reclamar dos veces no entrega dos veces — pero la garantía de verdad es el
+	 * `INSERT IGNORE` + `rowCount()` de dentro de la transacción, no el
+	 * `$estado["reclamado"]` de aquí arriba. Ese primero es solo un atajo para
+	 * el caso normal (sin bloqueo, corre antes de abrir transacción): dos
+	 * peticiones simultáneas lo pasan las dos, y hasta la auditoría de
+	 * seguridad que lo encontró, eso duplicaba el botín.
 	 */
 	public function reclamarCofre($id_nodo, $id_usuario) {
 		$nodo = $this->obtenerNodo($id_nodo);
