@@ -883,3 +883,113 @@
   .partido-acciones { grid-template-columns: 1fr; }
   .partido-accion   { min-height: 64px; }
 }
+
+/* =========================================================================
+   LA TANDA DE PENALTIS DEL MOTOR JUGABLE (§15.11)
+
+   Vive DENTRO de `.partido-jugable`, no en un modal: la tanda es una fase más
+   del encuentro. Nombres propios (`.partido-penaltis-*`) y no `.sim-tanda-*`:
+   aquellos son del modal narrado viejo, que sigue en la misma página hasta la
+   Task 17, y `.partido-tanda` ya lo usa el titular de resultado (layout.css).
+   ========================================================================= */
+.partido-penaltis:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--e-1, .5rem);
+  text-align: center;
+}
+.partido-penaltis p { margin: 0; }
+
+.partido-penaltis-ronda {
+  color: var(--texto-3, #8a8a96);
+  font-size: .8125rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.partido-penaltis-marcador {
+  color: var(--texto-1, #f5f5f7);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.partido-penaltis-orden {
+  color: var(--texto-1, #f5f5f7);
+  font-size: .9375rem;
+  font-weight: 600;
+}
+.partido-penaltis-reloj {
+  color: var(--texto-3, #8a8a96);
+  font-size: .8125rem;
+}
+
+/* La portería partida en cuatro. `grid-template-areas` con las claves de zona
+   tal cual las manda el servidor: el JS solo pone `style.gridArea = z`, así que
+   si algún día cambian las cuatro claves, esto es lo único que hay que tocar.
+
+   Filas con `minmax()` y nunca `height` fija: el nombre del hueco tiene que
+   caber entero también con el texto agrandado. */
+.partido-penaltis-porteria {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(64px, auto));
+  grid-template-areas:
+    "arriba_izq arriba_der"
+    "abajo_izq  abajo_der";
+  gap: 4px;
+  width: 100%;
+  max-width: 380px;
+  padding: 4px;
+  border: 3px solid var(--texto-1, #f5f5f7);
+  border-bottom-width: 6px;      /* la línea de gol se insinúa */
+  border-radius: 4px;
+}
+/* Vacía no debe dejar un marco fantasma flotando (tanda terminada). */
+.partido-penaltis-porteria:empty { display: none; }
+
+.partido-hueco {
+  border: 1px dashed var(--borde-1, #2c2c36);
+  border-radius: var(--radio-1, 8px);
+  background: transparent;
+  color: var(--texto-2, #c6c6d0);
+  font: inherit;
+  font-size: .8125rem;
+  cursor: pointer;
+}
+.partido-hueco:hover:not(:disabled),
+.partido-hueco:focus-visible {
+  border-style: solid;
+  border-color: var(--ascua-1, #ff7a1a);
+  color: var(--texto-1, #f5f5f7);
+}
+.partido-hueco:focus-visible { outline: 2px solid var(--ascua-1, #ff7a1a); outline-offset: 2px; }
+/* Ya elegido, o tiro cerrado: se ve, pero no invita. */
+.partido-hueco:disabled { opacity: .45; cursor: default; }
+
+/* El historial: un punto por tiro resuelto, para leer la tanda de un vistazo. */
+.partido-penaltis-historial {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.partido-penaltis-historial li {
+  padding: 2px .5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--fondo-2, #16161c);
+  color: var(--texto-3, #8a8a96);
+  font-size: .75rem;
+}
+.partido-penaltis-historial li.es-gol { color: var(--cesped, #55c46a); }
+/* `es-mio` marca de quién era el tiro con el BORDE y no con el color: el color
+   ya está diciendo gol o parada, y pisarlo aquí (misma especificidad, regla
+   posterior) dejaba todos mis goles del color de una parada. */
+.partido-penaltis-historial li.es-mio { border-color: var(--ascua-1, #ff7a1a); }
+
+@media (max-width: 480px) {
+  .partido-penaltis-porteria { grid-template-rows: repeat(2, minmax(72px, auto)); }
+}

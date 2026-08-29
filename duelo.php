@@ -428,6 +428,25 @@ include __DIR__ . '/navbar.php';
 
       <div class="partido-acciones" id="partido-acciones" hidden></div>
       <div class="partido-lona" id="partido-lona" hidden></div>
+
+      <?php /* LA TANDA DE PENALTIS (§15.11), dentro del partido y no en un modal
+               aparte: es una fase más del encuentro, no otra pantalla. Los ids
+               son NUEVOS (`partido-penaltis-*`) a propósito — los `simTanda*` son
+               del modal narrado viejo, que sigue vivo en esta misma página hasta
+               que la Task 17 lo retire, y dos cajas con el mismo id serían una
+               tanda pintada dos veces.
+
+               La clase base tampoco puede ser `.partido-tanda`: ese nombre ya lo
+               usa el "en los penaltis" del titular de resultado (layout.css). */ ?>
+      <div class="partido-penaltis" id="partido-penaltis" hidden>
+        <p class="partido-penaltis-ronda" id="partido-penaltis-ronda"></p>
+        <p class="partido-penaltis-marcador mono" id="partido-penaltis-marcador">0 – 0</p>
+        <p class="partido-penaltis-orden" id="partido-penaltis-orden"></p>
+        <div class="partido-penaltis-porteria" id="partido-penaltis-porteria"></div>
+        <p class="partido-penaltis-reloj mono" id="partido-penaltis-reloj"></p>
+        <ul class="partido-penaltis-historial" id="partido-penaltis-historial"></ul>
+      </div>
+
       <p class="partido-espera" id="partido-espera">Empieza el partido…</p>
     </section>
 
@@ -914,6 +933,12 @@ include __DIR__ . '/navbar.php';
     idDuelo: <?= (int) $id_duelo ?>,
     csrf: <?= json_encode(csrfToken()) ?>,
     base: <?= json_encode($base ?? '') ?>,
+    <?php /* Si el duelo YA venía decidido, esta página es la de resultado y es
+             correcta: recargarla al ver `estado: 'resuelto'` sería un bucle de
+             recargas. Solo se va a buscar la pantalla nueva cuando el duelo se
+             decide MIENTRAS se está mirando. Mismo guardia que el
+             `data-decidido` del modal viejo. */ ?>
+    decidido: <?= $resuelto ? 1 : 0 ?>,
     minutos: 90,
     narracionSeg: <?= (float) $db->config('partido_narracion_seg', 3) ?>
   });

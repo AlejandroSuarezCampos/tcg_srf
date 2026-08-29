@@ -14447,9 +14447,48 @@ class Tcg
 			];
 		}
 
+		/* LA TANDA DE PENALTIS, EN EL MISMO SONDEO QUE LAS JUGADAS (§15.11).
+		   El servidor ya la abre solo —`cerrarPartidoJugable()` llama a
+		   `cerrarConTandaSiHace()`, que solo empuja `tandaAvanzar()` si el
+		   marcador quedó EMPATADO—, así que aquí no hay nada que decidir: solo
+		   leerla y mandarla. Y no se toca ninguna de esas funciones desde aquí,
+		   a propósito: este método lo llama el sondeo de los dos jugadores y su
+		   trabajo es MIRAR, no mover dinero.
+
+		   La condición es la más estrecha que sirve, y son dos cosas a la vez:
+
+		     · `fin` — las 12 jugadas están resueltas. Sin esto, un partido a
+		       medias podría enseñar una tanda (por ejemplo, si el cierre por
+		       abandono la forzó) mientras todavía hay jugadas que pueden
+		       deshacer el empate. Una jugada por resolver aún mueve el marcador,
+		       así que hasta que no hay ninguna no se sabe si hay tanda.
+
+		     · Que EXISTA al menos una fila en `duelo_penaltis`. Es la única
+		       prueba fiable de que la tanda se abrió de verdad: mirar el empate
+		       en `duelos.goles_*` no vale porque esa fila puede llevar todavía
+		       el 0-0 con el que `resolverDuelo()` montó el partido —solo
+		       `cerrarPartidoJugable()` la pone al día—, y con eso la tanda
+		       parpadearía en TODO partido antes de que se escriba el marcador
+		       real. Sin filas no hay tanda que pintar; con filas, la hay pase lo
+		       que pase después (si ya terminó, `tandaParaCliente()` lo dice con
+		       `acabada` y `tiro: null`, y el cliente pinta el estado final en vez
+		       de una portería viva).
+
+		   `tandaParaCliente()` es quien filtra: del tiro en curso solo sale si YO
+		   ya elegí, nunca la zona del rival. */
+		$tanda = null;
+		if (!empty($abrir["fin"])) {
+			$hayTanda = $this->pdo->prepare("SELECT 1 FROM duelo_penaltis WHERE id_duelo = :d LIMIT 1");
+			$hayTanda->execute([":d" => $id_duelo]);
+			if ($hayTanda->fetchColumn()) {
+				$tanda = $this->tandaParaCliente($id_duelo, $id_usuario);
+			}
+		}
+
 		return [
 			"ok"        => true,
 			"fin"       => !empty($abrir["fin"]),
+			"tanda"     => $tanda,
 			"jugada"    => $vista,
 			"decido_yo" => $j ? ((int) $j["id_poseedor"] === (int) $id_usuario && $j["accion"] === null) : false,
 			"acciones"  => ($j && $j["accion"] === null && (int) $j["id_poseedor"] === (int) $id_usuario)
