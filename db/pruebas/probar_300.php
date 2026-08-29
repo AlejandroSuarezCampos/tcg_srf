@@ -203,9 +203,13 @@ for ($n = 0; $n < TOTAL; $n++) {
 
     if ($conCarta) {
         $perdedor = (int) $d["id_ganador"] === 9 ? 2 : 9;
+        /* `id_coleccion` no vive en `duelo_apuestas`: cada apuesta puede llevar
+           varias copias desde la 031, y viven en `duelo_apuesta_cartas`, ligadas
+           por `id_apuesta`. */
         $st = $p->prepare("
             SELECT c.id_usuario, c.bloqueada FROM duelo_apuestas da
-            INNER JOIN coleccion c ON c.id_coleccion = da.id_coleccion
+            INNER JOIN duelo_apuesta_cartas dac ON dac.id_apuesta = da.id_apuesta
+            INNER JOIN coleccion c ON c.id_coleccion = dac.id_coleccion
             WHERE da.id_duelo = :d AND da.id_usuario = :u
         ");
         $st->execute([":d" => $id, ":u" => $perdedor]);
