@@ -20,7 +20,7 @@ if (empty($_SESSION['id_usuario'])) {
     exit;
 }
 
-/* Mismo motivo que en duelo_minijuego.php: este endpoint solo LEE de la sesión,
+/* Mismo motivo que en duelo_estado.php: este endpoint solo LEE de la sesión,
    y el partido en vivo sondea cada segundo. Sin cerrar aquí el cerrojo de
    sesión, cada petición hace cola detrás de la anterior y en IONOS eso acaba en
    «Gateway Timeout». */

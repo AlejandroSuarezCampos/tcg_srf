@@ -22,12 +22,14 @@ if ($zona !== null) {
 }
 
 // El rival tambien sondea, que es lo que empuja la tanda.
-$e = $db->estadoPartidoNarrado($id, $RIVAL);
+// Motor jugable: estadoPartido() trae la tanda en el mismo sondeo que las jugadas.
+$e = $db->estadoPartido($id, $RIVAL);
 $t = $e["tanda"] ?? null;
-if (!$t) { echo "fase=" . ($e["fase"] ?? "?") . " sin tanda\n"; exit; }
+if (!$t) { echo "fin=" . (!empty($e["fin"]) ? "si" : "no") . " sin tanda\n"; exit; }
 
-printf("fase=%s  tanda %d-%d  acabada=%s\n",
-    $e["fase"], $t["marcador"][0], $t["marcador"][1], $t["acabada"] ? "SI" : "no");
+printf("fin=%s  tanda %d-%d  acabada=%s\n",
+    !empty($e["fin"]) ? "si" : "no", $t["marcador"][0], $t["marcador"][1],
+    $t["acabada"] ? "SI" : "no");
 if (!empty($t["tiro"])) {
     printf("  tiro abierto: ronda %d, %s, ya_elegi=%s, quedan %ds\n",
         $t["tiro"]["ronda"], $t["tiro"]["tiro_yo"] ? "TIRA el rival" : "PARA el rival",

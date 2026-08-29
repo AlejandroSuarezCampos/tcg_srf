@@ -7003,7 +7003,7 @@ class Tcg
 		if (count($candidatos) === 1) return $candidatos[0];
 
 		/* Elección DETERMINISTA, nunca mt_rand(): el navegador manda solo qué
-		   opción eligió, y resolverMinijuegoDuelo() vuelve a preguntar por este
+		   opción eligió, y el servidor vuelve a preguntar por este
 		   camino qué minijuego era. Si aquí hubiera azar real, el servidor
 		   podría recalcular una entrada distinta a la que se jugó.
 		   Sal propia (3313) para no correlacionar QUÉ minijuego sale con el dato
@@ -7199,8 +7199,8 @@ class Tcg
 	 * ¿El dato oculto lo pone el equipo CONTRARIO al del evento?
 	 *
 	 * Fuente única de verdad para saber de qué alineación hay que sacar las
-	 * cartas. La usan resolverMinijuegoDuelo() (para calcular el dato) y
-	 * narracionDuelo() (para calcular la pista), y tienen que coincidir: si una
+	 * cartas. La usan quien calcula el dato oculto y narracionDuelo() (para
+	 * calcular la pista), y tienen que coincidir: si una
 	 * mirase la alineación equivocada, la pista hablaría de una carta y el
 	 * sorteo saldría de otra.
 	 *
@@ -7391,10 +7391,10 @@ class Tcg
 	 * las candidatas que sobren, para no perder una decisión por un reparto
 	 * desafortunado de los eventos.
 	 *
-	 * DETERMINISTA de principio a fin, y no es un detalle: resolverMinijuegoDuelo()
-	 * vuelve a llamar a narracionDuelo() para recalcular qué se jugó, así que con
-	 * azar real aquí el servidor podría elegir una jugada distinta a la que el
-	 * jugador tenía delante.
+	 * DETERMINISTA de principio a fin, y no es un detalle: al resolver una
+	 * jugada se vuelve a llamar a narracionDuelo() para recalcular qué se jugó,
+	 * así que con azar real aquí el servidor podría elegir una jugada distinta
+	 * a la que el jugador tenía delante.
 	 *
 	 * @param array $candidatas  [["i"=>indice, "minuto"=>int, "mueve"=>bool], ...]
 	 * @return array             [indice_de_evento => true]
@@ -7680,12 +7680,11 @@ class Tcg
 		   hay nadie a quien aplicarle la opción segura, y sin jugarla no mueve el
 		   marcador. El resultado es el que la simulación dejó escrito.
 
-		   (`partido_pausado_en` lo pone `pausarPartido()`, llamada solo desde
-		   `estadoPartidoNarrado()` — el motor jugable nunca la toca. PERO ese
-		   modal narrado sigue vivo hasta la Task 17 y `duelo.php` lo sigue
-		   pintando SIEMPRE, jugable o no: si alguien lo abrió antes de irse, esta
-		   rama puede disparar sobre un duelo con `partido_jugadas`. Mismo motivo
-		   que la rama de arriba: hay que sincronizar antes de forzar el cierre.) */
+		   (`partido_pausado_en` lo ponía `pausarPartido()`, del motor narrado que
+		   la Task 17 retiró; el motor jugable nunca la toca. La columna sigue
+		   existiendo y puede venir con valor de duelos viejos, así que esta rama
+		   todavía puede disparar sobre un duelo con `partido_jugadas`. Mismo
+		   motivo que la rama de arriba: hay que sincronizar antes de cerrar.) */
 		if ($duelo["partido_pausado_en"]) {
 			if (time() - strtotime($duelo["partido_pausado_en"]) < $abandono) return false;
 			// Abandonado: se fuerza también la tanda, si la hubiera.
@@ -8327,195 +8326,6 @@ class Tcg
 	}
 
 	/**
-	 * Quién juega el minijuego de cada evento, visto desde fuera de los dos
-	 * jugadores. Devuelve [id_evento => id_usuario].
-	 *
-	 * Hace falta mirar el duelo desde los DOS lados porque narracionDuelo()
-	 * razona en primera persona: una ocasión es "ataque mío" para uno y
-	 * "ocasión del rival" para el otro, y el minijuego solo se le ofrece a
-	 * quien defiende. Las dos lecturas nunca se contradicen —cada evento tiene
-	 * un único defensor— así que juntarlas es seguro.
-	 */
-	private function duenosDeMinijuego($id_duelo, $idCreador, $idRival) {
-		$duenos = [];
-		$idBot = $this->idBot();
-		foreach ([$idCreador, $idRival] as $quien) {
-			/* ⚠️ EL CPU NO JUEGA MINIJUEGOS, y esto no es un detalle de comodidad.
-			   Un minijuego con dueño detiene el partido hasta que lo resuelven o
-			   vence el plazo, así que darle decisiones al bot —que no tiene
-			   pantalla— pausaría TU partido de cadena nueve segundos por cada una,
-			   varias veces, y el jugador solo vería el reloj parado sin nada que
-			   hacer. Sus jugadas se narran igual; lo que no pasa es que esperen. */
-			if ((int) $quien === $idBot) continue;
-
-			$n = $this->narracionDuelo($id_duelo, $quien);
-			if (empty($n["ok"])) continue;
-			foreach ($n["eventos"] as $e) {
-				if (!empty($e["interactivo"]) && !empty($e["minijuego"])) {
-					$duenos[$e["id"]] = $quien;
-				}
-			}
-		}
-		return $duenos;
-	}
-
-	/**
-	 * EL SONDEO DEL PARTIDO NARRADO (sistema antiguo, previo al bucle de
-	 * jugadas). Devuelve en qué minuto va el partido, qué se ha narrado hasta
-	 * ahí y si hay un minijuego esperando decisión.
-	 *
-	 * Todo se evalúa aquí, en diferido: arrancar el reloj, pausarlo al llegar a
-	 * un minijuego, resolver por fallback al que no contesta y reanudar. No hay
-	 * nada corriendo de fondo entre sondeo y sondeo.
-	 *
-	 * ⚠️ RENOMBRADO de `estadoPartido()` a `estadoPartidoNarrado()` en la Task 7
-	 * del motor de partido jugable: ese nombre lo reclama el método NUEVO (el
-	 * del bucle de jugadas persistido, más abajo en esta clase), y las dos
-	 * cosas no pueden llamarse igual. Este sistema —narración generada de
-	 * antemano por `generarEventosPartido()`— es el que la Task 17 del mismo
-	 * plan retira por completo; hasta entonces sigue vivo con este nombre.
-	 */
-	public function estadoPartidoNarrado($id_duelo, $id_usuario) {
-		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
-		if (!$duelo) return ["ok" => false, "error" => "Ese duelo no existe o no es tuyo."];
-		if (!in_array($duelo["estado"], self::ESTADOS_CON_PARTIDO, true)) {
-			return ["ok" => false, "error" => "Ese partido todavía no se ha jugado."];
-		}
-
-		$this->latirPartido($id_duelo, $id_usuario);
-		$duelo = $this->arrancarPartidoSiToca($this->obtenerDuelo($id_duelo, $id_usuario));
-
-		$narracion = $this->narracionDuelo($id_duelo, $id_usuario);
-		if (empty($narracion["ok"])) return $narracion;
-
-		if (!$duelo["partido_inicio"]) {
-			// `decidido` va también aquí, aunque en esta fase el cliente no lo
-			// mire: una respuesta que cambia de forma según la fase es una trampa
-			// esperando a que alguien lea la clave en el sitio equivocado.
-			return ["ok" => true, "fase" => "esperando", "minuto" => 0, "eventos" => [],
-			        "nombres" => $narracion["nombres"], "marcador" => [0, 0],
-			        "decidido" => $duelo["estado"] === "resuelto",
-			        "por_tanda" => (bool) ($duelo["resuelto_por_tanda"] ?? 0)];
-		}
-
-		$duracion = max(10, (int) $this->config("partido_duracion_seg", 75));
-		$minutos  = (int) $narracion["minutos"];
-		$avance   = min(1.0, self::segundosDePartido($duelo) / $duracion);
-		$minutoActual = $avance * $minutos;
-
-		$resueltos = $this->minijuegosResueltos($id_duelo);
-		$duenos    = $this->duenosDeMinijuego($id_duelo, (int) $duelo["id_creador"], (int) $duelo["id_rival"]);
-
-		/* ¿Hay un minijuego que ya toca y que nadie ha resuelto? El partido se
-		   detiene AHÍ, aunque el reloj de pared siga corriendo: el minuto no
-		   avanza mientras partido_pausado_en esté puesto. */
-		$pendiente = null;
-		foreach ($narracion["eventos"] as $e) {
-			if (empty($duenos[$e["id"]])) continue;
-			if ($e["minuto"] > $minutoActual) break;
-			if (isset($resueltos[$e["id"] . ":" . $duenos[$e["id"]]])) continue;
-			$pendiente = $e;
-			break;
-		}
-
-		if ($pendiente) {
-			$this->pausarPartido($id_duelo);
-			$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
-
-			$plazo = (int) ($pendiente["minijuego"]["plazo"] ?? 9);
-			$parado = $duelo["partido_pausado_en"] ? time() - strtotime($duelo["partido_pausado_en"]) : 0;
-
-			// Se acabó el plazo: decide el sistema por quien no contestó, con la
-			// opción SEGURA (§1.5 regla 4), y el partido sigue para los dos.
-			if ($parado >= $plazo) {
-				$this->resolverMinijuegoDuelo($id_duelo, $duenos[$pendiente["id"]], (int) $pendiente["id"], "");
-				$this->reanudarPartido($id_duelo);
-				$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
-				$pendiente = null;
-			}
-		}
-
-		// El minuto se recalcula tras haber podido pausar/reanudar arriba.
-		$avance = min(1.0, self::segundosDePartido($duelo) / $duracion);
-		$minutoActual = $avance * $minutos;
-
-		/* FINAL DEL PARTIDO — aquí se decide el duelo.
-		   El marcador que hay guardado en este momento ES el resultado: lo puso
-		   la simulación y lo movieron las decisiones de los dos jugadores. Se
-		   determina el ganador y se entrega el bote. Lo piden los DOS jugadores
-		   en cada sondeo; que se pague una sola vez lo garantiza el WHERE de
-		   liquidarPartido().
-
-		   Si el partido acabó EMPATADO no se liquida todavía: la tanda se juega
-		   (§15.11), así que el duelo se queda en `en_juego` con la tanda abierta y
-		   liquidarPartido() no encuentra ganador hasta que termine. */
-		/* ⚠️ `!$pendiente` NO ES OPCIONAL: las fases tienen que ser excluyentes.
-		   Sin esa condición el sondeo podía anunciar la tanda Y una decisión
-		   pendiente a la vez, y eso es un estado del que no se sale: la decisión
-		   pausa el partido, `cerrarPartidoSiToca()` se niega a cerrar mientras
-		   está pausado, y el duelo se queda con el bote dentro mientras el cliente
-		   pinta penaltis. Lo cazó la prueba de 300 duelos, con 74 colgados.
-
-		   Y el orden correcto es este: una decisión pendiente todavía puede mover
-		   el marcador y deshacer el empate, así que hasta que no se resuelva no se
-		   sabe siquiera si hay tanda que jugar. */
-		$tanda = null;
-		if ($avance >= 1 && !$pendiente) {
-			$empatado = (int) $duelo["goles_creador"] === (int) $duelo["goles_rival"];
-			// cerrarPartidoSiToca() ya empuja la tanda cuando hay empate, así que
-			// no hace falta llamarla aquí aparte: solo leer cómo quedó.
-			$this->cerrarPartidoSiToca($id_duelo);
-			$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
-			if ($empatado) $tanda = $this->tandaParaCliente($id_duelo, $id_usuario);
-		}
-
-		$hasta = [];
-		foreach ($narracion["eventos"] as $e) {
-			if ($e["minuto"] > $minutoActual) break;
-			$hasta[] = $e;
-		}
-		$ultimo = end($hasta) ?: null;
-
-		$mio = $pendiente && (int) $duenos[$pendiente["id"]] === (int) $id_usuario;
-
-		/* La TANDA es una fase propia entre el final del partido y el resultado.
-		   No es "final": el duelo todavía no está decidido y el cliente no debe
-		   irse a buscar la pantalla de resultado, que aún no existe. */
-		$enTanda = $tanda !== null && empty($tanda["acabada"]);
-
-		return [
-			"ok"        => true,
-			"fase"      => $pendiente ? "minijuego"
-			             : ($enTanda ? "tanda"
-			             : ($avance >= 1 ? "final" : "jugando")),
-			"tanda"     => $tanda,
-			"minuto"    => (int) floor($minutoActual),
-			"minutos"   => $minutos,
-			"avance"    => round($avance, 4),
-			"eventos"   => $hasta,
-			"marcador"  => $ultimo ? $ultimo["marcador"] : [0, 0],
-			"stats"     => $narracion["stats"],
-			"nombres"   => $narracion["nombres"],
-			// Solo se manda el minijuego a quien le toca defender; al otro se le
-			// dice que espere, para que vea por qué se ha parado el partido.
-			"minijuego" => ($pendiente && $mio) ? $pendiente["minijuego"] + ["id_evento" => $pendiente["id"]] : null,
-			"esperando_rival" => (bool) ($pendiente && !$mio),
-			/* Si el duelo ya está decidido. La pantalla de resultado se renderiza
-			   en el servidor y se pintó ANTES de que el partido acabara, cuando
-			   todavía no había ganador: con esto el cliente sabe que al terminar
-			   tiene que ir a por ella en vez de destapar una pantalla en blanco.
-			   Ver el final de assets/js/duelo.js. */
-			"decidido"  => $duelo["estado"] === "resuelto",
-			"por_tanda" => (bool) ($duelo["resuelto_por_tanda"] ?? 0),
-			/* Puntuación de actuación (§4.6 y §6.4): independiente de ganar o
-			   perder. Es lo que hace que una jugada siga importando cuando el
-			   marcador ya no puede moverse, y lo que da algo que optimizar a
-			   quien pierde. Se deriva de lo guardado, no se acumula aparte. */
-			"actuacion" => $this->actuacionDuelo($id_duelo, $id_usuario),
-		];
-	}
-
-	/**
 	 * EL VEREDICTO DEL PARTIDO  (§1.5 regla 7 y §6.1)
 	 *
 	 * "Incluso una derrota debe generar su propio resumen narrado con algún
@@ -8660,122 +8470,6 @@ class Tcg
 		$stmt->execute([":d" => $id_duelo, ":u" => $id_usuario]);
 		$f = $stmt->fetch(PDO::FETCH_ASSOC);
 		return ["jugados" => (int) $f["jugados"], "aciertos" => (int) $f["aciertos"]];
-	}
-
-	/**
-	 * Resuelve un minijuego y lo deja escrito. Es la única vía: el resultado
-	 * tiene que ser el mismo para los dos jugadores y sobrevivir al sondeo, así
-	 * que no puede vivir en la sesión de nadie.
-	 */
-	public function resolverMinijuegoDuelo($id_duelo, $id_usuario, $id_evento, $opcion) {
-		$narracion = $this->narracionDuelo($id_duelo, $id_usuario);
-		if (empty($narracion["ok"])) return $narracion;
-
-		$evento = null;
-		foreach ($narracion["eventos"] as $e) {
-			if ((int) $e["id"] === (int) $id_evento) { $evento = $e; break; }
-		}
-		if (!$evento || empty($evento["interactivo"]) || empty($evento["minijuego"])) {
-			return ["ok" => false, "error" => "Esa jugada no admite decisión."];
-		}
-
-		$catalogo  = self::catalogoMinijuegos();
-		$minijuego = $catalogo[$evento["minijuego"]["clave"]] ?? null;
-		if (!$minijuego) return ["ok" => false, "error" => "Minijuego desconocido."];
-
-		if ($opcion === "" || $opcion === null) $opcion = self::opcionSegura($minijuego);
-
-		$duelo = $this->obtenerDuelo($id_duelo, $id_usuario);
-
-		/* De qué alineación sale el dato oculto depende de qué se adivina: el
-		   REMATE lo elige quien ataca; el ESTILO DEL PORTERO y la COLOCACIÓN DE
-		   LA DEFENSA, quien defiende. */
-		$idAtacante = $evento["lado"] === "local" ? (int) $duelo["id_creador"] : (int) $duelo["id_rival"];
-		$idDefensor = $evento["lado"] === "local" ? (int) $duelo["id_rival"]   : (int) $duelo["id_creador"];
-		$cartas = $this->listarAlineacionDuelo(
-			$id_duelo,
-			self::datoOcultoLoPoneElDefensor($minijuego) ? $idDefensor : $idAtacante
-		);
-
-		$remate    = self::ocultoDeJugada($minijuego, $evento, $cartas, (float) $duelo["valor_sorteo"]);
-		$resultado = self::resolverMinijuego($minijuego, $opcion, $remate);
-
-		/* INSERT IGNORE es la defensa contra resolver dos veces la misma jugada:
-		   la clave primaria (duelo, evento, usuario) lo impide en la propia base
-		   de datos. Antes esto se guardaba en $_SESSION, que ni servía para dos
-		   jugadores ni sobrevivía a un cambio de pestaña. */
-		$stmt = $this->pdo->prepare("
-			INSERT IGNORE INTO duelo_minijuegos
-				(id_duelo, id_evento, id_usuario, minijuego, opcion, resultado)
-			VALUES (:d, :e, :u, :m, :o, :r)
-		");
-		$stmt->execute([
-			":d" => $id_duelo, ":e" => $id_evento, ":u" => $id_usuario,
-			":m" => $evento["minijuego"]["clave"], ":o" => $opcion, ":r" => $resultado,
-		]);
-		if ($stmt->rowCount() === 0) {
-			return ["ok" => false, "error" => "Esa jugada ya estaba resuelta."];
-		}
-
-		$parado = false;
-		/* El marcador solo se mueve si la ENTRADA lo declara (impacto "jugada").
-		   Una decisión disciplinaria o una defensa sobre una jugada que no era
-		   gol no tiene ningún gol que quitar ni que sumar: cuenta para la
-		   puntuación de actuación (§4.6) y ahí se queda. Hasta ahora esta clave
-		   no la leía nadie y el marcador se movía por `lado` a secas. */
-		/* ¿Podía esta jugada mover el marcador? Viaja al cliente porque sin ese
-		   dato no puede explicar un acierto que no acabó en gol: distinguir "lo
-		   hiciste bien y no entró" de "esto solo contaba para la actuación". */
-		$podiaMover = ($minijuego["impacto"] ?? "jugada") === "jugada"
-			&& (($minijuego["lado"] ?? "defiendo") === "defiendo"
-				? $evento["tipo"] === "gol"
-				: $evento["tipo"] !== "gol");
-
-		if ($resultado === "acierto" && ($minijuego["impacto"] ?? "jugada") === "jugada") {
-			/* EL ACIERTO SUBE LA PROBABILIDAD, NO REGALA EL GOL. Decisión de
-			   Alejandro: "si ganas un minijuego en un punto decisivo que sea
-			   ocasión de gol". Así puedes leerle la intención y que se te vaya al
-			   palo, como en el fútbol — y el minijuego sigue sin poder empeorarte
-			   la jugada, porque fallar deja las cosas como estaban.
-
-			   El sorteo es DETERMINISTA por (duelo, evento): resolverMinijuegoDuelo
-			   se puede reintentar y el sondeo repite, así que con azar real el
-			   mismo acierto podría entrar una vez y no la siguiente. Sal propia
-			   (8663) para no correlacionar con qué minijuego salió ni con el dato
-			   oculto. */
-			$probGol = (float) $this->config("partido_minijuego_prob_gol", 0.70);
-			$entra = self::azarDeJugada((float) $duelo["valor_sorteo"], (int) $id_evento, 8663) < $probGol;
-
-			/* Defendiendo se le quita un gol al rival; atacando me sumo uno. El
-			   TOPE va como parámetro y lo aplica el SQL: sin él, el presupuesto no
-			   lo hacía cumplir nadie desde que se retiró la §1.3. */
-			$tope = (int) ($narracion["tope_marcador"] ?? 0);
-			$parado = $entra && (($minijuego["lado"] ?? "defiendo") === "defiendo"
-				? ($evento["tipo"] === "gol" && $this->descontarGolRival($id_duelo, $id_usuario, $tope))
-				: ($evento["tipo"] !== "gol" && $this->sumarGolPropio($id_duelo, $id_usuario, $tope)));
-			if ($parado) {
-				$this->pdo->prepare("
-					UPDATE duelo_minijuegos SET aplicado = 1
-					WHERE id_duelo = :d AND id_evento = :e AND id_usuario = :u
-				")->execute([":d" => $id_duelo, ":e" => $id_evento, ":u" => $id_usuario]);
-			}
-		}
-
-		// Resuelta la jugada, el partido sigue para los dos.
-		$this->reanudarPartido($id_duelo);
-
-		$refrescado = $this->obtenerDuelo($id_duelo, $id_usuario);
-		$soyCreador = (int) $refrescado["id_creador"] === (int) $id_usuario;
-
-		return [
-			"ok" => true, "resultado" => $resultado, "remate" => $remate, "parado" => $parado,
-			// Para que el cliente pueda contar un acierto que no acabó en gol sin
-			// confundirlo con una decisión que solo sumaba a la actuación.
-			"podia_mover" => $podiaMover,
-			"marcador" => $soyCreador
-				? [(int) $refrescado["goles_creador"], (int) $refrescado["goles_rival"]]
-				: [(int) $refrescado["goles_rival"], (int) $refrescado["goles_creador"]],
-		];
 	}
 
 	/**
@@ -9056,7 +8750,7 @@ class Tcg
 		   tanda, donde un acierto rompió un 1-1 con el presupuesto a 0.
 
 		   Se devuelve el tope INICIAL —con los efectos de `impacto: partido` ya
-		   sumados, ver abajo— para que resolverMinijuegoDuelo() se lo pase al SQL
+		   sumados, ver abajo— para que quien resuelve la jugada se lo pase al SQL
 		   y haya UN SOLO sitio que lo calcula. */
 		$topeMarcador = 0;   // se fija más abajo, tras los efectos de partido
 
@@ -9148,7 +8842,7 @@ class Tcg
 		   La lista de eventos ya está completa aquí, así que en vez de ir
 		   cogiendo las primeras se ELIGE repartiendo por ventanas iguales del
 		   encuentro. Sigue siendo función pura de la lista y del sorteo del
-		   duelo, que es obligatorio: resolverMinijuegoDuelo() vuelve a pasar por
+		   duelo, que es obligatorio: al resolver una jugada se vuelve a pasar por
 		   aquí para recalcular qué minijuego se jugó, y si esto tuviera azar real
 		   podría recalcular otro distinto.
 		   --------------------------------------------------------------- */

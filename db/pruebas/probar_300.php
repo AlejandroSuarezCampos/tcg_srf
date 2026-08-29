@@ -71,7 +71,7 @@ $copias9Antes = (int) $uno("SELECT COUNT(*) FROM coleccion WHERE id_usuario = 9"
 
 $resumen = [
     "liquidados" => 0, "conCarta" => 0, "tandas" => 0, "gana9" => 0, "gana2" => 0,
-    "decisiones" => 0, "aciertos" => 0, "movieron" => 0, "marcadorCambiado" => 0,
+    "decisiones" => 0, "jugadasResueltas" => 0,
     "golesTotales" => 0, "empatesEnElCampo" => 0, "cartasTraspasadas" => 0, "tirosTanda" => 0,
 ];
 $margenes = [];
@@ -104,18 +104,23 @@ for ($n = 0; $n < TOTAL; $n++) {
         if (in_array($par["mia"], array_map("intval", $apostables), true)) $retencionMal++;
     }
 
-    $antes = $p->query("SELECT goles_creador, goles_rival FROM duelos WHERE id_duelo = $id")
-               ->fetch(PDO::FETCH_ASSOC);
+    /* Se juega el partido entero por el CAMINO REAL DEL MOTOR JUGABLE, el mismo
+       que recorre `assets/ajax/duelo_estado.php` en cada sondeo: abrir la jugada
+       siguiente (o cerrar el partido si ya no queda ninguna), mirar el estado y
+       jugar lo que toque. Nada se ataja escribiendo desenlaces a mano.
 
-    $p->prepare("UPDATE duelos SET partido_inicio = NOW() - INTERVAL 600 SECOND,
-                 partido_pausado_en = NULL WHERE id_duelo = :d")->execute([":d" => $id]);
-
-    /* Se juega el partido entero, resolviendo lo que salga por el camino real —
-       y AHORA TAMBIÉN LA TANDA, que es una fase más del sondeo. Sin esto los
+       Y TAMBIÉN LA TANDA, que viaja en el mismo `estadoPartido()`. Sin ella los
        duelos que acaban empatados se quedan en `en_juego` con el bote retenido:
-       lo detectó esta misma prueba al añadir la tanda jugable (73 de 300). */
-    for ($i = 0; $i < 200; $i++) {
-        $e = $db->estadoPartidoNarrado($id, 9);
+       lo detectó esta misma prueba al añadir la tanda jugable (73 de 300).
+
+       El motor narrado viejo —`estadoPartidoNarrado()` y `resolverMinijuegoDuelo()`—
+       se retiró en la Task 17; este bucle es su sustituto. */
+    for ($i = 0; $i < 400; $i++) {
+        // Lo que hace el sondeo ANTES de mirar. `cerrarPartidoJugable()` es
+        // idempotente y no hace nada mientras queden jugadas.
+        if (empty($db->abrirJugada($id)["jugada"])) $db->cerrarPartidoJugable($id);
+
+        $e = $db->estadoPartido($id, 9);
         if (empty($e["ok"])) break;
 
         // --- LA TANDA ---
@@ -139,24 +144,43 @@ for ($n = 0; $n < TOTAL; $n++) {
             continue;
         }
 
-        $quien = null; $mj = null;
-        if (!empty($e["minijuego"]))            { $quien = 9; $mj = $e["minijuego"]; }
-        elseif (!empty($e["esperando_rival"]))  {
-            $e2 = $db->estadoPartidoNarrado($id, 2);
-            if (!empty($e2["minijuego"])) { $quien = 2; $mj = $e2["minijuego"]; }
-        }
-        if ($mj) {
-            $ops = array_column($mj["opciones"], "clave");
-            $op = $ops[($n + $i) % max(1, count($ops))] ?? "";
-            $res = $db->resolverMinijuegoDuelo($id, $quien, (int) $mj["id_evento"], $op);
-            if (!empty($res["ok"])) {
-                $resumen["decisiones"]++;
-                if (($res["resultado"] ?? "") === "acierto") $resumen["aciertos"]++;
-                if (!empty($res["parado"])) $resumen["movieron"]++;
+        if (!empty($e["tanda"]["acabada"])) break;
+        if (!empty($e["fin"])) break;
+        if (empty($e["jugada"])) continue;
+
+        /* LOS DOS LADOS DE LA JUGADA. Una jugada no se resuelve hasta que han
+           ejecutado atacante y defensor, así que hay que jugar por los dos: si
+           solo contestara el 9, el partido se quedaría parado hasta el plazo. */
+        foreach ([9, 2] as $quien) {
+            $v = $db->estadoPartido($id, $quien);
+            $j = $v["jugada"] ?? null;
+            if (!$j) continue;
+            $num = (int) $j["numero"];
+
+            // 1) El poseedor elige acción; eso es lo que reparte los minijuegos.
+            if (!empty($v["decido_yo"]) && !empty($v["acciones"])) {
+                $claves = array_keys($v["acciones"]);
+                $db->decidirAccion($id, $quien, $num, $claves[($n + $i) % count($claves)]);
+                $v = $db->estadoPartido($id, $quien);
+                $j = $v["jugada"] ?? null;
+                if (!$j) continue;
             }
-            continue;
+
+            // 2) Ejecutar. Se varía la opción para que haya aciertos y fallos.
+            if (empty($j["ya_jugue"]) && !empty($j["minijuego"])) {
+                $mj = Partido::catalogo()[$j["minijuego"]] ?? null;
+                $carga = [];
+                if ($mj && $mj["tipo"] === "lectura") {
+                    $ops = array_column($mj["opciones"], "clave");
+                    if ($ops) $carga["opcion"] = $ops[($n + $i + $quien) % count($ops)];
+                }
+                $res = $db->registrarEjecucion($id, $quien, $num, $carga);
+                if (!empty($res["ok"])) {
+                    $resumen["decisiones"]++;
+                    if (!empty($res["resuelta"])) $resumen["jugadasResueltas"]++;
+                }
+            }
         }
-        if (($e["fase"] ?? "") === "final") break;
     }
 
     $d = $p->query("SELECT estado, id_ganador, goles_creador, goles_rival, resuelto_por_tanda,
@@ -171,7 +195,6 @@ for ($n = 0; $n < TOTAL; $n++) {
     if ((int) $d["id_ganador"] === 9) $resumen["gana9"]++; else $resumen["gana2"]++;
     if ($d["resuelto_por_tanda"]) $resumen["tandas"]++;
     if ($gc === $gr) $resumen["empatesEnElCampo"]++;
-    if ($antes["goles_creador"] != $gc || $antes["goles_rival"] != $gr) $resumen["marcadorCambiado"]++;
 
     // El ganador tiene que salir del marcador, o la tanda tiene que explicarlo.
     $porMarcador = $gc > $gr ? 9 : ($gr > $gc ? 2 : null);
@@ -265,15 +288,19 @@ $autos === 0
     : $ko("$autos penaltis los decidio el plazo (la prueba deberia contestarlos todos)");
 $resumen["tandas"] > 0 ? $ok("hubo tandas que jugar") : $ko("ninguna tanda: no se ha probado nada");
 
-echo "\n=== LOS MINIJUEGOS, QUE ERA EL PUNTO DE TODO ESTO ===\n";
-printf("        %d decisiones jugadas (%.2f por duelo), %d aciertos (%.1f %%)\n",
+echo "\n=== LAS JUGADAS, QUE ERA EL PUNTO DE TODO ESTO ===\n";
+printf("        %d ejecuciones jugadas (%.2f por duelo), %d jugadas resueltas (%.2f por duelo)\n",
     $resumen["decisiones"], $resumen["decisiones"] / max(1, $resumen["liquidados"]),
-    $resumen["aciertos"], 100 * $resumen["aciertos"] / max(1, $resumen["decisiones"]));
-printf("        %d aciertos movieron el marcador; %d duelos (%.1f %%) acabaron con un marcador\n",
-    $resumen["movieron"], $resumen["marcadorCambiado"],
-    100 * $resumen["marcadorCambiado"] / max(1, $resumen["liquidados"]));
-echo "        distinto al que salio de la simulacion\n";
-$resumen["movieron"] > 0 ? $ok("los minijuegos mueven el resultado de verdad") : $ko("ningun minijuego movio nada");
+    $resumen["jugadasResueltas"], $resumen["jugadasResueltas"] / max(1, $resumen["liquidados"]));
+/* En el motor jugable el marcador ES la cuenta de jugadas ganadas: no hay
+   resultado escrito de antemano al que estas decisiones tengan que ganarle.
+   Que haya goles ya prueba que lo que se juega decide el partido. */
+$resumen["jugadasResueltas"] > 0
+    ? $ok("las jugadas se resolvieron por el bucle real, no por el plazo")
+    : $ko("ninguna jugada se resolvio: no se ha probado nada");
+$resumen["golesTotales"] > 0
+    ? $ok("las jugadas ganadas construyen el marcador")
+    : $ko("ningun gol en " . TOTAL . " duelos");
 
 echo "\n=== BALANCE (dato, no comprobacion) ===\n";
 printf("        Claude gana %.1f %%, LuluLulez %.1f %%\n",
