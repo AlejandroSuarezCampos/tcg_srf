@@ -12,8 +12,15 @@
  *   false → SIMULA. Calcula y devuelve exactamente lo que haría, sin tocar
  *           nada. Es el modo por defecto en los dos frentes, a propósito.
  *   true  → lo hace.
+ *
+ * ⚠️ SIN GUARDIA CLI A PROPÓSITO: a diferencia de los demás archivos de esta
+ * carpeta, este es una LIBRERÍA que también carga `assets/ajax/mantenimiento.php`
+ * bajo Apache — un `if (PHP_SAPI !== "cli")` aquí tumbaría el panel de
+ * mantenimiento con un 404 antes de llegar siquiera a comprobar quién pregunta.
+ * Su protección contra el acceso directo por navegador es `db/.htaccess`
+ * (`Require all denied` sobre toda la carpeta), la misma que ya protegía a
+ * este archivo antes de que existieran los guiones de consola.
  */
-if (PHP_SAPI !== "cli") { http_response_code(404); exit; }
 
 require_once __DIR__ . '/../../partials/subida_imagen.php';   // convertirAWebp()
 
